@@ -1,0 +1,51 @@
+{
+  "name": "portafolio-page",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint",
+    "typecheck": "tsc --noEmit",
+    "db:push": "dotenv -e .env.local -- drizzle-kit push",
+    "db:generate": "dotenv -e .env.local -- drizzle-kit generate",
+    "db:studio": "dotenv -e .env.local -- drizzle-kit studio",
+    "db:seed": "dotenv -e .env.local -- tsx scripts/seed.ts",
+    "demo:seed": "dotenv -e .env.local -- tsx scripts/demo-data.ts seed",
+    "demo:clear": "dotenv -e .env.local -- tsx scripts/demo-data.ts clear",
+    "analytics:reset": "dotenv -e .env.local -- tsx scripts/reset-analytics.ts",
+    "analytics:check": "dotenv -e .env.local -- tsx scripts/verify.ts"
+  },
+  "dependencies": {
+    "@dnd-kit/core": "^6.3.1",
+    "@dnd-kit/sortable": "^10.0.0",
+    "@dnd-kit/utilities": "^3.2.2",
+    "@neondatabase/serverless": "^1.1.0",
+    "@vercel/blob": "^2.7.0",
+    "clsx": "^2.1.1",
+    "date-fns": "^4.4.0",
+    "drizzle-orm": "^0.45.2",
+    "jose": "^6.2.8",
+    "lucide-react": "^1.31.0",
+    "next": "16.3.0",
+    "react": "19.2.8",
+    "react-dom": "19.2.8",
+    "recharts": "^3.10.1",
+    "tailwind-merge": "^3.6.0",
+    "ua-parser-js": "^2.0.10"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4",
+    "@types/node": "^20",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "dotenv-cli": "^11.0.0",
+    "drizzle-kit": "^0.31.10",
+    "eslint": "^9",
+    "eslint-config-next": "16.3.0",
+    "tailwindcss": "^4",
+    "tsx": "^4.23.12",
+    "typescript": "^5"
+  }
+}
