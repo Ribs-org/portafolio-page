@@ -20,7 +20,13 @@ export function hexToRgbChannels(hex: string): string {
   return `${(int >> 16) & 255} ${(int >> 8) & 255} ${int & 255}`
 }
 
-/** Companion hue for the aurora, 45° around the wheel from the accent. */
+/**
+ * Companion hue for the aurora: the accent rotated 30° counter-clockwise.
+ *
+ * The direction matters. Rotating forward sends warm accents into yellow-green,
+ * which reads as swamp against a near-black page; rotating back keeps golds moving
+ * into amber, violets into blue, and pinks into magenta — analogous in every case.
+ */
 export function accentCompanion(hex: string): string {
   const [r, g, b] = hexToRgbChannels(hex).split(' ').map(Number) as [number, number, number]
   const [rn, gn, bn] = [r / 255, g / 255, b / 255]
@@ -36,7 +42,7 @@ export function accentCompanion(hex: string): string {
     else if (max === gn) h = (bn - rn) / d + 2
     else h = (rn - gn) / d + 4
   }
-  h = (h * 60 + 45 + 360) % 360
+  h = (h * 60 - 30 + 360) % 360
 
   const c = (1 - Math.abs(2 * l - 1)) * s
   const x = c * (1 - Math.abs(((h / 60) % 2) - 1))
