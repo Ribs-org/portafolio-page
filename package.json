@@ -8,6 +8,8 @@
     "start": "next start",
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
+    "setup": "tsx scripts/setup.ts",
+    "db:setup": "npm run db:push && npm run db:seed",
     "db:push": "dotenv -e .env.local -- drizzle-kit push",
     "db:generate": "dotenv -e .env.local -- drizzle-kit generate",
     "db:studio": "dotenv -e .env.local -- drizzle-kit studio",
