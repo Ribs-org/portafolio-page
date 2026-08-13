@@ -106,6 +106,76 @@ export function formatPercent(n: number, digits = 1): string {
   return `${n.toFixed(digits)}%`
 }
 
+/* ------------------------------------------------- scheduled link windows -- */
+
+/** Wall-clock fields of `date` as `timeZone` sees them. */
+function zonedParts(date: Date, timeZone: string) {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone,
+    hour12: false,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+  }).formatToParts(date)
+
+  const read = (type: string) => Number(parts.find((part) => part.type === type)?.value ?? '0')
+
+  return {
+    year: read('year'),
+    month: read('month'),
+    day: read('day'),
+    // Some ICU builds spell midnight as hour 24 when hour12 is off.
+    hour: read('hour') % 24,
+    minute: read('minute'),
+    second: read('second'),
+  }
+}
+
+/** Milliseconds `timeZone` runs ahead of UTC at that instant. */
+function zoneOffset(date: Date, timeZone: string): number {
+  const p = zonedParts(date, timeZone)
+  return Date.UTC(p.year, p.month - 1, p.day, p.hour, p.minute, p.second) - date.getTime()
+}
+
+const pad = (n: number) => String(n).padStart(2, '0')
+
+/**
+ * Renders an instant as a `datetime-local` value in `timeZone`.
+ *
+ * `toISOString().slice(0, 16)` looks like it does this, but it writes UTC into a
+ * field the browser reads as local time. Every save then reinterprets the value
+ * and shifts it by the offset again, so a scheduled link drifts an hour block
+ * per edit — and the toggle on each row re-saves the whole link.
+ */
+export function toZonedInput(date: Date | null, timeZone: string): string {
+  if (!date || Number.isNaN(date.getTime())) return ''
+  const p = zonedParts(date, timeZone)
+  return `${p.year}-${pad(p.month)}-${pad(p.day)}T${pad(p.hour)}:${pad(p.minute)}`
+}
+
+const LOCAL_DATETIME = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/
+
+/** The inverse: reads a `datetime-local` value as wall-clock time in `timeZone`. */
+export function fromZonedInput(value: string, timeZone: string): Date | null {
+  const trimmed = value.trim().slice(0, 16)
+  // Checked before parsing: V8's lenient parser reads `abc:00Z` as the year 2000
+  // rather than failing, which would silently schedule a link into the past.
+  if (!LOCAL_DATETIME.test(trimmed)) return null
+
+  // Treat the wall clock as if it were UTC, then subtract the zone's offset.
+  const asUtc = new Date(`${trimmed}:00Z`)
+  if (Number.isNaN(asUtc.getTime())) return null
+
+  const first = new Date(asUtc.getTime() - zoneOffset(asUtc, timeZone))
+  // One refinement settles a daylight-saving changeover, where the offset on
+  // either side of the guess differs.
+  const second = new Date(asUtc.getTime() - zoneOffset(first, timeZone))
+  return second
+}
+
 /** Normalises user input into a valid absolute URL. */
 export function normalizeUrl(raw: string): string {
   const trimmed = raw.trim()

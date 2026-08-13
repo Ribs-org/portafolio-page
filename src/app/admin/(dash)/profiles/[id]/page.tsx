@@ -4,16 +4,13 @@ import { notFound } from 'next/navigation'
 import { eq } from 'drizzle-orm'
 import { ArrowLeft, ExternalLink } from 'lucide-react'
 import { getDb, profiles } from '@/db'
+import { SITE_TIMEZONE } from '@/lib/analytics'
 import { getAllLinks } from '@/lib/profiles'
+import { toZonedInput } from '@/lib/utils'
 import { ProfileEditor } from './editor'
 import type { DraftLink } from './link-row'
 
 export const dynamic = 'force-dynamic'
-
-function toInputValue(date: Date | null): string {
-  if (!date) return ''
-  return date.toISOString().slice(0, 16)
-}
 
 export default async function EditProfilePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
@@ -31,8 +28,8 @@ export default async function EditProfilePage({ params }: { params: Promise<{ id
     icon: link.icon ?? '',
     imageUrl: link.imageUrl,
     isActive: link.isActive,
-    startsAt: toInputValue(link.startsAt),
-    endsAt: toInputValue(link.endsAt),
+    startsAt: toZonedInput(link.startsAt, SITE_TIMEZONE),
+    endsAt: toZonedInput(link.endsAt, SITE_TIMEZONE),
   }))
 
   const requestHeaders = await headers()

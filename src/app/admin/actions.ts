@@ -8,8 +8,9 @@ import { put } from '@vercel/blob'
 import { and, eq, max, ne, sql } from 'drizzle-orm'
 import { getDb, links, profiles } from '@/db'
 import { LINK_KINDS, type LinkKind } from '@/db/schema'
+import { SITE_TIMEZONE } from '@/lib/analytics'
 import { createSession, destroySession, isAuthenticated, passwordMatches } from '@/lib/auth'
-import { normalizeUrl, slugify } from '@/lib/utils'
+import { fromZonedInput, normalizeUrl, slugify } from '@/lib/utils'
 
 export type FormState = { error?: string; ok?: boolean }
 
@@ -164,8 +165,6 @@ export async function rotateSlug(profileId: string) {
 
 function readLinkForm(formData: FormData) {
   const kind = String(formData.get('kind') ?? 'standard')
-  const startsAt = String(formData.get('startsAt') ?? '')
-  const endsAt = String(formData.get('endsAt') ?? '')
 
   return {
     kind: (LINK_KINDS as readonly string[]).includes(kind) ? (kind as LinkKind) : 'standard',
@@ -175,8 +174,10 @@ function readLinkForm(formData: FormData) {
     icon: String(formData.get('icon') ?? '').trim() || null,
     imageUrl: String(formData.get('imageUrl') ?? '').trim() || null,
     isActive: formData.get('isActive') === 'on',
-    startsAt: startsAt ? new Date(startsAt) : null,
-    endsAt: endsAt ? new Date(endsAt) : null,
+    // Read in the same zone the editor rendered them in, so re-saving a link —
+    // which the row toggle does on every click — leaves the window untouched.
+    startsAt: fromZonedInput(String(formData.get('startsAt') ?? ''), SITE_TIMEZONE),
+    endsAt: fromZonedInput(String(formData.get('endsAt') ?? ''), SITE_TIMEZONE),
   }
 }
 
