@@ -21,10 +21,19 @@ type Credential = {
   handle: string | null
 }
 
+/**
+ * The only error type whose `.message` is allowed to reach the redirect: every throw
+ * site below writes its own fixed, human-authored Spanish sentence, never a fragment
+ * of an upstream response or a driver error. Anything else caught in the handler
+ * (a non-JSON body breaking `.json()`, a DB write failure) is not an `OAuthError` and
+ * falls back to a generic message instead.
+ */
+class OAuthError extends Error {}
+
 async function instagramCredential(code: string, redirectUri: string): Promise<Credential> {
   const appId = env('INSTAGRAM_APP_ID')
   const appSecret = env('INSTAGRAM_APP_SECRET')
-  if (!appId || !appSecret) throw new Error('Faltan las credenciales de Instagram')
+  if (!appId || !appSecret) throw new OAuthError('Faltan las credenciales de Instagram')
 
   const short = await fetch('https://api.instagram.com/oauth/access_token', {
     method: 'POST',
@@ -36,16 +45,17 @@ async function instagramCredential(code: string, redirectUri: string): Promise<C
       code,
     }),
   })
-  if (!short.ok) throw new Error(`Instagram rechazó el código: ${short.status}`)
+  if (!short.ok) throw new OAuthError(`Instagram rechazó el código: ${short.status}`)
   const shortData = (await short.json()) as { access_token?: string; user_id?: number }
-  if (!shortData.access_token) throw new Error('Instagram no devolvió token')
+  if (!shortData.access_token) throw new OAuthError('Instagram no devolvió token')
 
   // The short-lived token lasts an hour; only the long-lived one is worth storing.
-  const long = await fetch(
-    `https://graph.instagram.com/access_token?grant_type=ig_exchange_token` +
-      `&client_secret=${appSecret}&access_token=${shortData.access_token}`,
-  )
-  if (!long.ok) throw new Error(`Instagram no canjeó el token largo: ${long.status}`)
+  const longUrl = new URL('https://graph.instagram.com/access_token')
+  longUrl.searchParams.set('grant_type', 'ig_exchange_token')
+  longUrl.searchParams.set('client_secret', appSecret)
+  longUrl.searchParams.set('access_token', shortData.access_token)
+  const long = await fetch(longUrl)
+  if (!long.ok) throw new OAuthError(`Instagram no canjeó el token largo: ${long.status}`)
   const longData = (await long.json()) as { access_token?: string; expires_in?: number }
 
   const token = longData.access_token ?? shortData.access_token
@@ -65,7 +75,7 @@ async function instagramCredential(code: string, redirectUri: string): Promise<C
 async function tiktokCredential(code: string, redirectUri: string): Promise<Credential> {
   const clientKey = env('TIKTOK_CLIENT_KEY')
   const clientSecret = env('TIKTOK_CLIENT_SECRET')
-  if (!clientKey || !clientSecret) throw new Error('Faltan las credenciales de TikTok')
+  if (!clientKey || !clientSecret) throw new OAuthError('Faltan las credenciales de TikTok')
 
   const response = await fetch('https://open.tiktokapis.com/v2/oauth/token/', {
     method: 'POST',
@@ -78,7 +88,7 @@ async function tiktokCredential(code: string, redirectUri: string): Promise<Cred
       code,
     }),
   })
-  if (!response.ok) throw new Error(`TikTok rechazó el código: ${response.status}`)
+  if (!response.ok) throw new OAuthError(`TikTok rechazó el código: ${response.status}`)
 
   const data = (await response.json()) as {
     access_token?: string
@@ -86,7 +96,7 @@ async function tiktokCredential(code: string, redirectUri: string): Promise<Cred
     expires_in?: number
     open_id?: string
   }
-  if (!data.access_token) throw new Error('TikTok no devolvió token')
+  if (!data.access_token) throw new OAuthError('TikTok no devolvió token')
 
   return {
     accessToken: data.access_token,
@@ -95,6 +105,15 @@ async function tiktokCredential(code: string, redirectUri: string): Promise<Cred
     externalId: data.open_id ?? null,
     handle: null,
   }
+}
+
+/** Explicit rather than an implicit "not instagram, so tiktok" ternary — the network
+ *  is only ever `instagram` or `tiktok` here because `connect/route.ts` refuses to mint
+ *  a state for anything else, but that invariant should be legible at the call site too. */
+async function fetchCredential(network: string, code: string, redirectUri: string): Promise<Credential> {
+  if (network === 'instagram') return instagramCredential(code, redirectUri)
+  if (network === 'tiktok') return tiktokCredential(code, redirectUri)
+  throw new OAuthError('Esa red no usa OAuth.')
 }
 
 export async function GET(
@@ -123,10 +142,7 @@ export async function GET(
   const redirectUri = `${url.origin}/api/social/${network}/callback`
 
   try {
-    const credential =
-      network === 'instagram'
-        ? await instagramCredential(code, redirectUri)
-        : await tiktokCredential(code, redirectUri)
+    const credential = await fetchCredential(network, code, redirectUri)
 
     await getDb()
       .insert(socialAccounts)
@@ -153,6 +169,11 @@ export async function GET(
 
     return back(`${network} conectado.`)
   } catch (error) {
-    return back(error instanceof Error ? error.message : 'No se pudo conectar.')
+    // Only our own OAuthError carries a message we wrote ourselves. Everything else —
+    // a non-JSON upstream body breaking `.json()`, a DB write failure — gets logged
+    // server-side and a fixed fallback, never its raw message, in the redirect.
+    if (error instanceof OAuthError) return back(error.message)
+    console.error('Error conectando red social:', error)
+    return back('No se pudo conectar. Inténtalo de nuevo.')
   }
 }
