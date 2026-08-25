@@ -15,6 +15,11 @@ export type YouTubeVideo = {
 
 const MAX_POSTS = 200
 const PAGE_SIZE = 50
+// Bounds page fetches independently of how many ids a page actually yields: a page can
+// return zero eligible `videoId` entries (e.g. every video on it was deleted) while the
+// API still hands back a `nextPageToken`, which would otherwise starve the ids.length
+// check below and loop forever.
+const MAX_PLAYLIST_PAGES = 50
 
 /** `null` rather than 0: YouTube omits a counter the creator chose to hide. */
 function count(raw: string | undefined): number | null {
@@ -40,6 +45,8 @@ export function normalizeYouTubeVideo(item: YouTubeVideo): FetchedPost {
     permalink: `https://www.youtube.com/watch?v=${item.id}`,
     caption: item.snippet?.title ?? null,
     thumbnailUrl: thumbnails.medium?.url ?? thumbnails.high?.url ?? null,
+    // An unmatched duration (e.g. a live/premiere placeholder like "P0D") falls through
+    // to 'video' — the safe default when we don't actually know the length.
     mediaType: seconds !== null && seconds < 60 ? 'short' : 'video',
     publishedAt: new Date(item.snippet?.publishedAt ?? 0),
     metrics: {
@@ -85,8 +92,9 @@ export const youtubeConnector: Connector = {
     const playlist = await uploadsPlaylistId(channelId, apiKey)
     const ids: string[] = []
     let pageToken = ''
+    let pagesFetched = 0
 
-    while (ids.length < MAX_POSTS) {
+    while (ids.length < MAX_POSTS && pagesFetched < MAX_PLAYLIST_PAGES) {
       const page = (await getJson(
         `https://www.googleapis.com/youtube/v3/playlistItems?part=contentDetails` +
           `&playlistId=${playlist}&maxResults=${PAGE_SIZE}&key=${apiKey}` +
@@ -95,8 +103,10 @@ export const youtubeConnector: Connector = {
         items?: Array<{ contentDetails?: { videoId?: string } }>
         nextPageToken?: string
       }
+      pagesFetched++
 
       for (const item of page.items ?? []) {
+        if (ids.length >= MAX_POSTS) break
         if (item.contentDetails?.videoId) ids.push(item.contentDetails.videoId)
       }
       if (!page.nextPageToken) break
