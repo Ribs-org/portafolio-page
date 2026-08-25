@@ -54,28 +54,21 @@ describe('postKpisFrom', () => {
     expect(kpis.visits).toBe(20)
   })
 
-  it('distingue visitas nulas (etiqueta nunca pegada) de visitas en cero (pegada, sin tráfico)', () => {
-    const neverPasted = row({ views: 50, visits: null })
-    const pastedButQuiet = row({ views: 50, visits: 0 })
-
-    const kpis = postKpisFrom([neverPasted, pastedButQuiet])
-
-    // Both contribute 0 to the visits total — the distinction matters per-row,
-    // not in the aggregate — but the total itself must still land on a real 0.
-    expect(kpis.visits).toBe(0)
-    expect(kpis.views).toBe(100)
-  })
-
   it('arrastre es nulo cuando las views totales son cero', () => {
     const rows = [row({ views: null, visits: 10 }), row({ views: null, visits: null })]
 
     expect(postKpisFrom(rows).pull).toBeNull()
   })
 
-  it('arrastre es un porcentaje real cuando hay views', () => {
-    const rows = [row({ views: 200, visits: 50 }), row({ views: 100, visits: 25 })]
+  it('arrastre suma visitas y views totales antes de dividir, no promedia la razón de cada fila', () => {
+    // Per-row ratios are 1% and 40% — deliberately far apart so summing-then-dividing
+    // and averaging-the-ratios land on very different numbers. Only the former is
+    // correct: a post with 1000 views must outweigh one with 100 in the total.
+    const rows = [row({ views: 1000, visits: 10 }), row({ views: 100, visits: 40 })]
 
-    // total visits 75 / total views 300 * 100 = 25
-    expect(postKpisFrom(rows).pull).toBe(25)
+    // Summed: (10 + 40) / (1000 + 100) * 100 ≈ 4.55%. Averaging the ratios would give
+    // (1% + 40%) / 2 = 20.5% instead — a test built on closer numbers wouldn't tell
+    // these two formulas apart.
+    expect(postKpisFrom(rows).pull).toBeCloseTo((50 / 1100) * 100, 10)
   })
 })

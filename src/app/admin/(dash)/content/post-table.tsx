@@ -7,7 +7,9 @@ import { networkLabel } from '@/lib/networks'
 import type { PostRow } from '@/lib/posts-kpis'
 import { cn, formatNumber } from '@/lib/utils'
 
-const COLUMNS: Array<{ key: string; label: string; hint?: string }> = [
+type Column = 'views' | 'likes' | 'comments' | 'visits' | 'clicks' | 'ctr' | 'pull'
+
+const COLUMNS: Array<{ key: Column; label: string; hint?: string }> = [
   { key: 'views', label: 'Views' },
   { key: 'likes', label: 'Likes' },
   { key: 'comments', label: 'Coment.' },
@@ -103,14 +105,20 @@ export function PostTable({ rows }: { rows: PostRow[] }) {
                     <span className="h-9 w-9 shrink-0 rounded-md bg-white/[0.06]" aria-hidden />
                   )}
                   <div className="min-w-0">
-                    <a
-                      href={row.permalink ?? '#'}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="block max-w-[18rem] truncate text-fg transition-colors hover:text-fg-muted"
-                    >
-                      {row.caption ?? 'Sin descripción'}
-                    </a>
+                    {row.permalink ? (
+                      <a
+                        href={row.permalink}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="block max-w-[18rem] truncate text-fg transition-colors hover:text-fg-muted"
+                      >
+                        {row.caption ?? 'Sin descripción'}
+                      </a>
+                    ) : (
+                      <span className="block max-w-[18rem] truncate text-fg">
+                        {row.caption ?? 'Sin descripción'}
+                      </span>
+                    )}
                     <span className="font-mono text-[0.65rem] text-fg-faint">
                       {networkLabel(row.network)} · {DATE.format(new Date(row.publishedAt))}
                       {row.isNew ? ' · nuevo' : ''}

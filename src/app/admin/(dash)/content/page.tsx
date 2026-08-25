@@ -11,6 +11,27 @@ import { PostTable } from './post-table'
 
 export const dynamic = 'force-dynamic'
 
+/**
+ * Toggles `archivados` while carrying every other search param along — range,
+ * profile and bots all live in the URL (see `FilterBar`), and this link must not
+ * silently reset them just because it targets a different query key.
+ */
+function archivedToggleHref(
+  params: Record<string, string | string[] | undefined>,
+  includeArchived: boolean,
+): string {
+  const next = new URLSearchParams()
+  for (const [key, value] of Object.entries(params)) {
+    if (key === 'archivados') continue
+    if (typeof value === 'string') next.set(key, value)
+    else if (Array.isArray(value)) for (const v of value) next.append(key, v)
+  }
+  if (!includeArchived) next.set('archivados', '1')
+
+  const query = next.toString()
+  return query ? `/admin/content?${query}` : '/admin/content'
+}
+
 export default async function ContentPage({
   searchParams,
 }: {
@@ -67,7 +88,7 @@ export default async function ContentPage({
           hint="Ordena por cualquier columna. Arrastre es visitas sobre views — lo que ninguna de las dos plataformas calcula sola."
           action={
             <Link
-              href={includeArchived ? '/admin/content' : '/admin/content?archivados=1'}
+              href={archivedToggleHref(params, includeArchived)}
               className="text-[0.75rem] text-fg-faint transition-colors hover:text-fg"
             >
               {includeArchived ? 'Ocultar borrados' : 'Ver borrados'}
