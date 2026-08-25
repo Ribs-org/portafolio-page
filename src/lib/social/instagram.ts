@@ -9,6 +9,7 @@ const PAGE_SIZE = 50
 // can return an empty `data: []` while still handing back a `paging.next` cursor, which
 // would otherwise starve the media.length check below and loop forever.
 const MAX_MEDIA_PAGES = 50
+const INSIGHTS_CHUNK_SIZE = 5
 const REFRESH_WINDOW_MS = 7 * 864e5
 
 export type InstagramMedia = {
@@ -65,10 +66,24 @@ export function normalizeInstagramMedia(
   }
 }
 
+// Carries the HTTP status alongside the message so callers can tell a 404 (a normal,
+// expected answer for some Instagram endpoints) apart from anything else.
+class InstagramHttpError extends Error {
+  constructor(
+    public status: number,
+    message: string,
+  ) {
+    super(message)
+  }
+}
+
 async function getJson(url: string): Promise<Record<string, unknown>> {
   const response = await fetch(url)
   if (!response.ok) {
-    throw new Error(`Instagram ${response.status}: ${(await response.text()).slice(0, 200)}`)
+    throw new InstagramHttpError(
+      response.status,
+      `Instagram ${response.status}: ${(await response.text()).slice(0, 200)}`,
+    )
   }
   return response.json()
 }
@@ -88,9 +103,18 @@ export const instagramConnector: Connector = {
       !account.expiresAt || account.expiresAt.getTime() - Date.now() < REFRESH_WINDOW_MS
     if (!expiresSoon) return token
 
-    const refreshed = (await getJson(
-      `${GRAPH}/refresh_access_token?grant_type=ig_refresh_token&access_token=${token}`,
-    )) as { access_token?: string; expires_in?: number }
+    let refreshed: { access_token?: string; expires_in?: number } = {}
+    try {
+      refreshed = (await getJson(
+        `${GRAPH}/refresh_access_token?grant_type=ig_refresh_token&access_token=${token}`,
+      )) as { access_token?: string; expires_in?: number }
+    } catch {
+      // The current token isn't expired yet — only within the refresh window — so a
+      // transient failure here (network blip, Instagram 5xx) should fall back to it
+      // rather than discard a perfectly usable credential, same as the case below where
+      // Instagram answers OK but omits access_token.
+      return token
+    }
 
     if (!refreshed.access_token) return token
 
@@ -132,20 +156,37 @@ export const instagramConnector: Connector = {
     }
 
     const metrics = 'views,reach,likes,comments,saved,shares'
-    return Promise.all(
-      media.map(async (item) => {
-        // Insights are per-media and 404 for content too old or of the wrong type,
-        // which is a normal answer here rather than a failure worth aborting the sync.
-        let insights: InstagramInsights = {}
-        try {
-          insights = (await getJson(
-            `${GRAPH}/${item.id}/insights?metric=${metrics}&access_token=${token}`,
-          )) as InstagramInsights
-        } catch {
-          insights = {}
-        }
-        return normalizeInstagramMedia(item, insights)
-      }),
-    )
+    const posts: FetchedPost[] = []
+    // Sequential chunks rather than one Promise.all over every post: up to MAX_POSTS
+    // concurrent requests risks a 429 from the Graph API, and since a non-404 insights
+    // failure now aborts the whole sync (see below), keeping concurrency low keeps that
+    // risk low. Wall-clock doesn't matter — this runs once a day from a cron.
+    for (let i = 0; i < media.length; i += INSIGHTS_CHUNK_SIZE) {
+      const chunk = media.slice(i, i + INSIGHTS_CHUNK_SIZE)
+      const chunkPosts = await Promise.all(
+        chunk.map(async (item) => {
+          let insights: InstagramInsights = {}
+          try {
+            insights = (await getJson(
+              `${GRAPH}/${item.id}/insights?metric=${metrics}&access_token=${token}`,
+            )) as InstagramInsights
+          } catch (error) {
+            // A 404 means Instagram has no insights for this specific post (too old, or
+            // a media type insights don't cover) — a normal answer, not a failure.
+            // Anything else (expired token, rate limit, 5xx) is systemic: swallowing it
+            // too would silently write NO_METRICS as if it were real data for every
+            // remaining post, since fetchPosts reuses the same token throughout.
+            if (error instanceof InstagramHttpError && error.status === 404) {
+              insights = {}
+            } else {
+              throw error
+            }
+          }
+          return normalizeInstagramMedia(item, insights)
+        }),
+      )
+      posts.push(...chunkPosts)
+    }
+    return posts
   },
 }
