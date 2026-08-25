@@ -3,6 +3,7 @@
 import { useState, useTransition } from 'react'
 import { AlertTriangle, Check, RefreshCw } from 'lucide-react'
 import { disconnectNetwork, syncSocialNow } from '@/app/admin/actions'
+import { NEGATIVE, POSITIVE } from '@/components/charts/theme'
 import type { ConnectionRow } from '@/lib/posts'
 import { networkLabel } from '@/lib/networks'
 import { cn } from '@/lib/utils'
@@ -38,9 +39,9 @@ export function Connections({ rows }: { rows: ConnectionRow[] }) {
                 {networkLabel(row.network)}
               </span>
               {row.lastSyncError ? (
-                <AlertTriangle className="h-3.5 w-3.5 text-[#d03b3b]" aria-hidden />
+                <AlertTriangle className="h-3.5 w-3.5" style={{ color: NEGATIVE }} aria-hidden />
               ) : row.connected ? (
-                <Check className="h-3.5 w-3.5 text-[#0ca30c]" aria-hidden />
+                <Check className="h-3.5 w-3.5" style={{ color: POSITIVE }} aria-hidden />
               ) : null}
             </div>
 
@@ -53,7 +54,9 @@ export function Connections({ rows }: { rows: ConnectionRow[] }) {
             </p>
 
             {row.lastSyncError ? (
-              <p className="mt-2 line-clamp-2 text-[0.72rem] text-[#d03b3b]">{row.lastSyncError}</p>
+              <p className="mt-2 line-clamp-2 text-[0.72rem]" style={{ color: NEGATIVE }}>
+                {row.lastSyncError}
+              </p>
             ) : null}
 
             <div className="mt-3">

@@ -3,42 +3,14 @@ import { and, desc, eq, gte, inArray, isNull, lte, sql, type SQL } from 'drizzle
 import { clicks, getDb, postMetrics, socialAccounts, socialPosts, visits } from '@/db'
 import type { Filters } from './analytics'
 import { SITE_TIMEZONE } from './analytics'
+import { postKpisFrom, type PostKpis, type PostRow } from './posts-kpis'
 import { periodChange, type Snapshot } from './social/delta'
 
-export type PostRow = {
-  id: string
-  network: string
-  permalink: string | null
-  caption: string | null
-  thumbnailUrl: string | null
-  mediaType: string | null
-  publishedAt: string
-  campaign: string
-  /** Deleted on the network. Hidden unless the view asks for them. */
-  archived: boolean
-  views: number | null
-  viewsChange: number | null
-  isNew: boolean
-  likes: number | null
-  comments: number | null
-  shares: number | null
-  saves: number | null
-  reach: number | null
-  /** null when the tag has never been seen in a visit — the link was never pasted. */
-  visits: number | null
-  uniques: number | null
-  clicks: number | null
-  ctr: number | null
-  /** Visits over views: the fraction of the audience that actually arrived. */
-  pull: number | null
-}
-
-export type PostKpis = {
-  views: number
-  engagement: number
-  visits: number
-  pull: number | null
-}
+// Re-exported so call sites only need one import line; the types and the pure
+// summing function actually live in `posts-kpis.ts`, which stays free of
+// `server-only` so a test file can import it without pulling in the DB layer.
+export type { PostKpis, PostRow }
+export { postKpisFrom }
 
 export type ConnectionRow = {
   network: string
@@ -185,23 +157,6 @@ export async function getPostRows(f: Filters, includeArchived = false): Promise<
           : null,
     }
   })
-}
-
-export async function getPostKpis(f: Filters): Promise<PostKpis> {
-  const rows = await getPostRows(f)
-
-  const sum = (pick: (row: PostRow) => number | null) =>
-    rows.reduce((total, row) => total + (pick(row) ?? 0), 0)
-
-  const views = sum((r) => r.views)
-  const visitTotal = sum((r) => r.visits)
-
-  return {
-    views,
-    engagement: sum((r) => r.likes) + sum((r) => r.comments) + sum((r) => r.shares),
-    visits: visitTotal,
-    pull: views > 0 ? (visitTotal / views) * 100 : null,
-  }
 }
 
 export type PostSeriesPoint = {
