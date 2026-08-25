@@ -1,6 +1,12 @@
 import type { SocialAccount } from '@/db'
 import { env } from '../env'
-import { MAX_POSTS_PER_SYNC, NO_METRICS, type Connector, type FetchedPost } from './connector'
+import {
+  MAX_POSTS_PER_SYNC,
+  NO_METRICS,
+  type Connector,
+  type FetchedBatch,
+  type FetchedPost,
+} from './connector'
 
 export type YouTubeVideo = {
   id: string
@@ -83,15 +89,16 @@ export const youtubeConnector: Connector = {
     return env('YOUTUBE_API_KEY') ?? null
   },
 
-  async fetchPosts(account: SocialAccount, token: string | null): Promise<FetchedPost[]> {
+  async fetchPosts(account: SocialAccount, token: string | null): Promise<FetchedBatch> {
     const apiKey = token
     const channelId = account.externalId ?? env('YOUTUBE_CHANNEL_ID')
-    if (!apiKey || !channelId) return []
+    if (!apiKey || !channelId) return { posts: [], windowWasCapped: false }
 
     const playlist = await uploadsPlaylistId(channelId, apiKey)
     const ids: string[] = []
     let pageToken = ''
     let pagesFetched = 0
+    let moreToPage = false
 
     while (ids.length < MAX_POSTS_PER_SYNC && pagesFetched < MAX_PLAYLIST_PAGES) {
       const page = (await getJson(
@@ -108,8 +115,9 @@ export const youtubeConnector: Connector = {
         if (ids.length >= MAX_POSTS_PER_SYNC) break
         if (item.contentDetails?.videoId) ids.push(item.contentDetails.videoId)
       }
-      if (!page.nextPageToken) break
-      pageToken = page.nextPageToken
+      moreToPage = Boolean(page.nextPageToken)
+      if (!moreToPage) break
+      pageToken = page.nextPageToken!
     }
 
     const posts: FetchedPost[] = []
@@ -124,6 +132,13 @@ export const youtubeConnector: Connector = {
       posts.push(...(data.items ?? []).map(normalizeYouTubeVideo))
     }
 
-    return posts
+    // Judged on the ids the playlist handed over, never on `posts.length`. `videos.list`
+    // silently omits private and deleted videos, so one unavailable video among the
+    // newest 200 turns a capped window into 199 posts — and a caller counting posts
+    // would read that as an exhaustive fetch and archive the whole back catalogue.
+    return {
+      posts,
+      windowWasCapped: ids.length >= MAX_POSTS_PER_SYNC || moreToPage,
+    }
   },
 }

@@ -1,6 +1,12 @@
 import type { SocialAccount } from '@/db'
 import { env } from '../env'
-import { MAX_POSTS_PER_SYNC, NO_METRICS, type Connector, type FetchedPost } from './connector'
+import {
+  MAX_POSTS_PER_SYNC,
+  NO_METRICS,
+  type Connector,
+  type FetchedBatch,
+  type FetchedPost,
+} from './connector'
 import { decryptToken } from './crypto'
 
 const API = 'https://open.tiktokapis.com/v2'
@@ -99,8 +105,8 @@ export const tiktokConnector: Connector = {
     return data.access_token
   },
 
-  async fetchPosts(_account: SocialAccount, token: string | null): Promise<FetchedPost[]> {
-    if (!token) return []
+  async fetchPosts(_account: SocialAccount, token: string | null): Promise<FetchedBatch> {
+    if (!token) return { posts: [], windowWasCapped: false }
 
     const fields = [
       'id',
@@ -118,6 +124,7 @@ export const tiktokConnector: Connector = {
     const videos: TikTokVideo[] = []
     let cursor: number | undefined
     let pagesFetched = 0
+    let moreToPage = false
 
     while (videos.length < MAX_POSTS_PER_SYNC && pagesFetched < MAX_VIDEO_PAGES) {
       const response = await fetch(`${API}/video/list/?fields=${fields}`, {
@@ -142,10 +149,17 @@ export const tiktokConnector: Connector = {
         videos.push(item)
       }
 
-      if (!payload.data?.has_more || payload.data.cursor === undefined) break
-      cursor = payload.data.cursor
+      moreToPage = Boolean(payload.data?.has_more) && payload.data?.cursor !== undefined
+      if (!moreToPage) break
+      cursor = payload.data!.cursor
     }
 
-    return videos.slice(0, MAX_POSTS_PER_SYNC).map(normalizeTikTokVideo)
+    // Videos still waiting behind the cursor mean the loop stopped at a ceiling rather
+    // than at the end of the account. Hitting exactly MAX_POSTS_PER_SYNC counts too:
+    // items from the last page get dropped once the array is full, `has_more` or not.
+    return {
+      posts: videos.slice(0, MAX_POSTS_PER_SYNC).map(normalizeTikTokVideo),
+      windowWasCapped: videos.length >= MAX_POSTS_PER_SYNC || moreToPage,
+    }
   },
 }

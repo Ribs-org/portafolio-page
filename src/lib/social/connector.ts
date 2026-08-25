@@ -19,6 +19,23 @@ export type FetchedPost = {
   metrics: PostMetricValues
 }
 
+export type FetchedBatch = {
+  posts: FetchedPost[]
+  /**
+   * The connector stopped at a ceiling of its own instead of reaching the end of the
+   * catalogue, so what it returned is a window, not everything. `postsToArchive` needs
+   * this to tell "deleted" from "beyond the edge of what we asked for".
+   *
+   * Only the connector can answer it. The orchestrator used to infer it from
+   * `posts.length >= MAX_POSTS_PER_SYNC`, which YouTube quietly broke: it collects up to
+   * 200 *ids* from `playlistItems` and then builds posts from `videos.list`, which omits
+   * private and deleted videos. One unavailable video in the newest 200 returned 199,
+   * read as an exhaustive fetch, and archived every older post — permanently, since
+   * those posts sit beyond the cap and never come back to clear `archivedAt`.
+   */
+  windowWasCapped: boolean
+}
+
 /**
  * The only thing the orchestrator knows about a network. Everything network-specific —
  * field names, pagination, auth dance — stays inside the implementation.
@@ -27,14 +44,10 @@ export type Connector = {
   network: string
   /** Returns the usable credential, refreshing it first when it is close to expiring. */
   ensureCredential(account: SocialAccount): Promise<string | null>
-  fetchPosts(account: SocialAccount, token: string | null): Promise<FetchedPost[]>
+  fetchPosts(account: SocialAccount, token: string | null): Promise<FetchedBatch>
 }
 
-/**
- * The shared ceiling every connector pages up to. One place so the orchestrator can
- * compare a fetch's length against it to tell a truncated window from a full one —
- * see `postsToArchive`, which needs that distinction to judge deletions safely.
- */
+/** The shared ceiling every connector pages up to. */
 export const MAX_POSTS_PER_SYNC = 200
 
 /** Every metric absent — the starting point a connector fills in with what it has. */

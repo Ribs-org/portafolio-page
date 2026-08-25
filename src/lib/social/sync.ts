@@ -7,7 +7,7 @@ import { SITE_TIMEZONE } from '../analytics'
 import { env } from '../env'
 import { postsToArchive } from './archive'
 import { campaignTagFor } from './campaign'
-import { MAX_POSTS_PER_SYNC, type FetchedPost } from './connector'
+import type { FetchedPost } from './connector'
 import { CONNECTORS, connectorFor } from './index'
 
 export type SyncReport = Array<{ network: string; ok: boolean; posts: number; error?: string }>
@@ -134,7 +134,10 @@ export async function syncNetwork(network: string): Promise<number> {
 
   try {
     const token = await connector.ensureCredential(account as SocialAccount)
-    const fetched = await connector.fetchPosts(account as SocialAccount, token)
+    const { posts: fetched, windowWasCapped } = await connector.fetchPosts(
+      account as SocialAccount,
+      token,
+    )
 
     const day = localDay(new Date())
     for (const post of fetched) {
@@ -147,9 +150,9 @@ export async function syncNetwork(network: string): Promise<number> {
       .from(socialPosts)
       .where(and(eq(socialPosts.network, network), isNull(socialPosts.archivedAt)))
 
-    // Hitting the cap means the fetch window is truncated, not exhaustive — a known post
-    // that didn't come back can only be judged deleted once it falls inside that window.
-    const windowWasCapped = fetched.length >= MAX_POSTS_PER_SYNC
+    // A truncated window is the connector's own answer, not something counted from here:
+    // a known post that didn't come back can only be judged deleted once it falls inside
+    // the window, and only the connector knows where that edge really is.
     const gone = postsToArchive(known, fetched, windowWasCapped)
     if (gone.length > 0) {
       await db

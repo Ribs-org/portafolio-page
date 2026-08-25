@@ -3,6 +3,7 @@ import {
   MAX_POSTS_PER_SYNC,
   NO_METRICS,
   type Connector,
+  type FetchedBatch,
   type FetchedPost,
   type PostMetricValues,
 } from './connector'
@@ -138,8 +139,8 @@ export const instagramConnector: Connector = {
     return refreshed.access_token
   },
 
-  async fetchPosts(_account: SocialAccount, token: string | null): Promise<FetchedPost[]> {
-    if (!token) return []
+  async fetchPosts(_account: SocialAccount, token: string | null): Promise<FetchedBatch> {
+    if (!token) return { posts: [], windowWasCapped: false }
 
     const fields = 'id,caption,media_type,media_product_type,media_url,thumbnail_url,permalink,timestamp'
     const media: InstagramMedia[] = []
@@ -192,6 +193,13 @@ export const instagramConnector: Connector = {
       )
       posts.push(...chunkPosts)
     }
-    return posts
+
+    // A cursor still in hand means the paging loop stopped at a ceiling, not at the end
+    // of the account's media. Hitting exactly MAX_POSTS_PER_SYNC counts too: items from
+    // the last page get dropped once the array is full, whatever the cursor says.
+    return {
+      posts,
+      windowWasCapped: media.length >= MAX_POSTS_PER_SYNC || next !== '',
+    }
   },
 }
