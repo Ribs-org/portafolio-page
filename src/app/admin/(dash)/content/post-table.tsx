@@ -1,7 +1,7 @@
 'use client'
 
 import Image from 'next/image'
-import { useState, useTransition } from 'react'
+import { useRef, useState, useTransition } from 'react'
 import { ArrowDown, ArrowUp, Check, Copy } from 'lucide-react'
 import { updatePostCampaign } from '@/app/admin/actions'
 import { useSortedRows } from '@/components/charts/use-sorted-rows'
@@ -172,8 +172,23 @@ function CampaignCell({ postId, campaign }: { postId: string; campaign: string }
   const [copied, setCopied] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [pending, startTransition] = useTransition()
+  // Escape unmounts the focused <input> synchronously, which fires a native blur as
+  // part of that DOM removal. React delivers that blur through the pre-Escape
+  // render's stale onBlur closure (still holding the dirty, about-to-be-discarded
+  // value), so without this guard the "cancelled" edit gets saved anyway. The ref
+  // is shared across renders/closures, so setting it inside cancel() or the real
+  // save() is visible to that stale call too, and the same guard collapses Enter's
+  // matching stale blur into a no-op instead of a second, redundant save.
+  const settledRef = useRef(false)
+
+  function startEditing() {
+    settledRef.current = false
+    setEditing(true)
+  }
 
   function save() {
+    if (settledRef.current) return
+    settledRef.current = true
     setEditing(false)
     if (value === campaign) return
     startTransition(async () => {
@@ -190,12 +205,24 @@ function CampaignCell({ postId, campaign }: { postId: string; campaign: string }
     })
   }
 
+  function cancel() {
+    settledRef.current = true
+    setValue(campaign)
+    setEditing(false)
+  }
+
   function copy() {
     // Built here rather than on the server so the URL matches whatever host the
-    // dashboard is actually being used on.
-    void navigator.clipboard.writeText(`${window.location.origin}/?s=${value}`)
-    setCopied(true)
-    setTimeout(() => setCopied(false), 1500)
+    // dashboard is actually being used on. Chained off the actual write instead of
+    // assumed: a denied permission or an insecure context rejects, and a checkmark
+    // that lies is worse than no checkmark.
+    navigator.clipboard
+      .writeText(`${window.location.origin}/?s=${value}`)
+      .then(() => {
+        setCopied(true)
+        setTimeout(() => setCopied(false), 1500)
+      })
+      .catch(() => setError('No se pudo copiar el link.'))
   }
 
   return (
@@ -208,17 +235,14 @@ function CampaignCell({ postId, campaign }: { postId: string; campaign: string }
           onBlur={save}
           onKeyDown={(event) => {
             if (event.key === 'Enter') save()
-            if (event.key === 'Escape') {
-              setValue(campaign)
-              setEditing(false)
-            }
+            if (event.key === 'Escape') cancel()
           }}
           className="w-36 rounded bg-white/[0.08] px-1 py-0.5 font-mono text-[0.65rem] text-fg outline-none"
         />
       ) : (
         <button
           type="button"
-          onClick={() => setEditing(true)}
+          onClick={startEditing}
           disabled={pending}
           title="Editar la etiqueta"
           className="rounded bg-white/[0.06] px-1.5 py-0.5 font-mono text-[0.65rem] text-fg-muted transition-colors hover:text-fg"
@@ -230,6 +254,7 @@ function CampaignCell({ postId, campaign }: { postId: string; campaign: string }
       <button
         type="button"
         onClick={copy}
+        disabled={pending}
         title="Copiar el link con la etiqueta"
         className="text-fg-faint transition-colors hover:text-fg"
       >
