@@ -1,0 +1,32 @@
+{
+  "data": {
+    "videos": [
+      {
+        "id": "7234567890123456789",
+        "title": "Respuesta a @alguien sobre entrenar en casa",
+        "cover_image_url": "https://p16.tiktokcdn.com/cover1.jpeg",
+        "share_url": "https://www.tiktok.com/@ribs/video/7234567890123456789",
+        "create_time": 1785801600,
+        "duration": 42,
+        "view_count": 91204,
+        "like_count": 7712,
+        "comment_count": 620,
+        "share_count": 388
+      },
+      {
+        "id": "7234567890123456790",
+        "title": "",
+        "cover_image_url": "https://p16.tiktokcdn.com/cover2.jpeg",
+        "share_url": "https://www.tiktok.com/@ribs/video/7234567890123456790",
+        "create_time": 1785888000,
+        "duration": 15,
+        "view_count": 0,
+        "like_count": 0,
+        "comment_count": 0,
+        "share_count": 0
+      }
+    ],
+    "cursor": 0,
+    "has_more": false
+  }
+}
