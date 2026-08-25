@@ -161,7 +161,7 @@ INSTAGRAM_APP_SECRET=
 ### TikTok
 
 En [developers.tiktok.com](https://developers.tiktok.com), registra una app, agrega el
-producto **Login Kit** con el scope `video.list`, y usa como redirect URI:
+producto **Login Kit** con los scopes `user.info.basic` y `video.list`, y usa como redirect URI:
 
 ```
 https://TU-DOMINIO/api/social/tiktok/callback
@@ -257,6 +257,13 @@ Vercel y bajan con `vercel env pull .env.local`.
 | `FINGERPRINT_SALT` | Sal del hash de visitante | Sí |
 | `BLOB_READ_WRITE_TOKEN` | Subida de imágenes | No — sin ella no puedes subir fotos |
 | `SITE_TIMEZONE` | Zona en la que el dashboard agrupa los días | No — por defecto `America/Santiago` |
+| `YOUTUBE_API_KEY` | Métricas de YouTube | No — sin ella esa red aparece como no conectada |
+| `YOUTUBE_CHANNEL_ID` | Métricas de YouTube | No — sin ella esa red aparece como no conectada |
+| `INSTAGRAM_APP_ID` | Conectar Instagram | No — sin ella esa red aparece como no conectada |
+| `INSTAGRAM_APP_SECRET` | Conectar Instagram | No — sin ella esa red aparece como no conectada |
+| `TIKTOK_CLIENT_KEY` | Conectar TikTok | No — sin ella esa red aparece como no conectada |
+| `TIKTOK_CLIENT_SECRET` | Conectar TikTok | No — sin ella esa red aparece como no conectada |
+| `CRON_SECRET` | Autoriza la corrida diaria | No — la pone Vercel solo, al declarar el cron |
 
 Para cambiar la contraseña:
 
