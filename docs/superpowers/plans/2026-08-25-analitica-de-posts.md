@@ -79,7 +79,9 @@ import { defineConfig } from 'vitest/config'
 
 export default defineConfig({
   test: { environment: 'node', include: ['src/**/*.test.ts'] },
-  resolve: { alias: { '@': path.resolve(__dirname, 'src') } },
+  // cwd rather than __dirname: this file is ESM, where __dirname does not exist,
+  // and `npm test` always runs from the repo root.
+  resolve: { alias: { '@': path.resolve(process.cwd(), 'src') } },
 })
 ```
 
@@ -1002,7 +1004,7 @@ git commit -m "Implementa el conector de Instagram sobre la Graph API"
         "title": "Respuesta a @alguien sobre entrenar en casa",
         "cover_image_url": "https://p16.tiktokcdn.com/cover1.jpeg",
         "share_url": "https://www.tiktok.com/@ribs/video/7234567890123456789",
-        "create_time": 1786012800,
+        "create_time": 1785801600,
         "duration": 42,
         "view_count": 91204,
         "like_count": 7712,
@@ -1014,7 +1016,7 @@ git commit -m "Implementa el conector de Instagram sobre la Graph API"
         "title": "",
         "cover_image_url": "https://p16.tiktokcdn.com/cover2.jpeg",
         "share_url": "https://www.tiktok.com/@ribs/video/7234567890123456790",
-        "create_time": 1786099200,
+        "create_time": 1785888000,
         "duration": 15,
         "view_count": 0,
         "like_count": 0,
