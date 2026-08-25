@@ -43,13 +43,18 @@ describe('compareRows', () => {
       expect(result).toBeGreaterThan(0) // reversed: 'beta' < 'alfa'
     })
 
-    it('should respect Spanish locale for accented characters', () => {
-      const a: TestRow = { name: 'árbol', value: 1 }
-      const b: TestRow = { name: 'aro', value: 2 }
+    it('should place accented vowels with their base letter, not after z', () => {
+      const a: TestRow = { name: 'ábaco', value: 1 }
+      const b: TestRow = { name: 'bota', value: 2 }
 
-      // In Spanish locale, 'á' sorts near 'a', not after 'z'
-      const result = compareRows(a, b, 'name', false)
-      expect(result).toBeLessThan(0) // 'árbol' < 'aro'
+      // Under localeCompare('es'), 'á' sorts with 'a', so 'ábaco' < 'bota'.
+      // Under plain <, 'á' (U+00E1=225) > 'b' (U+0062=98), so the result would be positive.
+      // This test proves locale comparison is active.
+      const resultAscending = compareRows(a, b, 'name', false)
+      expect(resultAscending).toBeLessThan(0) // negative: 'á' sorts near 'a'
+
+      const resultDescending = compareRows(a, b, 'name', true)
+      expect(resultDescending).toBeGreaterThan(0) // reversed: positive
     })
   })
 
