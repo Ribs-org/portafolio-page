@@ -127,7 +127,7 @@ export const tiktokConnector: Connector = {
           Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ max_count: PAGE_SIZE, ...(cursor ? { cursor } : {}) }),
+        body: JSON.stringify({ max_count: PAGE_SIZE, ...(cursor !== undefined ? { cursor } : {}) }),
       })
       if (!response.ok) {
         throw new Error(`TikTok ${response.status}: ${(await response.text()).slice(0, 200)}`)

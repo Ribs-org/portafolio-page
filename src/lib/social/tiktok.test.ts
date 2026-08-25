@@ -36,6 +36,8 @@ describe('normalizeTikTokVideo', () => {
     const post = normalizeTikTokVideo(fresh!)
     expect(post.metrics.views).toBe(0)
     expect(post.metrics.likes).toBe(0)
+    expect(post.metrics.comments).toBe(0)
+    expect(post.metrics.shares).toBe(0)
   })
 
   it('trata el título vacío como sin caption', () => {
