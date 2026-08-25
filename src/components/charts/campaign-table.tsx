@@ -1,7 +1,9 @@
 'use client'
 
 import { ArrowDown, ArrowUp } from 'lucide-react'
+import Image from 'next/image'
 import type { CampaignRow } from '@/lib/analytics'
+import type { CampaignPost } from '@/lib/posts'
 import { cn, formatNumber } from '@/lib/utils'
 import { SERIES } from './theme'
 import { useSortedRows } from './use-sorted-rows'
@@ -20,7 +22,13 @@ const COLUMNS: Array<{ key: Column; label: string; numeric: boolean; hint?: stri
  * The table that answers "which reel is working". Sorting by CTR rather than raw
  * visits is what separates a piece that drives traffic from one that drives action.
  */
-export function CampaignTable({ rows }: { rows: CampaignRow[] }) {
+export function CampaignTable({
+  rows,
+  posts = {},
+}: {
+  rows: CampaignRow[]
+  posts?: Record<string, CampaignPost>
+}) {
   const { sorted, sortKey, descending, toggle } = useSortedRows(rows, 'visits')
 
   if (rows.length === 0) {
@@ -87,7 +95,25 @@ export function CampaignTable({ rows }: { rows: CampaignRow[] }) {
                     opacity: 0.14,
                   }}
                 />
-                <span className="font-mono text-[0.8rem]">{row.campaign}</span>
+                {posts[row.campaign] ? (
+                  <span className="flex items-center gap-2">
+                    {posts[row.campaign]!.thumbnailUrl ? (
+                      <Image
+                        src={posts[row.campaign]!.thumbnailUrl!}
+                        alt=""
+                        width={20}
+                        height={20}
+                        unoptimized
+                        className="h-5 w-5 shrink-0 rounded object-cover"
+                      />
+                    ) : null}
+                    <span className="truncate text-[0.8rem]">
+                      {posts[row.campaign]!.caption ?? row.campaign}
+                    </span>
+                  </span>
+                ) : (
+                  <span className="font-mono text-[0.8rem]">{row.campaign}</span>
+                )}
               </td>
               <td className="py-2 text-right font-mono tabular-nums">{formatNumber(row.visits)}</td>
               <td className="py-2 text-right font-mono tabular-nums text-fg-muted">
