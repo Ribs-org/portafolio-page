@@ -292,3 +292,61 @@ export async function uploadImage(formData: FormData): Promise<{ url?: string; e
     return { error: 'No se pudo subir la imagen.' }
   }
 }
+
+/* ------------------------------------------------------------------ social -- */
+
+let lastSyncStartedAt = 0
+const SYNC_COOLDOWN_MS = 5 * 60 * 1000
+
+export async function syncSocialNow(): Promise<{ ok?: boolean; error?: string }> {
+  await requireAuth()
+
+  if (Date.now() - lastSyncStartedAt < SYNC_COOLDOWN_MS) {
+    return { error: 'Espera unos minutos antes de volver a sincronizar.' }
+  }
+  lastSyncStartedAt = Date.now()
+
+  const { syncAll } = await import('@/lib/social/sync')
+  const report = await syncAll()
+
+  revalidatePath('/admin/content')
+
+  const failed = report.filter((r) => !r.ok)
+  if (failed.length === report.length) {
+    return { error: 'Ninguna red respondió. Revisa las tarjetas de conexión.' }
+  }
+  return { ok: true }
+}
+
+export async function disconnectNetwork(network: string): Promise<void> {
+  await requireAuth()
+
+  const { socialAccounts } = await import('@/db')
+  // Posts and metrics survive: the traffic they brought really happened.
+  await getDb().delete(socialAccounts).where(eq(socialAccounts.network, network))
+
+  revalidatePath('/admin/content')
+}
+
+export async function updatePostCampaign(
+  postId: string,
+  campaign: string,
+): Promise<{ ok?: boolean; error?: string }> {
+  await requireAuth()
+
+  const clean = campaign.trim().replace(/[^A-Za-z0-9_-]+/g, '-').slice(0, 48)
+  if (!clean) return { error: 'La etiqueta no puede quedar vacía.' }
+
+  const { socialPosts } = await import('@/db')
+
+  try {
+    await getDb().update(socialPosts).set({ campaign: clean }).where(eq(socialPosts.id, postId))
+  } catch {
+    // The unique index is what rejects it; two posts sharing a tag would merge histories.
+    return { error: 'Otra pieza de contenido ya usa esa etiqueta.' }
+  }
+
+  revalidatePath('/admin/content')
+  revalidatePath('/admin/analytics')
+  return { ok: true }
+}
