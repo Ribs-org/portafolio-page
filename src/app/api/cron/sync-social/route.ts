@@ -14,15 +14,22 @@ export async function GET(request: Request) {
   }
 
   try {
+    // A report where all three networks failed still answers 200, deliberately. That is
+    // the orchestrator running correctly and telling us three connectors failed: each one
+    // wrote its own `lastSyncError`, so the connection cards will say so. Nothing is lost.
     const report = await syncAll()
     return NextResponse.json({ report })
   } catch (error) {
-    // syncAll settles every network on its own, so getting here means the orchestrator
-    // itself broke. An unhandled rejection would hand the operator a framework 500 page
-    // with nothing in it; this keeps the answer shaped like the all-networks-failed case,
-    // which already reports its failures in the body.
+    // Reaching here is the other case entirely: syncAll settles every network on its own,
+    // so a throw is the orchestrator itself breaking, before any per-network catch could
+    // record anything. No `lastSyncError` gets written and the cards keep showing the
+    // previous run — which makes Vercel's cron status the only place a total failure is
+    // visible, and that keys off a non-2xx. Hence the 500, and hence the two failure paths
+    // answering differently on purpose.
+    //
+    // Fixed body, same discipline as the OAuth callback: the real error goes to the log,
+    // never into the response.
     console.error('Falló la sincronización de redes:', error)
-    const message = error instanceof Error ? error.message : String(error)
-    return NextResponse.json({ report: [], error: message })
+    return NextResponse.json({ error: 'La sincronización falló por completo.' }, { status: 500 })
   }
 }
