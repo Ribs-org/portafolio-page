@@ -1,7 +1,9 @@
 'use client'
 
 import Image from 'next/image'
-import { ArrowDown, ArrowUp } from 'lucide-react'
+import { useState, useTransition } from 'react'
+import { ArrowDown, ArrowUp, Check, Copy } from 'lucide-react'
+import { updatePostCampaign } from '@/app/admin/actions'
 import { useSortedRows } from '@/components/charts/use-sorted-rows'
 import { networkLabel } from '@/lib/networks'
 import type { PostRow } from '@/lib/posts-kpis'
@@ -123,6 +125,7 @@ export function PostTable({ rows }: { rows: PostRow[] }) {
                       {networkLabel(row.network)} · {DATE.format(new Date(row.publishedAt))}
                       {row.isNew ? ' · nuevo' : ''}
                     </span>
+                    <CampaignCell postId={row.id} campaign={row.campaign} />
                   </div>
                 </div>
               </td>
@@ -141,7 +144,13 @@ export function PostTable({ rows }: { rows: PostRow[] }) {
               <td className="py-2 text-right font-mono tabular-nums text-fg-muted">
                 {num(row.comments)}
               </td>
-              <td className="py-2 text-right font-mono tabular-nums">{num(row.visits)}</td>
+              <td className="py-2 text-right font-mono tabular-nums">
+                {row.visits === null ? (
+                  <span className="text-[0.7rem] text-fg-faint">pega el link</span>
+                ) : (
+                  formatNumber(row.visits)
+                )}
+              </td>
               <td className="py-2 text-right font-mono tabular-nums text-fg-muted">
                 {num(row.clicks)}
               </td>
@@ -153,6 +162,81 @@ export function PostTable({ rows }: { rows: PostRow[] }) {
           ))}
         </tbody>
       </table>
+    </div>
+  )
+}
+
+function CampaignCell({ postId, campaign }: { postId: string; campaign: string }) {
+  const [value, setValue] = useState(campaign)
+  const [editing, setEditing] = useState(false)
+  const [copied, setCopied] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [pending, startTransition] = useTransition()
+
+  function save() {
+    setEditing(false)
+    if (value === campaign) return
+    startTransition(async () => {
+      const result = await updatePostCampaign(postId, value)
+      if (result.error) {
+        setError(result.error)
+        setValue(campaign)
+      } else {
+        setError(null)
+        // The server normalises what was typed (spaces become hyphens, etc), so
+        // display and the copy button must reflect the tag it actually stored.
+        if (result.campaign) setValue(result.campaign)
+      }
+    })
+  }
+
+  function copy() {
+    // Built here rather than on the server so the URL matches whatever host the
+    // dashboard is actually being used on.
+    void navigator.clipboard.writeText(`${window.location.origin}/?s=${value}`)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 1500)
+  }
+
+  return (
+    <div className="mt-0.5 flex items-center gap-1.5">
+      {editing ? (
+        <input
+          value={value}
+          autoFocus
+          onChange={(event) => setValue(event.target.value)}
+          onBlur={save}
+          onKeyDown={(event) => {
+            if (event.key === 'Enter') save()
+            if (event.key === 'Escape') {
+              setValue(campaign)
+              setEditing(false)
+            }
+          }}
+          className="w-36 rounded bg-white/[0.08] px-1 py-0.5 font-mono text-[0.65rem] text-fg outline-none"
+        />
+      ) : (
+        <button
+          type="button"
+          onClick={() => setEditing(true)}
+          disabled={pending}
+          title="Editar la etiqueta"
+          className="rounded bg-white/[0.06] px-1.5 py-0.5 font-mono text-[0.65rem] text-fg-muted transition-colors hover:text-fg"
+        >
+          ?s={value}
+        </button>
+      )}
+
+      <button
+        type="button"
+        onClick={copy}
+        title="Copiar el link con la etiqueta"
+        className="text-fg-faint transition-colors hover:text-fg"
+      >
+        {copied ? <Check className="h-3 w-3" aria-hidden /> : <Copy className="h-3 w-3" aria-hidden />}
+      </button>
+
+      {error ? <span className="text-[0.65rem] text-[#d03b3b]">{error}</span> : null}
     </div>
   )
 }

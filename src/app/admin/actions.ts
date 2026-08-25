@@ -338,7 +338,7 @@ export async function disconnectNetwork(network: string): Promise<void> {
 export async function updatePostCampaign(
   postId: string,
   campaign: string,
-): Promise<{ ok?: boolean; error?: string }> {
+): Promise<{ ok?: boolean; campaign?: string; error?: string }> {
   await requireAuth()
 
   const clean = normalizeCampaignTag(campaign)
@@ -360,5 +360,8 @@ export async function updatePostCampaign(
 
   revalidatePath('/admin/content')
   revalidatePath('/admin/analytics')
-  return { ok: true }
+  // Return the normalised value: the caller's typed text and what actually got
+  // stored can differ (spaces become hyphens, etc), and the copy button must hand
+  // out a link with the tag the database actually holds.
+  return { ok: true, campaign: clean }
 }
