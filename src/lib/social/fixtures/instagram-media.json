@@ -1,0 +1,31 @@
+{
+  "media": {
+    "id": "17912345678901234",
+    "caption": "Rutina de gimnasio completa 💪 link en bio",
+    "media_type": "VIDEO",
+    "media_product_type": "REELS",
+    "media_url": "https://scontent.cdninstagram.com/v/video.mp4",
+    "thumbnail_url": "https://scontent.cdninstagram.com/v/thumb.jpg",
+    "permalink": "https://www.instagram.com/reel/C8xK2Lp/",
+    "timestamp": "2026-08-12T18:22:04+0000"
+  },
+  "insights": {
+    "data": [
+      { "name": "views", "values": [{ "value": 42130 }] },
+      { "name": "reach", "values": [{ "value": 38104 }] },
+      { "name": "likes", "values": [{ "value": 3211 }] },
+      { "name": "comments", "values": [{ "value": 180 }] },
+      { "name": "saved", "values": [{ "value": 640 }] },
+      { "name": "shares", "values": [{ "value": 212 }] }
+    ]
+  },
+  "imageMedia": {
+    "id": "17998877665544332",
+    "caption": null,
+    "media_type": "IMAGE",
+    "media_url": "https://scontent.cdninstagram.com/v/foto.jpg",
+    "permalink": "https://www.instagram.com/p/C9aB3Cd/",
+    "timestamp": "2026-08-01T12:00:00+0000"
+  },
+  "imageInsights": { "data": [{ "name": "reach", "values": [{ "value": 900 }] }] }
+}
