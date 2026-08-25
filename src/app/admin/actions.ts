@@ -321,8 +321,8 @@ export async function syncSocialNow(): Promise<{ ok?: boolean; error?: string }>
     report = await syncAll()
   } catch (error) {
     // syncAll settles every network on its own, so a throw here is the orchestrator
-    // itself failing. Letting it propagate would reach the button as an opaque server
-    // -action digest instead of the sentence this function already returns for failures.
+    // itself failing. Letting it propagate would reach the button as an opaque digest
+    // instead of the sentence this function already returns for its other failures.
     console.error('Falló la sincronización de redes:', error)
     return { error: 'No se pudo sincronizar. Intenta de nuevo.' }
   }

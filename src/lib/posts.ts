@@ -1,8 +1,8 @@
 import 'server-only'
 import { and, desc, eq, gte, inArray, isNull, lte, sql, type SQL } from 'drizzle-orm'
 import { clicks, getDb, postMetrics, socialAccounts, socialPosts, visits } from '@/db'
-import type { Filters } from './analytics'
-import { SITE_TIMEZONE } from './analytics'
+import type { Filters, Granularity } from './analytics'
+import { SITE_TIMEZONE, describe, granularityFor, localDay } from './analytics'
 import { postKpisFrom, type PostKpis, type PostRow } from './posts-kpis'
 import { periodChange, type Snapshot } from './social/delta'
 
@@ -31,19 +31,23 @@ export type CampaignPost = {
 
 const int = (fragment: SQL) => sql<number>`${fragment}`.mapWith(Number)
 
-function day(date: Date): string {
-  return new Intl.DateTimeFormat('en-CA', {
-    timeZone: SITE_TIMEZONE,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  }).format(date)
-}
+/**
+ * The publication date as the table shows it. Formatted here rather than in the client
+ * component: that component renders on the server first (in the runtime's zone, UTC on
+ * Vercel) and then in the browser (in the viewer's), so a post published at 02:00 UTC
+ * read "25 ago" on one side and "24 ago" on the other — a hydration mismatch, and a day
+ * boundary drawn outside SITE_TIMEZONE either way.
+ */
+const PUBLISHED = new Intl.DateTimeFormat('es', {
+  day: 'numeric',
+  month: 'short',
+  timeZone: SITE_TIMEZONE,
+})
 
 export async function getPostRows(f: Filters, includeArchived = false): Promise<PostRow[]> {
   const db = getDb()
-  const from = day(f.from)
-  const to = day(f.to)
+  const from = localDay(f.from)
+  const to = localDay(f.to)
 
   const posts = await db
     .select()
@@ -136,7 +140,7 @@ export async function getPostRows(f: Filters, includeArchived = false): Promise<
       caption: post.caption,
       thumbnailUrl: post.thumbnailUrl,
       mediaType: post.mediaType,
-      publishedAt: post.publishedAt.toISOString(),
+      publishedLabel: PUBLISHED.format(post.publishedAt),
       campaign: post.campaign,
       archived: post.archivedAt !== null,
       views: views.current,
@@ -176,31 +180,41 @@ export type PostSeriesPoint = {
   visits: number
 }
 
-const TICK = new Intl.DateTimeFormat('es', { day: 'numeric', month: 'short', timeZone: 'UTC' })
-const FULL = new Intl.DateTimeFormat('es', {
-  weekday: 'long',
-  day: 'numeric',
-  month: 'long',
-  timeZone: 'UTC',
-})
+/**
+ * Snapshots are captured once a day, so an hourly bucket has nothing to put in 23 of
+ * every 24 slots — the day's whole gain would pile up at midnight and the rest of the
+ * chart would read as a flat zero. A day is the finest this series can honestly draw,
+ * whatever the range asks for.
+ */
+function seriesGranularity(f: Filters): Granularity {
+  const unit = granularityFor(f)
+  return unit === 'hour' ? 'day' : unit
+}
 
 /**
- * Views gained per day against the visits they drove.
+ * Views gained per bucket against the visits they drove.
  *
  * The `lag` window is what turns cumulative counters into daily gains, and the
  * `greatest(0, …)` absorbs the downward revisions Instagram occasionally publishes.
+ *
+ * Those daily gains are computed first and only then rolled up into the chosen bucket.
+ * Subtracting a week's edge snapshots instead would look equivalent and isn't: a post
+ * that grew and was then revised down inside the same week would come out understated,
+ * or negative, because the `greatest(0, …)` would never see the individual days.
  */
 export async function getPostSeries(f: Filters): Promise<PostSeriesPoint[]> {
   const tz = SITE_TIMEZONE
-  const from = day(f.from)
-  const to = day(f.to)
+  const unit = seriesGranularity(f)
+  const interval = unit === 'day' ? '1 day' : '1 week'
+  const from = localDay(f.from)
+  const to = localDay(f.to)
 
   const query = sql`
     with span as (
       select generate_series(
-        date_trunc('day', ${f.from}::timestamptz at time zone ${tz}),
-        date_trunc('day', ${f.to}::timestamptz at time zone ${tz}),
-        '1 day'::interval
+        date_trunc(${unit}, ${f.from}::timestamptz at time zone ${tz}),
+        date_trunc(${unit}, ${f.to}::timestamptz at time zone ${tz}),
+        ${interval}::interval
       ) as bucket
     ),
     gains as (
@@ -211,10 +225,11 @@ export async function getPostSeries(f: Filters): Promise<PostSeriesPoint[]> {
       where p.archived_at is null and m.views is not null and m.day <= ${to}
     ),
     g as (
-      select day, sum(gained)::int as total from gains where day >= ${from} group by 1
+      select date_trunc(${unit}, day::timestamp) as bucket, sum(gained)::int as total
+      from gains where day >= ${from} group by 1
     ),
     v as (
-      select date_trunc('day', vi.created_at at time zone ${tz}) as bucket, count(*) as total
+      select date_trunc(${unit}, vi.created_at at time zone ${tz}) as bucket, count(*) as total
       from ${visits} vi
       join ${socialPosts} p on p.campaign = vi.campaign
       where vi.created_at >= ${f.from} and vi.created_at <= ${f.to}
@@ -226,7 +241,7 @@ export async function getPostSeries(f: Filters): Promise<PostSeriesPoint[]> {
            coalesce(g.total, 0)::int as views,
            coalesce(v.total, 0)::int as visits
     from span
-    left join g on g.day = span.bucket::date
+    left join g on g.bucket = span.bucket
     left join v on v.bucket = span.bucket
     order by span.bucket
   `
@@ -238,16 +253,12 @@ export async function getPostSeries(f: Filters): Promise<PostSeriesPoint[]> {
     visits: number
   }>
 
-  return rows.map((row) => {
-    const at = new Date(`${row.bucket}T00:00:00Z`)
-    return {
-      bucket: row.bucket,
-      label: TICK.format(at),
-      fullLabel: FULL.format(at),
-      views: Number(row.views),
-      visits: Number(row.visits),
-    }
-  })
+  return rows.map((row) => ({
+    bucket: row.bucket,
+    ...describe(row.bucket, unit),
+    views: Number(row.views),
+    visits: Number(row.visits),
+  }))
 }
 
 const OAUTH_NETWORKS = new Set(['instagram', 'tiktok'])

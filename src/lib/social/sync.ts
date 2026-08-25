@@ -3,7 +3,7 @@ import { createHash } from 'node:crypto'
 import { and, eq, inArray, isNull } from 'drizzle-orm'
 import { getDb, postMetrics, socialAccounts, socialPosts } from '@/db'
 import type { SocialAccount } from '@/db'
-import { SITE_TIMEZONE } from '../analytics'
+import { localDay } from '../analytics'
 import { env } from '../env'
 import { postsToArchive } from './archive'
 import { campaignTagFor } from './campaign'
@@ -11,16 +11,6 @@ import type { FetchedPost } from './connector'
 import { CONNECTORS, connectorFor } from './index'
 
 export type SyncReport = Array<{ network: string; ok: boolean; posts: number; error?: string }>
-
-/** The dashboard buckets days in SITE_TIMEZONE, and a snapshot has to agree with it. */
-export function localDay(date: Date): string {
-  return new Intl.DateTimeFormat('en-CA', {
-    timeZone: SITE_TIMEZONE,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  }).format(date)
-}
 
 /**
  * YouTube has no OAuth to complete, so its account row is born the first time a sync

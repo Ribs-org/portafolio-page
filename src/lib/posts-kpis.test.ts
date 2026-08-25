@@ -10,7 +10,7 @@ function row(overrides: Partial<PostRow>): PostRow {
     caption: null,
     thumbnailUrl: null,
     mediaType: null,
-    publishedAt: '2026-08-01T00:00:00.000Z',
+    publishedLabel: '1 ago',
     campaign: 'reel-1',
     archived: false,
     views: null,

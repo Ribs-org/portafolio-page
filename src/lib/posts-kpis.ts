@@ -9,7 +9,12 @@ export type PostRow = {
   caption: string | null
   thumbnailUrl: string | null
   mediaType: string | null
-  publishedAt: string
+  /**
+   * Already formatted, in SITE_TIMEZONE. A raw timestamp would be formatted twice by
+   * the client component that renders it — once on the server, once in the browser —
+   * in two different zones, and the day boundary belongs to neither of them.
+   */
+  publishedLabel: string
   campaign: string
   /** Deleted on the network. Hidden unless the view asks for them. */
   archived: boolean

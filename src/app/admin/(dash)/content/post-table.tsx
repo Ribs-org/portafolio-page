@@ -21,8 +21,6 @@ const COLUMNS: Array<{ key: Column; label: string; hint?: string }> = [
   { key: 'pull', label: 'Arrastre' },
 ]
 
-const DATE = new Intl.DateTimeFormat('es', { day: 'numeric', month: 'short' })
-
 /** `—` and never `0`: no data and no traffic are different answers. */
 function num(value: number | null): string {
   return value === null ? '—' : formatNumber(value)
@@ -122,7 +120,7 @@ export function PostTable({ rows }: { rows: PostRow[] }) {
                       </span>
                     )}
                     <span className="font-mono text-[0.65rem] text-fg-faint">
-                      {networkLabel(row.network)} · {DATE.format(new Date(row.publishedAt))}
+                      {networkLabel(row.network)} · {row.publishedLabel}
                       {row.isNew ? ' · nuevo' : ''}
                     </span>
                     <CampaignCell postId={row.id} campaign={row.campaign} />
