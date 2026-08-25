@@ -119,6 +119,71 @@ npx vercel           # cuando quieras subirlo
 
 ---
 
+## Analítica de posts (opcional)
+
+El panel puede traer las métricas de tus posts desde Instagram, TikTok y YouTube y
+cruzarlas con el tráfico que cada uno te trajo. La columna que importa es **arrastre**:
+de cada mil personas que vieron el post, cuántas llegaron efectivamente a tu página.
+
+Sin configurar nada, la pestaña *Contenido* aparece vacía y el resto del sitio funciona
+igual. Cada red se activa por separado.
+
+### YouTube — sin trámite
+
+En [Google Cloud Console](https://console.cloud.google.com), crea un proyecto, habilita
+**YouTube Data API v3** y genera una API key. El channel id sale de
+[youtube.com/account_advanced](https://www.youtube.com/account_advanced).
+
+```
+YOUTUBE_API_KEY=AIza...
+YOUTUBE_CHANNEL_ID=UC...
+```
+
+### Instagram — cuenta profesional
+
+Necesitas una cuenta Business o Creator. No hace falta ligarla a una página de Facebook.
+
+En [developers.facebook.com](https://developers.facebook.com), crea una app, agrega el
+producto **Instagram**, y en *Business Login* configura como redirect URI:
+
+```
+https://TU-DOMINIO/api/social/instagram/callback
+```
+
+Copia el app id y el secret. Mientras la app esté en **modo desarrollo** y tú seas su
+dueño, no necesitas App Review.
+
+```
+INSTAGRAM_APP_ID=
+INSTAGRAM_APP_SECRET=
+```
+
+### TikTok
+
+En [developers.tiktok.com](https://developers.tiktok.com), registra una app, agrega el
+producto **Login Kit** con el scope `video.list`, y usa como redirect URI:
+
+```
+https://TU-DOMINIO/api/social/tiktok/callback
+```
+
+```
+TIKTOK_CLIENT_KEY=
+TIKTOK_CLIENT_SECRET=
+```
+
+### Conectar y sincronizar
+
+Con las variables puestas y un redeploy hecho, entra a `/admin/content` y aprieta
+*Conectar* en cada tarjeta. El `vercel.json` del repo declara una corrida diaria a las
+9:00 UTC; Vercel inyecta `CRON_SECRET` solo. También puedes apretar *Sincronizar ahora*
+cuando quieras.
+
+Después de sincronizar, cada post trae su etiqueta `?s=` lista. Copia el link de la fila,
+pégalo en el post, y de ahí en adelante el cruce es automático.
+
+---
+
 ## Atribuir tráfico a una pieza de contenido
 
 Agrega `?s=` al link que pones en la bio:

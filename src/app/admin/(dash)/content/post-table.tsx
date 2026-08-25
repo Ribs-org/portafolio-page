@@ -220,6 +220,7 @@ function CampaignCell({ postId, campaign }: { postId: string; campaign: string }
       .writeText(`${window.location.origin}/?s=${value}`)
       .then(() => {
         setCopied(true)
+        setError(null)
         setTimeout(() => setCopied(false), 1500)
       })
       .catch(() => setError('No se pudo copiar el link.'))
