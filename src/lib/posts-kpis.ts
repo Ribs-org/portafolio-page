@@ -1,6 +1,16 @@
-// Kept free of `server-only` on purpose: this is the one piece of the posts module
-// that a unit test — and the client table's row type — can import directly, without
-// dragging in the DB layer that the rest of `posts.ts` depends on.
+// Kept free of `server-only` on purpose: these are the pieces of the posts module that
+// a unit test — and the two client components under `admin/content` — can import
+// directly, without dragging in the DB layer that the rest of `posts.ts` depends on.
+
+export type ConnectionRow = {
+  network: string
+  handle: string | null
+  connected: boolean
+  lastSyncedAt: string | null
+  lastSyncError: string | null
+  /** YouTube is configured by environment and has no button. */
+  usesOAuth: boolean
+}
 
 export type PostRow = {
   id: string

@@ -4,7 +4,7 @@ import { useState, useTransition } from 'react'
 import { AlertTriangle, Check, RefreshCw } from 'lucide-react'
 import { disconnectNetwork, syncSocialNow } from '@/app/admin/actions'
 import { NEGATIVE, POSITIVE } from '@/components/charts/theme'
-import type { ConnectionRow } from '@/lib/posts'
+import type { ConnectionRow } from '@/lib/posts-kpis'
 import { networkLabel } from '@/lib/networks'
 import { cn } from '@/lib/utils'
 

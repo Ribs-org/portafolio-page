@@ -3,24 +3,20 @@ import { and, desc, eq, gte, inArray, isNull, lte, sql, type SQL } from 'drizzle
 import { clicks, getDb, postMetrics, socialAccounts, socialPosts, visits } from '@/db'
 import type { Filters, Granularity } from './analytics'
 import { SITE_TIMEZONE, describe, granularityFor, localDay } from './analytics'
-import { postKpisFrom, type PostKpis, type PostRow } from './posts-kpis'
+import {
+  postKpisFrom,
+  type ConnectionRow,
+  type PostKpis,
+  type PostRow,
+} from './posts-kpis'
 import { periodChange, type Snapshot } from './social/delta'
 
-// Re-exported so call sites only need one import line; the types and the pure
+// Re-exported so server call sites only need one import line; the types and the pure
 // summing function actually live in `posts-kpis.ts`, which stays free of
 // `server-only` so a test file can import it without pulling in the DB layer.
-export type { PostKpis, PostRow }
+// Client components must import them from there directly, not from here.
+export type { ConnectionRow, PostKpis, PostRow }
 export { postKpisFrom }
-
-export type ConnectionRow = {
-  network: string
-  handle: string | null
-  connected: boolean
-  lastSyncedAt: string | null
-  lastSyncError: string | null
-  /** YouTube is configured by environment and has no button. */
-  usesOAuth: boolean
-}
 
 export type CampaignPost = {
   network: string

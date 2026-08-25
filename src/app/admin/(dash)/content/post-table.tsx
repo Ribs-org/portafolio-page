@@ -210,11 +210,20 @@ function CampaignCell({ postId, campaign }: { postId: string; campaign: string }
   }
 
   function copy() {
+    // An insecure context (plain http against a LAN address, say) leaves
+    // `navigator.clipboard` undefined altogether, and reading `.writeText` off it throws
+    // synchronously — past the `.catch` below, which only ever sees a rejection.
+    const clipboard = navigator.clipboard
+    if (!clipboard) {
+      setError('No se pudo copiar el link.')
+      return
+    }
+
     // Built here rather than on the server so the URL matches whatever host the
     // dashboard is actually being used on. Chained off the actual write instead of
-    // assumed: a denied permission or an insecure context rejects, and a checkmark
-    // that lies is worse than no checkmark.
-    navigator.clipboard
+    // assumed: a denied permission rejects, and a checkmark that lies is worse than no
+    // checkmark.
+    clipboard
       .writeText(`${window.location.origin}/?s=${value}`)
       .then(() => {
         setCopied(true)

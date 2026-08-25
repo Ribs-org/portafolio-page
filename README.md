@@ -174,8 +174,12 @@ TIKTOK_CLIENT_SECRET=
 
 ### Conectar y sincronizar
 
-Con las variables puestas y un redeploy hecho, entra a `/admin/content` y aprieta
-*Conectar* en cada tarjeta. El `vercel.json` del repo declara una corrida diaria a las
+Antes que nada, `npm run db:push`: la analítica de posts agrega tablas nuevas, y este
+proyecto no lleva archivos de migración. Si el deploy sale antes que el esquema,
+`/admin/analytics` responde 500 y el cron también.
+
+Con eso hecho, las variables puestas y un redeploy encima, entra a `/admin/content` y
+aprieta *Conectar* en cada tarjeta. El `vercel.json` del repo declara una corrida diaria a las
 9:00 UTC; Vercel inyecta `CRON_SECRET` solo. También puedes apretar *Sincronizar ahora*
 cuando quieras.
 
