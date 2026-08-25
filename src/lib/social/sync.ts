@@ -166,9 +166,11 @@ export async function syncNetwork(network: string): Promise<number> {
     return fetched.length
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
+    // `lastSyncedAt` deliberately untouched: this run fetched nothing, and stamping it
+    // would leave the card reading "Sincronizado recién" over an empty day.
     await db
       .update(socialAccounts)
-      .set({ lastSyncedAt: new Date(), lastSyncError: message.slice(0, 500) })
+      .set({ lastSyncError: message.slice(0, 500) })
       .where(eq(socialAccounts.id, account.id))
     throw error
   }
@@ -180,9 +182,15 @@ export async function syncNetwork(network: string): Promise<number> {
  * reason it was defensible to take on three integrations at once.
  */
 export async function syncAll(): Promise<SyncReport> {
-  await ensureYouTubeAccount()
-
-  const results = await Promise.allSettled(CONNECTORS.map((c) => syncNetwork(c.network)))
+  const results = await Promise.allSettled(
+    CONNECTORS.map(async (connector) => {
+      // Inside the settled slot, not before it: awaited outside, an unreachable DB or a
+      // constraint surprise here would reject syncAll and cost Instagram and TikTok the
+      // day's snapshot too, over a row neither of them uses.
+      if (connector.network === 'youtube') await ensureYouTubeAccount()
+      return syncNetwork(connector.network)
+    }),
+  )
 
   return CONNECTORS.map((connector, i) => {
     const result = results[i]!

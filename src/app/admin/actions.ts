@@ -315,7 +315,17 @@ export async function syncSocialNow(): Promise<{ ok?: boolean; error?: string }>
   // Deferred: syncAll pulls in the three connectors and the token-crypto helpers behind
   // it, weight that the rest of this file's actions have no reason to carry.
   const { syncAll } = await import('@/lib/social/sync')
-  const report = await syncAll()
+
+  let report
+  try {
+    report = await syncAll()
+  } catch (error) {
+    // syncAll settles every network on its own, so a throw here is the orchestrator
+    // itself failing. Letting it propagate would reach the button as an opaque server
+    // -action digest instead of the sentence this function already returns for failures.
+    console.error('Falló la sincronización de redes:', error)
+    return { error: 'No se pudo sincronizar. Intenta de nuevo.' }
+  }
 
   revalidatePath('/admin/content')
 

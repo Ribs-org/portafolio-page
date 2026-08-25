@@ -13,6 +13,16 @@ export async function GET(request: Request) {
     return new NextResponse('No autorizado', { status: 401 })
   }
 
-  const report = await syncAll()
-  return NextResponse.json({ report })
+  try {
+    const report = await syncAll()
+    return NextResponse.json({ report })
+  } catch (error) {
+    // syncAll settles every network on its own, so getting here means the orchestrator
+    // itself broke. An unhandled rejection would hand the operator a framework 500 page
+    // with nothing in it; this keeps the answer shaped like the all-networks-failed case,
+    // which already reports its failures in the body.
+    console.error('Falló la sincronización de redes:', error)
+    const message = error instanceof Error ? error.message : String(error)
+    return NextResponse.json({ report: [], error: message })
+  }
 }
