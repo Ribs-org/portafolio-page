@@ -6,10 +6,11 @@ import { redirect } from 'next/navigation'
 import { headers } from 'next/headers'
 import { put } from '@vercel/blob'
 import { and, eq, max, ne, sql } from 'drizzle-orm'
-import { getDb, links, profiles } from '@/db'
+import { getDb, links, profiles, socialAccounts, socialPosts } from '@/db'
 import { LINK_KINDS, type LinkKind } from '@/db/schema'
 import { SITE_TIMEZONE } from '@/lib/analytics'
 import { createSession, destroySession, isAuthenticated, passwordMatches } from '@/lib/auth'
+import { normalizeCampaignTag } from '@/lib/social/campaign'
 import { fromZonedInput, normalizeUrl, slugify } from '@/lib/utils'
 
 export type FormState = { error?: string; ok?: boolean }
@@ -295,6 +296,11 @@ export async function uploadImage(formData: FormData): Promise<{ url?: string; e
 
 /* ------------------------------------------------------------------ social -- */
 
+/**
+ * Best effort only: serverless instances are ephemeral and there may be several, so
+ * this slows down repeated presses of the sync button from one instance rather than
+ * enforcing any real limit.
+ */
 let lastSyncStartedAt = 0
 const SYNC_COOLDOWN_MS = 5 * 60 * 1000
 
@@ -306,6 +312,8 @@ export async function syncSocialNow(): Promise<{ ok?: boolean; error?: string }>
   }
   lastSyncStartedAt = Date.now()
 
+  // Deferred: syncAll pulls in the three connectors and the token-crypto helpers behind
+  // it, weight that the rest of this file's actions have no reason to carry.
   const { syncAll } = await import('@/lib/social/sync')
   const report = await syncAll()
 
@@ -321,7 +329,6 @@ export async function syncSocialNow(): Promise<{ ok?: boolean; error?: string }>
 export async function disconnectNetwork(network: string): Promise<void> {
   await requireAuth()
 
-  const { socialAccounts } = await import('@/db')
   // Posts and metrics survive: the traffic they brought really happened.
   await getDb().delete(socialAccounts).where(eq(socialAccounts.network, network))
 
@@ -334,16 +341,21 @@ export async function updatePostCampaign(
 ): Promise<{ ok?: boolean; error?: string }> {
   await requireAuth()
 
-  const clean = campaign.trim().replace(/[^A-Za-z0-9_-]+/g, '-').slice(0, 48)
+  const clean = normalizeCampaignTag(campaign)
   if (!clean) return { error: 'La etiqueta no puede quedar vacía.' }
-
-  const { socialPosts } = await import('@/db')
 
   try {
     await getDb().update(socialPosts).set({ campaign: clean }).where(eq(socialPosts.id, postId))
-  } catch {
-    // The unique index is what rejects it; two posts sharing a tag would merge histories.
-    return { error: 'Otra pieza de contenido ya usa esa etiqueta.' }
+  } catch (error) {
+    // Deferred with syncAll's rationale: isCampaignUniqueViolation lives in sync.ts,
+    // which pulls in the connector tree, and that weight has no reason to load just to
+    // save a campaign tag.
+    const { isCampaignUniqueViolation } = await import('@/lib/social/sync')
+    if (isCampaignUniqueViolation(error)) {
+      // The unique index is what rejects it; two posts sharing a tag would merge histories.
+      return { error: 'Otra pieza de contenido ya usa esa etiqueta.' }
+    }
+    return { error: 'No se pudo guardar. Intenta de nuevo.' }
   }
 
   revalidatePath('/admin/content')

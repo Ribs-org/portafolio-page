@@ -45,7 +45,7 @@ async function ensureYouTubeAccount(): Promise<void> {
 // unrelated unique violation (e.g. a future constraint on the table) that should propagate.
 const CAMPAIGN_UNIQUE_CONSTRAINT = 'social_posts_campaign_unique'
 
-function isCampaignUniqueViolation(error: unknown): boolean {
+export function isCampaignUniqueViolation(error: unknown): boolean {
   if (!(error instanceof Error)) return false
   const withPgFields = error as Error & { code?: string; constraint?: string }
   return withPgFields.code === '23505' && withPgFields.constraint === CAMPAIGN_UNIQUE_CONSTRAINT

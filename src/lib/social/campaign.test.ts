@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { campaignTagFor } from './campaign'
+import { campaignTagFor, normalizeCampaignTag } from './campaign'
 
 describe('campaignTagFor', () => {
   it('prefija según la red', () => {
@@ -26,5 +26,12 @@ describe('campaignTagFor', () => {
 
   it('cae a la red misma como prefijo cuando no la conoce', () => {
     expect(campaignTagFor('threads', 'abc')).toBe('threads-abc')
+  })
+})
+
+describe('normalizeCampaignTag', () => {
+  it('reduce una entrada hecha solo de símbolos a cadena vacía', () => {
+    expect(normalizeCampaignTag('😀😀😀')).toBe('')
+    expect(normalizeCampaignTag('###???')).toBe('')
   })
 })
