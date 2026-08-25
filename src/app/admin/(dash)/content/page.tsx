@@ -85,11 +85,11 @@ export default async function ContentPage({
       <Connections rows={connections} />
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <StatTile label="Views" value={formatNumber(kpis.views)} hint="En el período" />
+        <StatTile label="Views" value={formatNumber(kpis.views)} hint="Ganadas en el período" />
         <StatTile
           label="Interacciones"
           value={formatNumber(kpis.engagement)}
-          hint="Likes, comentarios y compartidos"
+          hint="Likes, comentarios y compartidos del período"
         />
         <StatTile
           label="Visitas desde posts"
@@ -106,7 +106,7 @@ export default async function ContentPage({
       <div className="mt-4 grid gap-4">
         <Panel
           title="Tus posts"
-          hint="Ordena por cualquier columna. Arrastre es visitas sobre views — lo que ninguna de las dos plataformas calcula sola."
+          hint="Ordena por cualquier columna. Arrastre es visitas sobre views ganadas en el período — lo que ninguna de las dos plataformas calcula sola. La columna Views muestra el acumulado, con lo ganado al lado."
           action={
             <Link
               href={archivedToggleHref(params, includeArchived)}

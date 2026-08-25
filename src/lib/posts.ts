@@ -121,6 +121,9 @@ export async function getPostRows(f: Filters, includeArchived = false): Promise<
       list.map((s) => ({ day: s.day, value: s[key] }))
 
     const views = periodChange(snapshotsOf('views'), from, to)
+    const likes = periodChange(snapshotsOf('likes'), from, to)
+    const comments = periodChange(snapshotsOf('comments'), from, to)
+    const shares = periodChange(snapshotsOf('shares'), from, to)
     const pasted = seen.has(post.campaign)
     const traffic = visitMap.get(post.campaign)
     const visitCount = pasted ? (traffic?.total ?? 0) : null
@@ -138,10 +141,13 @@ export async function getPostRows(f: Filters, includeArchived = false): Promise<
       archived: post.archivedAt !== null,
       views: views.current,
       viewsChange: views.change,
+      likesChange: likes.change,
+      commentsChange: comments.change,
+      sharesChange: shares.change,
       isNew: views.isNew,
-      likes: periodChange(snapshotsOf('likes'), from, to).current,
-      comments: periodChange(snapshotsOf('comments'), from, to).current,
-      shares: periodChange(snapshotsOf('shares'), from, to).current,
+      likes: likes.current,
+      comments: comments.current,
+      shares: shares.current,
       saves: periodChange(snapshotsOf('saves'), from, to).current,
       reach: periodChange(snapshotsOf('reach'), from, to).current,
       visits: visitCount,
@@ -151,9 +157,12 @@ export async function getPostRows(f: Filters, includeArchived = false): Promise<
         visitCount !== null && visitCount > 0 && clickCount !== null
           ? (clickCount / visitCount) * 100
           : null,
+      // Against the views *gained* this period, never the lifetime counter: the
+      // visits above are counted inside the window, so the divisor has to be too.
+      // A post that gained nothing yields null, which is the honest answer.
       pull:
-        views.current !== null && views.current > 0 && visitCount !== null
-          ? (visitCount / views.current) * 100
+        views.change !== null && views.change > 0 && visitCount !== null
+          ? (visitCount / views.change) * 100
           : null,
     }
   })
