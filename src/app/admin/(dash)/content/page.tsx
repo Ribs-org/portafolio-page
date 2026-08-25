@@ -1,9 +1,10 @@
 import Link from 'next/link'
 import { Panel } from '@/components/charts/panel'
 import { StatTile } from '@/components/charts/stat-tile'
+import { TrafficChart } from '@/components/charts/traffic-chart'
 import { FilterBar } from '@/components/filter-bar'
 import { parseFilters } from '@/lib/filters'
-import { getConnections, getPostRows, postKpisFrom } from '@/lib/posts'
+import { getConnections, getPostRows, getPostSeries, postKpisFrom } from '@/lib/posts'
 import { getAllProfiles } from '@/lib/profiles'
 import { formatNumber, formatPercent } from '@/lib/utils'
 import { Connections } from './connections'
@@ -41,10 +42,11 @@ export default async function ContentPage({
   const filters = parseFilters(params)
   const includeArchived = params.archivados === '1'
 
-  const [profiles, connections, rows] = await Promise.all([
+  const [profiles, connections, rows, series] = await Promise.all([
     getAllProfiles(),
     getConnections(),
     getPostRows(filters, includeArchived),
+    getPostSeries(filters),
   ])
 
   // Derived from the same rows the table renders, so the tiles above never
@@ -82,7 +84,7 @@ export default async function ContentPage({
         />
       </div>
 
-      <div className="mt-4">
+      <div className="mt-4 grid gap-4">
         <Panel
           title="Tus posts"
           hint="Ordena por cualquier columna. Arrastre es visitas sobre views — lo que ninguna de las dos plataformas calcula sola."
@@ -96,6 +98,19 @@ export default async function ContentPage({
           }
         >
           <PostTable rows={rows} />
+        </Panel>
+
+        <Panel
+          title="Views ganadas por día"
+          hint="Cuánto creció el alcance contra cuánta gente llegó efectivamente a tu página"
+        >
+          <TrafficChart
+            data={series}
+            series={[
+              { key: 'views', name: 'Views ganadas' },
+              { key: 'visits', name: 'Visitas' },
+            ]}
+          />
         </Panel>
       </div>
     </>
