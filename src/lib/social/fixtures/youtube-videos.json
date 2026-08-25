@@ -1,0 +1,27 @@
+{
+  "items": [
+    {
+      "id": "dQw4w9WgXcQ",
+      "snippet": {
+        "publishedAt": "2026-08-12T14:03:11Z",
+        "title": "Cómo edito mis reels",
+        "thumbnails": {
+          "medium": { "url": "https://i.ytimg.com/vi/dQw4w9WgXcQ/mqdefault.jpg" },
+          "high": { "url": "https://i.ytimg.com/vi/dQw4w9WgXcQ/hqdefault.jpg" }
+        }
+      },
+      "statistics": { "viewCount": "8412", "likeCount": "402", "commentCount": "51" },
+      "contentDetails": { "duration": "PT8M12S" }
+    },
+    {
+      "id": "aBcDeFgHiJk",
+      "snippet": {
+        "publishedAt": "2026-08-20T09:00:00Z",
+        "title": "Short de prueba",
+        "thumbnails": { "medium": { "url": "https://i.ytimg.com/vi/aBcDeFgHiJk/mqdefault.jpg" } }
+      },
+      "statistics": { "viewCount": "1203" },
+      "contentDetails": { "duration": "PT41S" }
+    }
+  ]
+}

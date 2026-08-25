@@ -1,0 +1,120 @@
+import type { SocialAccount } from '@/db'
+import { env } from '../env'
+import { NO_METRICS, type Connector, type FetchedPost } from './connector'
+
+export type YouTubeVideo = {
+  id: string
+  snippet?: {
+    publishedAt?: string
+    title?: string
+    thumbnails?: Record<string, { url?: string } | undefined>
+  }
+  statistics?: { viewCount?: string; likeCount?: string; commentCount?: string }
+  contentDetails?: { duration?: string }
+}
+
+const MAX_POSTS = 200
+const PAGE_SIZE = 50
+
+/** `null` rather than 0: YouTube omits a counter the creator chose to hide. */
+function count(raw: string | undefined): number | null {
+  if (raw === undefined) return null
+  const parsed = Number(raw)
+  return Number.isFinite(parsed) ? parsed : null
+}
+
+/** ISO 8601 duration to seconds. Only the shapes YouTube actually emits. */
+function durationSeconds(raw: string | undefined): number | null {
+  const match = /^PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?$/.exec(raw ?? '')
+  if (!match) return null
+  const [, h, m, s] = match
+  return Number(h ?? 0) * 3600 + Number(m ?? 0) * 60 + Number(s ?? 0)
+}
+
+export function normalizeYouTubeVideo(item: YouTubeVideo): FetchedPost {
+  const seconds = durationSeconds(item.contentDetails?.duration)
+  const thumbnails = item.snippet?.thumbnails ?? {}
+
+  return {
+    externalId: item.id,
+    permalink: `https://www.youtube.com/watch?v=${item.id}`,
+    caption: item.snippet?.title ?? null,
+    thumbnailUrl: thumbnails.medium?.url ?? thumbnails.high?.url ?? null,
+    mediaType: seconds !== null && seconds < 60 ? 'short' : 'video',
+    publishedAt: new Date(item.snippet?.publishedAt ?? 0),
+    metrics: {
+      ...NO_METRICS,
+      views: count(item.statistics?.viewCount),
+      likes: count(item.statistics?.likeCount),
+      comments: count(item.statistics?.commentCount),
+    },
+  }
+}
+
+async function getJson(url: string): Promise<Record<string, unknown>> {
+  const response = await fetch(url)
+  if (!response.ok) {
+    throw new Error(`YouTube ${response.status}: ${(await response.text()).slice(0, 200)}`)
+  }
+  return response.json()
+}
+
+async function uploadsPlaylistId(channelId: string, apiKey: string): Promise<string> {
+  const data = (await getJson(
+    `https://www.googleapis.com/youtube/v3/channels?part=contentDetails&id=${channelId}&key=${apiKey}`,
+  )) as { items?: Array<{ contentDetails?: { relatedPlaylists?: { uploads?: string } } }> }
+
+  const uploads = data.items?.[0]?.contentDetails?.relatedPlaylists?.uploads
+  if (!uploads) throw new Error(`No uploads playlist for channel ${channelId}`)
+  return uploads
+}
+
+export const youtubeConnector: Connector = {
+  network: 'youtube',
+
+  // No OAuth: the Data API serves public statistics against an API key alone.
+  async ensureCredential() {
+    return env('YOUTUBE_API_KEY') ?? null
+  },
+
+  async fetchPosts(account: SocialAccount, token: string | null): Promise<FetchedPost[]> {
+    const apiKey = token
+    const channelId = account.externalId ?? env('YOUTUBE_CHANNEL_ID')
+    if (!apiKey || !channelId) return []
+
+    const playlist = await uploadsPlaylistId(channelId, apiKey)
+    const ids: string[] = []
+    let pageToken = ''
+
+    while (ids.length < MAX_POSTS) {
+      const page = (await getJson(
+        `https://www.googleapis.com/youtube/v3/playlistItems?part=contentDetails` +
+          `&playlistId=${playlist}&maxResults=${PAGE_SIZE}&key=${apiKey}` +
+          (pageToken ? `&pageToken=${pageToken}` : ''),
+      )) as {
+        items?: Array<{ contentDetails?: { videoId?: string } }>
+        nextPageToken?: string
+      }
+
+      for (const item of page.items ?? []) {
+        if (item.contentDetails?.videoId) ids.push(item.contentDetails.videoId)
+      }
+      if (!page.nextPageToken) break
+      pageToken = page.nextPageToken
+    }
+
+    const posts: FetchedPost[] = []
+    // videos.list costs one quota unit per call regardless of how many ids it carries,
+    // so the batch size is what keeps a 200-video channel at four units a day.
+    for (let i = 0; i < ids.length; i += PAGE_SIZE) {
+      const batch = ids.slice(i, i + PAGE_SIZE).join(',')
+      const data = (await getJson(
+        `https://www.googleapis.com/youtube/v3/videos?part=snippet,statistics,contentDetails` +
+          `&id=${batch}&key=${apiKey}`,
+      )) as { items?: YouTubeVideo[] }
+      posts.push(...(data.items ?? []).map(normalizeYouTubeVideo))
+    }
+
+    return posts
+  },
+}
