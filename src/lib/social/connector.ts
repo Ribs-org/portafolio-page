@@ -30,6 +30,13 @@ export type Connector = {
   fetchPosts(account: SocialAccount, token: string | null): Promise<FetchedPost[]>
 }
 
+/**
+ * The shared ceiling every connector pages up to. One place so the orchestrator can
+ * compare a fetch's length against it to tell a truncated window from a full one —
+ * see `postsToArchive`, which needs that distinction to judge deletions safely.
+ */
+export const MAX_POSTS_PER_SYNC = 200
+
 /** Every metric absent — the starting point a connector fills in with what it has. */
 export const NO_METRICS: PostMetricValues = {
   views: null,

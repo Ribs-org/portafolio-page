@@ -1,6 +1,6 @@
 import type { SocialAccount } from '@/db'
 import { env } from '../env'
-import { NO_METRICS, type Connector, type FetchedPost } from './connector'
+import { MAX_POSTS_PER_SYNC, NO_METRICS, type Connector, type FetchedPost } from './connector'
 
 export type YouTubeVideo = {
   id: string
@@ -13,7 +13,6 @@ export type YouTubeVideo = {
   contentDetails?: { duration?: string }
 }
 
-const MAX_POSTS = 200
 const PAGE_SIZE = 50
 // Bounds page fetches independently of how many ids a page actually yields: a page can
 // return zero eligible `videoId` entries (e.g. every video on it was deleted) while the
@@ -94,7 +93,7 @@ export const youtubeConnector: Connector = {
     let pageToken = ''
     let pagesFetched = 0
 
-    while (ids.length < MAX_POSTS && pagesFetched < MAX_PLAYLIST_PAGES) {
+    while (ids.length < MAX_POSTS_PER_SYNC && pagesFetched < MAX_PLAYLIST_PAGES) {
       const page = (await getJson(
         `https://www.googleapis.com/youtube/v3/playlistItems?part=contentDetails` +
           `&playlistId=${playlist}&maxResults=${PAGE_SIZE}&key=${apiKey}` +
@@ -106,7 +105,7 @@ export const youtubeConnector: Connector = {
       pagesFetched++
 
       for (const item of page.items ?? []) {
-        if (ids.length >= MAX_POSTS) break
+        if (ids.length >= MAX_POSTS_PER_SYNC) break
         if (item.contentDetails?.videoId) ids.push(item.contentDetails.videoId)
       }
       if (!page.nextPageToken) break

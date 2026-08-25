@@ -1,10 +1,9 @@
 import type { SocialAccount } from '@/db'
 import { env } from '../env'
-import { NO_METRICS, type Connector, type FetchedPost } from './connector'
+import { MAX_POSTS_PER_SYNC, NO_METRICS, type Connector, type FetchedPost } from './connector'
 import { decryptToken } from './crypto'
 
 const API = 'https://open.tiktokapis.com/v2'
-const MAX_POSTS = 200
 const PAGE_SIZE = 20
 // Bounds page fetches independently of how many videos a page actually yields: a page can
 // return `has_more: true` with an empty `videos` array, which would otherwise starve the
@@ -120,7 +119,7 @@ export const tiktokConnector: Connector = {
     let cursor: number | undefined
     let pagesFetched = 0
 
-    while (videos.length < MAX_POSTS && pagesFetched < MAX_VIDEO_PAGES) {
+    while (videos.length < MAX_POSTS_PER_SYNC && pagesFetched < MAX_VIDEO_PAGES) {
       const response = await fetch(`${API}/video/list/?fields=${fields}`, {
         method: 'POST',
         headers: {
@@ -139,7 +138,7 @@ export const tiktokConnector: Connector = {
       pagesFetched++
 
       for (const item of payload.data?.videos ?? []) {
-        if (videos.length >= MAX_POSTS) break
+        if (videos.length >= MAX_POSTS_PER_SYNC) break
         videos.push(item)
       }
 
@@ -147,6 +146,6 @@ export const tiktokConnector: Connector = {
       cursor = payload.data.cursor
     }
 
-    return videos.slice(0, MAX_POSTS).map(normalizeTikTokVideo)
+    return videos.slice(0, MAX_POSTS_PER_SYNC).map(normalizeTikTokVideo)
   },
 }

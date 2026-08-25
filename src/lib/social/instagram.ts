@@ -1,9 +1,14 @@
 import type { SocialAccount } from '@/db'
-import { NO_METRICS, type Connector, type FetchedPost, type PostMetricValues } from './connector'
+import {
+  MAX_POSTS_PER_SYNC,
+  NO_METRICS,
+  type Connector,
+  type FetchedPost,
+  type PostMetricValues,
+} from './connector'
 import { decryptToken } from './crypto'
 
 const GRAPH = 'https://graph.instagram.com/v23.0'
-const MAX_POSTS = 200
 const PAGE_SIZE = 50
 // Bounds page fetches independently of how many items a page actually yields: Instagram
 // can return an empty `data: []` while still handing back a `paging.next` cursor, which
@@ -141,7 +146,7 @@ export const instagramConnector: Connector = {
     let next = `${GRAPH}/me/media?fields=${fields}&limit=${PAGE_SIZE}&access_token=${token}`
     let pagesFetched = 0
 
-    while (next && media.length < MAX_POSTS && pagesFetched < MAX_MEDIA_PAGES) {
+    while (next && media.length < MAX_POSTS_PER_SYNC && pagesFetched < MAX_MEDIA_PAGES) {
       const page = (await getJson(next)) as {
         data?: InstagramMedia[]
         paging?: { next?: string }
@@ -149,7 +154,7 @@ export const instagramConnector: Connector = {
       pagesFetched++
 
       for (const item of page.data ?? []) {
-        if (media.length >= MAX_POSTS) break
+        if (media.length >= MAX_POSTS_PER_SYNC) break
         media.push(item)
       }
       next = page.paging?.next ?? ''
@@ -157,7 +162,7 @@ export const instagramConnector: Connector = {
 
     const metrics = 'views,reach,likes,comments,saved,shares'
     const posts: FetchedPost[] = []
-    // Sequential chunks rather than one Promise.all over every post: up to MAX_POSTS
+    // Sequential chunks rather than one Promise.all over every post: up to MAX_POSTS_PER_SYNC
     // concurrent requests risks a 429 from the Graph API, and since a non-404 insights
     // failure now aborts the whole sync (see below), keeping concurrency low keeps that
     // risk low. Wall-clock doesn't matter — this runs once a day from a cron.
