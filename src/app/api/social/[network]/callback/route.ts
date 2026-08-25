@@ -1,17 +1,11 @@
 import { NextResponse } from 'next/server'
-import { jwtVerify } from 'jose'
 import { getDb, socialAccounts } from '@/db'
 import { isAuthenticated } from '@/lib/auth'
 import { env } from '@/lib/env'
 import { encryptToken } from '@/lib/social/crypto'
+import { oauthStateMatches } from '@/lib/social/oauth-state'
 
 export const dynamic = 'force-dynamic'
-
-function secret(): Uint8Array {
-  const value = env('AUTH_SECRET')
-  if (!value) throw new Error('AUTH_SECRET is not set')
-  return new TextEncoder().encode(value)
-}
 
 type Credential = {
   accessToken: string
@@ -133,8 +127,11 @@ export async function GET(
   if (!code || !state) return back('La red no devolvió el código de autorización.')
 
   try {
-    const { payload } = await jwtVerify(state, secret())
-    if (payload.network !== network) return back('El estado no corresponde a esa red.')
+    // Verifies, but as something other than a state we minted for this network — a
+    // session cookie replayed here would land exactly there.
+    if (!(await oauthStateMatches(state, network))) {
+      return back('El estado no corresponde a esa red.')
+    }
   } catch {
     return back('El enlace de conexión expiró. Inténtalo de nuevo.')
   }

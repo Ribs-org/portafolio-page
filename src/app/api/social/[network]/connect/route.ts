@@ -1,19 +1,13 @@
 import { NextResponse } from 'next/server'
-import { SignJWT } from 'jose'
 import { isAuthenticated } from '@/lib/auth'
 import { env } from '@/lib/env'
+import { signOAuthState } from '@/lib/social/oauth-state'
 
 export const dynamic = 'force-dynamic'
 
 const SCOPES: Record<string, string> = {
   instagram: 'instagram_business_basic,instagram_business_manage_insights',
   tiktok: 'user.info.basic,video.list',
-}
-
-function secret(): Uint8Array {
-  const value = env('AUTH_SECRET')
-  if (!value) throw new Error('AUTH_SECRET is not set')
-  return new TextEncoder().encode(value)
 }
 
 export async function GET(
@@ -31,11 +25,7 @@ export async function GET(
 
   // A signed, short-lived state is what stops a stranger's callback from writing
   // their tokens into this dashboard.
-  const state = await new SignJWT({ network })
-    .setProtectedHeader({ alg: 'HS256' })
-    .setIssuedAt()
-    .setExpirationTime('10m')
-    .sign(secret())
+  const state = await signOAuthState(network)
 
   if (network === 'instagram') {
     const appId = env('INSTAGRAM_APP_ID')

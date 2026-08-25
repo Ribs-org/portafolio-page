@@ -4,6 +4,8 @@ import { env } from './env'
 
 const COOKIE_NAME = 'pf_session'
 const MAX_AGE_SECONDS = 60 * 60 * 24 * 30
+/** The claim that marks a token as a session cookie and nothing else. See `isAuthenticated`. */
+const SESSION_ROLE = 'admin'
 
 function secret(): Uint8Array {
   const value = env('AUTH_SECRET')
@@ -28,7 +30,7 @@ export function passwordMatches(candidate: string): boolean {
 }
 
 export async function createSession(): Promise<void> {
-  const token = await new SignJWT({ role: 'admin' })
+  const token = await new SignJWT({ role: SESSION_ROLE })
     .setProtectedHeader({ alg: 'HS256' })
     .setIssuedAt()
     .setExpirationTime(`${MAX_AGE_SECONDS}s`)
@@ -49,13 +51,20 @@ export async function destroySession(): Promise<void> {
   store.delete(COOKIE_NAME)
 }
 
+/**
+ * A valid signature is not enough. `AUTH_SECRET` also signs the short-lived OAuth
+ * `state` token, which travels through a query string to instagram.com and lands in
+ * browser history and their logs — so accepting any token this key verifies would make
+ * that value a ten-minute admin session for whoever read it off a URL. Requiring the
+ * `role` claim that only `createSession` mints is what keeps the two apart.
+ */
 export async function isAuthenticated(): Promise<boolean> {
   const store = await cookies()
   const token = store.get(COOKIE_NAME)?.value
   if (!token) return false
   try {
-    await jwtVerify(token, secret())
-    return true
+    const { payload } = await jwtVerify(token, secret())
+    return payload.role === SESSION_ROLE
   } catch {
     return false
   }
