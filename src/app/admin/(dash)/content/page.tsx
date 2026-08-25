@@ -16,6 +16,9 @@ export const dynamic = 'force-dynamic'
  * Toggles `archivados` while carrying every other search param along — range,
  * profile and bots all live in the URL (see `FilterBar`), and this link must not
  * silently reset them just because it targets a different query key.
+ *
+ * `mensaje` is the exception: it is the one-shot outcome of an OAuth callback, so
+ * carrying it would pin a stale "instagram conectado." to every later navigation.
  */
 function archivedToggleHref(
   params: Record<string, string | string[] | undefined>,
@@ -23,7 +26,7 @@ function archivedToggleHref(
 ): string {
   const next = new URLSearchParams()
   for (const [key, value] of Object.entries(params)) {
-    if (key === 'archivados') continue
+    if (key === 'archivados' || key === 'mensaje') continue
     if (typeof value === 'string') next.set(key, value)
     else if (Array.isArray(value)) for (const v of value) next.append(key, v)
   }
@@ -41,6 +44,12 @@ export default async function ContentPage({
   const params = await searchParams
   const filters = parseFilters(params)
   const includeArchived = params.archivados === '1'
+
+  // What `/api/social/[network]/callback` has to say about the connection attempt that
+  // just bounced back here. Truncated because the value is a query param: it reaches the
+  // page as text either way, but a hand-crafted link should not get to paste an essay
+  // above the cards.
+  const mensaje = typeof params.mensaje === 'string' ? params.mensaje.slice(0, 200) : null
 
   const [profiles, connections, rows, series] = await Promise.all([
     getAllProfiles(),
@@ -63,6 +72,16 @@ export default async function ContentPage({
       </header>
 
       <FilterBar profiles={profiles} />
+
+      {mensaje ? (
+        <p
+          role="status"
+          className="surface mb-4 rounded-2xl px-4 py-3 text-[0.82rem] leading-relaxed text-fg-muted"
+        >
+          {mensaje}
+        </p>
+      ) : null}
+
       <Connections rows={connections} />
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
