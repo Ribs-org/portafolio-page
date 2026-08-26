@@ -7,7 +7,7 @@ export const metadata: Metadata = {
 }
 
 /** Must match the address in the privacy page — a fork changes both. */
-const CONTACTO = 'TU-EMAIL@EJEMPLO.COM'
+const CONTACTO = 'vicente.pareja.jones@gmail.com'
 
 const ACTUALIZADO = '26 de agosto de 2026'
 
