@@ -1,3 +1,4 @@
+import Link from 'next/link'
 import { BarList } from '@/components/charts/bar-list'
 import { CampaignTable } from '@/components/charts/campaign-table'
 import { Donut } from '@/components/charts/donut'
@@ -28,6 +29,7 @@ import {
 } from '@/lib/analytics'
 import { parseFilters } from '@/lib/filters'
 import { networkLabel } from '@/lib/networks'
+import { getCampaignPosts } from '@/lib/posts'
 import { getAllProfiles } from '@/lib/profiles'
 import { countryName, flagEmoji, formatNumber, formatPercent } from '@/lib/utils'
 
@@ -92,6 +94,8 @@ export default async function AnalyticsPage({
     getRecentVisits(filters),
   ])
 
+  const campaignPosts = await getCampaignPosts(campaigns.map((c) => c.campaign))
+
   const [topLinks, funnel] = await Promise.all([
     getTopLinks(filters, kpis.visits),
     getFunnel(filters, kpis),
@@ -123,8 +127,16 @@ export default async function AnalyticsPage({
         <Panel
           title="Qué contenido te trae gente"
           hint="Cada etiqueta ?s= es una pieza de contenido. Ordena por CTR para ver cuál convierte."
+          action={
+            <Link
+              href="/admin/content"
+              className="text-[0.75rem] text-fg-faint transition-colors hover:text-fg"
+            >
+              Ver por post →
+            </Link>
+          }
         >
-          <CampaignTable rows={campaigns} />
+          <CampaignTable rows={campaigns} posts={Object.fromEntries(campaignPosts)} />
         </Panel>
 
         <div className="grid gap-4 lg:grid-cols-2">

@@ -59,6 +59,50 @@ export function Button({
   )
 }
 
+/**
+ * The switch on its own, for rows that already say what it controls.
+ *
+ * `label` is the accessible name, never drawn. Anything that needs visible text
+ * beside it wants `Toggle`, which composes this one — rendering an empty label
+ * here would leave the parent's gap as dead space next to the switch.
+ */
+export function Switch({
+  label,
+  id,
+  checked,
+  onChange,
+  className,
+}: {
+  label: string
+  id?: string
+  checked: boolean
+  onChange: (value: boolean) => void
+  className?: string
+}) {
+  return (
+    <button
+      type="button"
+      id={id}
+      role="switch"
+      aria-label={label}
+      aria-checked={checked}
+      onClick={() => onChange(!checked)}
+      className={cn(
+        'relative h-5 w-9 shrink-0 rounded-full transition-colors',
+        checked ? 'bg-white/40' : 'bg-white/10',
+        className,
+      )}
+    >
+      <span
+        className={cn(
+          'absolute top-0.5 h-4 w-4 rounded-full bg-fg transition-transform',
+          checked ? 'translate-x-[1.15rem]' : 'translate-x-0.5',
+        )}
+      />
+    </button>
+  )
+}
+
 export function Toggle({
   label,
   hint,
@@ -75,24 +119,8 @@ export function Toggle({
   const id = useId()
   return (
     <div className="flex items-start gap-3">
-      <button
-        type="button"
-        id={id}
-        role="switch"
-        aria-checked={checked}
-        onClick={() => onChange(!checked)}
-        className={cn(
-          'relative mt-0.5 h-5 w-9 shrink-0 rounded-full transition-colors',
-          checked ? 'bg-white/40' : 'bg-white/10',
-        )}
-      >
-        <span
-          className={cn(
-            'absolute top-0.5 h-4 w-4 rounded-full bg-fg transition-transform',
-            checked ? 'translate-x-[1.15rem]' : 'translate-x-0.5',
-          )}
-        />
-      </button>
+      {/* mt-0.5 lines the switch up with the first line of the label, not the block. */}
+      <Switch id={id} label={label} checked={checked} onChange={onChange} className="mt-0.5" />
       <label htmlFor={id} className="cursor-pointer select-none">
         <span className="block text-sm">{label}</span>
         {hint ? <span className="block text-[0.72rem] text-fg-faint">{hint}</span> : null}

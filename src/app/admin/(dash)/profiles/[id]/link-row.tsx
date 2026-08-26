@@ -6,7 +6,7 @@ import { CSS } from '@dnd-kit/utilities'
 import { Check, ChevronDown, GripVertical, Trash2 } from 'lucide-react'
 import { ICON_NAMES } from '@/components/icon'
 import { ImageField } from '@/components/image-field'
-import { Button, Field, Input, Select, Toggle } from '@/components/ui'
+import { Button, Field, Input, Select, Switch } from '@/components/ui'
 import { cn, displayHost } from '@/lib/utils'
 import { deleteLink, updateLink, type FormState } from '../../../actions'
 
@@ -96,8 +96,8 @@ export function LinkRow({
           />
         </button>
 
-        <Toggle
-          label=""
+        <Switch
+          label={`${link.isActive ? 'Apagar' : 'Prender'} ${link.label || 'este link'}`}
           checked={link.isActive}
           onChange={(value) => {
             onChange({ isActive: value })

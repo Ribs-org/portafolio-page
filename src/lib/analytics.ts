@@ -6,6 +6,23 @@ import { env } from './env'
 /** Dashboard days are bucketed in this zone, not UTC. Override per deployment. */
 export const SITE_TIMEZONE = env('SITE_TIMEZONE') ?? 'America/Santiago'
 
+/**
+ * The `YYYY-MM-DD` a moment falls on in SITE_TIMEZONE.
+ *
+ * Shared rather than copied: the sync writes a snapshot's `day` with it and the query
+ * layer buckets by it, so the two agreeing is what keeps a metric on the day it was
+ * actually captured. Two identical copies under two names are one careless edit away
+ * from silently disagreeing.
+ */
+export function localDay(date: Date): string {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: SITE_TIMEZONE,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(date)
+}
+
 export type Filters = {
   profileId: string | null
   from: Date
@@ -99,7 +116,10 @@ const MONTHS_LONG = [
  * holds wall-clock time in SITE_TIMEZONE, so re-parsing it as an instant would
  * shift it a second time.
  */
-function describe(bucket: string, unit: Granularity): { label: string; fullLabel: string } {
+export function describe(
+  bucket: string,
+  unit: Granularity,
+): { label: string; fullLabel: string } {
   const [datePart, hourPart] = bucket.split('T')
   const [year, month, day] = datePart!.split('-').map(Number) as [number, number, number]
   const hour = hourPart ? Number(hourPart) : 0

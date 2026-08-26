@@ -1,11 +1,13 @@
 import {
   boolean,
+  date,
   doublePrecision,
   index,
   integer,
   pgTable,
   text,
   timestamp,
+  unique,
   uuid,
 } from 'drizzle-orm/pg-core'
 
@@ -127,7 +129,93 @@ export const clicks = pgTable(
   ],
 )
 
+export const SOCIAL_NETWORKS = ['instagram', 'tiktok', 'youtube'] as const
+export type SocialNetwork = (typeof SOCIAL_NETWORKS)[number]
+
+/**
+ * One connected network. Tokens are stored encrypted — see `lib/social/crypto`.
+ * YouTube needs no OAuth, so it lands here with both tokens null and only a channel id.
+ */
+export const socialAccounts = pgTable('social_accounts', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  network: text('network').notNull().unique(),
+  handle: text('handle'),
+  externalId: text('external_id'),
+  accessToken: text('access_token'),
+  refreshToken: text('refresh_token'),
+  expiresAt: timestamp('expires_at', { withTimezone: true }),
+  lastSyncedAt: timestamp('last_synced_at', { withTimezone: true }),
+  lastSyncError: text('last_sync_error'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+})
+
+/**
+ * A published piece of content.
+ *
+ * `campaign` is the `?s=` tag that joins this post to `visits`. The join is by string
+ * and not by foreign key on purpose: visits are written long before the post exists
+ * here, and editing the tag re-links the whole history without migrating a row.
+ * The sync never overwrites it.
+ *
+ * `archivedAt` marks a post deleted on the network. The row survives — dropping it
+ * would erase traffic that really happened.
+ */
+export const socialPosts = pgTable(
+  'social_posts',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    network: text('network').notNull(),
+    externalId: text('external_id').notNull(),
+    permalink: text('permalink'),
+    caption: text('caption'),
+    thumbnailUrl: text('thumbnail_url'),
+    mediaType: text('media_type'),
+    publishedAt: timestamp('published_at', { withTimezone: true }).notNull(),
+    campaign: text('campaign').notNull().unique(),
+    archivedAt: timestamp('archived_at', { withTimezone: true }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    unique('social_posts_network_external_key').on(t.network, t.externalId),
+    index('social_posts_campaign_idx').on(t.campaign),
+    index('social_posts_published_idx').on(t.publishedAt),
+  ],
+)
+
+/**
+ * One cumulative snapshot per post per local day — cumulative because that is what
+ * all three APIs return. A period's growth is the difference between two snapshots.
+ *
+ * Every metric is nullable: null means the network does not report it, which is not
+ * the same as zero. TikTok has no saves or reach; the YouTube Data API has no shares
+ * or saves.
+ *
+ * The unique on `(postId, day)` is what makes the sync idempotent.
+ */
+export const postMetrics = pgTable(
+  'post_metrics',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    postId: uuid('post_id')
+      .notNull()
+      .references(() => socialPosts.id, { onDelete: 'cascade' }),
+    day: date('day').notNull(),
+    views: integer('views'),
+    likes: integer('likes'),
+    comments: integer('comments'),
+    shares: integer('shares'),
+    saves: integer('saves'),
+    reach: integer('reach'),
+    capturedAt: timestamp('captured_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [unique('post_metrics_post_day_key').on(t.postId, t.day), index('post_metrics_day_idx').on(t.day)],
+)
+
 export type Profile = typeof profiles.$inferSelect
 export type Link = typeof links.$inferSelect
 export type Visit = typeof visits.$inferSelect
 export type Click = typeof clicks.$inferSelect
+export type SocialAccount = typeof socialAccounts.$inferSelect
+export type SocialPost = typeof socialPosts.$inferSelect
+export type PostMetric = typeof postMetrics.$inferSelect

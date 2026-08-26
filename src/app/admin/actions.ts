@@ -6,10 +6,12 @@ import { redirect } from 'next/navigation'
 import { headers } from 'next/headers'
 import { put } from '@vercel/blob'
 import { and, eq, max, ne, sql } from 'drizzle-orm'
-import { getDb, links, profiles } from '@/db'
+import { getDb, links, profiles, socialAccounts, socialPosts } from '@/db'
 import { LINK_KINDS, type LinkKind } from '@/db/schema'
+import { SITE_TIMEZONE } from '@/lib/analytics'
 import { createSession, destroySession, isAuthenticated, passwordMatches } from '@/lib/auth'
-import { normalizeUrl, slugify } from '@/lib/utils'
+import { normalizeCampaignTag } from '@/lib/social/campaign'
+import { fromZonedInput, normalizeUrl, slugify } from '@/lib/utils'
 
 export type FormState = { error?: string; ok?: boolean }
 
@@ -164,8 +166,6 @@ export async function rotateSlug(profileId: string) {
 
 function readLinkForm(formData: FormData) {
   const kind = String(formData.get('kind') ?? 'standard')
-  const startsAt = String(formData.get('startsAt') ?? '')
-  const endsAt = String(formData.get('endsAt') ?? '')
 
   return {
     kind: (LINK_KINDS as readonly string[]).includes(kind) ? (kind as LinkKind) : 'standard',
@@ -175,8 +175,10 @@ function readLinkForm(formData: FormData) {
     icon: String(formData.get('icon') ?? '').trim() || null,
     imageUrl: String(formData.get('imageUrl') ?? '').trim() || null,
     isActive: formData.get('isActive') === 'on',
-    startsAt: startsAt ? new Date(startsAt) : null,
-    endsAt: endsAt ? new Date(endsAt) : null,
+    // Read in the same zone the editor rendered them in, so re-saving a link —
+    // which the row toggle does on every click — leaves the window untouched.
+    startsAt: fromZonedInput(String(formData.get('startsAt') ?? ''), SITE_TIMEZONE),
+    endsAt: fromZonedInput(String(formData.get('endsAt') ?? ''), SITE_TIMEZONE),
   }
 }
 
@@ -290,4 +292,86 @@ export async function uploadImage(formData: FormData): Promise<{ url?: string; e
     console.error('[upload] failed', error)
     return { error: 'No se pudo subir la imagen.' }
   }
+}
+
+/* ------------------------------------------------------------------ social -- */
+
+/**
+ * Best effort only: serverless instances are ephemeral and there may be several, so
+ * this slows down repeated presses of the sync button from one instance rather than
+ * enforcing any real limit.
+ */
+let lastSyncStartedAt = 0
+const SYNC_COOLDOWN_MS = 5 * 60 * 1000
+
+export async function syncSocialNow(): Promise<{ ok?: boolean; error?: string }> {
+  await requireAuth()
+
+  if (Date.now() - lastSyncStartedAt < SYNC_COOLDOWN_MS) {
+    return { error: 'Espera unos minutos antes de volver a sincronizar.' }
+  }
+  lastSyncStartedAt = Date.now()
+
+  // Deferred: syncAll pulls in the three connectors and the token-crypto helpers behind
+  // it, weight that the rest of this file's actions have no reason to carry.
+  const { syncAll } = await import('@/lib/social/sync')
+
+  let report
+  try {
+    report = await syncAll()
+  } catch (error) {
+    // syncAll settles every network on its own, so a throw here is the orchestrator
+    // itself failing. Letting it propagate would reach the button as an opaque digest
+    // instead of the sentence this function already returns for its other failures.
+    console.error('Falló la sincronización de redes:', error)
+    return { error: 'No se pudo sincronizar. Intenta de nuevo.' }
+  }
+
+  revalidatePath('/admin/content')
+
+  const failed = report.filter((r) => !r.ok)
+  if (failed.length === report.length) {
+    return { error: 'Ninguna red respondió. Revisa las tarjetas de conexión.' }
+  }
+  return { ok: true }
+}
+
+export async function disconnectNetwork(network: string): Promise<void> {
+  await requireAuth()
+
+  // Posts and metrics survive: the traffic they brought really happened.
+  await getDb().delete(socialAccounts).where(eq(socialAccounts.network, network))
+
+  revalidatePath('/admin/content')
+}
+
+export async function updatePostCampaign(
+  postId: string,
+  campaign: string,
+): Promise<{ ok?: boolean; campaign?: string; error?: string }> {
+  await requireAuth()
+
+  const clean = normalizeCampaignTag(campaign)
+  if (!clean) return { error: 'La etiqueta no puede quedar vacía.' }
+
+  try {
+    await getDb().update(socialPosts).set({ campaign: clean }).where(eq(socialPosts.id, postId))
+  } catch (error) {
+    // Deferred with syncAll's rationale: isCampaignUniqueViolation lives in sync.ts,
+    // which pulls in the connector tree, and that weight has no reason to load just to
+    // save a campaign tag.
+    const { isCampaignUniqueViolation } = await import('@/lib/social/sync')
+    if (isCampaignUniqueViolation(error)) {
+      // The unique index is what rejects it; two posts sharing a tag would merge histories.
+      return { error: 'Otra pieza de contenido ya usa esa etiqueta.' }
+    }
+    return { error: 'No se pudo guardar. Intenta de nuevo.' }
+  }
+
+  revalidatePath('/admin/content')
+  revalidatePath('/admin/analytics')
+  // Return the normalised value: the caller's typed text and what actually got
+  // stored can differ (spaces become hyphens, etc), and the copy button must hand
+  // out a link with the tag the database actually holds.
+  return { ok: true, campaign: clean }
 }

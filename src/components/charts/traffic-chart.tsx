@@ -9,17 +9,26 @@ import {
   XAxis,
   YAxis,
 } from 'recharts'
-import type { SeriesPoint } from '@/lib/analytics'
 import { CHART, SERIES } from './theme'
 
-type Props = { data: SeriesPoint[] }
+type Series = { key: string; name: string }
+
+/** The dashboard's original pair, kept as the default so existing call sites are unchanged. */
+const DEFAULT_SERIES: [Series, Series] = [
+  { key: 'visits', name: 'Visitas' },
+  { key: 'clicks', name: 'Clicks' },
+]
+
+type ChartPoint = { label: string; fullLabel: string } & Record<string, string | number>
+
+type Props = { data: ChartPoint[]; series?: [Series, Series] }
 
 function TooltipCard({
   active,
   payload,
 }: {
   active?: boolean
-  payload?: Array<{ name?: string; value?: number; dataKey?: string; payload?: SeriesPoint }>
+  payload?: Array<{ name?: string; value?: number; dataKey?: string; payload?: ChartPoint }>
 }) {
   if (!active || !payload?.length) return null
   const point = payload[0]?.payload
@@ -42,8 +51,8 @@ function TooltipCard({
   )
 }
 
-export function TrafficChart({ data }: Props) {
-  const empty = data.every((point) => point.visits === 0 && point.clicks === 0)
+export function TrafficChart({ data, series = DEFAULT_SERIES }: Props) {
+  const empty = data.every((point) => !point[series[0].key] && !point[series[1].key])
 
   if (empty) {
     return (
@@ -56,10 +65,10 @@ export function TrafficChart({ data }: Props) {
   return (
     <>
       <ul className="mb-3 flex flex-wrap items-center gap-4 text-[0.78rem]">
-        {['Visitas', 'Clicks'].map((name, i) => (
-          <li key={name} className="flex items-center gap-1.5 text-fg-muted">
+        {series.map((entry, i) => (
+          <li key={entry.key} className="flex items-center gap-1.5 text-fg-muted">
             <span className="h-2 w-2 rounded-full" style={{ background: SERIES[i] }} aria-hidden />
-            {name}
+            {entry.name}
           </li>
         ))}
       </ul>
@@ -93,8 +102,8 @@ export function TrafficChart({ data }: Props) {
           <Tooltip cursor={{ stroke: CHART.axis, strokeWidth: 1 }} content={<TooltipCard />} />
           <Area
             type="monotone"
-            dataKey="visits"
-            name="Visitas"
+            dataKey={series[0].key}
+            name={series[0].name}
             stroke={SERIES[0]}
             strokeWidth={2}
             fill="url(#fill-0)"
@@ -103,8 +112,8 @@ export function TrafficChart({ data }: Props) {
           />
           <Area
             type="monotone"
-            dataKey="clicks"
-            name="Clicks"
+            dataKey={series[1].key}
+            name={series[1].name}
             stroke={SERIES[1]}
             strokeWidth={2}
             fill="url(#fill-1)"

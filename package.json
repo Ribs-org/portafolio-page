@@ -7,6 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "test": "vitest run",
     "typecheck": "tsc --noEmit",
     "setup": "tsx scripts/setup.ts",
     "db:setup": "npm run db:push && npm run db:seed",
@@ -48,6 +49,7 @@
     "eslint-config-next": "16.3.0",
     "tailwindcss": "^4",
     "tsx": "^4.23.12",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "^4.1.11"
   }
 }
