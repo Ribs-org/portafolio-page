@@ -159,6 +159,15 @@ usa todavía: se pide ahora porque los permisos se conceden una sola vez, al aut
 Copia el app id y el secret. Mientras la app esté en **modo desarrollo** y tú seas su
 dueño, no necesitas App Review.
 
+Si administras **más de una cuenta de Instagram**, hay que decir cuál es la que se
+conecta. Sin la variable, el callback se niega a elegir y te lo dice: el orden en que Meta
+lista tus páginas no es estable, y conectar sin querer otra cuenta archivaría el
+catálogo de la anterior. El id aparece en los logs del servidor al intentar conectar.
+
+```
+INSTAGRAM_IG_USER_ID=
+```
+
 ```
 INSTAGRAM_APP_ID=
 INSTAGRAM_APP_SECRET=
@@ -271,6 +280,7 @@ Vercel y bajan con `vercel env pull .env.local`.
 | `YOUTUBE_CHANNEL_ID` | Métricas de YouTube | No — sin ella esa red aparece como no conectada |
 | `INSTAGRAM_APP_ID` | Conectar Instagram | No — sin ella esa red aparece como no conectada |
 | `INSTAGRAM_APP_SECRET` | Conectar Instagram | No — sin ella esa red aparece como no conectada |
+| `INSTAGRAM_IG_USER_ID` | Elegir cuál de tus cuentas de Instagram se conecta | Solo si administras más de una: sin ella, conectar falla en vez de adivinar |
 | `TIKTOK_CLIENT_KEY` | Conectar TikTok | No — sin ella esa red aparece como no conectada |
 | `TIKTOK_CLIENT_SECRET` | Conectar TikTok | No — sin ella esa red aparece como no conectada |
 | `CRON_SECRET` | Autoriza la corrida diaria | No — la pone Vercel solo, al declarar el cron |

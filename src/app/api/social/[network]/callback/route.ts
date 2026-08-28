@@ -1,9 +1,14 @@
 import { NextResponse } from 'next/server'
+import { eq } from 'drizzle-orm'
 import { getDb, socialAccounts } from '@/db'
 import { isAuthenticated } from '@/lib/auth'
 import { env } from '@/lib/env'
 import { encryptToken } from '@/lib/social/crypto'
-import { pickInstagramAccount, type FacebookPages } from '@/lib/social/instagram'
+import {
+  InstagramAccountError,
+  pickInstagramAccount,
+  type FacebookPages,
+} from '@/lib/social/instagram'
 import { oauthStateMatches } from '@/lib/social/oauth-state'
 
 export const dynamic = 'force-dynamic'
@@ -63,9 +68,22 @@ async function instagramCredential(code: string, redirectUri: string): Promise<C
     `${GRAPH}/me/accounts?fields=name,instagram_business_account{id,username}&access_token=${token}`,
   )
   if (!pages.ok) throw new OAuthError(`No se pudieron leer las páginas de Facebook: ${pages.status}`)
-  const igAccount = pickInstagramAccount((await pages.json()) as FacebookPages)
-  if (!igAccount) {
-    throw new OAuthError('Ninguna página de Facebook tiene una cuenta de Instagram asociada.')
+
+  let igAccount
+  try {
+    igAccount = pickInstagramAccount(
+      (await pages.json()) as FacebookPages,
+      env('INSTAGRAM_IG_USER_ID'),
+    )
+  } catch (error) {
+    if (!(error instanceof InstagramAccountError)) throw error
+    // The message is one of the connector's own fixed sentences, so it is safe to show.
+    // The candidates are not: they carry usernames Meta sent us, and those only go to
+    // the server log, where they are what the owner needs to pick an id for the variable.
+    if (error.candidates.length > 0) {
+      console.error('Cuentas de Instagram disponibles:', error.candidates)
+    }
+    throw new OAuthError(error.message)
   }
 
   return {
@@ -151,6 +169,30 @@ export async function GET(
 
   try {
     const credential = await fetchCredential(network, code, redirectUri)
+
+    // Refuse to move a connected network onto a different account.
+    //
+    // `external_id` is what the sync fetches posts for, while `social_posts` is keyed on
+    // the network alone. Overwrite the id and the next cron run compares account B's
+    // media against account A's stored posts, finds none of them, and — as long as B
+    // returned something and fewer than MAX_POSTS_PER_SYNC items — archives A's entire
+    // catalogue in a single statement. Reconnecting to A afterwards only clears
+    // `archivedAt` for posts still inside the newest window; everything older stays
+    // archived permanently. Disconnecting first is the deliberate, recoverable path.
+    const [existing] = await getDb()
+      .select({ externalId: socialAccounts.externalId })
+      .from(socialAccounts)
+      .where(eq(socialAccounts.network, network))
+
+    if (
+      existing?.externalId &&
+      credential.externalId &&
+      existing.externalId !== credential.externalId
+    ) {
+      throw new OAuthError(
+        'Esa cuenta no es la que ya está conectada en esta red. Desconéctala primero si de verdad quieres cambiarla.',
+      )
+    }
 
     await getDb()
       .insert(socialAccounts)

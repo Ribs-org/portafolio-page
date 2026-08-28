@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import fixture from './fixtures/instagram-media.json'
 import {
+  AMBIGUOUS_INSTAGRAM_ACCOUNT,
+  InstagramAccountError,
+  NO_INSTAGRAM_ACCOUNT,
+  PINNED_INSTAGRAM_ACCOUNT_MISSING,
   normalizeInstagramMedia,
   pickInstagramAccount,
   type FacebookPages,
@@ -90,16 +94,16 @@ describe('pickInstagramAccount', () => {
     })
   })
 
-  it('devuelve null si ninguna página tiene cuenta de Instagram', () => {
+  it('falla si ninguna página tiene cuenta de Instagram', () => {
     const pages: FacebookPages = {
       data: [{ id: '61550000000005', name: 'Solo Facebook' }],
     }
-    expect(pickInstagramAccount(pages)).toBeNull()
+    expect(() => pickInstagramAccount(pages)).toThrowError(NO_INSTAGRAM_ACCOUNT)
   })
 
-  it('devuelve null cuando no hay páginas', () => {
-    expect(pickInstagramAccount({ data: [] })).toBeNull()
-    expect(pickInstagramAccount({})).toBeNull()
+  it('falla cuando no hay páginas', () => {
+    expect(() => pickInstagramAccount({ data: [] })).toThrowError(NO_INSTAGRAM_ACCOUNT)
+    expect(() => pickInstagramAccount({})).toThrowError(NO_INSTAGRAM_ACCOUNT)
   })
 
   it('acepta una cuenta sin username en vez de inventarlo', () => {
@@ -107,5 +111,79 @@ describe('pickInstagramAccount', () => {
       data: [{ id: '6155000000006', instagram_business_account: { id: '17841400000000010' } }],
     }
     expect(pickInstagramAccount(pages)).toEqual({ id: '17841400000000010', username: null })
+  })
+
+  // El dueño tiene tres cuentas de Instagram, así que este es el caso real, no el raro.
+  const tresCuentas: FacebookPages = {
+    data: [
+      {
+        id: '61550000000010',
+        name: 'Personal',
+        instagram_business_account: { id: '17841400000000101', username: 'vicente' },
+      },
+      { id: '61550000000011', name: 'Página sin Instagram' },
+      {
+        id: '61550000000012',
+        name: 'Gimnasio',
+        instagram_business_account: { id: '17841400000000102', username: 'gimnasio' },
+      },
+      {
+        id: '61550000000013',
+        name: 'Proyecto',
+        instagram_business_account: { id: '17841400000000103', username: 'proyecto' },
+      },
+    ],
+  }
+
+  it('se niega a elegir cuando hay varias candidatas', () => {
+    // Nunca la primera: el orden en que Meta lista las páginas no es una promesa, y
+    // adivinar aquí archiva el catálogo de la cuenta anterior.
+    expect(() => pickInstagramAccount(tresCuentas)).toThrowError(AMBIGUOUS_INSTAGRAM_ACCOUNT)
+  })
+
+  it('con varias candidatas elige la fijada, no la primera', () => {
+    expect(pickInstagramAccount(tresCuentas, '17841400000000103')).toEqual({
+      id: '17841400000000103',
+      username: 'proyecto',
+    })
+  })
+
+  it('falla si la cuenta fijada no está entre las disponibles', () => {
+    expect(() => pickInstagramAccount(tresCuentas, '17841400000000999')).toThrowError(
+      PINNED_INSTAGRAM_ACCOUNT_MISSING,
+    )
+  })
+
+  it('deja las candidatas en el error, no en el mensaje', () => {
+    // Los usernames vienen de Meta: sirven para el log del servidor, nunca para el texto
+    // que se le muestra a nadie.
+    try {
+      pickInstagramAccount(tresCuentas)
+      expect.unreachable('debía lanzar')
+    } catch (error) {
+      expect(error).toBeInstanceOf(InstagramAccountError)
+      const accountError = error as InstagramAccountError
+      expect(accountError.message).toBe(AMBIGUOUS_INSTAGRAM_ACCOUNT)
+      expect(accountError.message).not.toContain('gimnasio')
+      expect(accountError.candidates).toEqual([
+        { id: '17841400000000101', username: 'vicente' },
+        { id: '17841400000000102', username: 'gimnasio' },
+        { id: '17841400000000103', username: 'proyecto' },
+      ])
+    }
+  })
+
+  it('una sola candidata sigue sin necesitar la variable', () => {
+    const pages: FacebookPages = {
+      data: [
+        { id: '61550000000014', name: 'Sin Instagram' },
+        {
+          id: '61550000000015',
+          name: 'La única',
+          instagram_business_account: { id: '17841400000000104', username: 'unica' },
+        },
+      ],
+    }
+    expect(pickInstagramAccount(pages)).toEqual({ id: '17841400000000104', username: 'unica' })
   })
 })

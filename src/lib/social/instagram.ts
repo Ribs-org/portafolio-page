@@ -50,20 +50,63 @@ export type FacebookPages = {
 export type InstagramAccount = { id: string; username: string | null }
 
 /**
+ * Why picking the account can fail loudly. `message` is always one of the fixed Spanish
+ * sentences below — never upstream text — so the callback can show it as-is. The
+ * candidates ride along separately for the server log: usernames come from Meta, and
+ * upstream text does not belong in anything the browser renders.
+ */
+export class InstagramAccountError extends Error {
+  constructor(
+    message: string,
+    public readonly candidates: InstagramAccount[] = [],
+  ) {
+    super(message)
+  }
+}
+
+export const NO_INSTAGRAM_ACCOUNT =
+  'Ninguna página de Facebook tiene una cuenta de Instagram asociada.'
+export const AMBIGUOUS_INSTAGRAM_ACCOUNT =
+  'Hay varias cuentas de Instagram disponibles. Define INSTAGRAM_IG_USER_ID con el id de la que quieres conectar.'
+export const PINNED_INSTAGRAM_ACCOUNT_MISSING =
+  'INSTAGRAM_IG_USER_ID no coincide con ninguna de las cuentas de Instagram disponibles.'
+
+/**
  * Finds the Instagram account behind the owner's Facebook Pages.
  *
  * Facebook Login hands back Pages, not Instagram accounts: the Instagram user id the
  * whole sync is keyed on only exists as a nested field on whichever Page owns it, and
- * most Pages carry none at all. Picking the first Page and reading its id would store a
- * Page id where an Instagram id belongs — the media endpoint would then answer for the
- * wrong asset, or not at all, with nothing in the data to say which happened.
+ * most Pages carry none at all.
+ *
+ * Taking the first candidate is only safe when there is exactly one. The owner has
+ * several Instagram accounts, and the order Meta lists Pages in is not a promise —
+ * a Page added or removed can change it. Silently connecting a different account than
+ * last time is not a cosmetic error: `sync.ts` would fetch account B's media, find every
+ * post of account A missing from it, and archive A's whole back catalogue in one
+ * statement. Reconnecting to A afterwards only un-archives what still fits in the newest
+ * `MAX_POSTS_PER_SYNC`; anything older stays archived for good. So when the answer is
+ * ambiguous this throws instead of guessing, and `pinnedId` (from INSTAGRAM_IG_USER_ID)
+ * is how the owner makes it unambiguous.
  */
-export function pickInstagramAccount(pages: FacebookPages): InstagramAccount | null {
+export function pickInstagramAccount(
+  pages: FacebookPages,
+  pinnedId?: string,
+): InstagramAccount {
+  const candidates: InstagramAccount[] = []
   for (const page of pages.data ?? []) {
     const linked = page.instagram_business_account
-    if (linked?.id) return { id: linked.id, username: linked.username ?? null }
+    if (linked?.id) candidates.push({ id: linked.id, username: linked.username ?? null })
   }
-  return null
+
+  if (pinnedId) {
+    const pinned = candidates.find((candidate) => candidate.id === pinnedId)
+    if (!pinned) throw new InstagramAccountError(PINNED_INSTAGRAM_ACCOUNT_MISSING, candidates)
+    return pinned
+  }
+
+  if (candidates.length === 0) throw new InstagramAccountError(NO_INSTAGRAM_ACCOUNT)
+  if (candidates.length === 1) return candidates[0]!
+  throw new InstagramAccountError(AMBIGUOUS_INSTAGRAM_ACCOUNT, candidates)
 }
 
 const METRIC_NAMES: Record<string, keyof PostMetricValues> = {

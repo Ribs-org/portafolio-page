@@ -49,6 +49,14 @@ export function Connections({ rows }: { rows: ConnectionRow[] }) {
               {row.handle ?? (row.connected ? 'Conectado' : 'Sin conectar')}
             </p>
 
+            {/* El handle se ve bien aunque el id de abajo sea el de otra cuenta, y esa
+                diferencia es justo la que archiva un catálogo entero. Mejor a la vista. */}
+            {row.externalId ? (
+              <p className="mt-0.5 truncate font-mono text-[0.68rem] text-fg-faint">
+                {row.externalId}
+              </p>
+            ) : null}
+
             <p className="mt-0.5 font-mono text-[0.68rem] text-fg-faint">
               Sincronizado {syncedAgo(row.lastSyncedAt)}
             </p>

@@ -268,6 +268,7 @@ export async function getConnections(): Promise<ConnectionRow[]> {
     return {
       network,
       handle: account?.handle ?? null,
+      externalId: account?.externalId ?? null,
       connected: Boolean(account),
       lastSyncedAt: account?.lastSyncedAt?.toISOString() ?? null,
       lastSyncError: account?.lastSyncError ?? null,
