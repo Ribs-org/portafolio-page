@@ -8,7 +8,7 @@ export const metadata: Metadata = {
 /** The one value a fork has to change before deploying these pages. */
 const CONTACTO = 'vicente.pareja.jones@gmail.com'
 
-const ACTUALIZADO = '26 de agosto de 2026'
+const ACTUALIZADO = '28 de agosto de 2026'
 
 export default function PrivacidadPage() {
   return (
@@ -89,8 +89,11 @@ export default function PrivacidadPage() {
         </p>
         <ul className="space-y-2 leading-relaxed text-fg-muted">
           <li>
-            Los tokens de acceso se guardan <span className="text-fg">cifrados</span> (AES-256-GCM)
-            y se usan únicamente para pedir esas métricas.
+            Los tokens de acceso se guardan <span className="text-fg">cifrados</span> (AES-256-GCM).
+            Hoy se usan únicamente para pedir esas métricas. La conexión con Instagram pide
+            además permiso para publicar, pensando en una función futura del panel:{' '}
+            <span className="text-fg">por ahora no se publica nada</span>, ni desde el panel ni
+            de forma automática.
           </li>
           <li>
             Se guardan los datos públicos de esas publicaciones: identificador, enlace,
