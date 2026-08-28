@@ -5,6 +5,7 @@ import {
   InstagramAccountError,
   NO_INSTAGRAM_ACCOUNT,
   PINNED_INSTAGRAM_ACCOUNT_MISSING,
+  instagramTokenExpiry,
   normalizeInstagramMedia,
   pickInstagramAccount,
   type FacebookPages,
@@ -185,5 +186,28 @@ describe('pickInstagramAccount', () => {
       ],
     }
     expect(pickInstagramAccount(pages)).toEqual({ id: '17841400000000104', username: 'unica' })
+  })
+})
+
+describe('instagramTokenExpiry', () => {
+  it('usa los ~60 días documentados cuando Meta no dice nada', () => {
+    const expiry = instagramTokenExpiry(undefined)
+    expect(expiry).not.toBeNull()
+    const days = (expiry!.getTime() - Date.now()) / 864e5
+    expect(days).toBeGreaterThan(59)
+    expect(days).toBeLessThan(61)
+  })
+
+  it('respeta el plazo que venga', () => {
+    const expiry = instagramTokenExpiry(3600)
+    const minutes = (expiry!.getTime() - Date.now()) / 60000
+    expect(minutes).toBeGreaterThan(59)
+    expect(minutes).toBeLessThan(61)
+  })
+
+  it('lee un cero como «no vence», no como «venció recién»', () => {
+    // Con `?? 5184000` el cero pasaba de largo y se guardaba Date.now(): una credencial
+    // buena marcada como muerta en el mismo instante de escribirla.
+    expect(instagramTokenExpiry(0)).toBeNull()
   })
 })

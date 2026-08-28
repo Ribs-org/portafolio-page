@@ -168,6 +168,17 @@ catálogo de la anterior. El id aparece en los logs del servidor al intentar con
 INSTAGRAM_IG_USER_ID=
 ```
 
+#### Renovar la conexión, cada ~60 días
+
+El token de Facebook dura unos 60 días. El cron intenta extenderlo una semana antes de que
+venza, pero **no está garantizado que eso funcione** sobre un token que ya es de larga
+duración: la vía documentada por Meta para uno que se está muriendo es volver a pasar por
+el login. Si el intento no sirve, la credencial caduca y la tarjeta de Instagram en
+**Contenido → Conexiones** se pone roja con el error de la API.
+
+Cuando pase, entra al panel, pulsa **Desconectar** y luego **Conectar** otra vez. El
+historial de métricas ya recogido no se toca. Cuenta con hacerlo cada dos meses más o menos.
+
 ```
 INSTAGRAM_APP_ID=
 INSTAGRAM_APP_SECRET=

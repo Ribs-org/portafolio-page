@@ -6,6 +6,7 @@ import { env } from '@/lib/env'
 import { encryptToken } from '@/lib/social/crypto'
 import {
   InstagramAccountError,
+  instagramTokenExpiry,
   pickInstagramAccount,
   type FacebookPages,
 } from '@/lib/social/instagram'
@@ -58,8 +59,13 @@ async function instagramCredential(code: string, redirectUri: string): Promise<C
   const long = await fetch(longUrl)
   if (!long.ok) throw new OAuthError(`Instagram no canjeó el token largo: ${long.status}`)
   const longData = (await long.json()) as { access_token?: string; expires_in?: number }
-
-  const token = longData.access_token ?? shortData.access_token
+  // Falling back to the short-lived token here used to be the tolerant thing to do, but
+  // `expiresAt` below is computed from the *long* response: a 200 without a token would
+  // store a credential good for about an hour stamped as good for sixty days. The sync
+  // would then fail every night for two months without `ensureCredential` ever trying an
+  // exchange, because by that stamp nothing was expiring.
+  if (!longData.access_token) throw new OAuthError('Instagram no devolvió el token largo')
+  const token = longData.access_token
 
   // Facebook Login authorizes a person, not one Instagram account, so the id the sync
   // is keyed on has to be discovered through the Pages this person administers. Failing
@@ -89,7 +95,7 @@ async function instagramCredential(code: string, redirectUri: string): Promise<C
   return {
     accessToken: token,
     refreshToken: null,
-    expiresAt: new Date(Date.now() + (longData.expires_in ?? 5184000) * 1000),
+    expiresAt: instagramTokenExpiry(longData.expires_in),
     externalId: igAccount.id,
     handle: igAccount.username ? `@${igAccount.username}` : null,
   }

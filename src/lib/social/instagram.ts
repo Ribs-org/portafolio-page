@@ -109,6 +109,19 @@ export function pickInstagramAccount(
   throw new InstagramAccountError(AMBIGUOUS_INSTAGRAM_ACCOUNT, candidates)
 }
 
+/**
+ * When the stored credential should be considered dead.
+ *
+ * `expires_in: 0` is how Meta says "this token does not expire", and a `??` default
+ * misses it — zero is not nullish — stamping a perfectly good token as having expired
+ * the instant it was written. Absent is the different case where the response simply
+ * didn't say, and the documented ~60 days is the safe assumption there.
+ */
+export function instagramTokenExpiry(expiresIn: number | undefined): Date | null {
+  if (expiresIn === 0) return null
+  return new Date(Date.now() + (expiresIn ?? 5184000) * 1000)
+}
+
 const METRIC_NAMES: Record<string, keyof PostMetricValues> = {
   views: 'views',
   reach: 'reach',
@@ -174,15 +187,26 @@ export const instagramConnector: Connector = {
   network: 'instagram',
 
   /**
-   * A long-lived Facebook token lasts about 60 days. There is no refresh token in this
-   * flow: the only way to extend it is to hand it back through `fb_exchange_token`,
-   * which returns a fresh 60-day token. Doing that a week early leaves room for a few
-   * missed cron runs before the credential dies for good.
+   * A long-lived Facebook token lasts about 60 days, and this flow has no refresh token:
+   * the only thing to try is handing the token back through `fb_exchange_token` a week
+   * before it dies, which leaves room for a few missed cron runs.
+   *
+   * Whether that actually extends an *already* long-lived user token is not something we
+   * can confirm from here — Meta's guidance for a dying long-lived user token is to send
+   * the person through login again, and the exchange may simply return the same expiry.
+   * If it does, the credential dies on day 60 and the owner has to reconnect. That fails
+   * visibly (a Graph 190 lands in `lastSyncError` and turns the card red), which is why
+   * it is acceptable to find out in production; the README says so as a routine.
    */
   async ensureCredential(account: SocialAccount): Promise<string | null> {
     if (!account.accessToken) return null
     const token = decryptToken(account.accessToken)
 
+    // A null `expiresAt` still means "try": either the row predates a known expiry, or
+    // `instagramTokenExpiry` read an `expires_in: 0` as "never expires". Attempting an
+    // exchange we may not need costs one request a night and every failure path below
+    // hands the current token back anyway, whereas skipping one we did need kills the
+    // credential. The asymmetry is the whole argument.
     const expiresSoon =
       !account.expiresAt || account.expiresAt.getTime() - Date.now() < REFRESH_WINDOW_MS
     if (!expiresSoon) return token
@@ -224,7 +248,7 @@ export const instagramConnector: Connector = {
       .update(socialAccounts)
       .set({
         accessToken: encryptToken(refreshed.access_token),
-        expiresAt: new Date(Date.now() + (refreshed.expires_in ?? 5184000) * 1000),
+        expiresAt: instagramTokenExpiry(refreshed.expires_in),
       })
       .where(eq(socialAccounts.id, account.id))
 
