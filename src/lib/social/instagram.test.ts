@@ -155,6 +155,27 @@ describe('pickInstagramAccount', () => {
     )
   })
 
+  it('con un pin que no calza, nombra los ids encontrados y no los usernames', () => {
+    try {
+      pickInstagramAccount(tresCuentas, '17841400000000999')
+      expect.unreachable('debía lanzar')
+    } catch (error) {
+      const { message } = error as InstagramAccountError
+      expect(message).toContain('17841400000000101')
+      expect(message).toContain('17841400000000103')
+      expect(message).not.toContain('gimnasio')
+      expect(message).not.toContain('vicente')
+    }
+  })
+
+  it('sin ninguna candidata dice que falta el vínculo, aunque haya pin', () => {
+    // Un pin que no calza y cero cuentas vinculadas son diagnósticos distintos: el primero
+    // apunta a la cuenta equivocada, el segundo a que ninguna página tiene cuenta asociada.
+    expect(() => pickInstagramAccount({ data: [] }, '17841400000000999')).toThrowError(
+      NO_INSTAGRAM_ACCOUNT,
+    )
+  })
+
   it('deja las candidatas en el error, no en el mensaje', () => {
     // Los usernames vienen de Meta: sirven para el log del servidor, nunca para el texto
     // que se le muestra a nadie.
