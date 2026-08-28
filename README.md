@@ -159,6 +159,11 @@ usa todavía: se pide ahora porque los permisos se conceden una sola vez, al aut
 Copia el app id y el secret. Mientras la app esté en **modo desarrollo** y tú seas su
 dueño, no necesitas App Review.
 
+```
+INSTAGRAM_APP_ID=
+INSTAGRAM_APP_SECRET=
+```
+
 Si administras **más de una cuenta de Instagram**, hay que decir cuál es la que se
 conecta. Sin la variable, el callback se niega a elegir y te lo dice: el orden en que Meta
 lista tus páginas no es estable, y conectar sin querer otra cuenta archivaría el
@@ -178,11 +183,6 @@ el login. Si el intento no sirve, la credencial caduca y la tarjeta de Instagram
 
 Cuando pase, entra al panel, pulsa **Desconectar** y luego **Conectar** otra vez. El
 historial de métricas ya recogido no se toca. Cuenta con hacerlo cada dos meses más o menos.
-
-```
-INSTAGRAM_APP_ID=
-INSTAGRAM_APP_SECRET=
-```
 
 ### TikTok
 
