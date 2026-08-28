@@ -85,7 +85,12 @@ export default function PrivacidadPage() {
         <p className="leading-relaxed text-fg-muted">
           El panel privado puede conectarse a las cuentas de Instagram, TikTok y YouTube{' '}
           <span className="text-fg">del propio dueño del sitio</span> para leer las métricas de
-          sus publicaciones. Si eso está activo:
+          sus publicaciones. La de Instagram se conecta{' '}
+          <span className="text-fg">mediante un inicio de sesión de Facebook</span>: eso lee la
+          lista de páginas de Facebook del dueño, y solo para encontrar cuál de ellas tiene
+          asociada la cuenta de Instagram. De esa lista no se guarda nada —ni nombres de
+          páginas, ni sus datos, ni nada de la cuenta de Facebook— salvo el identificador y el
+          nombre de usuario de la cuenta de Instagram que quedó conectada. Si eso está activo:
         </p>
         <ul className="space-y-2 leading-relaxed text-fg-muted">
           <li>
