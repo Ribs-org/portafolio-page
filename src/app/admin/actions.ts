@@ -339,8 +339,24 @@ export async function syncSocialNow(): Promise<{ ok?: boolean; error?: string }>
 export async function disconnectNetwork(network: string): Promise<void> {
   await requireAuth()
 
-  // Posts and metrics survive: the traffic they brought really happened.
-  await getDb().delete(socialAccounts).where(eq(socialAccounts.network, network))
+  // A disconnect revokes the credentials, not the identity.
+  //
+  // Deleting the row threw away `external_id` too, and that is precisely what the
+  // callback compares against to refuse an authorization for a *different* account.
+  // Since "Desconectar y volver a conectar" is the prescribed way to renew a dying
+  // token, the only reconnect path the panel offers was also the one that erased its
+  // own guard before the next connect could use it.
+  //
+  // Posts and metrics survive as well: the traffic they brought really happened.
+  await getDb()
+    .update(socialAccounts)
+    .set({
+      accessToken: null,
+      refreshToken: null,
+      expiresAt: null,
+      lastSyncError: null,
+    })
+    .where(eq(socialAccounts.network, network))
 
   revalidatePath('/admin/content')
 }

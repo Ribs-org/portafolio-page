@@ -184,6 +184,10 @@ el login. Si el intento no sirve, la credencial caduca y la tarjeta de Instagram
 Cuando pase, entra al panel, pulsa **Desconectar** y luego **Conectar** otra vez. El
 historial de métricas ya recogido no se toca. Cuenta con hacerlo cada dos meses más o menos.
 
+Desconectar borra las credenciales, pero **no olvida qué cuenta era**. Al volver a conectar
+tiene que salir la misma: si autorizas otra, el panel lo rechaza en vez de archivarte el
+catálogo de la anterior.
+
 ### TikTok
 
 En [developers.tiktok.com](https://developers.tiktok.com), registra una app, agrega el
