@@ -8,7 +8,7 @@ export const metadata: Metadata = {
 /** The one value a fork has to change before deploying these pages. */
 const CONTACTO = 'vicente.pareja.jones@gmail.com'
 
-const ACTUALIZADO = '26 de agosto de 2026'
+const ACTUALIZADO = '28 de agosto de 2026'
 
 export default function PrivacidadPage() {
   return (
@@ -85,12 +85,20 @@ export default function PrivacidadPage() {
         <p className="leading-relaxed text-fg-muted">
           El panel privado puede conectarse a las cuentas de Instagram, TikTok y YouTube{' '}
           <span className="text-fg">del propio dueño del sitio</span> para leer las métricas de
-          sus publicaciones. Si eso está activo:
+          sus publicaciones. La de Instagram se conecta{' '}
+          <span className="text-fg">mediante un inicio de sesión de Facebook</span>: eso lee la
+          lista de páginas de Facebook del dueño, y solo para encontrar cuál de ellas tiene
+          asociada la cuenta de Instagram. De esa lista no se guarda nada —ni nombres de
+          páginas, ni sus datos, ni nada de la cuenta de Facebook— salvo el identificador y el
+          nombre de usuario de la cuenta de Instagram que quedó conectada. Si eso está activo:
         </p>
         <ul className="space-y-2 leading-relaxed text-fg-muted">
           <li>
-            Los tokens de acceso se guardan <span className="text-fg">cifrados</span> (AES-256-GCM)
-            y se usan únicamente para pedir esas métricas.
+            Los tokens de acceso se guardan <span className="text-fg">cifrados</span> (AES-256-GCM).
+            Hoy se usan únicamente para pedir esas métricas. La conexión con Instagram pide
+            además permiso para publicar, pensando en una función futura del panel:{' '}
+            <span className="text-fg">por ahora no se publica nada</span>, ni desde el panel ni
+            de forma automática.
           </li>
           <li>
             Se guardan los datos públicos de esas publicaciones: identificador, enlace,

@@ -1,11 +1,22 @@
 import { NextResponse } from 'next/server'
+import { eq } from 'drizzle-orm'
 import { getDb, socialAccounts } from '@/db'
 import { isAuthenticated } from '@/lib/auth'
 import { env } from '@/lib/env'
+import { mayConnectAccount } from '@/lib/social/connector'
 import { encryptToken } from '@/lib/social/crypto'
+import {
+  InstagramAccountError,
+  instagramTokenExpiry,
+  pickInstagramAccount,
+  type FacebookPages,
+} from '@/lib/social/instagram'
 import { oauthStateMatches } from '@/lib/social/oauth-state'
 
 export const dynamic = 'force-dynamic'
+
+/** Instagram runs on Facebook Login, so every leg of its OAuth is on the Facebook host. */
+const GRAPH = 'https://graph.facebook.com/v23.0'
 
 type Credential = {
   accessToken: string
@@ -29,40 +40,65 @@ async function instagramCredential(code: string, redirectUri: string): Promise<C
   const appSecret = env('INSTAGRAM_APP_SECRET')
   if (!appId || !appSecret) throw new OAuthError('Faltan las credenciales de Instagram')
 
-  const short = await fetch('https://api.instagram.com/oauth/access_token', {
-    method: 'POST',
-    body: new URLSearchParams({
-      client_id: appId,
-      client_secret: appSecret,
-      grant_type: 'authorization_code',
-      redirect_uri: redirectUri,
-      code,
-    }),
-  })
+  const shortUrl = new URL(`${GRAPH}/oauth/access_token`)
+  shortUrl.searchParams.set('client_id', appId)
+  shortUrl.searchParams.set('client_secret', appSecret)
+  shortUrl.searchParams.set('redirect_uri', redirectUri)
+  shortUrl.searchParams.set('code', code)
+  const short = await fetch(shortUrl)
   if (!short.ok) throw new OAuthError(`Instagram rechazó el código: ${short.status}`)
-  const shortData = (await short.json()) as { access_token?: string; user_id?: number }
+  const shortData = (await short.json()) as { access_token?: string }
   if (!shortData.access_token) throw new OAuthError('Instagram no devolvió token')
 
-  // The short-lived token lasts an hour; only the long-lived one is worth storing.
-  const longUrl = new URL('https://graph.instagram.com/access_token')
-  longUrl.searchParams.set('grant_type', 'ig_exchange_token')
+  // The code exchange returns a token good for a couple of hours; handing it straight
+  // back through fb_exchange_token is what turns it into the ~60-day one worth storing.
+  const longUrl = new URL(`${GRAPH}/oauth/access_token`)
+  longUrl.searchParams.set('grant_type', 'fb_exchange_token')
+  longUrl.searchParams.set('client_id', appId)
   longUrl.searchParams.set('client_secret', appSecret)
-  longUrl.searchParams.set('access_token', shortData.access_token)
+  longUrl.searchParams.set('fb_exchange_token', shortData.access_token)
   const long = await fetch(longUrl)
   if (!long.ok) throw new OAuthError(`Instagram no canjeó el token largo: ${long.status}`)
   const longData = (await long.json()) as { access_token?: string; expires_in?: number }
+  // Falling back to the short-lived token here used to be the tolerant thing to do, but
+  // `expiresAt` below is computed from the *long* response: a 200 without a token would
+  // store a credential good for about an hour stamped as good for sixty days. The sync
+  // would then fail every night for two months without `ensureCredential` ever trying an
+  // exchange, because by that stamp nothing was expiring.
+  if (!longData.access_token) throw new OAuthError('Instagram no devolvió el token largo')
+  const token = longData.access_token
 
-  const token = longData.access_token ?? shortData.access_token
-  const profile = (await (
-    await fetch(`https://graph.instagram.com/v23.0/me?fields=id,username&access_token=${token}`)
-  ).json()) as { id?: string; username?: string }
+  // Facebook Login authorizes a person, not one Instagram account, so the id the sync
+  // is keyed on has to be discovered through the Pages this person administers. Failing
+  // loudly here beats storing a credential the connector could never use.
+  const pages = await fetch(
+    `${GRAPH}/me/accounts?fields=name,instagram_business_account{id,username}&access_token=${token}`,
+  )
+  if (!pages.ok) throw new OAuthError(`No se pudieron leer las páginas de Facebook: ${pages.status}`)
+
+  let igAccount
+  try {
+    igAccount = pickInstagramAccount(
+      (await pages.json()) as FacebookPages,
+      env('INSTAGRAM_IG_USER_ID'),
+    )
+  } catch (error) {
+    if (!(error instanceof InstagramAccountError)) throw error
+    // The message is one of the connector's own fixed sentences, so it is safe to show.
+    // The candidates are not: they carry usernames Meta sent us, and those only go to
+    // the server log, where they are what the owner needs to pick an id for the variable.
+    if (error.candidates.length > 0) {
+      console.error('Cuentas de Instagram disponibles:', error.candidates)
+    }
+    throw new OAuthError(error.message)
+  }
 
   return {
     accessToken: token,
     refreshToken: null,
-    expiresAt: new Date(Date.now() + (longData.expires_in ?? 5184000) * 1000),
-    externalId: profile.id ?? String(shortData.user_id ?? ''),
-    handle: profile.username ? `@${profile.username}` : null,
+    expiresAt: instagramTokenExpiry(longData.expires_in),
+    externalId: igAccount.id,
+    handle: igAccount.username ? `@${igAccount.username}` : null,
   }
 }
 
@@ -140,6 +176,30 @@ export async function GET(
 
   try {
     const credential = await fetchCredential(network, code, redirectUri)
+
+    // Refuse to move a connected network onto a different account.
+    //
+    // `external_id` is what the sync fetches posts for, while `social_posts` is keyed on
+    // the network alone. Overwrite the id and the next cron run compares account B's
+    // media against account A's stored posts, finds none of them, and — as long as B
+    // returned something and fewer than MAX_POSTS_PER_SYNC items — archives A's entire
+    // catalogue in a single statement. Reconnecting to A afterwards only clears
+    // `archivedAt` for posts still inside the newest window; everything older stays
+    // archived permanently.
+    //
+    // This stops that happening by accident. It does not make a deliberate switch safe:
+    // changing accounts on purpose destroys the same history in the same way, which is
+    // why the panel offers no way to do it and the message below does not invent one.
+    const [existing] = await getDb()
+      .select({ externalId: socialAccounts.externalId })
+      .from(socialAccounts)
+      .where(eq(socialAccounts.network, network))
+
+    if (!mayConnectAccount(existing?.externalId ?? null, credential.externalId)) {
+      throw new OAuthError(
+        'Esta red ya está conectada a otra cuenta. Cambiarla archivaría las publicaciones de la anterior, así que no se hace desde el panel.',
+      )
+    }
 
     await getDb()
       .insert(socialAccounts)

@@ -265,13 +265,23 @@ export async function getConnections(): Promise<ConnectionRow[]> {
 
   return ['instagram', 'tiktok', 'youtube'].map((network) => {
     const account = byNetwork.get(network)
+    const usesOAuth = OAUTH_NETWORKS.has(network)
     return {
       network,
       handle: account?.handle ?? null,
-      connected: Boolean(account),
+      externalId: account?.externalId ?? null,
+      // The two kinds of network answer "connected?" differently, and the row existing
+      // is no longer the answer for either reason it used to be.
+      //
+      // An OAuth network keeps its row through a disconnect on purpose — the identity has
+      // to outlive the credentials so the callback can still refuse a different account —
+      // so only a stored token means connected. YouTube never holds a token: it runs on
+      // environment variables, and `ensureYouTubeAccount` writes its row exactly when both
+      // are present, so for it the row really is the whole answer.
+      connected: usesOAuth ? Boolean(account?.accessToken) : Boolean(account),
       lastSyncedAt: account?.lastSyncedAt?.toISOString() ?? null,
       lastSyncError: account?.lastSyncError ?? null,
-      usesOAuth: OAUTH_NETWORKS.has(network),
+      usesOAuth,
     }
   })
 }

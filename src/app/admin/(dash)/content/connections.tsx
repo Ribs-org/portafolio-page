@@ -10,6 +10,16 @@ import { cn } from '@/lib/utils'
 
 const RELATIVE = new Intl.RelativeTimeFormat('es', { numeric: 'auto' })
 
+/**
+ * A disconnect keeps the handle now, so a handle on its own no longer means connected.
+ * Without saying so, a card could read "@vicente" with a Conectar button under it and
+ * leave the owner guessing which of the two to believe.
+ */
+function accountLabel(row: ConnectionRow): string {
+  if (!row.handle) return row.connected ? 'Conectado' : 'Sin conectar'
+  return row.connected ? row.handle : `${row.handle} · sin conectar`
+}
+
 function syncedAgo(iso: string | null): string {
   if (!iso) return 'nunca'
   const hours = Math.round((Date.now() - new Date(iso).getTime()) / 3.6e6)
@@ -46,8 +56,16 @@ export function Connections({ rows }: { rows: ConnectionRow[] }) {
             </div>
 
             <p className="mt-1 truncate text-[0.78rem] text-fg-muted">
-              {row.handle ?? (row.connected ? 'Conectado' : 'Sin conectar')}
+              {accountLabel(row)}
             </p>
+
+            {/* El handle se ve bien aunque el id de abajo sea el de otra cuenta, y esa
+                diferencia es justo la que archiva un catálogo entero. Mejor a la vista. */}
+            {row.externalId ? (
+              <p className="mt-0.5 truncate font-mono text-[0.68rem] text-fg-faint">
+                {row.externalId}
+              </p>
+            ) : null}
 
             <p className="mt-0.5 font-mono text-[0.68rem] text-fg-faint">
               Sincronizado {syncedAgo(row.lastSyncedAt)}

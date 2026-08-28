@@ -5,6 +5,12 @@
 export type ConnectionRow = {
   network: string
   handle: string | null
+  /**
+   * The account the sync actually fetches for. Shown on the card because a handle looks
+   * right even when the id underneath belongs to a different account, and that mismatch
+   * is what archives a catalogue.
+   */
+  externalId: string | null
   connected: boolean
   lastSyncedAt: string | null
   lastSyncError: string | null

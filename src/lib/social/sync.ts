@@ -124,6 +124,14 @@ export async function syncNetwork(network: string): Promise<number> {
 
   try {
     const token = await connector.ensureCredential(account as SocialAccount)
+
+    // No credential is not a failure, it is a network the owner disconnected: the row
+    // now outlives the token on purpose, so a disconnected network still has one to
+    // find. Leaving before the writes below is what keeps its card from reading
+    // "Sincronizado recién" under a Conectar button. YouTube reaches this the same way
+    // when its API key is missing, and it had nothing to fetch in that case either.
+    if (token === null) return 0
+
     const { posts: fetched, windowWasCapped } = await connector.fetchPosts(
       account as SocialAccount,
       token,

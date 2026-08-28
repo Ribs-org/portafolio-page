@@ -139,16 +139,22 @@ YOUTUBE_API_KEY=AIza...
 YOUTUBE_CHANNEL_ID=UC...
 ```
 
-### Instagram — cuenta profesional
+### Instagram — cuenta profesional y página de Facebook
 
-Necesitas una cuenta Business o Creator. No hace falta ligarla a una página de Facebook.
+Necesitas una cuenta Business o Creator **ligada a una página de Facebook**. La conexión
+usa *Instagram API with Facebook Login*: el id de la cuenta de Instagram se descubre a
+través de las páginas que administras, así que sin esa página no hay nada que leer.
 
 En [developers.facebook.com](https://developers.facebook.com), crea una app, agrega el
-producto **Instagram**, y en *Business Login* configura como redirect URI:
+producto **Facebook Login**, y configura como redirect URI válida:
 
 ```
 https://TU-DOMINIO/api/social/instagram/callback
 ```
+
+Los permisos que pide la app son `instagram_basic`, `instagram_manage_insights`,
+`pages_show_list`, `pages_read_engagement` e `instagram_content_publish`. El último no se
+usa todavía: se pide ahora porque los permisos se conceden una sola vez, al autorizar.
 
 Copia el app id y el secret. Mientras la app esté en **modo desarrollo** y tú seas su
 dueño, no necesitas App Review.
@@ -157,6 +163,30 @@ dueño, no necesitas App Review.
 INSTAGRAM_APP_ID=
 INSTAGRAM_APP_SECRET=
 ```
+
+Si administras **más de una cuenta de Instagram**, hay que decir cuál es la que se
+conecta. Sin la variable, el callback se niega a elegir y te lo dice: el orden en que Meta
+lista tus páginas no es estable, y conectar sin querer otra cuenta archivaría el
+catálogo de la anterior. El id aparece en los logs del servidor al intentar conectar.
+
+```
+INSTAGRAM_IG_USER_ID=
+```
+
+#### Renovar la conexión, cada ~60 días
+
+El token de Facebook dura unos 60 días. El cron intenta extenderlo una semana antes de que
+venza, pero **no está garantizado que eso funcione** sobre un token que ya es de larga
+duración: la vía documentada por Meta para uno que se está muriendo es volver a pasar por
+el login. Si el intento no sirve, la credencial caduca y la tarjeta de Instagram en
+**Contenido → Conexiones** se pone roja con el error de la API.
+
+Cuando pase, entra al panel, pulsa **Desconectar** y luego **Conectar** otra vez. El
+historial de métricas ya recogido no se toca. Cuenta con hacerlo cada dos meses más o menos.
+
+Desconectar borra las credenciales, pero **no olvida qué cuenta era**. Al volver a conectar
+tiene que salir la misma: si autorizas otra, el panel lo rechaza en vez de archivarte el
+catálogo de la anterior.
 
 ### TikTok
 
@@ -265,6 +295,7 @@ Vercel y bajan con `vercel env pull .env.local`.
 | `YOUTUBE_CHANNEL_ID` | Métricas de YouTube | No — sin ella esa red aparece como no conectada |
 | `INSTAGRAM_APP_ID` | Conectar Instagram | No — sin ella esa red aparece como no conectada |
 | `INSTAGRAM_APP_SECRET` | Conectar Instagram | No — sin ella esa red aparece como no conectada |
+| `INSTAGRAM_IG_USER_ID` | Elegir cuál de tus cuentas de Instagram se conecta | Solo si administras más de una: sin ella, conectar falla en vez de adivinar |
 | `TIKTOK_CLIENT_KEY` | Conectar TikTok | No — sin ella esa red aparece como no conectada |
 | `TIKTOK_CLIENT_SECRET` | Conectar TikTok | No — sin ella esa red aparece como no conectada |
 | `CRON_SECRET` | Autoriza la corrida diaria | No — la pone Vercel solo, al declarar el cron |

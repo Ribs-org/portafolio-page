@@ -5,8 +5,15 @@ import { signOAuthState } from '@/lib/social/oauth-state'
 
 export const dynamic = 'force-dynamic'
 
+// Instagram goes through Facebook Login, so the Pages scopes are not optional extras:
+// the Instagram user id only exists as a field on the Page that owns it, and without
+// `pages_show_list` and `pages_read_engagement` the callback has nothing to read it from.
+// `instagram_content_publish` buys nothing today — it is requested now because scopes are
+// granted once, at authorization, and a publishing feature added later would otherwise
+// mean sending the owner back through the consent screen.
 const SCOPES: Record<string, string> = {
-  instagram: 'instagram_business_basic,instagram_business_manage_insights',
+  instagram:
+    'instagram_basic,instagram_manage_insights,pages_show_list,pages_read_engagement,instagram_content_publish',
   tiktok: 'user.info.basic,video.list',
 }
 
@@ -31,7 +38,7 @@ export async function GET(
     const appId = env('INSTAGRAM_APP_ID')
     if (!appId) return new NextResponse('Falta INSTAGRAM_APP_ID', { status: 400 })
 
-    const url = new URL('https://www.instagram.com/oauth/authorize')
+    const url = new URL('https://www.facebook.com/v23.0/dialog/oauth')
     url.searchParams.set('client_id', appId)
     url.searchParams.set('redirect_uri', redirectUri)
     url.searchParams.set('scope', scope)
