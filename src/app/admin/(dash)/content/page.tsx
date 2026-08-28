@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { BarList } from '@/components/charts/bar-list'
-import { Panel } from '@/components/charts/panel'
+import { Empty, Panel } from '@/components/charts/panel'
 import { StatTile } from '@/components/charts/stat-tile'
 import { seriesColor } from '@/components/charts/theme'
 import { TrafficChart } from '@/components/charts/traffic-chart'
@@ -84,11 +84,40 @@ export default async function ContentPage({
   // The notices describe the catalogue, not the current view, so they count the
   // unfiltered active rows. With `metricas=1` on, that is what makes the "sin métricas"
   // line double as the sign that something is being hidden.
+  //
+  // They count only active rows even under `archivados=1`, so the number deliberately
+  // understates what the metrics filter is hiding at that moment: an archived row with
+  // no metrics is filtered out of the table but not counted here. That is the trade the
+  // notices make — they are about a catalogue worth acting on, and a deleted post is
+  // not one, so a count that grew when "Ver borrados" was pressed would be describing
+  // the view instead.
   const activeCount = activeRows(rows).length
   const unpasted = unpastedCount(rows)
   const withoutMetrics = withoutPlatformMetricsCount(rows)
 
+  // Fed `visible` rather than `rows`, though the two are provably the same set here:
+  // `periodChange` nulls `current` and `change` together (see `social/delta.ts`), so a
+  // row with no cumulative `views` cannot carry a `viewsChange` above zero, and the
+  // metrics filter can never remove a row this ranking would have kept. Passing the
+  // displayed set keeps the panel honest by construction rather than by that argument.
   const topPosts = topPostsByGain(visible, 10)
+
+  // Spanish inflects the noun, the possessive and the verb together, so the singular is
+  // a different sentence rather than a different suffix.
+  const unpastedNotice =
+    unpasted === activeCount
+      ? 'Ninguna etiqueta está pegada todavía. Copia el link de una fila y pégalo en ese post de la red.'
+      : unpasted === 1
+        ? '1 publicación aún no tiene su link pegado.'
+        : `${formatNumber(unpasted)} publicaciones aún no tienen su link pegado.`
+
+  // The count knows only that the network reported nothing — which a stale sync window
+  // or another network can also produce. So the observation is asserted and the usual
+  // cause is offered as an explanation, not diagnosed as the fact.
+  const metricsNotice =
+    withoutMetrics === 1
+      ? '1 publicación no tiene métricas de la red en este período (Instagram no las entrega para lo publicado antes de tu cuenta profesional).'
+      : `${formatNumber(withoutMetrics)} publicaciones no tienen métricas de la red en este período (Instagram no las entrega para lo publicado antes de tu cuenta profesional).`
 
   return (
     <>
@@ -133,19 +162,8 @@ export default async function ContentPage({
 
       {unpasted > 0 || withoutMetrics > 0 ? (
         <div className="surface mt-4 space-y-1 rounded-2xl px-4 py-3 text-[0.82rem] leading-relaxed text-fg-muted">
-          {unpasted > 0 ? (
-            <p>
-              {unpasted === activeCount
-                ? 'Ninguna etiqueta está pegada todavía. Copia el link de una fila y pégalo en ese post de la red.'
-                : `${formatNumber(unpasted)} publicaciones aún no tienen su link pegado.`}
-            </p>
-          ) : null}
-          {withoutMetrics > 0 ? (
-            <p>
-              {formatNumber(withoutMetrics)} publicaciones anteriores a tu cuenta profesional no
-              tienen métricas de Instagram.
-            </p>
-          ) : null}
+          {unpasted > 0 ? <p>{unpastedNotice}</p> : null}
+          {withoutMetrics > 0 ? <p>{metricsNotice}</p> : null}
         </div>
       ) : null}
 
@@ -170,12 +188,25 @@ export default async function ContentPage({
             </div>
           }
         >
-          <PostTable rows={visible} />
+          {/*
+            An empty `visible` with a non-empty `rows` is the filter's doing, not an
+            empty catalogue. `PostTable`'s own empty state would tell someone whose
+            posts are all pre-conversion to go connect a network and sync — which they
+            already did, and which would not change a thing.
+          */}
+          {onlyWithMetrics && visible.length === 0 && rows.length > 0 ? (
+            <Empty>
+              El filtro dejó la lista vacía: ninguna publicación tiene métricas de la red en
+              este período.
+            </Empty>
+          ) : (
+            <PostTable rows={visible} />
+          )}
         </Panel>
 
         <Panel
           title="Views ganadas por día"
-          hint="Cuánto creció el alcance contra cuánta gente llegó efectivamente a tu página"
+          hint="Cuánto creció el alcance contra cuánta gente llegó efectivamente a tu página. La serie siempre cubre el catálogo completo, sin importar los filtros de la tabla."
         >
           <TrafficChart
             data={series}
@@ -191,8 +222,10 @@ export default async function ContentPage({
             items={topPosts.map((post) => ({
               key: post.id,
               // The tag is the fallback label because it is what the owner typed, and
-              // it identifies the post better than a generic placeholder would.
-              label: post.caption ?? post.campaign,
+              // it identifies the post better than a generic placeholder would. `||`
+              // and not `??`: Instagram keeps an empty-string caption where TikTok
+              // normalises it to null, and a blank row is as useless as a missing one.
+              label: post.caption || post.campaign,
               // `topPostsByGain` only returns rows whose gain is a number above zero.
               value: post.viewsChange ?? 0,
               note: post.pull === null ? '—' : formatPercent(post.pull, 2),
