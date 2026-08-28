@@ -179,24 +179,57 @@ export function normalizeInstagramMedia(
 
 // Carries the HTTP status alongside the message so callers can tell a 404 (a normal,
 // expected answer for some Instagram endpoints) apart from anything else.
-class InstagramHttpError extends Error {
+export class InstagramHttpError extends Error {
   constructor(
     public status: number,
     message: string,
+    /** Graph's `error_subcode`, which says *why* far more precisely than the status does. */
+    public subcode?: number,
   ) {
     super(message)
   }
 }
 
+/** Graph: the media predates the account's conversion to a professional account. */
+const MEDIA_PREDATES_CONVERSION = 2108006
+
+/**
+ * Whether Graph is telling us this one media has no insights, rather than that something
+ * is wrong with the run.
+ *
+ * A 404 means the media is gone or ineligible. Subcode 2108006 means it was published
+ * before the account became professional, so Instagram never recorded insights for it and
+ * never will — the same permanent, per-media answer arriving as a 400. Treating that 400
+ * as systemic aborts the whole sync over posts that are simply older than the account's
+ * conversion, which for most owners is a large part of the catalogue.
+ */
+export function isMediaWithoutInsights(error: unknown): boolean {
+  if (!(error instanceof InstagramHttpError)) return false
+  return error.status === 404 || error.subcode === MEDIA_PREDATES_CONVERSION
+}
+
 async function getJson(url: string): Promise<Record<string, unknown>> {
   const response = await fetch(url)
   if (!response.ok) {
+    const body = await response.text()
     throw new InstagramHttpError(
       response.status,
-      `Instagram ${response.status}: ${(await response.text()).slice(0, 200)}`,
+      `Instagram ${response.status}: ${body.slice(0, 200)}`,
+      subcodeOf(body),
     )
   }
   return response.json()
+}
+
+/** Best effort: an unparseable body is still a failure, just one we cannot classify. */
+function subcodeOf(body: string): number | undefined {
+  try {
+    const parsed = JSON.parse(body) as { error?: { error_subcode?: unknown } }
+    const subcode = parsed.error?.error_subcode
+    return typeof subcode === 'number' ? subcode : undefined
+  } catch {
+    return undefined
+  }
 }
 
 export const instagramConnector: Connector = {
@@ -313,12 +346,13 @@ export const instagramConnector: Connector = {
               `${GRAPH}/${item.id}/insights?metric=${metrics}&access_token=${token}`,
             )) as InstagramInsights
           } catch (error) {
-            // A 404 means Instagram has no insights for this specific post (too old, or
-            // a media type insights don't cover) — a normal answer, not a failure.
+            // Two answers mean "this one post has no insights, permanently": a 404, and a
+            // 400 whose subcode says the post predates the account's conversion to a
+            // professional account. Both are facts about the media, not about the run.
             // Anything else (expired token, rate limit, 5xx) is systemic: swallowing it
             // too would silently write NO_METRICS as if it were real data for every
             // remaining post, since fetchPosts reuses the same token throughout.
-            if (error instanceof InstagramHttpError && error.status === 404) {
+            if (isMediaWithoutInsights(error)) {
               insights = {}
             } else {
               throw error

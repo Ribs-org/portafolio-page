@@ -3,9 +3,11 @@ import fixture from './fixtures/instagram-media.json'
 import {
   AMBIGUOUS_INSTAGRAM_ACCOUNT,
   InstagramAccountError,
+  InstagramHttpError,
   NO_INSTAGRAM_ACCOUNT,
   PINNED_INSTAGRAM_ACCOUNT_MISSING,
   instagramTokenExpiry,
+  isMediaWithoutInsights,
   normalizeInstagramMedia,
   pickInstagramAccount,
   type FacebookPages,
@@ -230,5 +232,39 @@ describe('instagramTokenExpiry', () => {
     // Con `?? 5184000` el cero pasaba de largo y se guardaba Date.now(): una credencial
     // buena marcada como muerta en el mismo instante de escribirla.
     expect(instagramTokenExpiry(0)).toBeNull()
+  })
+})
+
+describe('isMediaWithoutInsights', () => {
+  it('tolera un 404: la publicación no tiene estadísticas', () => {
+    expect(isMediaWithoutInsights(new InstagramHttpError(404, 'Instagram 404: ...'))).toBe(true)
+  })
+
+  it('tolera el 400 de contenido anterior a la conversión a cuenta profesional', () => {
+    // Instagram nunca registró estadísticas de esos posts y nunca lo va a hacer: es un
+    // hecho permanente sobre esa publicación, no sobre la corrida.
+    expect(
+      isMediaWithoutInsights(new InstagramHttpError(400, 'Instagram 400: ...', 2108006)),
+    ).toBe(true)
+  })
+
+  it('no tolera otro 400: un parámetro inválido sí es problema nuestro', () => {
+    expect(isMediaWithoutInsights(new InstagramHttpError(400, 'Instagram 400: ...', 1234))).toBe(
+      false,
+    )
+  })
+
+  it('no tolera un 400 sin subcódigo', () => {
+    expect(isMediaWithoutInsights(new InstagramHttpError(400, 'Instagram 400: ...'))).toBe(false)
+  })
+
+  it('no tolera un 429 ni un 5xx, que son sistémicos', () => {
+    expect(isMediaWithoutInsights(new InstagramHttpError(429, 'rate limit'))).toBe(false)
+    expect(isMediaWithoutInsights(new InstagramHttpError(500, 'boom'))).toBe(false)
+  })
+
+  it('no tolera un error que no venga de una respuesta HTTP', () => {
+    // Un fallo de red o un JSON.parse roto no dicen nada sobre esta publicación.
+    expect(isMediaWithoutInsights(new Error('fetch failed'))).toBe(false)
   })
 })
