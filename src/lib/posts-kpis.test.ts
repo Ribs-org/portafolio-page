@@ -138,6 +138,16 @@ describe('activeRows', () => {
   it('un arreglo vacío queda vacío', () => {
     expect(activeRows([])).toEqual([])
   })
+
+  it('no muta el arreglo que recibe', () => {
+    // Everything else in this module filters through `activeRows`, so a mutation here
+    // would reach the rows the page is about to render.
+    const rows = [row({ id: 'a' }), row({ id: 'b', archived: true })]
+
+    activeRows(rows)
+
+    expect(rows.map((r) => r.id)).toEqual(['a', 'b'])
+  })
 })
 
 describe('unpastedCount', () => {
