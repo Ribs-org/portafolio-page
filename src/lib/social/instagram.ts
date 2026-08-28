@@ -72,6 +72,16 @@ export const PINNED_INSTAGRAM_ACCOUNT_MISSING =
   'INSTAGRAM_IG_USER_ID no coincide con ninguna de las cuentas de Instagram disponibles.'
 
 /**
+ * Ids are numeric and assigned by Meta, so echoing them into the page cannot smuggle
+ * upstream text the way a username could. Naming them turns "it does not match" into a
+ * message the owner can act on without reading a server log.
+ */
+export function pinnedAccountMissingMessage(candidates: InstagramAccount[]): string {
+  const ids = candidates.map((candidate) => candidate.id).join(', ')
+  return `${PINNED_INSTAGRAM_ACCOUNT_MISSING} Encontradas: ${ids}.`
+}
+
+/**
  * Finds the Instagram account behind the owner's Facebook Pages.
  *
  * Facebook Login hands back Pages, not Instagram accounts: the Instagram user id the
@@ -100,8 +110,14 @@ export function pickInstagramAccount(
 
   if (pinnedId) {
     const pinned = candidates.find((candidate) => candidate.id === pinnedId)
-    if (!pinned) throw new InstagramAccountError(PINNED_INSTAGRAM_ACCOUNT_MISSING, candidates)
-    return pinned
+    if (pinned) return pinned
+
+    // Two different diagnoses that used to share one message: no Page carries an Instagram
+    // account at all, versus some do and none is the pinned one. The first points at a
+    // missing Page-to-account link, the second at the wrong account being linked — and
+    // reading the same sentence for both sent us chasing the wrong thing once already.
+    if (candidates.length === 0) throw new InstagramAccountError(NO_INSTAGRAM_ACCOUNT)
+    throw new InstagramAccountError(pinnedAccountMissingMessage(candidates), candidates)
   }
 
   if (candidates.length === 0) throw new InstagramAccountError(NO_INSTAGRAM_ACCOUNT)

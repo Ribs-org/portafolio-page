@@ -13,7 +13,10 @@ export const dynamic = 'force-dynamic'
 // mean sending the owner back through the consent screen.
 const SCOPES: Record<string, string> = {
   instagram:
-    'instagram_basic,instagram_manage_insights,pages_show_list,pages_read_engagement,instagram_content_publish',
+    // `business_management` is what lets `me/accounts` enumerate Pages owned by a business
+    // portfolio rather than by the person. Without it the call returns an empty list and the
+    // Instagram account is undiscoverable, even when Page and account are correctly linked.
+    'instagram_basic,instagram_manage_insights,pages_show_list,pages_read_engagement,instagram_content_publish,business_management',
   tiktok: 'user.info.basic,video.list',
 }
 
