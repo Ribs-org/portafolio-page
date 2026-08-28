@@ -1,5 +1,14 @@
 import { describe, expect, it } from 'vitest'
-import { postKpisFrom, type PostRow } from './posts-kpis'
+import {
+  activeRows,
+  hasNoPlatformMetrics,
+  postKpisFrom,
+  topPostsByGain,
+  unpastedCount,
+  withPlatformMetrics,
+  withoutPlatformMetricsCount,
+  type PostRow,
+} from './posts-kpis'
 
 /** Builds a full `PostRow`, overriding only the fields a test cares about. */
 function row(overrides: Partial<PostRow>): PostRow {
@@ -112,5 +121,199 @@ describe('postKpisFrom', () => {
     // (1% + 40%) / 2 = 20.5% instead — a test built on closer numbers wouldn't tell
     // these two formulas apart.
     expect(postKpisFrom(rows).pull).toBeCloseTo((50 / 1100) * 100, 10)
+  })
+})
+
+describe('activeRows', () => {
+  it('deja fuera las borradas y conserva el orden de las demás', () => {
+    const rows = [
+      row({ id: 'a' }),
+      row({ id: 'b', archived: true }),
+      row({ id: 'c' }),
+    ]
+
+    expect(activeRows(rows).map((r) => r.id)).toEqual(['a', 'c'])
+  })
+
+  it('un arreglo vacío queda vacío', () => {
+    expect(activeRows([])).toEqual([])
+  })
+})
+
+describe('unpastedCount', () => {
+  it('un arreglo vacío no tiene nada que avisar', () => {
+    expect(unpastedCount([])).toBe(0)
+  })
+
+  it('cero visitas no es lo mismo que nunca haber pegado el link', () => {
+    // The whole point of the nudge: a tag that was pasted and nobody clicked comes back
+    // as 0 and needs no advice. Only `null` — never seen — counts.
+    const rows = [row({ id: 'a', visits: null }), row({ id: 'b', visits: 0 })]
+
+    expect(unpastedCount(rows)).toBe(1)
+  })
+
+  it('cuenta todas cuando ninguna tiene el link pegado', () => {
+    expect(unpastedCount([row({ id: 'a' }), row({ id: 'b' }), row({ id: 'c' })])).toBe(3)
+  })
+
+  it('no cuenta las borradas: nadie puede pegar un link en un post que ya no existe', () => {
+    const rows = [
+      row({ id: 'a', visits: null }),
+      row({ id: 'b', visits: null, archived: true }),
+      row({ id: 'c', visits: null, archived: true }),
+    ]
+
+    expect(unpastedCount(rows)).toBe(1)
+  })
+
+  it('cero cuando todas ya tienen visitas', () => {
+    expect(unpastedCount([row({ id: 'a', visits: 12 }), row({ id: 'b', visits: 0 })])).toBe(0)
+  })
+})
+
+describe('hasNoPlatformMetrics', () => {
+  it('sólo cuando views, likes y comentarios son los tres nulos', () => {
+    expect(hasNoPlatformMetrics(row({}))).toBe(true)
+    expect(hasNoPlatformMetrics(row({ views: 0 }))).toBe(false)
+    expect(hasNoPlatformMetrics(row({ likes: 0 }))).toBe(false)
+    expect(hasNoPlatformMetrics(row({ comments: 3 }))).toBe(false)
+  })
+
+  it('ignora las métricas que ninguna columna muestra', () => {
+    // A row carrying only `shares`/`saves`/`reach` still reads as blank in the table,
+    // so it belongs with the rows that step back — consulting those fields would leave
+    // a visually empty row looking undimmed and unexplained.
+    expect(hasNoPlatformMetrics(row({ shares: 9, saves: 4, reach: 100 }))).toBe(true)
+  })
+
+  it('las visitas propias no rescatan a una fila sin métricas de la red', () => {
+    expect(hasNoPlatformMetrics(row({ visits: 40, clicks: 2 }))).toBe(true)
+  })
+})
+
+describe('withoutPlatformMetricsCount', () => {
+  it('un arreglo vacío da cero', () => {
+    expect(withoutPlatformMetricsCount([])).toBe(0)
+  })
+
+  it('cuenta las filas sin ninguna de las tres métricas', () => {
+    const rows = [
+      row({ id: 'a' }),
+      row({ id: 'b', views: 1200, likes: 30, comments: 4 }),
+      row({ id: 'c', views: 0, likes: null, comments: null }),
+    ]
+
+    // 'c' has a real zero from the network, which is data — only 'a' is blank.
+    expect(withoutPlatformMetricsCount(rows)).toBe(1)
+  })
+
+  it('todas cuando el catálogo entero es anterior a la cuenta profesional', () => {
+    expect(withoutPlatformMetricsCount([row({ id: 'a' }), row({ id: 'b' })])).toBe(2)
+  })
+
+  it('no cuenta las borradas', () => {
+    const rows = [row({ id: 'a' }), row({ id: 'b', archived: true })]
+
+    expect(withoutPlatformMetricsCount(rows)).toBe(1)
+  })
+})
+
+describe('withPlatformMetrics', () => {
+  it('deja pasar las filas con al menos una de las tres métricas', () => {
+    const rows = [
+      row({ id: 'a' }),
+      row({ id: 'b', likes: 0 }),
+      row({ id: 'c', views: 900, likes: 10, comments: 2 }),
+    ]
+
+    expect(withPlatformMetrics(rows).map((r) => r.id)).toEqual(['b', 'c'])
+  })
+
+  it('no toca el estado de borrado: el filtro responde otra pregunta', () => {
+    const rows = [row({ id: 'a', archived: true, views: 500 }), row({ id: 'b', archived: true })]
+
+    expect(withPlatformMetrics(rows).map((r) => r.id)).toEqual(['a'])
+  })
+
+  it('un arreglo vacío queda vacío', () => {
+    expect(withPlatformMetrics([])).toEqual([])
+  })
+})
+
+describe('topPostsByGain', () => {
+  it('un arreglo vacío no tiene tope', () => {
+    expect(topPostsByGain([], 10)).toEqual([])
+  })
+
+  it('ordena de mayor a menor por views ganadas', () => {
+    const rows = [
+      row({ id: 'a', viewsChange: 50 }),
+      row({ id: 'b', viewsChange: 900 }),
+      row({ id: 'c', viewsChange: 300 }),
+    ]
+
+    const top = topPostsByGain(rows, 10)
+
+    expect(top.map((r) => r.id)).toEqual(['b', 'c', 'a'])
+    expect(top.map((r) => r.viewsChange)).toEqual([900, 300, 50])
+  })
+
+  it('deja fuera lo que no creció: cero no es crecimiento y nulo no es cero', () => {
+    const rows = [
+      row({ id: 'creció', viewsChange: 10 }),
+      row({ id: 'plano', viewsChange: 0 }),
+      row({ id: 'sin-lectura', viewsChange: null }),
+    ]
+
+    expect(topPostsByGain(rows, 10).map((r) => r.id)).toEqual(['creció'])
+  })
+
+  it('respeta el límite y devuelve las mejores, no las primeras', () => {
+    const rows = [
+      row({ id: 'a', viewsChange: 1 }),
+      row({ id: 'b', viewsChange: 2 }),
+      row({ id: 'c', viewsChange: 3 }),
+    ]
+
+    const top = topPostsByGain(rows, 2)
+
+    expect(top.map((r) => r.id)).toEqual(['c', 'b'])
+    expect(top.map((r) => r.viewsChange)).toEqual([3, 2])
+  })
+
+  it('un límite de cero o negativo devuelve nada', () => {
+    const rows = [row({ id: 'a', viewsChange: 100 })]
+
+    expect(topPostsByGain(rows, 0)).toEqual([])
+    expect(topPostsByGain(rows, -1)).toEqual([])
+  })
+
+  it('los empates conservan el orden en que llegaron', () => {
+    const rows = [
+      row({ id: 'primera', viewsChange: 40 }),
+      row({ id: 'segunda', viewsChange: 40 }),
+      row({ id: 'tercera', viewsChange: 40 }),
+    ]
+
+    expect(topPostsByGain(rows, 3).map((r) => r.id)).toEqual(['primera', 'segunda', 'tercera'])
+    expect(topPostsByGain(rows, 2).map((r) => r.id)).toEqual(['primera', 'segunda'])
+  })
+
+  it('no rankea posts borrados por más que hayan crecido', () => {
+    const rows = [
+      row({ id: 'viva', viewsChange: 10 }),
+      row({ id: 'borrada', viewsChange: 5000, archived: true }),
+    ]
+
+    expect(topPostsByGain(rows, 10).map((r) => r.id)).toEqual(['viva'])
+  })
+
+  it('no muta el arreglo que recibe', () => {
+    const rows = [row({ id: 'a', viewsChange: 1 }), row({ id: 'b', viewsChange: 9 })]
+
+    topPostsByGain(rows, 10)
+
+    expect(rows.map((r) => r.id)).toEqual(['a', 'b'])
   })
 })
