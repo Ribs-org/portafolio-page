@@ -1,4 +1,5 @@
 import type { SocialAccount } from '@/db'
+import { env } from '../env'
 import {
   MAX_POSTS_PER_SYNC,
   NO_METRICS,
@@ -9,11 +10,15 @@ import {
 } from './connector'
 import { decryptToken } from './crypto'
 
-const GRAPH = 'https://graph.instagram.com/v23.0'
+// Instagram API with Facebook Login, not Instagram Login: the owner's app lives in a
+// Meta business portfolio, and instagram.com/oauth/authorize only ever answered
+// "rol de desarrollador insuficiente" for it. Everything — token exchange, account
+// discovery, media, insights — goes through the Facebook Graph host instead.
+const GRAPH = 'https://graph.facebook.com/v23.0'
 const PAGE_SIZE = 50
-// Bounds page fetches independently of how many items a page actually yields: Instagram
-// can return an empty `data: []` while still handing back a `paging.next` cursor, which
-// would otherwise starve the media.length check below and loop forever.
+// Bounds page fetches independently of how many items a page actually yields: the Graph
+// API can return an empty `data: []` while still handing back a `paging.next` cursor,
+// which would otherwise starve the media.length check below and loop forever.
 const MAX_MEDIA_PAGES = 50
 const INSIGHTS_CHUNK_SIZE = 5
 const REFRESH_WINDOW_MS = 7 * 864e5
@@ -31,6 +36,34 @@ export type InstagramMedia = {
 
 export type InstagramInsights = {
   data?: Array<{ name?: string; values?: Array<{ value?: number }> }>
+}
+
+/** The `me/accounts?fields=name,instagram_business_account{id,username}` payload. */
+export type FacebookPages = {
+  data?: Array<{
+    id?: string
+    name?: string
+    instagram_business_account?: { id?: string; username?: string } | null
+  }>
+}
+
+export type InstagramAccount = { id: string; username: string | null }
+
+/**
+ * Finds the Instagram account behind the owner's Facebook Pages.
+ *
+ * Facebook Login hands back Pages, not Instagram accounts: the Instagram user id the
+ * whole sync is keyed on only exists as a nested field on whichever Page owns it, and
+ * most Pages carry none at all. Picking the first Page and reading its id would store a
+ * Page id where an Instagram id belongs — the media endpoint would then answer for the
+ * wrong asset, or not at all, with nothing in the data to say which happened.
+ */
+export function pickInstagramAccount(pages: FacebookPages): InstagramAccount | null {
+  for (const page of pages.data ?? []) {
+    const linked = page.instagram_business_account
+    if (linked?.id) return { id: linked.id, username: linked.username ?? null }
+  }
+  return null
 }
 
 const METRIC_NAMES: Record<string, keyof PostMetricValues> = {
@@ -98,8 +131,10 @@ export const instagramConnector: Connector = {
   network: 'instagram',
 
   /**
-   * A long-lived token lasts 60 days and is refreshed by use, so the daily cron keeps
-   * it alive on its own. Refreshing a week early leaves room for a few missed runs.
+   * A long-lived Facebook token lasts about 60 days. There is no refresh token in this
+   * flow: the only way to extend it is to hand it back through `fb_exchange_token`,
+   * which returns a fresh 60-day token. Doing that a week early leaves room for a few
+   * missed cron runs before the credential dies for good.
    */
   async ensureCredential(account: SocialAccount): Promise<string | null> {
     if (!account.accessToken) return null
@@ -109,16 +144,30 @@ export const instagramConnector: Connector = {
       !account.expiresAt || account.expiresAt.getTime() - Date.now() < REFRESH_WINDOW_MS
     if (!expiresSoon) return token
 
+    // Unlike the Instagram Login refresh, this exchange is signed with the app
+    // credentials. Missing ones can't be recovered from here, and the stored token is
+    // still valid for up to a week, so hand it back rather than fail the whole sync.
+    const appId = env('INSTAGRAM_APP_ID')
+    const appSecret = env('INSTAGRAM_APP_SECRET')
+    if (!appId || !appSecret) return token
+
+    const exchange = new URL(`${GRAPH}/oauth/access_token`)
+    exchange.searchParams.set('grant_type', 'fb_exchange_token')
+    exchange.searchParams.set('client_id', appId)
+    exchange.searchParams.set('client_secret', appSecret)
+    exchange.searchParams.set('fb_exchange_token', token)
+
     let refreshed: { access_token?: string; expires_in?: number } = {}
     try {
-      refreshed = (await getJson(
-        `${GRAPH}/refresh_access_token?grant_type=ig_refresh_token&access_token=${token}`,
-      )) as { access_token?: string; expires_in?: number }
+      refreshed = (await getJson(exchange.toString())) as {
+        access_token?: string
+        expires_in?: number
+      }
     } catch {
       // The current token isn't expired yet — only within the refresh window — so a
-      // transient failure here (network blip, Instagram 5xx) should fall back to it
-      // rather than discard a perfectly usable credential, same as the case below where
-      // Instagram answers OK but omits access_token.
+      // transient failure here (network blip, Graph 5xx) should fall back to it rather
+      // than discard a perfectly usable credential, same as the case below where the
+      // Graph API answers OK but omits access_token.
       return token
     }
 
@@ -139,12 +188,16 @@ export const instagramConnector: Connector = {
     return refreshed.access_token
   },
 
-  async fetchPosts(_account: SocialAccount, token: string | null): Promise<FetchedBatch> {
-    if (!token) return { posts: [], windowWasCapped: false }
+  async fetchPosts(account: SocialAccount, token: string | null): Promise<FetchedBatch> {
+    // Under Facebook Login the token belongs to the person, not to one Instagram
+    // account, so there is no `me/media` to fall back on: without the id the callback
+    // stored there is nothing to ask about.
+    const igUserId = account.externalId
+    if (!token || !igUserId) return { posts: [], windowWasCapped: false }
 
     const fields = 'id,caption,media_type,media_product_type,media_url,thumbnail_url,permalink,timestamp'
     const media: InstagramMedia[] = []
-    let next = `${GRAPH}/me/media?fields=${fields}&limit=${PAGE_SIZE}&access_token=${token}`
+    let next = `${GRAPH}/${igUserId}/media?fields=${fields}&limit=${PAGE_SIZE}&access_token=${token}`
     let pagesFetched = 0
 
     while (next && media.length < MAX_POSTS_PER_SYNC && pagesFetched < MAX_MEDIA_PAGES) {

@@ -3,9 +3,13 @@ import { getDb, socialAccounts } from '@/db'
 import { isAuthenticated } from '@/lib/auth'
 import { env } from '@/lib/env'
 import { encryptToken } from '@/lib/social/crypto'
+import { pickInstagramAccount, type FacebookPages } from '@/lib/social/instagram'
 import { oauthStateMatches } from '@/lib/social/oauth-state'
 
 export const dynamic = 'force-dynamic'
+
+/** Instagram runs on Facebook Login, so every leg of its OAuth is on the Facebook host. */
+const GRAPH = 'https://graph.facebook.com/v23.0'
 
 type Credential = {
   accessToken: string
@@ -29,40 +33,47 @@ async function instagramCredential(code: string, redirectUri: string): Promise<C
   const appSecret = env('INSTAGRAM_APP_SECRET')
   if (!appId || !appSecret) throw new OAuthError('Faltan las credenciales de Instagram')
 
-  const short = await fetch('https://api.instagram.com/oauth/access_token', {
-    method: 'POST',
-    body: new URLSearchParams({
-      client_id: appId,
-      client_secret: appSecret,
-      grant_type: 'authorization_code',
-      redirect_uri: redirectUri,
-      code,
-    }),
-  })
+  const shortUrl = new URL(`${GRAPH}/oauth/access_token`)
+  shortUrl.searchParams.set('client_id', appId)
+  shortUrl.searchParams.set('client_secret', appSecret)
+  shortUrl.searchParams.set('redirect_uri', redirectUri)
+  shortUrl.searchParams.set('code', code)
+  const short = await fetch(shortUrl)
   if (!short.ok) throw new OAuthError(`Instagram rechazó el código: ${short.status}`)
-  const shortData = (await short.json()) as { access_token?: string; user_id?: number }
+  const shortData = (await short.json()) as { access_token?: string }
   if (!shortData.access_token) throw new OAuthError('Instagram no devolvió token')
 
-  // The short-lived token lasts an hour; only the long-lived one is worth storing.
-  const longUrl = new URL('https://graph.instagram.com/access_token')
-  longUrl.searchParams.set('grant_type', 'ig_exchange_token')
+  // The code exchange returns a token good for a couple of hours; handing it straight
+  // back through fb_exchange_token is what turns it into the ~60-day one worth storing.
+  const longUrl = new URL(`${GRAPH}/oauth/access_token`)
+  longUrl.searchParams.set('grant_type', 'fb_exchange_token')
+  longUrl.searchParams.set('client_id', appId)
   longUrl.searchParams.set('client_secret', appSecret)
-  longUrl.searchParams.set('access_token', shortData.access_token)
+  longUrl.searchParams.set('fb_exchange_token', shortData.access_token)
   const long = await fetch(longUrl)
   if (!long.ok) throw new OAuthError(`Instagram no canjeó el token largo: ${long.status}`)
   const longData = (await long.json()) as { access_token?: string; expires_in?: number }
 
   const token = longData.access_token ?? shortData.access_token
-  const profile = (await (
-    await fetch(`https://graph.instagram.com/v23.0/me?fields=id,username&access_token=${token}`)
-  ).json()) as { id?: string; username?: string }
+
+  // Facebook Login authorizes a person, not one Instagram account, so the id the sync
+  // is keyed on has to be discovered through the Pages this person administers. Failing
+  // loudly here beats storing a credential the connector could never use.
+  const pages = await fetch(
+    `${GRAPH}/me/accounts?fields=name,instagram_business_account{id,username}&access_token=${token}`,
+  )
+  if (!pages.ok) throw new OAuthError(`No se pudieron leer las páginas de Facebook: ${pages.status}`)
+  const igAccount = pickInstagramAccount((await pages.json()) as FacebookPages)
+  if (!igAccount) {
+    throw new OAuthError('Ninguna página de Facebook tiene una cuenta de Instagram asociada.')
+  }
 
   return {
     accessToken: token,
     refreshToken: null,
     expiresAt: new Date(Date.now() + (longData.expires_in ?? 5184000) * 1000),
-    externalId: profile.id ?? String(shortData.user_id ?? ''),
-    handle: profile.username ? `@${profile.username}` : null,
+    externalId: igAccount.id,
+    handle: igAccount.username ? `@${igAccount.username}` : null,
   }
 }
 

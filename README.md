@@ -139,16 +139,22 @@ YOUTUBE_API_KEY=AIza...
 YOUTUBE_CHANNEL_ID=UC...
 ```
 
-### Instagram — cuenta profesional
+### Instagram — cuenta profesional y página de Facebook
 
-Necesitas una cuenta Business o Creator. No hace falta ligarla a una página de Facebook.
+Necesitas una cuenta Business o Creator **ligada a una página de Facebook**. La conexión
+usa *Instagram API with Facebook Login*: el id de la cuenta de Instagram se descubre a
+través de las páginas que administras, así que sin esa página no hay nada que leer.
 
 En [developers.facebook.com](https://developers.facebook.com), crea una app, agrega el
-producto **Instagram**, y en *Business Login* configura como redirect URI:
+producto **Facebook Login**, y configura como redirect URI válida:
 
 ```
 https://TU-DOMINIO/api/social/instagram/callback
 ```
+
+Los permisos que pide la app son `instagram_basic`, `instagram_manage_insights`,
+`pages_show_list`, `pages_read_engagement` e `instagram_content_publish`. El último no se
+usa todavía: se pide ahora porque los permisos se conceden una sola vez, al autorizar.
 
 Copia el app id y el secret. Mientras la app esté en **modo desarrollo** y tú seas su
 dueño, no necesitas App Review.

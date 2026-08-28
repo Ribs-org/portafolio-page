@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest'
 import fixture from './fixtures/instagram-media.json'
 import {
   normalizeInstagramMedia,
+  pickInstagramAccount,
+  type FacebookPages,
   type InstagramInsights,
   type InstagramMedia,
 } from './instagram'
@@ -49,5 +51,61 @@ describe('normalizeInstagramMedia', () => {
 
   it('tolera un post sin caption', () => {
     expect(normalizeInstagramMedia(imageMedia, imageInsights).caption).toBeNull()
+  })
+})
+
+describe('pickInstagramAccount', () => {
+  it('saca la cuenta de la única página que la tiene', () => {
+    const pages: FacebookPages = {
+      data: [
+        {
+          id: '61550000000001',
+          name: 'Vicente Pareja',
+          instagram_business_account: { id: '17841400000000001', username: 'vicente' },
+        },
+      ],
+    }
+    expect(pickInstagramAccount(pages)).toEqual({
+      id: '17841400000000001',
+      username: 'vicente',
+    })
+  })
+
+  it('salta las páginas sin cuenta y devuelve la que sí la tiene', () => {
+    const pages: FacebookPages = {
+      data: [
+        { id: '61550000000002', name: 'Página vieja' },
+        { id: '61550000000003', name: 'Página sin Instagram', instagram_business_account: null },
+        {
+          id: '61550000000004',
+          name: 'Página buena',
+          instagram_business_account: { id: '17841400000000009', username: 'gimnasio' },
+        },
+      ],
+    }
+    // El id que importa es el de Instagram, nunca el de la página que lo contiene.
+    expect(pickInstagramAccount(pages)).toEqual({
+      id: '17841400000000009',
+      username: 'gimnasio',
+    })
+  })
+
+  it('devuelve null si ninguna página tiene cuenta de Instagram', () => {
+    const pages: FacebookPages = {
+      data: [{ id: '61550000000005', name: 'Solo Facebook' }],
+    }
+    expect(pickInstagramAccount(pages)).toBeNull()
+  })
+
+  it('devuelve null cuando no hay páginas', () => {
+    expect(pickInstagramAccount({ data: [] })).toBeNull()
+    expect(pickInstagramAccount({})).toBeNull()
+  })
+
+  it('acepta una cuenta sin username en vez de inventarlo', () => {
+    const pages: FacebookPages = {
+      data: [{ id: '6155000000006', instagram_business_account: { id: '17841400000000010' } }],
+    }
+    expect(pickInstagramAccount(pages)).toEqual({ id: '17841400000000010', username: null })
   })
 })
