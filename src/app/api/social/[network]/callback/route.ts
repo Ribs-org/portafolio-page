@@ -3,6 +3,7 @@ import { eq } from 'drizzle-orm'
 import { getDb, socialAccounts } from '@/db'
 import { isAuthenticated } from '@/lib/auth'
 import { env } from '@/lib/env'
+import { mayConnectAccount } from '@/lib/social/connector'
 import { encryptToken } from '@/lib/social/crypto'
 import {
   InstagramAccountError,
@@ -184,19 +185,19 @@ export async function GET(
     // returned something and fewer than MAX_POSTS_PER_SYNC items — archives A's entire
     // catalogue in a single statement. Reconnecting to A afterwards only clears
     // `archivedAt` for posts still inside the newest window; everything older stays
-    // archived permanently. Disconnecting first is the deliberate, recoverable path.
+    // archived permanently.
+    //
+    // This stops that happening by accident. It does not make a deliberate switch safe:
+    // changing accounts on purpose destroys the same history in the same way, which is
+    // why the panel offers no way to do it and the message below does not invent one.
     const [existing] = await getDb()
       .select({ externalId: socialAccounts.externalId })
       .from(socialAccounts)
       .where(eq(socialAccounts.network, network))
 
-    if (
-      existing?.externalId &&
-      credential.externalId &&
-      existing.externalId !== credential.externalId
-    ) {
+    if (!mayConnectAccount(existing?.externalId ?? null, credential.externalId)) {
       throw new OAuthError(
-        'Esa cuenta no es la que ya está conectada en esta red. Desconéctala primero si de verdad quieres cambiarla.',
+        'Esta red ya está conectada a otra cuenta. Cambiarla archivaría las publicaciones de la anterior, así que no se hace desde el panel.',
       )
     }
 

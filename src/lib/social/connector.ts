@@ -47,6 +47,25 @@ export type Connector = {
   fetchPosts(account: SocialAccount, token: string | null): Promise<FetchedBatch>
 }
 
+/**
+ * Whether an authorization that resolved to `discoveredId` may be stored over the account
+ * already held as `storedId`.
+ *
+ * `social_posts` is keyed on the network alone, so the stored `external_id` is what decides
+ * whose posts the next sync compares its results against. Let a different id land there and
+ * the orchestrator reads the previous account's entire catalogue as deleted.
+ *
+ * A null on either side is not a conflict: either nothing is connected yet, or the network
+ * did not report an id to compare.
+ */
+export function mayConnectAccount(
+  storedId: string | null,
+  discoveredId: string | null,
+): boolean {
+  if (!storedId || !discoveredId) return true
+  return storedId === discoveredId
+}
+
 /** The shared ceiling every connector pages up to. */
 export const MAX_POSTS_PER_SYNC = 200
 
