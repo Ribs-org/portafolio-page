@@ -4,9 +4,10 @@ import Image from 'next/image'
 import { useRef, useState, useTransition } from 'react'
 import { ArrowDown, ArrowUp, Check, Copy } from 'lucide-react'
 import { updatePostCampaign } from '@/app/admin/actions'
+import { SERIES } from '@/components/charts/theme'
 import { useSortedRows } from '@/components/charts/use-sorted-rows'
 import { networkLabel } from '@/lib/networks'
-import type { PostRow } from '@/lib/posts-kpis'
+import { hasNoPlatformMetrics, type PostRow } from '@/lib/posts-kpis'
 import { cn, formatNumber } from '@/lib/utils'
 
 type Column = 'views' | 'likes' | 'comments' | 'visits' | 'clicks' | 'ctr' | 'pull'
@@ -43,6 +44,11 @@ export function PostTable({ rows }: { rows: PostRow[] }) {
       </div>
     )
   }
+
+  // Scale of the comparison bars: the biggest cumulative view count on screen. Rows
+  // with no reading are skipped rather than counted as zero, and the guard keeps a
+  // catalogue that is all-null (or genuinely all-zero) from dividing by nothing.
+  const maxViews = rows.reduce((best, r) => (r.views !== null && r.views > best ? r.views : best), 0)
 
   return (
     <div className="-mx-1 overflow-x-auto px-1">
@@ -88,7 +94,13 @@ export function PostTable({ rows }: { rows: PostRow[] }) {
           {sorted.map((row) => (
             <tr
               key={row.id}
-              className={cn('border-t border-white/[0.06]', row.archived && 'opacity-50')}
+              className={cn(
+                'border-t border-white/[0.06]',
+                // A row the network reported nothing about steps back the same way a
+                // deleted one does: it is still true, just not comparable. The page
+                // explains why above the table, so the dimming is not a dead end.
+                (row.archived || hasNoPlatformMetrics(row)) && 'opacity-50',
+              )}
             >
               <td className="py-2 pr-3">
                 <div className="flex items-center gap-2.5">
@@ -128,7 +140,18 @@ export function PostTable({ rows }: { rows: PostRow[] }) {
                 </div>
               </td>
 
-              <td className="py-2 text-right font-mono tabular-nums">
+              <td className="relative py-2 text-right font-mono tabular-nums">
+                {row.views !== null && maxViews > 0 ? (
+                  <span
+                    aria-hidden
+                    className="absolute inset-y-1 left-0 -z-10 rounded"
+                    style={{
+                      width: `${(row.views / maxViews) * 100}%`,
+                      background: SERIES[0],
+                      opacity: 0.14,
+                    }}
+                  />
+                ) : null}
                 {num(row.views)}
                 {row.viewsChange !== null && row.viewsChange > 0 && !row.isNew ? (
                   <span className="ml-1 text-[0.68rem] text-fg-faint">
@@ -142,13 +165,7 @@ export function PostTable({ rows }: { rows: PostRow[] }) {
               <td className="py-2 text-right font-mono tabular-nums text-fg-muted">
                 {num(row.comments)}
               </td>
-              <td className="py-2 text-right font-mono tabular-nums">
-                {row.visits === null ? (
-                  <span className="text-[0.7rem] text-fg-faint">pega el link</span>
-                ) : (
-                  formatNumber(row.visits)
-                )}
-              </td>
+              <td className="py-2 text-right font-mono tabular-nums">{num(row.visits)}</td>
               <td className="py-2 text-right font-mono tabular-nums text-fg-muted">
                 {num(row.clicks)}
               </td>
