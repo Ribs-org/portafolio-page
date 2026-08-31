@@ -17,10 +17,11 @@ const SCOPES: Record<string, string> = {
     // portfolio rather than by the person. Without it the call returns an empty list and the
     // Instagram account is undiscoverable, even when Page and account are correctly linked.
     'instagram_basic,instagram_manage_insights,pages_show_list,pages_read_engagement,instagram_content_publish,business_management',
-  // Facebook rides the same Meta app as Instagram. `read_insights` is the only scope
-  // Instagram's entry doesn't already request; the pages scopes repeat because each
-  // network's authorization is its own consent screen.
-  facebook: 'pages_show_list,pages_read_engagement,read_insights,business_management',
+  // Facebook rides the same Meta app as Instagram; the pages scopes repeat because each
+  // network's authorization is its own consent screen. `read_insights` is deliberately
+  // absent: Meta deprecated it as a login scope (the dialog rejects it with
+  // "Invalid Scopes"), and `pages_read_engagement` is what covers post insights now.
+  facebook: 'pages_show_list,pages_read_engagement,business_management',
   tiktok: 'user.info.basic,video.list',
 }
 
