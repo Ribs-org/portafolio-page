@@ -1,6 +1,6 @@
 import 'server-only'
 import { and, desc, eq, gte, inArray, isNull, lte, sql, type SQL } from 'drizzle-orm'
-import { clicks, getDb, postMetrics, socialAccounts, socialPosts, visits } from '@/db'
+import { clicks, getDb, postMetrics, SOCIAL_NETWORKS, socialAccounts, socialPosts, visits } from '@/db'
 import type { Filters, Granularity } from './analytics'
 import { SITE_TIMEZONE, describe, granularityFor, localDay } from './analytics'
 import {
@@ -257,13 +257,15 @@ export async function getPostSeries(f: Filters): Promise<PostSeriesPoint[]> {
   }))
 }
 
-const OAUTH_NETWORKS = new Set(['instagram', 'tiktok'])
+// YouTube is the one network configured by environment instead of a button.
+const OAUTH_NETWORKS = new Set(['instagram', 'tiktok', 'facebook'])
 
 export async function getConnections(): Promise<ConnectionRow[]> {
   const accounts = await getDb().select().from(socialAccounts)
   const byNetwork = new Map(accounts.map((a) => [a.network, a]))
 
-  return ['instagram', 'tiktok', 'youtube'].map((network) => {
+  // Derived from the schema so this phase and the next ones add networks in one place.
+  return SOCIAL_NETWORKS.map((network) => {
     const account = byNetwork.get(network)
     const usesOAuth = OAUTH_NETWORKS.has(network)
     return {
