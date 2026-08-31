@@ -116,6 +116,8 @@ export type FacebookPost = {
   created_time?: string
   attachments?: { data?: Array<{ media_type?: string }> }
   shares?: { count?: number }
+  likes?: { summary?: { total_count?: number } }
+  comments?: { summary?: { total_count?: number } }
 }
 
 export type FacebookInsights = {
@@ -132,10 +134,8 @@ const METRIC_NAMES: Record<string, keyof PostMetricValues> = {
   post_total_media_view_unique: 'reach',
 }
 
-// Reactions arrive as a by-type breakdown ({like, love, …}); their sum is the closest
-// analogue to the reaction count Facebook shows on the post. The likes.summary field
-// would be exact, but reading it needs pages_read_user_content — a permission this
-// Meta app cannot request (its use cases don't include it, the dialog rejects it).
+// Reactions arrive as a by-type breakdown ({like, love, …}); their sum backs up the
+// exact likes.summary count from the post object, which wins whenever both answer.
 const REACTIONS_METRIC = 'post_reactions_by_type_total'
 
 function mediaTypeOf(post: FacebookPost): string {
@@ -166,9 +166,13 @@ export function normalizeFacebookPost(
     if (key && typeof value === 'number') metrics[key] = value
   }
 
-  // Shares is the one engagement count the post object still hands over with only
-  // pages_read_engagement. Comments has no permitted source at all, so it stays null.
+  // The exact counts ride on the post object itself and override the insights-derived
+  // reactions sum. `typeof` guards keep an absent count as null — absent is not zero.
+  const likes = post.likes?.summary?.total_count
+  const comments = post.comments?.summary?.total_count
   const shares = post.shares?.count
+  if (typeof likes === 'number') metrics.likes = likes
+  if (typeof comments === 'number') metrics.comments = comments
   if (typeof shares === 'number') metrics.shares = shares
 
   return {
@@ -237,11 +241,11 @@ export const facebookConnector: Connector = {
     const pageId = account.externalId
     if (!token || !pageId) return { posts: [], windowWasCapped: false }
 
-    // No likes.summary/comments.summary here: both fields answer (#10) without
-    // pages_read_user_content, a permission this app cannot request. Reactions come
-    // from insights instead; comments have no permitted source and stay null.
+    // likes.summary/comments.summary answer (#10) unless the token carries
+    // pages_read_user_content — granted since the Meta app gained the «Administrar
+    // páginas» use case. A token from before that consent needs reconnecting.
     const fields =
-      'id,message,permalink_url,full_picture,attachments{media_type},created_time,shares'
+      'id,message,permalink_url,full_picture,attachments{media_type},created_time,shares,likes.summary(true),comments.summary(true)'
     const first = `${GRAPH}/${pageId}/published_posts?fields=${fields}&limit=${PAGE_SIZE}&access_token=${token}`
     const { posts: fetched, windowWasCapped } = await collectPublishedPosts(first, getJson)
 
