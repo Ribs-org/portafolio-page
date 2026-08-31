@@ -18,14 +18,11 @@ const SCOPES: Record<string, string> = {
     // Instagram account is undiscoverable, even when Page and account are correctly linked.
     'instagram_basic,instagram_manage_insights,pages_show_list,pages_read_engagement,instagram_content_publish,business_management',
   // Facebook rides the same Meta app as Instagram; the pages scopes repeat because each
-  // network's authorization is its own consent screen. `read_insights` is deliberately
-  // absent: Meta deprecated it as a login scope (the dialog rejects it with
-  // "Invalid Scopes"), and `pages_read_engagement` is what covers post insights now.
-  // `pages_read_user_content` looks unrelated but is what the likes/comments summaries
-  // on published_posts actually demand — without it Graph answers (#10), misleadingly
-  // naming pages_read_engagement, and the sync dies on its first page.
-  facebook:
-    'pages_show_list,pages_read_engagement,pages_read_user_content,business_management',
+  // network's authorization is its own consent screen. This trio is exactly what the
+  // app's Meta use cases allow: the dialog rejects anything else as "Invalid Scopes"
+  // (verified with read_insights and pages_read_user_content — the latter is why the
+  // connector reads reactions via insights and leaves comments null).
+  facebook: 'pages_show_list,pages_read_engagement,business_management',
   tiktok: 'user.info.basic,video.list',
 }
 

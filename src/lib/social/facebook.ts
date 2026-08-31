@@ -116,18 +116,27 @@ export type FacebookPost = {
   created_time?: string
   attachments?: { data?: Array<{ media_type?: string }> }
   shares?: { count?: number }
-  likes?: { summary?: { total_count?: number } }
-  comments?: { summary?: { total_count?: number } }
 }
 
 export type FacebookInsights = {
-  data?: Array<{ name?: string; values?: Array<{ value?: number }> }>
+  data?: Array<{
+    name?: string
+    values?: Array<{ value?: number | Record<string, number> }>
+  }>
 }
 
+// post_impressions* died in the June 2026 deprecation — Graph now answers «must be a
+// valid insights metric» — and these are their verified living successors.
 const METRIC_NAMES: Record<string, keyof PostMetricValues> = {
-  post_impressions: 'views',
-  post_impressions_unique: 'reach',
+  post_media_view: 'views',
+  post_total_media_view_unique: 'reach',
 }
+
+// Reactions arrive as a by-type breakdown ({like, love, …}); their sum is the closest
+// analogue to the reaction count Facebook shows on the post. The likes.summary field
+// would be exact, but reading it needs pages_read_user_content — a permission this
+// Meta app cannot request (its use cases don't include it, the dialog rejects it).
+const REACTIONS_METRIC = 'post_reactions_by_type_total'
 
 function mediaTypeOf(post: FacebookPost): string {
   const attached = post.attachments?.data?.[0]?.media_type
@@ -143,18 +152,23 @@ export function normalizeFacebookPost(
 ): FetchedPost {
   const metrics: PostMetricValues = { ...NO_METRICS }
   for (const entry of insights.data ?? []) {
-    const key = entry.name ? METRIC_NAMES[entry.name] : undefined
     const value = entry.values?.[0]?.value
+    if (entry.name === REACTIONS_METRIC && typeof value === 'object' && value !== null) {
+      // A breakdown that came back empty is a post with zero reactions — a real zero.
+      // The metric being absent altogether stays null: absent is not zero.
+      metrics.likes = Object.values(value).reduce(
+        (sum, count) => sum + (typeof count === 'number' ? count : 0),
+        0,
+      )
+      continue
+    }
+    const key = entry.name ? METRIC_NAMES[entry.name] : undefined
     if (key && typeof value === 'number') metrics[key] = value
   }
 
-  // Unlike Instagram, the engagement counts ride on the post object itself, not on
-  // insights. `typeof` guards keep an absent count as null — absent is not zero.
-  const likes = post.likes?.summary?.total_count
-  const comments = post.comments?.summary?.total_count
+  // Shares is the one engagement count the post object still hands over with only
+  // pages_read_engagement. Comments has no permitted source at all, so it stays null.
   const shares = post.shares?.count
-  if (typeof likes === 'number') metrics.likes = likes
-  if (typeof comments === 'number') metrics.comments = comments
   if (typeof shares === 'number') metrics.shares = shares
 
   return {
@@ -223,12 +237,15 @@ export const facebookConnector: Connector = {
     const pageId = account.externalId
     if (!token || !pageId) return { posts: [], windowWasCapped: false }
 
+    // No likes.summary/comments.summary here: both fields answer (#10) without
+    // pages_read_user_content, a permission this app cannot request. Reactions come
+    // from insights instead; comments have no permitted source and stay null.
     const fields =
-      'id,message,permalink_url,full_picture,attachments{media_type},created_time,shares,likes.summary(true),comments.summary(true)'
+      'id,message,permalink_url,full_picture,attachments{media_type},created_time,shares'
     const first = `${GRAPH}/${pageId}/published_posts?fields=${fields}&limit=${PAGE_SIZE}&access_token=${token}`
     const { posts: fetched, windowWasCapped } = await collectPublishedPosts(first, getJson)
 
-    const metrics = 'post_impressions,post_impressions_unique'
+    const metrics = `post_media_view,post_total_media_view_unique,${REACTIONS_METRIC}`
     const posts: FetchedPost[] = []
     // Sequential chunks rather than one Promise.all over every post: up to 200
     // concurrent requests risks a 429, and a systemic insights failure aborts the whole

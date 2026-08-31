@@ -6,23 +6,20 @@
     "full_picture": "https://scontent.xx.fbcdn.net/v/thumb.jpg",
     "created_time": "2026-08-12T18:22:04+0000",
     "attachments": { "data": [{ "media_type": "video" }] },
-    "shares": { "count": 34 },
-    "likes": { "summary": { "total_count": 511 } },
-    "comments": { "summary": { "total_count": 48 } }
+    "shares": { "count": 34 }
   },
   "videoInsights": {
     "data": [
-      { "name": "post_impressions", "values": [{ "value": 12840 }] },
-      { "name": "post_impressions_unique", "values": [{ "value": 9310 }] }
+      { "name": "post_media_view", "values": [{ "value": 12840 }] },
+      { "name": "post_total_media_view_unique", "values": [{ "value": 9310 }] },
+      { "name": "post_reactions_by_type_total", "values": [{ "value": { "like": 500, "love": 11 } }] }
     ]
   },
   "statusPost": {
     "id": "61550000000001_1111111111111111",
     "message": null,
     "permalink_url": "https://www.facebook.com/61550000000001/posts/1111111111111111",
-    "created_time": "2026-08-01T12:00:00+0000",
-    "likes": { "summary": { "total_count": 12 } },
-    "comments": { "summary": { "total_count": 0 } }
+    "created_time": "2026-08-01T12:00:00+0000"
   },
   "statusInsights": { "data": [] }
 }
