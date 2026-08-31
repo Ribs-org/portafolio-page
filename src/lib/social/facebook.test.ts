@@ -124,16 +124,28 @@ describe('normalizeFacebookPost', () => {
     expect(post.publishedAt.toISOString()).toBe('2026-08-12T18:22:04.000Z')
   })
 
-  it('une insights con los conteos que vienen en el post mismo', () => {
+  it('une insights con los shares que vienen en el post mismo', () => {
     const post = normalizeFacebookPost(videoPost, videoInsights)
     expect(post.metrics).toEqual({
       views: 12840,
       reach: 9310,
       likes: 511,
-      comments: 48,
+      comments: null,
       shares: 34,
       saves: null,
     })
+  })
+
+  it('suma el desglose de reacciones por tipo como likes', () => {
+    // like 500 + love 11: lo más cercano al conteo de reacciones que Facebook muestra.
+    expect(normalizeFacebookPost(videoPost, videoInsights).metrics.likes).toBe(511)
+  })
+
+  it('un desglose presente pero vacío es un cero real, no un null', () => {
+    const post = normalizeFacebookPost(statusPost, {
+      data: [{ name: 'post_reactions_by_type_total', values: [{ value: {} }] }],
+    })
+    expect(post.metrics.likes).toBe(0)
   })
 
   it('deja en null lo que no vino: shares ausente no es cero', () => {
@@ -141,13 +153,15 @@ describe('normalizeFacebookPost', () => {
     expect(post.metrics.shares).toBeNull()
     expect(post.metrics.views).toBeNull()
     expect(post.metrics.reach).toBeNull()
-    // Un conteo que sí vino en cero es un cero real, no un null.
-    expect(post.metrics.comments).toBe(0)
-    expect(post.metrics.likes).toBe(12)
+    expect(post.metrics.likes).toBeNull()
   })
 
-  it('saves es siempre null: Facebook no lo reporta', () => {
-    expect(normalizeFacebookPost(videoPost, videoInsights).metrics.saves).toBeNull()
+  it('saves y comments son siempre null: la red no los entrega', () => {
+    // saves no existe en Facebook; comments exige pages_read_user_content, que la
+    // app de Meta no puede pedir (su caso de uso no lo incluye).
+    const metrics = normalizeFacebookPost(videoPost, videoInsights).metrics
+    expect(metrics.saves).toBeNull()
+    expect(metrics.comments).toBeNull()
   })
 
   it('tolera un post sin message ni full_picture', () => {
