@@ -41,7 +41,7 @@ export function Connections({ rows }: { rows: ConnectionRow[] }) {
 
   return (
     <section className="mb-4">
-      <div className="grid gap-3 sm:grid-cols-3">
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         {rows.map((row) => (
           <div key={row.network} className="surface rounded-2xl p-4">
             <div className="flex items-center gap-2">

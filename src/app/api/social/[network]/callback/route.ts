@@ -5,6 +5,7 @@ import { isAuthenticated } from '@/lib/auth'
 import { env } from '@/lib/env'
 import { mayConnectAccount } from '@/lib/social/connector'
 import { encryptToken } from '@/lib/social/crypto'
+import { FacebookPageError, pickFacebookPage, type FacebookPagesList } from '@/lib/social/facebook'
 import {
   InstagramAccountError,
   instagramTokenExpiry,
@@ -35,10 +36,20 @@ type Credential = {
  */
 class OAuthError extends Error {}
 
-async function instagramCredential(code: string, redirectUri: string): Promise<Credential> {
+/**
+ * The code → short token → long-lived token dance both Meta networks share. `label`
+ * only flavors the fixed error sentences; the credentials are the same Meta app.
+ */
+async function exchangeMetaCode(
+  code: string,
+  redirectUri: string,
+  label: 'Instagram' | 'Facebook',
+): Promise<{ accessToken: string; expiresIn?: number }> {
   const appId = env('INSTAGRAM_APP_ID')
   const appSecret = env('INSTAGRAM_APP_SECRET')
-  if (!appId || !appSecret) throw new OAuthError('Faltan las credenciales de Instagram')
+  if (!appId || !appSecret) {
+    throw new OAuthError('Faltan las credenciales de la app de Meta (INSTAGRAM_APP_ID / INSTAGRAM_APP_SECRET).')
+  }
 
   const shortUrl = new URL(`${GRAPH}/oauth/access_token`)
   shortUrl.searchParams.set('client_id', appId)
@@ -46,27 +57,30 @@ async function instagramCredential(code: string, redirectUri: string): Promise<C
   shortUrl.searchParams.set('redirect_uri', redirectUri)
   shortUrl.searchParams.set('code', code)
   const short = await fetch(shortUrl)
-  if (!short.ok) throw new OAuthError(`Instagram rechazó el código: ${short.status}`)
+  if (!short.ok) throw new OAuthError(`${label} rechazó el código: ${short.status}`)
   const shortData = (await short.json()) as { access_token?: string }
-  if (!shortData.access_token) throw new OAuthError('Instagram no devolvió token')
+  if (!shortData.access_token) throw new OAuthError(`${label} no devolvió token`)
 
   // The code exchange returns a token good for a couple of hours; handing it straight
-  // back through fb_exchange_token is what turns it into the ~60-day one worth storing.
+  // back through fb_exchange_token is what turns it into the ~60-day one worth keeping.
   const longUrl = new URL(`${GRAPH}/oauth/access_token`)
   longUrl.searchParams.set('grant_type', 'fb_exchange_token')
   longUrl.searchParams.set('client_id', appId)
   longUrl.searchParams.set('client_secret', appSecret)
   longUrl.searchParams.set('fb_exchange_token', shortData.access_token)
   const long = await fetch(longUrl)
-  if (!long.ok) throw new OAuthError(`Instagram no canjeó el token largo: ${long.status}`)
+  if (!long.ok) throw new OAuthError(`${label} no canjeó el token largo: ${long.status}`)
   const longData = (await long.json()) as { access_token?: string; expires_in?: number }
-  // Falling back to the short-lived token here used to be the tolerant thing to do, but
-  // `expiresAt` below is computed from the *long* response: a 200 without a token would
-  // store a credential good for about an hour stamped as good for sixty days. The sync
-  // would then fail every night for two months without `ensureCredential` ever trying an
-  // exchange, because by that stamp nothing was expiring.
-  if (!longData.access_token) throw new OAuthError('Instagram no devolvió el token largo')
-  const token = longData.access_token
+  // A 200 without a token would store a credential good for about an hour stamped as
+  // good for sixty days (see instagramCredential's history) — fail loudly instead.
+  if (!longData.access_token) throw new OAuthError(`${label} no devolvió el token largo`)
+
+  return { accessToken: longData.access_token, expiresIn: longData.expires_in }
+}
+
+async function instagramCredential(code: string, redirectUri: string): Promise<Credential> {
+  const exchanged = await exchangeMetaCode(code, redirectUri, 'Instagram')
+  const token = exchanged.accessToken
 
   // Facebook Login authorizes a person, not one Instagram account, so the id the sync
   // is keyed on has to be discovered through the Pages this person administers. Failing
@@ -96,9 +110,52 @@ async function instagramCredential(code: string, redirectUri: string): Promise<C
   return {
     accessToken: token,
     refreshToken: null,
-    expiresAt: instagramTokenExpiry(longData.expires_in),
+    expiresAt: instagramTokenExpiry(exchanged.expiresIn),
     externalId: igAccount.id,
     handle: igAccount.username ? `@${igAccount.username}` : null,
+  }
+}
+
+async function facebookCredential(code: string, redirectUri: string): Promise<Credential> {
+  const exchanged = await exchangeMetaCode(code, redirectUri, 'Facebook')
+
+  const pages = await fetch(
+    `${GRAPH}/me/accounts?fields=id,name,access_token&access_token=${exchanged.accessToken}`,
+  )
+  if (!pages.ok) {
+    throw new OAuthError(`No se pudieron leer las páginas de Facebook: ${pages.status}`)
+  }
+
+  let page
+  try {
+    page = pickFacebookPage((await pages.json()) as FacebookPagesList, env('FACEBOOK_PAGE_ID'))
+  } catch (error) {
+    if (!(error instanceof FacebookPageError)) throw error
+    // The message is one of the connector's own fixed sentences, so it is safe to show.
+    // The candidates also carry each page's access token, so only id and name go to the
+    // server log — never the raw candidates.
+    if (error.candidates.length > 0) {
+      console.error(
+        'Páginas de Facebook disponibles:',
+        error.candidates.map(({ id, name }) => ({ id, name })),
+      )
+    }
+    throw new OAuthError(error.message)
+  }
+
+  if (!page.accessToken) {
+    throw new OAuthError('Facebook no entregó el token de la página. Inténtalo de nuevo.')
+  }
+
+  return {
+    // The page token, not the user token: it is what published_posts and insights are
+    // asked with, and derived from a long-lived user token it does not expire — hence
+    // expiresAt null rather than an invented date.
+    accessToken: page.accessToken,
+    refreshToken: null,
+    expiresAt: null,
+    externalId: page.id,
+    handle: page.name,
   }
 }
 
@@ -137,11 +194,9 @@ async function tiktokCredential(code: string, redirectUri: string): Promise<Cred
   }
 }
 
-/** Explicit rather than an implicit "not instagram, so tiktok" ternary — the network
- *  is only ever `instagram` or `tiktok` here because `connect/route.ts` refuses to mint
- *  a state for anything else, but that invariant should be legible at the call site too. */
 async function fetchCredential(network: string, code: string, redirectUri: string): Promise<Credential> {
   if (network === 'instagram') return instagramCredential(code, redirectUri)
+  if (network === 'facebook') return facebookCredential(code, redirectUri)
   if (network === 'tiktok') return tiktokCredential(code, redirectUri)
   throw new OAuthError('Esa red no usa OAuth.')
 }
