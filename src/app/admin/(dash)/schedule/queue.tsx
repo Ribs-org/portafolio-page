@@ -1,6 +1,6 @@
 'use client'
 
-import { useTransition } from 'react'
+import { useState, useTransition } from 'react'
 import { deleteScheduledPost, rescheduleTarget } from '@/app/admin/actions'
 import type { ScheduledPost, ScheduledPostTarget } from '@/db/schema'
 import { networkLabel } from '@/lib/networks'
@@ -19,13 +19,16 @@ export function Queue({
   items: Array<{ post: ScheduledPost; targets: ScheduledPostTarget[] }>
 }) {
   const [pending, start] = useTransition()
+  const [error, setError] = useState<string | null>(null)
 
   if (items.length === 0) {
     return <p className="py-8 text-center text-sm text-fg-faint">Nada programado todavía.</p>
   }
 
   return (
-    <ul className="space-y-3">
+    <>
+      {error && <p className="mb-3 text-sm text-red-400">{error}</p>}
+      <ul className="space-y-3">
       {items.map(({ post, targets }) => (
         <li key={post.id} className="rounded-xl bg-white/[0.03] p-4">
           <div className="flex items-start justify-between gap-3">
@@ -38,7 +41,7 @@ export function Queue({
             <button
               type="button"
               disabled={pending}
-              onClick={() => start(() => void deleteScheduledPost(post.id))}
+              onClick={() => start(async () => { setError(null); const result = await deleteScheduledPost(post.id); if (result.error) setError(result.error) })}
               className="text-xs text-fg-faint hover:text-fg"
             >
               Eliminar
@@ -65,7 +68,7 @@ export function Queue({
                     className="ml-2 underline"
                     onClick={() => {
                       const when = prompt('Nueva fecha y hora (YYYY-MM-DDTHH:MM):')
-                      if (when) start(() => void rescheduleTarget(target.id, when))
+                      if (when) start(async () => { setError(null); const result = await rescheduleTarget(target.id, when); if (result.error) setError(result.error) })
                     }}
                   >
                     Reprogramar
@@ -76,6 +79,7 @@ export function Queue({
           </div>
         </li>
       ))}
-    </ul>
+      </ul>
+    </>
   )
 }
