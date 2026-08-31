@@ -24,6 +24,27 @@ export class FacebookPageError extends Error {
   }
 }
 
+// Carries the HTTP status alongside the message so callers can tell a 404 (a normal,
+// per-post answer for insights) apart from anything systemic.
+export class FacebookHttpError extends Error {
+  constructor(
+    public status: number,
+    message: string,
+  ) {
+    super(message)
+  }
+}
+
+/**
+ * Whether Graph is telling us this one post has no insights, rather than that
+ * something is wrong with the run. Anything that is not a 404 — expired token, rate
+ * limit, 5xx — is systemic: swallowing it would silently write NO_METRICS as if it
+ * were real data for every remaining post.
+ */
+export function isPostWithoutInsights(error: unknown): boolean {
+  return error instanceof FacebookHttpError && error.status === 404
+}
+
 export const NO_FACEBOOK_PAGE = 'Esta cuenta no administra ninguna página de Facebook.'
 export const AMBIGUOUS_FACEBOOK_PAGE =
   'Hay varias páginas de Facebook disponibles. Define FACEBOOK_PAGE_ID con el id de la que quieres conectar.'

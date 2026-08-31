@@ -3,8 +3,10 @@ import fixture from './fixtures/facebook-posts.json'
 import {
   AMBIGUOUS_FACEBOOK_PAGE,
   FacebookPageError,
+  FacebookHttpError,
   NO_FACEBOOK_PAGE,
   PINNED_FACEBOOK_PAGE_MISSING,
+  isPostWithoutInsights,
   pickFacebookPage,
   normalizeFacebookPost,
   type FacebookPagesList,
@@ -165,5 +167,21 @@ describe('normalizeFacebookPost', () => {
     expect(normalizeFacebookPost(withType('share'), {}).mediaType).toBe('link')
     // Sin attachment (un estado de texto) también cae en link.
     expect(normalizeFacebookPost(statusPost, {}).mediaType).toBe('link')
+  })
+})
+
+describe('isPostWithoutInsights', () => {
+  it('tolera un 404: la publicación no tiene estadísticas', () => {
+    expect(isPostWithoutInsights(new FacebookHttpError(404, 'Facebook 404: ...'))).toBe(true)
+  })
+
+  it('no tolera un 400, un 429 ni un 5xx, que son sistémicos', () => {
+    expect(isPostWithoutInsights(new FacebookHttpError(400, 'Facebook 400: ...'))).toBe(false)
+    expect(isPostWithoutInsights(new FacebookHttpError(429, 'rate limit'))).toBe(false)
+    expect(isPostWithoutInsights(new FacebookHttpError(500, 'boom'))).toBe(false)
+  })
+
+  it('no tolera un error que no venga de una respuesta HTTP', () => {
+    expect(isPostWithoutInsights(new Error('fetch failed'))).toBe(false)
   })
 })
