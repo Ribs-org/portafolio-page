@@ -319,12 +319,12 @@ Repite para `preview` y `development` si quieres la misma en todos lados.
 
 ### Cron de publicación cada 5 minutos
 
-`vercel.json` declara `/api/cron/publish-social` con `*/5 * * * *`, además de la corrida
-diaria de sync. El plan Hobby de Vercel solo permite crons diarios, así que esa corrida de
-5 minutos no arranca sola ahí: sube a Pro, o pega un pinger externo (por ejemplo
-[cron-job.org](https://cron-job.org)) que llame a `/api/cron/publish-social` cada 5 minutos
-con el header `Authorization: Bearer <CRON_SECRET>`. El endpoint es el mismo en los dos
-casos — cambia solo quién lo dispara.
+La cadencia real de `/api/cron/publish-social` la da un pinger externo (por ejemplo
+[cron-job.org](https://cron-job.org)) que lo llama cada 5 minutos con el header
+`Authorization: Bearer <CRON_SECRET>` — el plan Hobby de Vercel solo permite crons
+diarios, así que `vercel.json` declara apenas una corrida diaria de respaldo. En plan
+Pro puedes cambiar ese schedule a `*/5 * * * *` y prescindir del pinger: el endpoint
+es el mismo en los dos casos, cambia solo quién lo dispara.
 
 ## Estructura
 

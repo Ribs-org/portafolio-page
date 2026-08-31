@@ -3,7 +3,10 @@ import { publishDue } from '@/lib/social/publish/run'
 import { env } from '@/lib/env'
 
 export const dynamic = 'force-dynamic'
-export const maxDuration = 300
+// 240 on purpose, below the 5-minute cadence: a run that dies before the next tick
+// can never overlap it, which closes most of the double-publish window the claim in
+// publishDue cannot cover on its own.
+export const maxDuration = 240
 
 export async function GET(request: Request) {
   const secret = env('CRON_SECRET')
