@@ -29,6 +29,14 @@ describe('campaignTagFor', () => {
   })
 })
 
+describe('campaignTagFor facebook', () => {
+  it('acuña la etiqueta con el prefijo fb', () => {
+    expect(campaignTagFor('facebook', '61550000000001_1020304050607080')).toBe(
+      'fb-61550000000001_1020304050607080',
+    )
+  })
+})
+
 describe('normalizeCampaignTag', () => {
   it('reduce una entrada hecha solo de símbolos a cadena vacía', () => {
     expect(normalizeCampaignTag('😀😀😀')).toBe('')

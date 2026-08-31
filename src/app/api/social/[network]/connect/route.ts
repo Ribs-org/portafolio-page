@@ -17,6 +17,10 @@ const SCOPES: Record<string, string> = {
     // portfolio rather than by the person. Without it the call returns an empty list and the
     // Instagram account is undiscoverable, even when Page and account are correctly linked.
     'instagram_basic,instagram_manage_insights,pages_show_list,pages_read_engagement,instagram_content_publish,business_management',
+  // Facebook rides the same Meta app as Instagram. `read_insights` is the only scope
+  // Instagram's entry doesn't already request; the pages scopes repeat because each
+  // network's authorization is its own consent screen.
+  facebook: 'pages_show_list,pages_read_engagement,read_insights,business_management',
   tiktok: 'user.info.basic,video.list',
 }
 
@@ -37,7 +41,7 @@ export async function GET(
   // their tokens into this dashboard.
   const state = await signOAuthState(network)
 
-  if (network === 'instagram') {
+  if (network === 'instagram' || network === 'facebook') {
     const appId = env('INSTAGRAM_APP_ID')
     if (!appId) return new NextResponse('Falta INSTAGRAM_APP_ID', { status: 400 })
 
