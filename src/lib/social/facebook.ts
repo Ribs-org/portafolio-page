@@ -1,9 +1,13 @@
+import type { SocialAccount } from '@/db'
 import {
   NO_METRICS,
   MAX_POSTS_PER_SYNC,
+  type Connector,
+  type FetchedBatch,
   type FetchedPost,
   type PostMetricValues,
 } from './connector'
+import { decryptToken } from './crypto'
 
 /** El `me/accounts?fields=id,name,access_token` payload. */
 export type FacebookPageEntry = { id?: string; name?: string; access_token?: string }
@@ -44,6 +48,18 @@ export class FacebookHttpError extends Error {
  */
 export function isPostWithoutInsights(error: unknown): boolean {
   return error instanceof FacebookHttpError && error.status === 404
+}
+
+async function getJson(url: string): Promise<Record<string, unknown>> {
+  const response = await fetch(url)
+  if (!response.ok) {
+    const body = await response.text()
+    throw new FacebookHttpError(
+      response.status,
+      `Facebook ${response.status}: ${body.slice(0, 200)}`,
+    )
+  }
+  return response.json()
 }
 
 export const NO_FACEBOOK_PAGE = 'Esta cuenta no administra ninguna página de Facebook.'
@@ -183,4 +199,63 @@ export async function collectPublishedPosts(
   // page's posts. Hitting exactly MAX_POSTS_PER_SYNC counts too: items from the last
   // page get dropped once the array is full, whatever the cursor says.
   return { posts, windowWasCapped: posts.length >= MAX_POSTS_PER_SYNC || next !== '' }
+}
+
+const GRAPH = 'https://graph.facebook.com/v23.0'
+const PAGE_SIZE = 50
+const INSIGHTS_CHUNK_SIZE = 5
+
+export const facebookConnector: Connector = {
+  network: 'facebook',
+
+  /**
+   * A page access token derived from a long-lived user token does not expire, so there
+   * is nothing to refresh. If Meta invalidates it (password change, permissions
+   * revoked), the Graph 190 lands in `lastSyncError`, the card turns red, and the
+   * recovery path is reconnecting — same as every OAuth network here.
+   */
+  async ensureCredential(account: SocialAccount): Promise<string | null> {
+    if (!account.accessToken) return null
+    return decryptToken(account.accessToken)
+  },
+
+  async fetchPosts(account: SocialAccount, token: string | null): Promise<FetchedBatch> {
+    const pageId = account.externalId
+    if (!token || !pageId) return { posts: [], windowWasCapped: false }
+
+    const fields =
+      'id,message,permalink_url,full_picture,attachments{media_type},created_time,shares,likes.summary(true),comments.summary(true)'
+    const first = `${GRAPH}/${pageId}/published_posts?fields=${fields}&limit=${PAGE_SIZE}&access_token=${token}`
+    const { posts: fetched, windowWasCapped } = await collectPublishedPosts(first, getJson)
+
+    const metrics = 'post_impressions,post_impressions_unique'
+    const posts: FetchedPost[] = []
+    // Sequential chunks rather than one Promise.all over every post: up to 200
+    // concurrent requests risks a 429, and a systemic insights failure aborts the whole
+    // sync, so keeping concurrency low keeps that risk low. Wall-clock doesn't matter —
+    // this runs once a day from a cron.
+    for (let i = 0; i < fetched.length; i += INSIGHTS_CHUNK_SIZE) {
+      const chunk = fetched.slice(i, i + INSIGHTS_CHUNK_SIZE)
+      const chunkPosts = await Promise.all(
+        chunk.map(async (item) => {
+          let insights: FacebookInsights = {}
+          try {
+            insights = (await getJson(
+              `${GRAPH}/${item.id}/insights?metric=${metrics}&access_token=${token}`,
+            )) as FacebookInsights
+          } catch (error) {
+            if (isPostWithoutInsights(error)) {
+              insights = {}
+            } else {
+              throw error
+            }
+          }
+          return normalizeFacebookPost(item, insights)
+        }),
+      )
+      posts.push(...chunkPosts)
+    }
+
+    return { posts, windowWasCapped }
+  },
 }

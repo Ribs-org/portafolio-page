@@ -2,6 +2,7 @@ const PREFIXES: Record<string, string> = {
   instagram: 'ig',
   tiktok: 'tt',
   youtube: 'yt',
+  facebook: 'fb',
 }
 
 const MAX_LENGTH = 48
