@@ -212,6 +212,66 @@ export const postMetrics = pgTable(
   (t) => [unique('post_metrics_post_day_key').on(t.postId, t.day), index('post_metrics_day_idx').on(t.day)],
 )
 
+export const TARGET_STATUSES = ['scheduled', 'publishing', 'published', 'failed'] as const
+export type TargetStatus = (typeof TARGET_STATUSES)[number]
+
+/**
+ * What the owner composes once. No status column of its own: the post's state is the
+ * summary of its targets, and duplicating it here would let the two disagree.
+ */
+export const scheduledPosts = pgTable('scheduled_posts', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  caption: text('caption').notNull(),
+  scheduledAt: timestamp('scheduled_at', { withTimezone: true }).notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+})
+
+/**
+ * One row per destination network, each living its own publish cycle: if Instagram
+ * publishes and a future network fails, the calendar shows exactly that.
+ *
+ * `containerId` is Meta's async-processing handle: a video target parks in
+ * 'publishing' holding it, and the next cron run asks Meta whether it finished.
+ * `lastError` is always one of our fixed Spanish sentences — never upstream text.
+ */
+export const scheduledPostTargets = pgTable(
+  'scheduled_post_targets',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    postId: uuid('post_id')
+      .notNull()
+      .references(() => scheduledPosts.id, { onDelete: 'cascade' }),
+    network: text('network').notNull(),
+    captionOverride: text('caption_override'),
+    status: text('status').$type<TargetStatus>().notNull().default('scheduled'),
+    containerId: text('container_id'),
+    externalId: text('external_id'),
+    attemptCount: integer('attempt_count').notNull().default(0),
+    lastError: text('last_error'),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    unique('scheduled_post_targets_post_network_key').on(t.postId, t.network),
+    index('scheduled_post_targets_status_idx').on(t.status),
+  ],
+)
+
+/** One row per file, already living in Vercel Blob; `position` orders the carousel. */
+export const scheduledPostMedia = pgTable(
+  'scheduled_post_media',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    postId: uuid('post_id')
+      .notNull()
+      .references(() => scheduledPosts.id, { onDelete: 'cascade' }),
+    blobUrl: text('blob_url').notNull(),
+    mediaType: text('media_type').$type<'image' | 'video'>().notNull(),
+    position: integer('position').notNull(),
+  },
+  (t) => [index('scheduled_post_media_post_idx').on(t.postId)],
+)
+
 export type Profile = typeof profiles.$inferSelect
 export type Link = typeof links.$inferSelect
 export type Visit = typeof visits.$inferSelect
@@ -219,3 +279,6 @@ export type Click = typeof clicks.$inferSelect
 export type SocialAccount = typeof socialAccounts.$inferSelect
 export type SocialPost = typeof socialPosts.$inferSelect
 export type PostMetric = typeof postMetrics.$inferSelect
+export type ScheduledPost = typeof scheduledPosts.$inferSelect
+export type ScheduledPostTarget = typeof scheduledPostTargets.$inferSelect
+export type ScheduledPostMedia = typeof scheduledPostMedia.$inferSelect
