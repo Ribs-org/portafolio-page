@@ -9,6 +9,7 @@ import {
   isPostWithoutInsights,
   pickFacebookPage,
   normalizeFacebookPost,
+  collectPublishedPosts,
   type FacebookPagesList,
   type FacebookInsights,
   type FacebookPost,
@@ -183,5 +184,64 @@ describe('isPostWithoutInsights', () => {
 
   it('no tolera un error que no venga de una respuesta HTTP', () => {
     expect(isPostWithoutInsights(new Error('fetch failed'))).toBe(false)
+  })
+})
+
+describe('collectPublishedPosts', () => {
+  /** Sirve páginas de `count` posts; `next` dice si la página entrega cursor. */
+  function serving(pages: Array<{ count: number; next: boolean }>) {
+    let served = 0
+    let calls = 0
+    const fetchJson = async () => {
+      const page = pages[calls] ?? { count: 0, next: true }
+      calls++
+      const data = Array.from({ length: page.count }, () => ({ id: String(served++) }))
+      return { data, paging: page.next ? { next: `https://graph.test/p${calls}` } : {} }
+    }
+    return { fetchJson, callCount: () => calls }
+  }
+
+  it('junta todas las páginas hasta que se acaba el cursor', async () => {
+    const { fetchJson, callCount } = serving([
+      { count: 2, next: true },
+      { count: 3, next: false },
+    ])
+    const { posts, windowWasCapped } = await collectPublishedPosts('https://graph.test/p0', fetchJson)
+    expect(posts.map((p) => p.id)).toEqual(['0', '1', '2', '3', '4'])
+    expect(windowWasCapped).toBe(false)
+    expect(callCount()).toBe(2)
+  })
+
+  it('corta en MAX_POSTS_PER_SYNC y lo declara como ventana', async () => {
+    const { fetchJson, callCount } = serving(
+      Array.from({ length: 10 }, () => ({ count: 50, next: true })),
+    )
+    const { posts, windowWasCapped } = await collectPublishedPosts('https://graph.test/p0', fetchJson)
+    expect(posts).toHaveLength(200)
+    expect(windowWasCapped).toBe(true)
+    expect(callCount()).toBe(4)
+  })
+
+  it('un cursor que no trae datos no lo hace loopear para siempre', async () => {
+    // Graph puede devolver data: [] con paging.next presente; sin tope de páginas el
+    // while nunca llenaría el array y nunca saldría.
+    const { fetchJson, callCount } = serving([])
+    const { posts, windowWasCapped } = await collectPublishedPosts('https://graph.test/p0', fetchJson)
+    expect(posts).toHaveLength(0)
+    expect(callCount()).toBe(50)
+    // Con el cursor todavía en mano, lo honesto es declarar la ventana recortada.
+    expect(windowWasCapped).toBe(true)
+  })
+
+  it('exactamente 200 sin cursor pendiente también es ventana', async () => {
+    // Los items de la última página se descartan cuando el array se llena, diga lo
+    // que diga el cursor — mismo razonamiento que el conector de Instagram.
+    const { fetchJson } = serving([
+      { count: 100, next: true },
+      { count: 100, next: false },
+    ])
+    const { posts, windowWasCapped } = await collectPublishedPosts('https://graph.test/p0', fetchJson)
+    expect(posts).toHaveLength(200)
+    expect(windowWasCapped).toBe(true)
   })
 })

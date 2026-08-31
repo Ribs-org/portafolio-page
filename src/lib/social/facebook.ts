@@ -1,5 +1,6 @@
 import {
   NO_METRICS,
+  MAX_POSTS_PER_SYNC,
   type FetchedPost,
   type PostMetricValues,
 } from './connector'
@@ -149,4 +150,37 @@ export function normalizeFacebookPost(
     publishedAt: new Date(post.created_time ?? 0),
     metrics,
   }
+}
+
+// Bounds page fetches independently of how many items a page actually yields: Graph
+// can return an empty `data: []` while still handing back a `paging.next` cursor,
+// which would otherwise starve the length check below and loop forever.
+const MAX_POST_PAGES = 50
+
+export async function collectPublishedPosts(
+  firstUrl: string,
+  fetchJson: (url: string) => Promise<Record<string, unknown>>,
+): Promise<{ posts: FacebookPost[]; windowWasCapped: boolean }> {
+  const posts: FacebookPost[] = []
+  let next = firstUrl
+  let pagesFetched = 0
+
+  while (next && posts.length < MAX_POSTS_PER_SYNC && pagesFetched < MAX_POST_PAGES) {
+    const page = (await fetchJson(next)) as {
+      data?: FacebookPost[]
+      paging?: { next?: string }
+    }
+    pagesFetched++
+
+    for (const item of page.data ?? []) {
+      if (posts.length >= MAX_POSTS_PER_SYNC) break
+      posts.push(item)
+    }
+    next = page.paging?.next ?? ''
+  }
+
+  // A cursor still in hand means the loop stopped at a ceiling, not at the end of the
+  // page's posts. Hitting exactly MAX_POSTS_PER_SYNC counts too: items from the last
+  // page get dropped once the array is full, whatever the cursor says.
+  return { posts, windowWasCapped: posts.length >= MAX_POSTS_PER_SYNC || next !== '' }
 }
