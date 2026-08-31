@@ -21,7 +21,11 @@ const SCOPES: Record<string, string> = {
   // network's authorization is its own consent screen. `read_insights` is deliberately
   // absent: Meta deprecated it as a login scope (the dialog rejects it with
   // "Invalid Scopes"), and `pages_read_engagement` is what covers post insights now.
-  facebook: 'pages_show_list,pages_read_engagement,business_management',
+  // `pages_read_user_content` looks unrelated but is what the likes/comments summaries
+  // on published_posts actually demand — without it Graph answers (#10), misleadingly
+  // naming pages_read_engagement, and the sync dies on its first page.
+  facebook:
+    'pages_show_list,pages_read_engagement,pages_read_user_content,business_management',
   tiktok: 'user.info.basic,video.list',
 }
 
