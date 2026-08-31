@@ -1,11 +1,15 @@
 import { describe, expect, it } from 'vitest'
+import fixture from './fixtures/facebook-posts.json'
 import {
   AMBIGUOUS_FACEBOOK_PAGE,
   FacebookPageError,
   NO_FACEBOOK_PAGE,
   PINNED_FACEBOOK_PAGE_MISSING,
   pickFacebookPage,
+  normalizeFacebookPost,
   type FacebookPagesList,
+  type FacebookInsights,
+  type FacebookPost,
 } from './facebook'
 
 describe('pickFacebookPage', () => {
@@ -96,5 +100,70 @@ describe('pickFacebookPage', () => {
         '61550000000012',
       ])
     }
+  })
+})
+
+const videoPost = fixture.videoPost as FacebookPost
+const videoInsights = fixture.videoInsights as FacebookInsights
+const statusPost = fixture.statusPost as FacebookPost
+const statusInsights = fixture.statusInsights as FacebookInsights
+
+describe('normalizeFacebookPost', () => {
+  it('mapea identidad y contenido', () => {
+    const post = normalizeFacebookPost(videoPost, videoInsights)
+    expect(post.externalId).toBe('61550000000001_1020304050607080')
+    expect(post.permalink).toBe(
+      'https://www.facebook.com/61550000000001/posts/1020304050607080',
+    )
+    expect(post.caption).toBe('Nueva rutina en el gimnasio 💪 link en la bio')
+    expect(post.thumbnailUrl).toBe('https://scontent.xx.fbcdn.net/v/thumb.jpg')
+    expect(post.mediaType).toBe('video')
+    expect(post.publishedAt.toISOString()).toBe('2026-08-12T18:22:04.000Z')
+  })
+
+  it('une insights con los conteos que vienen en el post mismo', () => {
+    const post = normalizeFacebookPost(videoPost, videoInsights)
+    expect(post.metrics).toEqual({
+      views: 12840,
+      reach: 9310,
+      likes: 511,
+      comments: 48,
+      shares: 34,
+      saves: null,
+    })
+  })
+
+  it('deja en null lo que no vino: shares ausente no es cero', () => {
+    const post = normalizeFacebookPost(statusPost, statusInsights)
+    expect(post.metrics.shares).toBeNull()
+    expect(post.metrics.views).toBeNull()
+    expect(post.metrics.reach).toBeNull()
+    // Un conteo que sí vino en cero es un cero real, no un null.
+    expect(post.metrics.comments).toBe(0)
+    expect(post.metrics.likes).toBe(12)
+  })
+
+  it('saves es siempre null: Facebook no lo reporta', () => {
+    expect(normalizeFacebookPost(videoPost, videoInsights).metrics.saves).toBeNull()
+  })
+
+  it('tolera un post sin message ni full_picture', () => {
+    const post = normalizeFacebookPost(statusPost, statusInsights)
+    expect(post.caption).toBeNull()
+    expect(post.thumbnailUrl).toBeNull()
+  })
+
+  it('mapea el media_type del attachment al vocabulario del catálogo', () => {
+    const base = { id: 'x', created_time: '2026-08-01T12:00:00+0000' }
+    const withType = (media_type: string): FacebookPost => ({
+      ...base,
+      attachments: { data: [{ media_type }] },
+    })
+    expect(normalizeFacebookPost(withType('video'), {}).mediaType).toBe('video')
+    expect(normalizeFacebookPost(withType('photo'), {}).mediaType).toBe('image')
+    expect(normalizeFacebookPost(withType('album'), {}).mediaType).toBe('carousel')
+    expect(normalizeFacebookPost(withType('share'), {}).mediaType).toBe('link')
+    // Sin attachment (un estado de texto) también cae en link.
+    expect(normalizeFacebookPost(statusPost, {}).mediaType).toBe('link')
   })
 })

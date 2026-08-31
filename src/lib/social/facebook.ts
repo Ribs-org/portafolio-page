@@ -1,3 +1,9 @@
+import {
+  NO_METRICS,
+  type FetchedPost,
+  type PostMetricValues,
+} from './connector'
+
 /** El `me/accounts?fields=id,name,access_token` payload. */
 export type FacebookPageEntry = { id?: string; name?: string; access_token?: string }
 export type FacebookPagesList = { data?: FacebookPageEntry[] }
@@ -62,4 +68,64 @@ export function pickFacebookPage(
   if (candidates.length === 0) throw new FacebookPageError(NO_FACEBOOK_PAGE)
   if (candidates.length === 1) return candidates[0]!
   throw new FacebookPageError(AMBIGUOUS_FACEBOOK_PAGE, candidates)
+}
+
+export type FacebookPost = {
+  id: string
+  message?: string | null
+  permalink_url?: string
+  full_picture?: string
+  created_time?: string
+  attachments?: { data?: Array<{ media_type?: string }> }
+  shares?: { count?: number }
+  likes?: { summary?: { total_count?: number } }
+  comments?: { summary?: { total_count?: number } }
+}
+
+export type FacebookInsights = {
+  data?: Array<{ name?: string; values?: Array<{ value?: number }> }>
+}
+
+const METRIC_NAMES: Record<string, keyof PostMetricValues> = {
+  post_impressions: 'views',
+  post_impressions_unique: 'reach',
+}
+
+function mediaTypeOf(post: FacebookPost): string {
+  const attached = post.attachments?.data?.[0]?.media_type
+  if (attached === 'video') return 'video'
+  if (attached === 'photo') return 'image'
+  if (attached === 'album') return 'carousel'
+  return 'link'
+}
+
+export function normalizeFacebookPost(
+  post: FacebookPost,
+  insights: FacebookInsights,
+): FetchedPost {
+  const metrics: PostMetricValues = { ...NO_METRICS }
+  for (const entry of insights.data ?? []) {
+    const key = entry.name ? METRIC_NAMES[entry.name] : undefined
+    const value = entry.values?.[0]?.value
+    if (key && typeof value === 'number') metrics[key] = value
+  }
+
+  // Unlike Instagram, the engagement counts ride on the post object itself, not on
+  // insights. `typeof` guards keep an absent count as null — absent is not zero.
+  const likes = post.likes?.summary?.total_count
+  const comments = post.comments?.summary?.total_count
+  const shares = post.shares?.count
+  if (typeof likes === 'number') metrics.likes = likes
+  if (typeof comments === 'number') metrics.comments = comments
+  if (typeof shares === 'number') metrics.shares = shares
+
+  return {
+    externalId: post.id,
+    permalink: post.permalink_url ?? null,
+    caption: post.message ?? null,
+    thumbnailUrl: post.full_picture ?? null,
+    mediaType: mediaTypeOf(post),
+    publishedAt: new Date(post.created_time ?? 0),
+    metrics,
+  }
 }
