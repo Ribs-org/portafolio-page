@@ -300,6 +300,9 @@ Vercel y bajan con `vercel env pull .env.local`.
 | `TIKTOK_CLIENT_KEY` | Conectar TikTok | No — sin ella esa red aparece como no conectada |
 | `TIKTOK_CLIENT_SECRET` | Conectar TikTok | No — sin ella esa red aparece como no conectada |
 | `CRON_SECRET` | Autoriza la corrida diaria | No — la pone Vercel solo, al declarar el cron |
+| `RESEND_API_KEY` | Enviar el email de aviso cuando una publicación programada falla | La provisiona la integración de Resend del marketplace de Vercel |
+| `PUBLISH_ALERT_TO` | A qué correo llega el aviso de fallo | Sin ella no se envía ningún email; el calendario sigue mostrando el fallo |
+| `PUBLISH_ALERT_FROM` | Remitente del aviso | Opcional; default `onboarding@resend.dev` |
 
 Para cambiar la contraseña:
 
