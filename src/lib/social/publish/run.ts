@@ -44,9 +44,26 @@ export async function publishDue(now: Date = new Date()): Promise<Report> {
   for (const { target, post } of due) {
     let outcome: PublishOutcome
 
-    if (target.status === 'publishing' && isStaleProcessing(target.updatedAt, now)) {
-      // Never wait forever: 24 hours parked in 'publishing' is a verdict. Skipping the
-      // publisher counts the stale check itself as the failed attempt.
+    // A cron run can outlive its own 5-minute interval (Meta hanging, cold DB), and
+    // Vercel does not serialize invocations. Claiming the row first — an optimistic
+    // update keyed on the updatedAt this run read — makes the loser skip instead of
+    // double-publishing to the owner's real account.
+    const claimed = await db
+      .update(scheduledPostTargets)
+      .set({ updatedAt: now })
+      .where(
+        and(
+          eq(scheduledPostTargets.id, target.id),
+          eq(scheduledPostTargets.updatedAt, target.updatedAt),
+        ),
+      )
+      .returning({ id: scheduledPostTargets.id })
+    if (claimed.length === 0) continue
+
+    if (target.status === 'publishing' && isStaleProcessing(post.scheduledAt, now)) {
+      // A video is stale when 24 hours have passed since its scheduled moment — an
+      // anchor no poll refreshes (updatedAt now doubles as the claim token above).
+      // Skipping the publisher counts the stale check itself as the failed attempt.
       outcome = { kind: 'failed', reason: STALE_PROCESSING }
     } else {
       outcome = await attempt(target.network, target.id, post.id, target.containerId, {
