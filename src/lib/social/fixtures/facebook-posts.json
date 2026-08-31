@@ -6,7 +6,9 @@
     "full_picture": "https://scontent.xx.fbcdn.net/v/thumb.jpg",
     "created_time": "2026-08-12T18:22:04+0000",
     "attachments": { "data": [{ "media_type": "video" }] },
-    "shares": { "count": 34 }
+    "shares": { "count": 34 },
+    "likes": { "summary": { "total_count": 520 } },
+    "comments": { "summary": { "total_count": 48 } }
   },
   "videoInsights": {
     "data": [

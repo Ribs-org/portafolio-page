@@ -124,21 +124,29 @@ describe('normalizeFacebookPost', () => {
     expect(post.publishedAt.toISOString()).toBe('2026-08-12T18:22:04.000Z')
   })
 
-  it('une insights con los shares que vienen en el post mismo', () => {
+  it('une insights con los conteos que vienen en el post mismo', () => {
     const post = normalizeFacebookPost(videoPost, videoInsights)
     expect(post.metrics).toEqual({
       views: 12840,
       reach: 9310,
-      likes: 511,
-      comments: null,
+      likes: 520,
+      comments: 48,
       shares: 34,
       saves: null,
     })
   })
 
-  it('suma el desglose de reacciones por tipo como likes', () => {
-    // like 500 + love 11: lo más cercano al conteo de reacciones que Facebook muestra.
-    expect(normalizeFacebookPost(videoPost, videoInsights).metrics.likes).toBe(511)
+  it('el conteo exacto del post pisa la suma de reacciones de insights', () => {
+    // El fixture trae ambos a propósito: 520 en likes.summary contra 511 sumando el
+    // desglose por tipo. El conteo del post es el exacto; la suma es el respaldo.
+    expect(normalizeFacebookPost(videoPost, videoInsights).metrics.likes).toBe(520)
+  })
+
+  it('sin el conteo del post, la suma del desglose de reacciones es el likes', () => {
+    const post = normalizeFacebookPost(statusPost, {
+      data: [{ name: 'post_reactions_by_type_total', values: [{ value: { like: 3, wow: 2 } }] }],
+    })
+    expect(post.metrics.likes).toBe(5)
   })
 
   it('un desglose presente pero vacío es un cero real, no un null', () => {
@@ -148,20 +156,17 @@ describe('normalizeFacebookPost', () => {
     expect(post.metrics.likes).toBe(0)
   })
 
-  it('deja en null lo que no vino: shares ausente no es cero', () => {
+  it('deja en null lo que no vino: ausente no es cero', () => {
     const post = normalizeFacebookPost(statusPost, statusInsights)
     expect(post.metrics.shares).toBeNull()
     expect(post.metrics.views).toBeNull()
     expect(post.metrics.reach).toBeNull()
     expect(post.metrics.likes).toBeNull()
+    expect(post.metrics.comments).toBeNull()
   })
 
-  it('saves y comments son siempre null: la red no los entrega', () => {
-    // saves no existe en Facebook; comments exige pages_read_user_content, que la
-    // app de Meta no puede pedir (su caso de uso no lo incluye).
-    const metrics = normalizeFacebookPost(videoPost, videoInsights).metrics
-    expect(metrics.saves).toBeNull()
-    expect(metrics.comments).toBeNull()
+  it('saves es siempre null: Facebook no lo reporta', () => {
+    expect(normalizeFacebookPost(videoPost, videoInsights).metrics.saves).toBeNull()
   })
 
   it('tolera un post sin message ni full_picture', () => {
