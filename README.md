@@ -296,6 +296,7 @@ Vercel y bajan con `vercel env pull .env.local`.
 | `INSTAGRAM_APP_ID` | Conectar Instagram | No — sin ella esa red aparece como no conectada |
 | `INSTAGRAM_APP_SECRET` | Conectar Instagram | No — sin ella esa red aparece como no conectada |
 | `INSTAGRAM_IG_USER_ID` | Elegir cuál de tus cuentas de Instagram se conecta | Solo si administras más de una: sin ella, conectar falla en vez de adivinar |
+| `FACEBOOK_PAGE_ID` | Elegir cuál de tus páginas de Facebook se conecta | Solo si administras más de una: sin ella, conectar falla con `AMBIGUOUS_FACEBOOK_PAGE` en vez de adivinar |
 | `TIKTOK_CLIENT_KEY` | Conectar TikTok | No — sin ella esa red aparece como no conectada |
 | `TIKTOK_CLIENT_SECRET` | Conectar TikTok | No — sin ella esa red aparece como no conectada |
 | `CRON_SECRET` | Autoriza la corrida diaria | No — la pone Vercel solo, al declarar el cron |

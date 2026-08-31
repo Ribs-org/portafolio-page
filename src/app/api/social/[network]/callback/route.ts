@@ -132,9 +132,13 @@ async function facebookCredential(code: string, redirectUri: string): Promise<Cr
   } catch (error) {
     if (!(error instanceof FacebookPageError)) throw error
     // The message is one of the connector's own fixed sentences, so it is safe to show.
-    // The candidates carry page names Meta sent us; those only go to the server log.
+    // The candidates also carry each page's access token, so only id and name go to the
+    // server log — never the raw candidates.
     if (error.candidates.length > 0) {
-      console.error('Páginas de Facebook disponibles:', error.candidates)
+      console.error(
+        'Páginas de Facebook disponibles:',
+        error.candidates.map(({ id, name }) => ({ id, name })),
+      )
     }
     throw new OAuthError(error.message)
   }
