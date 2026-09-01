@@ -1,4 +1,5 @@
 import type { TargetStatus } from '@/db/schema'
+import type { SocialAccount } from '@/db'
 
 export type PublishMedia = { url: string; mediaType: 'image' | 'video'; position: number }
 
@@ -18,6 +19,8 @@ export type PublishOutcome =
 /** Adding a network in later phases is a file plus a line, same as Connector. */
 export type Publisher = {
   network: string
+  /** Write credential, when it differs from the connector's read credential. */
+  ensureCredential?(account: SocialAccount): Promise<string | null>
   publish(input: PublishInput): Promise<PublishOutcome>
 }
 
