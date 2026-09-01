@@ -159,6 +159,63 @@ async function facebookCredential(code: string, redirectUri: string): Promise<Cr
   }
 }
 
+async function youtubeCredential(code: string, redirectUri: string): Promise<Credential> {
+  const clientId = env('GOOGLE_CLIENT_ID')
+  const clientSecret = env('GOOGLE_CLIENT_SECRET')
+  if (!clientId || !clientSecret) {
+    throw new OAuthError('Faltan las credenciales de Google (GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET).')
+  }
+
+  const exchange = await fetch('https://oauth2.googleapis.com/token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({
+      code,
+      client_id: clientId,
+      client_secret: clientSecret,
+      redirect_uri: redirectUri,
+      grant_type: 'authorization_code',
+    }),
+  })
+  if (!exchange.ok) {
+    console.error('Google rechazó el código:', exchange.status, (await exchange.text()).slice(0, 300))
+    throw new OAuthError('Google rechazó el código. Inténtalo de nuevo.')
+  }
+  const tokens = (await exchange.json()) as {
+    access_token?: string
+    refresh_token?: string
+    expires_in?: number
+  }
+  if (!tokens.access_token) throw new OAuthError('Google no devolvió token.')
+  // Without a refresh token the hourly access token is a dead end: better to fail the
+  // connect now than to strand the cron in an hour. prompt=consent should prevent this.
+  if (!tokens.refresh_token) {
+    throw new OAuthError('Google no entregó el token de refresco. Reintenta la conexión.')
+  }
+
+  const channels = await fetch(
+    'https://www.googleapis.com/youtube/v3/channels?part=id,snippet&mine=true',
+    { headers: { Authorization: `Bearer ${tokens.access_token}` } },
+  )
+  if (!channels.ok) {
+    console.error('No se pudo leer el canal:', channels.status, (await channels.text()).slice(0, 300))
+    throw new OAuthError('No se pudo leer el canal de YouTube.')
+  }
+  const data = (await channels.json()) as {
+    items?: Array<{ id?: string; snippet?: { title?: string } }>
+  }
+  const channel = data.items?.[0]
+  if (!channel?.id) throw new OAuthError('Esta cuenta de Google no tiene canal de YouTube.')
+
+  return {
+    accessToken: tokens.access_token,
+    refreshToken: tokens.refresh_token,
+    expiresAt: new Date(Date.now() + (tokens.expires_in ?? 3600) * 1000),
+    externalId: channel.id,
+    handle: channel.snippet?.title ?? null,
+  }
+}
+
 async function tiktokCredential(code: string, redirectUri: string): Promise<Credential> {
   const clientKey = env('TIKTOK_CLIENT_KEY')
   const clientSecret = env('TIKTOK_CLIENT_SECRET')
@@ -197,6 +254,7 @@ async function tiktokCredential(code: string, redirectUri: string): Promise<Cred
 async function fetchCredential(network: string, code: string, redirectUri: string): Promise<Credential> {
   if (network === 'instagram') return instagramCredential(code, redirectUri)
   if (network === 'facebook') return facebookCredential(code, redirectUri)
+  if (network === 'youtube') return youtubeCredential(code, redirectUri)
   if (network === 'tiktok') return tiktokCredential(code, redirectUri)
   throw new OAuthError('Esa red no usa OAuth.')
 }
