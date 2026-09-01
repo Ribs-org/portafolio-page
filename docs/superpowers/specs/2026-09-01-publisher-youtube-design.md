@@ -51,9 +51,10 @@ Rama `youtube` en las rutas genéricas `/api/social/[network]/connect|callback`:
   `refreshToken` cifrado, `expiresAt` real (de `expires_in`), `externalId` = id del
   canal (de `channels?part=id&mine=true`), `handle` = título del canal. Frases de
   error fijas en español; el detalle de Google al log.
-- La card de YouTube en `/admin/content` pasa a ofrecer «Conectar →» además de su
-  estado por entorno: `OAUTH_NETWORKS` gana `'youtube'`. El texto «Configurado por
-  entorno» se conserva para el sync; el botón añade la credencial de escritura.
+- La card de YouTube en `/admin/content` se vuelve una card OAuth estándar:
+  `OAUTH_NETWORKS` gana `'youtube'`, con lo que muestra «Conectar →» hasta otorgar la
+  credencial de escritura (la etiqueta «Configurado por entorno» desaparece — el sync
+  por API key sigue intacto por debajo, solo cambia lo que la card enfatiza).
 
 ## Contrato: `ensureCredential` opcional en `Publisher`
 
