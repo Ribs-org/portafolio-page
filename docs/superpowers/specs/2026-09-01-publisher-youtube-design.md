@@ -43,7 +43,10 @@ pasando por los mismos estados que las demás redes.
 Rama `youtube` en las rutas genéricas `/api/social/[network]/connect|callback`:
 
 - **Connect**: `https://accounts.google.com/o/oauth2/v2/auth` con `client_id` =
-  `GOOGLE_CLIENT_ID`, scope `https://www.googleapis.com/auth/youtube.upload`,
+  `GOOGLE_CLIENT_ID`, scopes `youtube.upload` **y** `youtube.readonly` (corrección
+  post-producción: upload es solo-escritura y no autoriza `channels.list` ni
+  `videos.list` — el descubrimiento del canal y el poll de procesamiento fallaban
+  con 403; ambos scopes son sensibles de la misma clase),
   `access_type=offline` y `prompt=consent` — sin ese par Google no entrega refresh
   token en re-consentimientos. `state` firmado igual que las demás redes.
 - **Callback**: `youtubeCredential()` canjea el código en

@@ -27,7 +27,11 @@ const SCOPES: Record<string, string> = {
   // other four.
   facebook:
     'pages_show_list,pages_read_engagement,pages_read_user_content,pages_manage_posts,business_management',
-  youtube: 'https://www.googleapis.com/auth/youtube.upload',
+  // upload alone is write-only: it cannot read channels.list (the callback's channel
+  // discovery) nor videos.list (the publisher's processing poll) — both 403 without
+  // readonly. Space-separated: that is Google's delimiter, unlike Meta's commas.
+  youtube:
+    'https://www.googleapis.com/auth/youtube.upload https://www.googleapis.com/auth/youtube.readonly',
   tiktok: 'user.info.basic,video.list',
 }
 
