@@ -185,8 +185,12 @@ async function youtubeCredential(code: string, redirectUri: string): Promise<Cre
     access_token?: string
     refresh_token?: string
     expires_in?: number
+    scope?: string
   }
   if (!tokens.access_token) throw new OAuthError('Google no devolvió token.')
+  // Scope names are not secrets, and Google silently trims sensitive scopes it decides
+  // not to grant — this line is what tells that apart from every other 403.
+  console.error('Scopes otorgados por Google:', tokens.scope ?? '(sin campo scope)')
   // Without a refresh token the hourly access token is a dead end: better to fail the
   // connect now than to strand the cron in an hour. prompt=consent should prevent this.
   if (!tokens.refresh_token) {
