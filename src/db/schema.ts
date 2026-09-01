@@ -129,7 +129,7 @@ export const clicks = pgTable(
   ],
 )
 
-export const SOCIAL_NETWORKS = ['instagram', 'tiktok', 'youtube', 'facebook'] as const
+export const SOCIAL_NETWORKS = ['instagram', 'tiktok', 'youtube', 'facebook', 'threads', 'x'] as const
 export type SocialNetwork = (typeof SOCIAL_NETWORKS)[number]
 
 /**
