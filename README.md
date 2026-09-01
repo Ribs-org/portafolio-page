@@ -299,7 +299,10 @@ Vercel y bajan con `vercel env pull .env.local`.
 | `FACEBOOK_PAGE_ID` | Elegir cuál de tus páginas de Facebook se conecta | Solo si administras más de una: sin ella, conectar falla con `AMBIGUOUS_FACEBOOK_PAGE` en vez de adivinar |
 | `TIKTOK_CLIENT_KEY` | Conectar TikTok | No — sin ella esa red aparece como no conectada |
 | `TIKTOK_CLIENT_SECRET` | Conectar TikTok | No — sin ella esa red aparece como no conectada |
-| `CRON_SECRET` | Autoriza la corrida diaria | No — la pone Vercel solo, al declarar el cron |
+| `CRON_SECRET` | Autoriza las corridas programadas (sync diario y publicación cada 5 minutos) | No — la pone Vercel solo, al declarar el cron |
+| `RESEND_API_KEY` | Enviar el email de aviso cuando una publicación programada falla | La provisiona la integración de Resend del marketplace de Vercel |
+| `PUBLISH_ALERT_TO` | A qué correo llega el aviso de fallo | Sin ella no se envía ningún email; el calendario sigue mostrando el fallo |
+| `PUBLISH_ALERT_FROM` | Remitente del aviso | Opcional; default `onboarding@resend.dev` |
 
 Para cambiar la contraseña:
 
@@ -313,6 +316,15 @@ Repite para `preview` y `development` si quieres la misma en todos lados.
 
 > En PowerShell, `"valor" | vercel env add ...` escribe un BOM al principio del valor y lo
 > corrompe en silencio. Usa `printf` desde Git Bash, o la interfaz web de Vercel.
+
+### Cron de publicación cada 5 minutos
+
+La cadencia real de `/api/cron/publish-social` la da un pinger externo (por ejemplo
+[cron-job.org](https://cron-job.org)) que lo llama cada 5 minutos con el header
+`Authorization: Bearer <CRON_SECRET>` — el plan Hobby de Vercel solo permite crons
+diarios, así que `vercel.json` declara apenas una corrida diaria de respaldo. En plan
+Pro puedes cambiar ese schedule a `*/5 * * * *` y prescindir del pinger: el endpoint
+es el mismo en los dos casos, cambia solo quién lo dispara.
 
 ## Estructura
 

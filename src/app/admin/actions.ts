@@ -6,11 +6,12 @@ import { redirect } from 'next/navigation'
 import { headers } from 'next/headers'
 import { put } from '@vercel/blob'
 import { and, eq, max, ne, sql } from 'drizzle-orm'
-import { getDb, links, profiles, socialAccounts, socialPosts } from '@/db'
+import { getDb, links, profiles, socialAccounts, socialPosts, scheduledPosts, scheduledPostTargets, scheduledPostMedia } from '@/db'
 import { LINK_KINDS, type LinkKind } from '@/db/schema'
 import { SITE_TIMEZONE } from '@/lib/analytics'
 import { createSession, destroySession, isAuthenticated, passwordMatches } from '@/lib/auth'
 import { normalizeCampaignTag } from '@/lib/social/campaign'
+import { validateScheduleDraft } from '@/lib/social/publish/validate'
 import { fromZonedInput, normalizeUrl, slugify } from '@/lib/utils'
 
 export type FormState = { error?: string; ok?: boolean }
@@ -390,4 +391,86 @@ export async function updatePostCampaign(
   // stored can differ (spaces become hyphens, etc), and the copy button must hand
   // out a link with the tag the database actually holds.
   return { ok: true, campaign: clean }
+}
+
+/* ---------------------------------------------------------- scheduling -- */
+
+export async function createScheduledPost(_prev: FormState, formData: FormData): Promise<FormState> {
+  await requireAuth()
+
+  const caption = String(formData.get('caption') ?? '').trim()
+  const networks = formData.getAll('networks').map(String)
+  const scheduledAt = fromZonedInput(String(formData.get('scheduledAt') ?? ''), SITE_TIMEZONE)
+  const files = formData.getAll('media').filter((f): f is File => f instanceof File && f.size > 0)
+
+  const videoCount = files.filter((f) => f.type.startsWith('video/')).length
+  const error = validateScheduleDraft(
+    { caption, imageCount: files.length - videoCount, videoCount, networks, scheduledAt },
+    new Date(),
+  )
+  if (error) return { error }
+
+  const uploaded: Array<{ url: string; mediaType: 'image' | 'video' }> = []
+  for (const file of files) {
+    // Public on purpose: Instagram's Graph API fetches the media from this URL.
+    const blob = await put(`scheduled/${randomUUID()}-${file.name}`, file, { access: 'public' })
+    uploaded.push({ url: blob.url, mediaType: file.type.startsWith('video/') ? 'video' : 'image' })
+  }
+
+  const db = getDb()
+  const [post] = await db
+    .insert(scheduledPosts)
+    .values({ caption, scheduledAt: scheduledAt! })
+    .returning()
+  await db.insert(scheduledPostMedia).values(
+    uploaded.map((m, position) => ({ postId: post!.id, blobUrl: m.url, mediaType: m.mediaType, position })),
+  )
+  await db.insert(scheduledPostTargets).values(networks.map((network) => ({ postId: post!.id, network })))
+
+  revalidatePath('/admin/schedule')
+  return { ok: true }
+}
+
+export async function rescheduleTarget(targetId: string, localDatetime: string): Promise<FormState> {
+  await requireAuth()
+
+  const scheduledAt = fromZonedInput(localDatetime, SITE_TIMEZONE)
+  if (!scheduledAt || scheduledAt.getTime() <= Date.now()) {
+    return { error: 'La hora debe estar en el futuro.' }
+  }
+
+  const db = getDb()
+  const [target] = await db
+    .select()
+    .from(scheduledPostTargets)
+    .where(eq(scheduledPostTargets.id, targetId))
+  if (!target) return { error: 'Ese destino ya no existe.' }
+
+  await db.update(scheduledPosts).set({ scheduledAt, updatedAt: new Date() }).where(eq(scheduledPosts.id, target.postId))
+  // Back to square one: attempts spent against the old hour say nothing about the new one.
+  await db
+    .update(scheduledPostTargets)
+    .set({ status: 'scheduled', attemptCount: 0, lastError: null, containerId: null, updatedAt: new Date() })
+    .where(eq(scheduledPostTargets.id, targetId))
+
+  revalidatePath('/admin/schedule')
+  return { ok: true }
+}
+
+export async function deleteScheduledPost(postId: string): Promise<FormState> {
+  await requireAuth()
+
+  const db = getDb()
+  const targets = await db
+    .select()
+    .from(scheduledPostTargets)
+    .where(eq(scheduledPostTargets.postId, postId))
+  // Deleting the row cannot unpublish the post on the network — refuse instead of lying.
+  if (targets.some((t) => t.status === 'published' || t.status === 'publishing')) {
+    return { error: 'Ya se publicó (o está publicando): elimínalo en la red.' }
+  }
+
+  await db.delete(scheduledPosts).where(eq(scheduledPosts.id, postId))
+  revalidatePath('/admin/schedule')
+  return { ok: true }
 }
