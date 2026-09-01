@@ -257,8 +257,8 @@ export async function getPostSeries(f: Filters): Promise<PostSeriesPoint[]> {
   }))
 }
 
-// YouTube is the one network configured by environment instead of a button.
-const OAUTH_NETWORKS = new Set(['instagram', 'tiktok', 'facebook'])
+// TikTok is the one network left without a publisher; YouTube reads by env but writes by OAuth.
+const OAUTH_NETWORKS = new Set(['instagram', 'tiktok', 'facebook', 'youtube'])
 
 export async function getConnections(): Promise<ConnectionRow[]> {
   const accounts = await getDb().select().from(socialAccounts)
