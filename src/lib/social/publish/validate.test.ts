@@ -48,3 +48,39 @@ describe('validateScheduleDraft', () => {
     expect(validateScheduleDraft({ ...base, caption: '' }, now)).toBeNull()
   })
 })
+
+describe('validación por destino (Threads y X)', () => {
+  it('acepta texto puro cuando ningún destino exige archivo', () => {
+    expect(
+      validateScheduleDraft(
+        { ...base, imageCount: 0, networks: ['x', 'threads', 'facebook'] },
+        now,
+      ),
+    ).toBeNull()
+  })
+
+  it('rechaza texto puro si Instagram o YouTube están marcados', () => {
+    expect(
+      validateScheduleDraft({ ...base, imageCount: 0, networks: ['x', 'instagram'] }, now),
+    ).toMatch(/archivo/)
+    expect(
+      validateScheduleDraft({ ...base, imageCount: 0, networks: ['youtube'] }, now),
+    ).toMatch(/archivo/)
+  })
+
+  it('280 exactos pasan por X; 281 no', () => {
+    const conX = { ...base, networks: ['x'], imageCount: 0 }
+    expect(validateScheduleDraft({ ...conX, caption: 'x'.repeat(280) }, now)).toBeNull()
+    expect(validateScheduleDraft({ ...conX, caption: 'x'.repeat(281) }, now)).toMatch(/280/)
+  })
+
+  it('500 exactos pasan por Threads; 501 no', () => {
+    const conTh = { ...base, networks: ['threads'], imageCount: 0 }
+    expect(validateScheduleDraft({ ...conTh, caption: 'x'.repeat(500) }, now)).toBeNull()
+    expect(validateScheduleDraft({ ...conTh, caption: 'x'.repeat(501) }, now)).toMatch(/500/)
+  })
+
+  it('un texto largo sin X ni Threads marcados sigue valiendo hasta 2200', () => {
+    expect(validateScheduleDraft({ ...base, caption: 'x'.repeat(2200) }, now)).toBeNull()
+  })
+})
