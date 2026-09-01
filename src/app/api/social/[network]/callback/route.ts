@@ -276,6 +276,66 @@ async function threadsCredential(code: string, redirectUri: string): Promise<Cre
   }
 }
 
+async function xCredential(
+  code: string,
+  redirectUri: string,
+  pkceVerifier: string | undefined,
+): Promise<Credential> {
+  const clientId = env('X_CLIENT_ID')
+  const clientSecret = env('X_CLIENT_SECRET')
+  if (!clientId || !clientSecret) {
+    throw new OAuthError('Faltan las credenciales de X (X_CLIENT_ID / X_CLIENT_SECRET).')
+  }
+  if (!pkceVerifier) {
+    throw new OAuthError('La conexión con X expiró. Inténtalo de nuevo.')
+  }
+
+  const basic = Buffer.from(`${clientId}:${clientSecret}`).toString('base64')
+  const exchange = await fetch('https://api.x.com/2/oauth2/token', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded',
+      Authorization: `Basic ${basic}`,
+    },
+    body: new URLSearchParams({
+      code,
+      grant_type: 'authorization_code',
+      redirect_uri: redirectUri,
+      code_verifier: pkceVerifier,
+    }),
+  })
+  if (!exchange.ok) {
+    console.error('X rechazó el código:', exchange.status, (await exchange.text()).slice(0, 300))
+    throw new OAuthError('X rechazó el código. Inténtalo de nuevo.')
+  }
+  const tokens = (await exchange.json()) as {
+    access_token?: string
+    refresh_token?: string
+    expires_in?: number
+  }
+  if (!tokens.access_token) throw new OAuthError('X no devolvió token.')
+  // The two-hour token is useless without its refresh companion.
+  if (!tokens.refresh_token) throw new OAuthError('X no entregó el token de refresco. Inténtalo de nuevo.')
+
+  const me = await fetch('https://api.x.com/2/users/me', {
+    headers: { Authorization: `Bearer ${tokens.access_token}` },
+  })
+  if (!me.ok) {
+    console.error('No se pudo leer la cuenta de X:', me.status, (await me.text()).slice(0, 300))
+    throw new OAuthError('No se pudo leer la cuenta de X.')
+  }
+  const user = (await me.json()) as { data?: { id?: string; username?: string } }
+  if (!user.data?.id) throw new OAuthError('X no devolvió la cuenta.')
+
+  return {
+    accessToken: tokens.access_token,
+    refreshToken: tokens.refresh_token,
+    expiresAt: new Date(Date.now() + (tokens.expires_in ?? 7200) * 1000),
+    externalId: user.data.id,
+    handle: user.data.username ?? null,
+  }
+}
+
 async function tiktokCredential(code: string, redirectUri: string): Promise<Credential> {
   const clientKey = env('TIKTOK_CLIENT_KEY')
   const clientSecret = env('TIKTOK_CLIENT_SECRET')
@@ -311,11 +371,17 @@ async function tiktokCredential(code: string, redirectUri: string): Promise<Cred
   }
 }
 
-async function fetchCredential(network: string, code: string, redirectUri: string): Promise<Credential> {
+async function fetchCredential(
+  network: string,
+  code: string,
+  redirectUri: string,
+  pkceVerifier?: string,
+): Promise<Credential> {
   if (network === 'instagram') return instagramCredential(code, redirectUri)
   if (network === 'facebook') return facebookCredential(code, redirectUri)
   if (network === 'youtube') return youtubeCredential(code, redirectUri)
   if (network === 'threads') return threadsCredential(code, redirectUri)
+  if (network === 'x') return xCredential(code, redirectUri, pkceVerifier)
   if (network === 'tiktok') return tiktokCredential(code, redirectUri)
   throw new OAuthError('Esa red no usa OAuth.')
 }
@@ -349,7 +415,10 @@ export async function GET(
   const redirectUri = `${url.origin}/api/social/${network}/callback`
 
   try {
-    const credential = await fetchCredential(network, code, redirectUri)
+    const pkceVerifier = request.headers
+      .get('cookie')
+      ?.match(/(?:^|;\s*)x_pkce_verifier=([^;]+)/)?.[1]
+    const credential = await fetchCredential(network, code, redirectUri, pkceVerifier)
 
     // Refuse to move a connected network onto a different account.
     //

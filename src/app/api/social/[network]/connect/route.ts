@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { createHash, randomBytes } from 'node:crypto'
 import { isAuthenticated } from '@/lib/auth'
 import { env } from '@/lib/env'
 import { signOAuthState } from '@/lib/social/oauth-state'
@@ -33,6 +34,7 @@ const SCOPES: Record<string, string> = {
   youtube:
     'https://www.googleapis.com/auth/youtube.upload https://www.googleapis.com/auth/youtube.readonly',
   threads: 'threads_basic,threads_content_publish',
+  x: 'tweet.read tweet.write users.read offline.access',
   tiktok: 'user.info.basic,video.list',
 }
 
@@ -95,6 +97,35 @@ export async function GET(
     url.searchParams.set('response_type', 'code')
     url.searchParams.set('state', state)
     return NextResponse.redirect(url)
+  }
+
+  if (network === 'x') {
+    const clientId = env('X_CLIENT_ID')
+    if (!clientId) return new NextResponse('Falta X_CLIENT_ID', { status: 400 })
+
+    // PKCE: the verifier must come back at the callback but never travel through X's
+    // servers — a short-lived httpOnly cookie is the only channel that satisfies both.
+    const verifier = randomBytes(32).toString('base64url')
+    const challenge = createHash('sha256').update(verifier).digest('base64url')
+
+    const url = new URL('https://x.com/i/oauth2/authorize')
+    url.searchParams.set('client_id', clientId)
+    url.searchParams.set('redirect_uri', redirectUri)
+    url.searchParams.set('scope', scope)
+    url.searchParams.set('response_type', 'code')
+    url.searchParams.set('state', state)
+    url.searchParams.set('code_challenge', challenge)
+    url.searchParams.set('code_challenge_method', 'S256')
+
+    const response = NextResponse.redirect(url)
+    response.cookies.set('x_pkce_verifier', verifier, {
+      httpOnly: true,
+      secure: true,
+      sameSite: 'lax',
+      maxAge: 600,
+      path: '/api/social/x',
+    })
+    return response
   }
 
   const clientKey = env('TIKTOK_CLIENT_KEY')
