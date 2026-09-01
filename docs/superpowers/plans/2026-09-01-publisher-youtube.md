@@ -351,6 +351,7 @@ git commit -m "Arma título, metadata y cuerpo de subida para YouTube"
 ### Task 3: El publisher con refresh propio, y su registro
 
 **Files:**
+- Modify: `src/lib/social/publish/publisher.ts` (una línea en el tipo — debe ir primero o el typecheck de esta task falla)
 - Modify: `src/lib/social/publish/youtube.ts` (agregar al final)
 - Modify: `src/lib/social/publish/index.ts`
 
@@ -360,7 +361,21 @@ git commit -m "Arma título, metadata y cuerpo de subida para YouTube"
 
 Sin test unitario nuevo: orquestación HTTP y refresh siguen el trato de los connectors; las ramas viven en los helpers de Task 2. Verificación por typecheck, lint y suite.
 
-- [ ] **Step 1: Implementación**
+- [ ] **Step 1: El contrato gana la credencial opcional**
+
+En `src/lib/social/publish/publisher.ts`, el tipo `Publisher` pasa a (agregando
+`import type { SocialAccount } from '@/db'` junto al import existente):
+
+```ts
+export type Publisher = {
+  network: string
+  /** Write credential, when it differs from the connector's read credential. */
+  ensureCredential?(account: SocialAccount): Promise<string | null>
+  publish(input: PublishInput): Promise<PublishOutcome>
+}
+```
+
+- [ ] **Step 2: Implementación del publisher**
 
 Agregar a `src/lib/social/publish/youtube.ts` (con los imports de Interfaces arriba del archivo):
 
@@ -467,7 +482,7 @@ export const youtubePublisher: Publisher = {
 }
 ```
 
-- [ ] **Step 2: El registro**
+- [ ] **Step 3: El registro**
 
 En `src/lib/social/publish/index.ts`:
 
@@ -477,15 +492,15 @@ import { youtubePublisher } from './youtube'
 
 y `PUBLISHERS` pasa a `[instagramPublisher, facebookPublisher, youtubePublisher]`.
 
-- [ ] **Step 3: Verificar**
+- [ ] **Step 4: Verificar**
 
 Run: `npx vitest run src/lib/social/publish/ && npm run typecheck && npm run lint`
 Expected: PASS los tres.
 
-- [ ] **Step 4: Commit**
+- [ ] **Step 5: Commit**
 
 ```bash
-git add src/lib/social/publish/youtube.ts src/lib/social/publish/index.ts
+git add src/lib/social/publish/publisher.ts src/lib/social/publish/youtube.ts src/lib/social/publish/index.ts
 git commit -m "Sube el video a YouTube con refresh propio del token de Google"
 ```
 
@@ -494,7 +509,6 @@ git commit -m "Sube el video a YouTube con refresh propio del token de Google"
 ### Task 4: Contrato, orquestador, UI y verificación final
 
 **Files:**
-- Modify: `src/lib/social/publish/publisher.ts` (una línea en el tipo)
 - Modify: `src/lib/social/publish/run.ts` (la resolución de credencial)
 - Modify: `src/app/admin/(dash)/schedule/composer.tsx` (ENABLED)
 - Modify: `src/lib/posts.ts:261` (OAUTH_NETWORKS)
@@ -506,20 +520,7 @@ git commit -m "Sube el video a YouTube con refresh propio del token de Google"
 
 Sin test unitario nuevo (la preferencia es una expresión; las ramas reales ya están testeadas). Verificación final completa.
 
-- [ ] **Step 1: El contrato**
-
-En `publisher.ts`, el tipo `Publisher` gana la línea (con su import de `SocialAccount` desde `@/db`):
-
-```ts
-export type Publisher = {
-  network: string
-  /** Write credential, when it differs from the connector's read credential. */
-  ensureCredential?(account: SocialAccount): Promise<string | null>
-  publish(input: PublishInput): Promise<PublishOutcome>
-}
-```
-
-- [ ] **Step 2: El orquestador**
+- [ ] **Step 1: El orquestador**
 
 En `run.ts`, `attempt()` reemplaza:
 
@@ -547,7 +548,7 @@ y
   const token = account ? await ensure(account) : null
 ```
 
-- [ ] **Step 3: UI y README**
+- [ ] **Step 2: UI y README**
 
 - `composer.tsx`: `ENABLED` pasa a `new Set(['instagram', 'facebook', 'youtube'])` y su
   comentario a `// Phases 1–3 publish; the rest of the checkboxes exist but wait.`
@@ -561,15 +562,15 @@ y
 | `GOOGLE_CLIENT_SECRET` | El secreto de ese OAuth Client | Junto con el anterior; el sync de solo lectura sigue usando `YOUTUBE_API_KEY` |
 ```
 
-- [ ] **Step 4: Verificación final completa**
+- [ ] **Step 3: Verificación final completa**
 
 Run: `npm test && npm run typecheck && npm run lint && npm run build`
 Expected: PASS los cuatro (181 tests: 171 + 10 nuevos).
 
-- [ ] **Step 5: Commit**
+- [ ] **Step 4: Commit**
 
 ```bash
-git add src/lib/social/publish/publisher.ts src/lib/social/publish/run.ts "src/app/admin/(dash)/schedule/composer.tsx" src/lib/posts.ts README.md
+git add src/lib/social/publish/run.ts "src/app/admin/(dash)/schedule/composer.tsx" src/lib/posts.ts README.md
 git commit -m "Prefiere la credencial del publisher y habilita YouTube en el compositor"
 ```
 
