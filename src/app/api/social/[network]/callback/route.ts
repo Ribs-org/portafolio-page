@@ -220,6 +220,62 @@ async function youtubeCredential(code: string, redirectUri: string): Promise<Cre
   }
 }
 
+async function threadsCredential(code: string, redirectUri: string): Promise<Credential> {
+  const appId = env('THREADS_APP_ID')
+  const appSecret = env('THREADS_APP_SECRET')
+  if (!appId || !appSecret) {
+    throw new OAuthError('Faltan las credenciales de Threads (THREADS_APP_ID / THREADS_APP_SECRET).')
+  }
+
+  const short = await fetch('https://graph.threads.net/oauth/access_token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({
+      client_id: appId,
+      client_secret: appSecret,
+      grant_type: 'authorization_code',
+      redirect_uri: redirectUri,
+      code,
+    }),
+  })
+  if (!short.ok) {
+    console.error('Threads rechazó el código:', short.status, (await short.text()).slice(0, 300))
+    throw new OAuthError('Threads rechazó el código. Inténtalo de nuevo.')
+  }
+  const shortData = (await short.json()) as { access_token?: string }
+  if (!shortData.access_token) throw new OAuthError('Threads no devolvió token.')
+
+  // Same two-step dance as Instagram: the code buys an hour, th_exchange_token buys
+  // the ~60 days worth storing.
+  const long = await fetch(
+    `https://graph.threads.net/access_token?grant_type=th_exchange_token&client_secret=${appSecret}&access_token=${shortData.access_token}`,
+  )
+  if (!long.ok) {
+    console.error('Threads no canjeó el token largo:', long.status, (await long.text()).slice(0, 300))
+    throw new OAuthError('Threads no canjeó el token largo. Inténtalo de nuevo.')
+  }
+  const longData = (await long.json()) as { access_token?: string; expires_in?: number }
+  if (!longData.access_token) throw new OAuthError('Threads no devolvió el token largo.')
+
+  const me = await fetch(
+    `https://graph.threads.net/v1.0/me?fields=id,username&access_token=${longData.access_token}`,
+  )
+  if (!me.ok) {
+    console.error('No se pudo leer el perfil de Threads:', me.status, (await me.text()).slice(0, 300))
+    throw new OAuthError('No se pudo leer el perfil de Threads.')
+  }
+  const profile = (await me.json()) as { id?: string; username?: string }
+  if (!profile.id) throw new OAuthError('Threads no devolvió el perfil.')
+
+  return {
+    accessToken: longData.access_token,
+    refreshToken: null,
+    expiresAt: new Date(Date.now() + (longData.expires_in ?? 5184000) * 1000),
+    externalId: profile.id,
+    handle: profile.username ?? null,
+  }
+}
+
 async function tiktokCredential(code: string, redirectUri: string): Promise<Credential> {
   const clientKey = env('TIKTOK_CLIENT_KEY')
   const clientSecret = env('TIKTOK_CLIENT_SECRET')
@@ -259,6 +315,7 @@ async function fetchCredential(network: string, code: string, redirectUri: strin
   if (network === 'instagram') return instagramCredential(code, redirectUri)
   if (network === 'facebook') return facebookCredential(code, redirectUri)
   if (network === 'youtube') return youtubeCredential(code, redirectUri)
+  if (network === 'threads') return threadsCredential(code, redirectUri)
   if (network === 'tiktok') return tiktokCredential(code, redirectUri)
   throw new OAuthError('Esa red no usa OAuth.')
 }

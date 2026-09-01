@@ -32,6 +32,7 @@ const SCOPES: Record<string, string> = {
   // readonly. Space-separated: that is Google's delimiter, unlike Meta's commas.
   youtube:
     'https://www.googleapis.com/auth/youtube.upload https://www.googleapis.com/auth/youtube.readonly',
+  threads: 'threads_basic,threads_content_publish',
   tiktok: 'user.info.basic,video.list',
 }
 
@@ -79,6 +80,19 @@ export async function GET(
     url.searchParams.set('response_type', 'code')
     url.searchParams.set('access_type', 'offline')
     url.searchParams.set('prompt', 'consent')
+    url.searchParams.set('state', state)
+    return NextResponse.redirect(url)
+  }
+
+  if (network === 'threads') {
+    const appId = env('THREADS_APP_ID')
+    if (!appId) return new NextResponse('Falta THREADS_APP_ID', { status: 400 })
+
+    const url = new URL('https://threads.net/oauth/authorize')
+    url.searchParams.set('client_id', appId)
+    url.searchParams.set('redirect_uri', redirectUri)
+    url.searchParams.set('scope', scope)
+    url.searchParams.set('response_type', 'code')
     url.searchParams.set('state', state)
     return NextResponse.redirect(url)
   }
