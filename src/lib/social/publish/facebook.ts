@@ -1,6 +1,5 @@
 import {
   PUBLISH_NETWORK_ERROR,
-  PUBLISH_REJECTED,
   type PublishInput,
   type PublishMedia,
   type PublishOutcome,
@@ -8,6 +7,7 @@ import {
 } from './publisher'
 
 export const FACEBOOK_MIXED_MEDIA = 'Facebook no admite mezclar video y fotos en un post.'
+export const FACEBOOK_REJECTED = 'Facebook rechazó la publicación.'
 
 export function photoPostParams(caption: string, media: PublishMedia): Record<string, string> {
   return { url: media.url, caption }
@@ -79,10 +79,13 @@ export const facebookPublisher: Publisher = {
       )
       if (!response.ok) {
         console.error('Facebook video status:', response.status, (await response.text()).slice(0, 300))
-        return { kind: 'failed', reason: PUBLISH_NETWORK_ERROR }
+        // A poll that didn't answer says nothing about the video: stay parked instead of
+        // failing — a retry from scratch would upload a second public copy. The 24h stale
+        // cut still bounds how long this can wait.
+        return { kind: 'processing', containerId: input.containerId }
       }
       const verdict = classifyVideoStatus(await response.json())
-      if (verdict === 'error') return { kind: 'failed', reason: PUBLISH_REJECTED }
+      if (verdict === 'error') return { kind: 'failed', reason: FACEBOOK_REJECTED }
       if (verdict === 'processing') return { kind: 'processing', containerId: input.containerId }
       return { kind: 'published', externalId: input.containerId }
     }
@@ -109,7 +112,7 @@ export const facebookPublisher: Publisher = {
         access_token: token,
       })
       const id = data?.id
-      if (typeof id !== 'string') return { kind: 'failed', reason: PUBLISH_REJECTED }
+      if (typeof id !== 'string') return { kind: 'failed', reason: FACEBOOK_REJECTED }
       return { kind: 'published', externalId: id }
     }
 
@@ -129,7 +132,7 @@ export const facebookPublisher: Publisher = {
       access_token: token,
     })
     const postId = post?.id
-    if (typeof postId !== 'string') return { kind: 'failed', reason: PUBLISH_REJECTED }
+    if (typeof postId !== 'string') return { kind: 'failed', reason: FACEBOOK_REJECTED }
     return { kind: 'published', externalId: postId }
   },
 }

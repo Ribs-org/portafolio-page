@@ -27,6 +27,7 @@ const SCOPES: Record<string, string> = {
   // other four.
   facebook:
     'pages_show_list,pages_read_engagement,pages_read_user_content,pages_manage_posts,business_management',
+  youtube: 'https://www.googleapis.com/auth/youtube.upload',
   tiktok: 'user.info.basic,video.list',
 }
 
@@ -56,6 +57,24 @@ export async function GET(
     url.searchParams.set('redirect_uri', redirectUri)
     url.searchParams.set('scope', scope)
     url.searchParams.set('response_type', 'code')
+    url.searchParams.set('state', state)
+    return NextResponse.redirect(url)
+  }
+
+  if (network === 'youtube') {
+    const clientId = env('GOOGLE_CLIENT_ID')
+    if (!clientId) return new NextResponse('Falta GOOGLE_CLIENT_ID', { status: 400 })
+
+    // access_type=offline + prompt=consent is the pair that makes Google hand over a
+    // refresh token even on re-consent; without it the second connect gets none and
+    // the hourly access token dies with no way back.
+    const url = new URL('https://accounts.google.com/o/oauth2/v2/auth')
+    url.searchParams.set('client_id', clientId)
+    url.searchParams.set('redirect_uri', redirectUri)
+    url.searchParams.set('scope', scope)
+    url.searchParams.set('response_type', 'code')
+    url.searchParams.set('access_type', 'offline')
+    url.searchParams.set('prompt', 'consent')
     url.searchParams.set('state', state)
     return NextResponse.redirect(url)
   }

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   FACEBOOK_MIXED_MEDIA,
+  FACEBOOK_REJECTED,
   classifyVideoStatus,
   hasMixedMedia,
   multiPhotoFeedParams,
@@ -70,5 +71,9 @@ describe('hasMixedMedia', () => {
 
   it('la frase del rechazo es fija y en español', () => {
     expect(FACEBOOK_MIXED_MEDIA).toBe('Facebook no admite mezclar video y fotos en un post.')
+  })
+
+  it('la frase del rechazo nombra a Facebook, no a otra red', () => {
+    expect(FACEBOOK_REJECTED).toBe('Facebook rechazó la publicación.')
   })
 })

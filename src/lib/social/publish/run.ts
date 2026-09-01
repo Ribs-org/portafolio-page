@@ -98,14 +98,18 @@ async function attempt(
 ): Promise<PublishOutcome> {
   const db = getDb()
   const publisher = PUBLISHERS.find((p) => p.network === network)
+  if (!publisher) return { kind: 'failed', reason: NO_PUBLISH_TOKEN }
+  // The publisher's own credential wins: YouTube reads with an API key but writes
+  // with OAuth, and the read connector must not learn about writing.
   const connector = CONNECTORS.find((c) => c.network === network)
-  if (!publisher || !connector) return { kind: 'failed', reason: NO_PUBLISH_TOKEN }
+  const ensure = publisher.ensureCredential ?? connector?.ensureCredential
+  if (!ensure) return { kind: 'failed', reason: NO_PUBLISH_TOKEN }
 
   const [account] = await db
     .select()
     .from(socialAccounts)
     .where(eq(socialAccounts.network, network))
-  const token = account ? await connector.ensureCredential(account) : null
+  const token = account ? await ensure(account) : null
   if (!token || !account?.externalId) return { kind: 'failed', reason: NO_PUBLISH_TOKEN }
 
   const media = await db

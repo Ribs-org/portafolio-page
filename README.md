@@ -293,6 +293,8 @@ Vercel y bajan con `vercel env pull .env.local`.
 | `SITE_TIMEZONE` | Zona en la que el dashboard agrupa los días | No — por defecto `America/Santiago` |
 | `YOUTUBE_API_KEY` | Métricas de YouTube | No — sin ella esa red aparece como no conectada |
 | `YOUTUBE_CHANNEL_ID` | Métricas de YouTube | No — sin ella esa red aparece como no conectada |
+| `GOOGLE_CLIENT_ID` | Conectar YouTube para publicar (OAuth de Google) | El OAuth Client tipo Web del mismo proyecto de la API key |
+| `GOOGLE_CLIENT_SECRET` | El secreto de ese OAuth Client | Junto con el anterior; el sync de solo lectura sigue usando `YOUTUBE_API_KEY` |
 | `INSTAGRAM_APP_ID` | Conectar Instagram | No — sin ella esa red aparece como no conectada |
 | `INSTAGRAM_APP_SECRET` | Conectar Instagram | No — sin ella esa red aparece como no conectada |
 | `INSTAGRAM_IG_USER_ID` | Elegir cuál de tus cuentas de Instagram se conecta | Solo si administras más de una: sin ella, conectar falla en vez de adivinar |
