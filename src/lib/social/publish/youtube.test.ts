@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  YOUTUBE_REJECTED,
   classifyUploadStatus,
   singleVideo,
   youtubeMetadata,
@@ -67,6 +68,12 @@ describe('classifyUploadStatus', () => {
   it('un video que ya no aparece en la lista es un veredicto, no una espera', () => {
     expect(classifyUploadStatus({ items: [] })).toBe('error')
     expect(classifyUploadStatus({})).toBe('error')
+  })
+})
+
+describe('YOUTUBE_REJECTED', () => {
+  it('la frase del rechazo nombra a YouTube, no a otra red', () => {
+    expect(YOUTUBE_REJECTED).toBe('YouTube rechazó el video.')
   })
 })
 

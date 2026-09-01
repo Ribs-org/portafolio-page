@@ -1,5 +1,5 @@
 import type { PublishMedia, PublishInput, PublishOutcome, Publisher } from './publisher'
-import { PUBLISH_NETWORK_ERROR, PUBLISH_REJECTED } from './publisher'
+import { PUBLISH_NETWORK_ERROR } from './publisher'
 import type { SocialAccount } from '@/db'
 import { getDb, socialAccounts } from '@/db'
 import { eq } from 'drizzle-orm'
@@ -8,6 +8,7 @@ import { decryptToken, encryptToken } from '../crypto'
 import { randomUUID } from 'node:crypto'
 
 export const YOUTUBE_ONLY_VIDEO = 'YouTube solo recibe video.'
+export const YOUTUBE_REJECTED = 'YouTube rechazó el video.'
 
 const MAX_TITLE = 100
 
@@ -136,10 +137,13 @@ export const youtubePublisher: Publisher = {
       )
       if (!response.ok) {
         console.error('YouTube video status:', response.status, (await response.text()).slice(0, 300))
-        return { kind: 'failed', reason: PUBLISH_NETWORK_ERROR }
+        // A poll that didn't answer says nothing about the video: stay parked instead of
+        // failing — a retry from scratch would upload a second public copy. The 24h stale
+        // cut still bounds how long this can wait.
+        return { kind: 'processing', containerId: input.containerId }
       }
       const verdict = classifyUploadStatus(await response.json())
-      if (verdict === 'error') return { kind: 'failed', reason: PUBLISH_REJECTED }
+      if (verdict === 'error') return { kind: 'failed', reason: YOUTUBE_REJECTED }
       if (verdict === 'processing') return { kind: 'processing', containerId: input.containerId }
       return { kind: 'published', externalId: input.containerId }
     }
@@ -147,6 +151,11 @@ export const youtubePublisher: Publisher = {
     const video = singleVideo(input.media)
     if (!video) return { kind: 'failed', reason: YOUTUBE_ONLY_VIDEO }
 
+    // Accepted window: if the function dies after Google takes the insert but before
+    // the state patch lands, the next run re-uploads and the channel gets a duplicate.
+    // The bytes travel inside this function (no file_url handoff like Facebook), so the
+    // window is real but small under the 240s budget; resumable uploads are the future
+    // fix if it is ever observed.
     const blob = await fetch(video.url)
     if (!blob.ok) {
       console.error('No se pudo leer el video del Blob:', blob.status)
@@ -165,10 +174,10 @@ export const youtubePublisher: Publisher = {
     })
     if (!response.ok) {
       console.error('YouTube upload:', response.status, (await response.text()).slice(0, 300))
-      return { kind: 'failed', reason: PUBLISH_REJECTED }
+      return { kind: 'failed', reason: YOUTUBE_REJECTED }
     }
     const data = (await response.json()) as { id?: string }
-    if (typeof data.id !== 'string') return { kind: 'failed', reason: PUBLISH_REJECTED }
+    if (typeof data.id !== 'string') return { kind: 'failed', reason: YOUTUBE_REJECTED }
     return { kind: 'processing', containerId: data.id }
   },
 }

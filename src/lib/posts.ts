@@ -277,9 +277,9 @@ export async function getConnections(): Promise<ConnectionRow[]> {
       //
       // An OAuth network keeps its row through a disconnect on purpose — the identity has
       // to outlive the credentials so the callback can still refuse a different account —
-      // so only a stored token means connected. YouTube never holds a token: it runs on
-      // environment variables, and `ensureYouTubeAccount` writes its row exactly when both
-      // are present, so for it the row really is the whole answer.
+      // so only a stored token means connected. All four networks are OAuth now: YouTube
+      // reads by env (its API key) but writes by OAuth, so for it too `connected` means
+      // the write credential — the access token — is on file, not just the row existing.
       connected: usesOAuth ? Boolean(account?.accessToken) : Boolean(account),
       lastSyncedAt: account?.lastSyncedAt?.toISOString() ?? null,
       lastSyncError: account?.lastSyncError ?? null,
