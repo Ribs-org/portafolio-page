@@ -6,8 +6,8 @@ import { SOCIAL_NETWORKS } from '@/db/schema'
 import { networkLabel } from '@/lib/networks'
 import { cn } from '@/lib/utils'
 
-// Phase 1 publishes to Instagram; the rest of the checkboxes exist but wait.
-const ENABLED = new Set(['instagram'])
+// Phases 1–2 publish to the Meta networks; the rest of the checkboxes exist but wait.
+const ENABLED = new Set(['instagram', 'facebook'])
 
 export function Composer() {
   const [state, action, pending] = useActionState(createScheduledPost, {})

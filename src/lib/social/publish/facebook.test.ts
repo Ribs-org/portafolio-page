@@ -1,0 +1,74 @@
+import { describe, expect, it } from 'vitest'
+import {
+  FACEBOOK_MIXED_MEDIA,
+  classifyVideoStatus,
+  hasMixedMedia,
+  multiPhotoFeedParams,
+  photoPostParams,
+  unpublishedPhotoParams,
+  videoPostParams,
+} from './facebook'
+
+const image = { url: 'https://blob.test/a.jpg', mediaType: 'image' as const, position: 0 }
+const video = { url: 'https://blob.test/b.mp4', mediaType: 'video' as const, position: 0 }
+
+describe('payloads de publicación en la página', () => {
+  it('foto sola: url y caption, publicada de inmediato', () => {
+    expect(photoPostParams('Hola', image)).toEqual({
+      url: 'https://blob.test/a.jpg',
+      caption: 'Hola',
+    })
+  })
+
+  it('foto de un post múltiple: sin caption y sin publicar todavía', () => {
+    // El texto va una sola vez, en el post de /feed; la foto suelta espera invisible.
+    expect(unpublishedPhotoParams(image)).toEqual({
+      url: 'https://blob.test/a.jpg',
+      published: 'false',
+    })
+  })
+
+  it('el post múltiple adjunta los fbid en orden, como JSON indexado', () => {
+    expect(multiPhotoFeedParams('Hola', ['F1', 'F2', 'F3'])).toEqual({
+      message: 'Hola',
+      'attached_media[0]': '{"media_fbid":"F1"}',
+      'attached_media[1]': '{"media_fbid":"F2"}',
+      'attached_media[2]': '{"media_fbid":"F3"}',
+    })
+  })
+
+  it('video: file_url y description', () => {
+    expect(videoPostParams('Hola', video)).toEqual({
+      file_url: 'https://blob.test/b.mp4',
+      description: 'Hola',
+    })
+  })
+})
+
+describe('classifyVideoStatus', () => {
+  it('ready está listo para declararse publicado', () => {
+    expect(classifyVideoStatus({ status: { video_status: 'ready' } })).toBe('ready')
+  })
+
+  it('error es un veredicto, no una espera', () => {
+    expect(classifyVideoStatus({ status: { video_status: 'error' } })).toBe('error')
+  })
+
+  it('processing, ausente o desconocido siguen esperando', () => {
+    expect(classifyVideoStatus({ status: { video_status: 'processing' } })).toBe('processing')
+    expect(classifyVideoStatus({})).toBe('processing')
+    expect(classifyVideoStatus({ status: { video_status: 'upload_complete' } })).toBe('processing')
+  })
+})
+
+describe('hasMixedMedia', () => {
+  it('video y foto juntos es mezcla; cualquiera solo o repetido no lo es', () => {
+    expect(hasMixedMedia([image, video])).toBe(true)
+    expect(hasMixedMedia([image, { ...image, position: 1 }])).toBe(false)
+    expect(hasMixedMedia([video])).toBe(false)
+  })
+
+  it('la frase del rechazo es fija y en español', () => {
+    expect(FACEBOOK_MIXED_MEDIA).toBe('Facebook no admite mezclar video y fotos en un post.')
+  })
+})
