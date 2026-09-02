@@ -73,6 +73,38 @@ export function youtubeUploadBody(
   return body
 }
 
+/**
+ * Best-effort a conciencia: cuando esto corre el video YA subió, así que un fallo
+ * aquí (canal sin teléfono verificado → 403, portada ilegible, red) solo pierde la
+ * portada — devolver failed reintentaría el insert y duplicaría el video público.
+ * Se llama una sola vez, junto al insert; el camino de reanudación no la repite.
+ */
+async function setThumbnail(token: string, videoId: string, coverUrl: string): Promise<void> {
+  try {
+    const cover = await fetch(coverUrl, { signal: AbortSignal.timeout(30_000) })
+    if (!cover.ok) {
+      console.error('Portada de YouTube:', cover.status, coverUrl.slice(0, 200))
+      return
+    }
+    const response = await fetch(
+      `https://www.googleapis.com/upload/youtube/v3/thumbnails/set?videoId=${videoId}`,
+      {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': cover.headers.get('content-type') ?? 'image/jpeg',
+        },
+        body: new Uint8Array(await cover.arrayBuffer()),
+      },
+    )
+    if (!response.ok) {
+      console.error('Portada de YouTube:', response.status, (await response.text()).slice(0, 300))
+    }
+  } catch (error) {
+    console.error('Portada de YouTube:', String(error).slice(0, 300))
+  }
+}
+
 const REFRESH_WINDOW_MS = 5 * 60 * 1000
 
 /**
@@ -178,6 +210,7 @@ export const youtubePublisher: Publisher = {
     }
     const data = (await response.json()) as { id?: string }
     if (typeof data.id !== 'string') return { kind: 'failed', reason: YOUTUBE_REJECTED }
+    if (input.coverUrl) await setThumbnail(input.token, data.id, input.coverUrl)
     return { kind: 'processing', containerId: data.id }
   },
 }

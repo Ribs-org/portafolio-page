@@ -7,8 +7,16 @@ export function photoContainerParams(caption: string, media: PublishMedia): Reco
 
 // REELS rather than VIDEO: since v21 it is the only media_type Graph accepts for
 // standalone feed video.
-export function reelContainerParams(caption: string, media: PublishMedia): Record<string, string> {
-  return { media_type: 'REELS', video_url: media.url, caption }
+// La portada diseñada del reel; el carrusel y la foto no la llevan — Graph solo
+// la acepta en el contenedor REELS.
+export function reelContainerParams(
+  caption: string,
+  media: PublishMedia,
+  coverUrl: string | null,
+): Record<string, string> {
+  const params: Record<string, string> = { media_type: 'REELS', video_url: media.url, caption }
+  if (coverUrl) params.cover_url = coverUrl
+  return params
 }
 
 export function carouselChildParams(media: PublishMedia): Record<string, string> {
@@ -106,7 +114,7 @@ export const instagramPublisher: Publisher = {
     // Single video: create the container and park — Meta processes it asynchronously
     // and the next cron run polls status_code before publishing.
     if (media.length === 1) {
-      const containerId = await createContainer(input, reelContainerParams(input.caption, media[0]!))
+      const containerId = await createContainer(input, reelContainerParams(input.caption, media[0]!, input.coverUrl))
       if (!containerId) return { kind: 'failed', reason: PUBLISH_NETWORK_ERROR }
       return { kind: 'processing', containerId }
     }

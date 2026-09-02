@@ -12,7 +12,15 @@ import { SITE_TIMEZONE } from '@/lib/analytics'
 import { createSession, destroySession, isAuthenticated, passwordMatches } from '@/lib/auth'
 import { normalizeCampaignTag } from '@/lib/social/campaign'
 import { csvToBatchItems } from '@/lib/social/publish/csv'
-import { scheduleBatch, MAX_BATCH_ITEMS, mediaToBlob, mediaTypeFromUrl } from '@/lib/social/publish/batch'
+import {
+  scheduleBatch,
+  MAX_BATCH_ITEMS,
+  mediaToBlob,
+  mediaTypeFromUrl,
+  portadaExtensionError,
+  portadaTypeError,
+  PORTADA_NEEDS_VIDEO,
+} from '@/lib/social/publish/batch'
 import { validateScheduleDraft } from '@/lib/social/publish/validate'
 import { diffMedia, diffTargets } from '@/lib/social/publish/edit'
 import { fromZonedInput, normalizeUrl, slugify } from '@/lib/utils'
@@ -475,6 +483,8 @@ export async function updateScheduledPost(
     .split(/\r?\n/)
     .map((u) => u.trim())
     .filter(Boolean)
+  const keepPortada = String(formData.get('keepPortada') ?? '').trim()
+  const portadaUrl = String(formData.get('portadaUrl') ?? '').trim()
 
   // Editar un post cuya hora ya pasó (p.ej. corregir el texto que X rechazó) no debe
   // exigir mover la fecha: si la fecha no cambió, se permite guardar en el pasado — el
@@ -517,6 +527,11 @@ export async function updateScheduledPost(
     if (preError) return { error: preError }
   }
 
+  if (portadaUrl) {
+    const extensionError = portadaExtensionError(portadaUrl)
+    if (extensionError) return { error: extensionError }
+  }
+
   // Las URLs se resuelven primero: mediaToBlob es la falla más probable (enlace roto,
   // host que no responde). Si falla acá, no quedan blobs de archivos huérfanos — el
   // loop de put() de archivos corre después, solo si las URLs ya resolvieron.
@@ -555,6 +570,27 @@ export async function updateScheduledPost(
     if (error) return { error }
   }
 
+  // Conservar solo coteja contra lo guardado — el mismo trato que keptMedia con sus
+  // ids: el form dice «mantén lo que hay», nunca dicta una URL cruda.
+  const portadaKept = Boolean(keepPortada) && keepPortada === post.coverUrl
+
+  // El chequeo de video corre ANTES de descargar/subir la portada nueva — igual que en
+  // el lote (batch.ts): si el resultado ya es una portada sin video, no vale la pena
+  // pagar esa descarga.
+  if ((portadaUrl || portadaKept) && !finalTypes.includes('video')) {
+    return { error: PORTADA_NEEDS_VIDEO }
+  }
+
+  // La URL nueva gana sobre la conservada; ninguna de las dos = quitarla (null).
+  let coverUrl: string | null = portadaKept ? keepPortada : null
+  if (portadaUrl) {
+    const stored = await mediaToBlob(portadaUrl, null)
+    if (!stored) return { error: 'No se pudo leer una media por URL.' }
+    const typeError = portadaTypeError(stored)
+    if (typeError) return { error: typeError }
+    coverUrl = stored.url
+  }
+
   // Sequential writes (neon-http has no interactive transactions); worst-case cut
   // leaves media updated with old targets — the same partial-failure profile already
   // accepted in createScheduledPost. Every target write carries its status guard y el
@@ -562,7 +598,7 @@ export async function updateScheduledPost(
   // here makes the write no-op instead of clobbering the in-flight attempt.
   await db
     .update(scheduledPosts)
-    .set({ caption, scheduledAt: scheduledAt!, updatedAt: new Date() })
+    .set({ caption, scheduledAt: scheduledAt!, coverUrl, updatedAt: new Date() })
     .where(eq(scheduledPosts.id, postId))
 
   if (mediaPlan.deleteIds.length > 0) {

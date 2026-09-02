@@ -42,6 +42,7 @@ export default async function EditScheduledPostPage({
       scheduledAtLocal={toZonedInput(post.scheduledAt, SITE_TIMEZONE)}
       targets={targets.map((t) => ({ network: t.network, status: t.status }))}
       media={media.map((m) => ({ id: m.id, blobUrl: m.blobUrl, mediaType: m.mediaType }))}
+      coverUrl={post.coverUrl}
     />
   )
 }

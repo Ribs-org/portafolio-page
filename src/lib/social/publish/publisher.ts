@@ -9,6 +9,8 @@ export type PublishInput = {
   containerId: string | null
   token: string
   accountExternalId: string
+  /** Imagen de portada (URL del Blob) para los caminos de video; null si no hay. */
+  coverUrl: string | null
 }
 
 export type PublishOutcome =
