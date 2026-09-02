@@ -1,6 +1,7 @@
 import { asc, eq } from 'drizzle-orm'
 import { getDb, scheduledPosts, scheduledPostTargets } from '@/db'
 import { Composer } from './composer'
+import { BatchUpload } from './batch-upload'
 import { Queue } from './queue'
 
 export const dynamic = 'force-dynamic'
@@ -23,6 +24,7 @@ export default async function SchedulePage() {
   return (
     <div className="space-y-6">
       <Composer />
+      <BatchUpload />
       <Queue items={[...posts.values()]} />
     </div>
   )
