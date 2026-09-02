@@ -1,6 +1,10 @@
-import { SITE_TIMEZONE } from '@/lib/analytics'
+import { env } from '@/lib/env'
 import { fromZonedInput } from '@/lib/utils'
 import { validateScheduleDraft } from './validate'
+
+// Same derivation as SITE_TIMEZONE in lib/analytics — duplicated here because that
+// module is server-only and this one must stay importable by vitest.
+const ZONE = env('SITE_TIMEZONE') ?? 'America/Santiago'
 
 export type BatchItem = { fecha: string; texto: string; redes: string[]; media: string[] }
 
@@ -31,7 +35,7 @@ export function mediaTypeFromUrl(url: string): 'image' | 'video' | null {
  */
 export function validateBatchItem(item: BatchItem, now: Date): string | null {
   const isoDateTime = item.fecha.replace(' ', 'T')
-  const scheduledAt = fromZonedInput(isoDateTime, SITE_TIMEZONE)
+  const scheduledAt = fromZonedInput(isoDateTime, ZONE)
   if (!scheduledAt) return 'La fecha no se entendió (usa YYYY-MM-DD HH:MM).'
 
   for (const red of item.redes) {
