@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { mediaTypeFromUrl, validateBatchItem, type BatchItem } from './batch'
+import { mediaTypeFromUrl, typeFromContentType, validateBatchItem, type BatchItem } from './batch'
 
 const now = new Date('2026-09-02T12:00:00Z')
 const base: BatchItem = {
@@ -37,8 +37,20 @@ describe('validateBatchItem', () => {
     expect(validateBatchItem({ ...base, redes: ['myspace'] }, now)).toMatch(/myspace/)
   })
 
-  it('rechaza media con extensión indescifrable', () => {
-    expect(validateBatchItem({ ...base, media: ['https://ej.com/x.pdf'] }, now)).toMatch(/tipo/)
+  it('difiere la extensión desconocida: la URL de Drive pasa y el content-type decide', () => {
+    const drive = 'https://drive.usercontent.google.com/download?id=abc&export=download'
+    expect(validateBatchItem({ ...base, media: [drive] }, now)).toBeNull()
+  })
+
+  it('la media de tipo diferido igual cuenta como archivo en las reglas por cantidad', () => {
+    const url = 'https://ej.com/sin-extension'
+    expect(validateBatchItem({ ...base, redes: ['instagram'], media: [url] }, now)).toBeNull()
+    expect(validateBatchItem({ ...base, redes: ['threads'], media: [url, url] }, now)).toMatch(
+      /un solo archivo/,
+    )
+    expect(validateBatchItem({ ...base, redes: ['x'], media: Array(5).fill(url) }, now)).toMatch(
+      /cuatro/,
+    )
   })
 
   it('delega en las reglas del compositor: límites y formas por red', () => {
@@ -63,5 +75,23 @@ describe('validateBatchItem', () => {
 
   it('rechaza fechas ISO con zona o segundos: solo YYYY-MM-DD HH:MM', () => {
     expect(validateBatchItem({ ...base, fecha: '2026-09-03T10:00:00Z' }, now)).toMatch(/YYYY-MM-DD/)
+  })
+})
+
+describe('typeFromContentType', () => {
+  it('mapea image/* y video/* a tipo y extensión, tolerando parámetros', () => {
+    expect(typeFromContentType('image/jpeg')).toEqual({ mediaType: 'image', extension: 'jpg' })
+    expect(typeFromContentType('image/png')).toEqual({ mediaType: 'image', extension: 'png' })
+    expect(typeFromContentType('video/mp4; codecs=avc1')).toEqual({
+      mediaType: 'video',
+      extension: 'mp4',
+    })
+    expect(typeFromContentType('video/quicktime')).toEqual({ mediaType: 'video', extension: 'mov' })
+  })
+
+  it('cualquier otro content-type es null: la fila se rechaza al descargar', () => {
+    expect(typeFromContentType('application/pdf')).toBeNull()
+    expect(typeFromContentType('text/html; charset=utf-8')).toBeNull()
+    expect(typeFromContentType('')).toBeNull()
   })
 })
