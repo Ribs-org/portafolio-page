@@ -1,5 +1,6 @@
 'use client'
 
+import Link from 'next/link'
 import { useState, useTransition } from 'react'
 import { deleteScheduledPost, rescheduleTarget } from '@/app/admin/actions'
 import type { ScheduledPost, ScheduledPostTarget } from '@/db/schema'
@@ -15,8 +16,10 @@ const STATUS_LABEL: Record<string, string> = {
 
 export function Queue({
   items,
+  volver,
 }: {
   items: Array<{ post: ScheduledPost; targets: ScheduledPostTarget[] }>
+  volver: string
 }) {
   const [pending, start] = useTransition()
   const [error, setError] = useState<string | null>(null)
@@ -38,14 +41,22 @@ export function Queue({
                 {post.scheduledAt.toLocaleString('es-CL', { dateStyle: 'medium', timeStyle: 'short' })}
               </p>
             </div>
-            <button
-              type="button"
-              disabled={pending}
-              onClick={() => start(async () => { setError(null); const result = await deleteScheduledPost(post.id); if (result.error) setError(result.error) })}
-              className="text-xs text-fg-faint hover:text-fg"
-            >
-              Eliminar
-            </button>
+            <div className="flex shrink-0 items-center gap-3">
+              <Link
+                href={`/admin/schedule/${post.id}?volver=${encodeURIComponent(volver)}`}
+                className="text-xs text-fg-faint hover:text-fg"
+              >
+                Editar
+              </Link>
+              <button
+                type="button"
+                disabled={pending}
+                onClick={() => start(async () => { setError(null); const result = await deleteScheduledPost(post.id); if (result.error) setError(result.error) })}
+                className="text-xs text-fg-faint hover:text-fg"
+              >
+                Eliminar
+              </button>
+            </div>
           </div>
           <div className="mt-3 flex flex-wrap gap-2">
             {targets.map((target) => (
