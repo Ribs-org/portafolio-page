@@ -143,6 +143,21 @@ export function withPlatformMetrics(rows: PostRow[]): PostRow[] {
   return rows.filter((row) => !hasNoPlatformMetrics(row))
 }
 
+// The catalogue's canonical network order — twin of SOCIAL_NETWORKS in db/schema,
+// duplicated because this module must stay importable by client components and vitest.
+const NETWORK_ORDER = ['instagram', 'tiktok', 'youtube', 'facebook', 'threads', 'x']
+
+/**
+ * The distinct networks in the catalogue, in canonical order, for the platform filter
+ * chips: a network never synced gets no chip. Anything outside the canonical list —
+ * a network added later — still shows up, appended in arrival order.
+ */
+export function networksPresent(rows: PostRow[]): string[] {
+  const present = [...new Set(rows.map((row) => row.network))]
+  const canonical = NETWORK_ORDER.filter((network) => present.includes(network))
+  return [...canonical, ...present.filter((network) => !NETWORK_ORDER.includes(network))]
+}
+
 /**
  * The posts that gained the most views inside the period, best first.
  *

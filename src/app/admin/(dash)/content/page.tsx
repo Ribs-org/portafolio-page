@@ -7,15 +7,17 @@ import { TrafficChart } from '@/components/charts/traffic-chart'
 import { FilterBar } from '@/components/filter-bar'
 import { parseFilters } from '@/lib/filters'
 import { getConnections, getPostRows, getPostSeries, postKpisFrom } from '@/lib/posts'
+import { networkLabel } from '@/lib/networks'
 import {
   activeRows,
+  networksPresent,
   topPostsByGain,
   unpastedCount,
   withPlatformMetrics,
   withoutPlatformMetricsCount,
 } from '@/lib/posts-kpis'
 import { getAllProfiles } from '@/lib/profiles'
-import { formatNumber, formatPercent } from '@/lib/utils'
+import { cn, formatNumber, formatPercent } from '@/lib/utils'
 import { Connections } from './connections'
 import { PostTable } from './post-table'
 
@@ -31,21 +33,29 @@ export const dynamic = 'force-dynamic'
  * `mensaje` is the exception: it is the one-shot outcome of an OAuth callback, so
  * carrying it would pin a stale "instagram conectado." to every later navigation.
  */
+function contentHref(
+  params: Record<string, string | string[] | undefined>,
+  changed: string,
+  value: string | null,
+): string {
+  const next = new URLSearchParams()
+  for (const [key, param] of Object.entries(params)) {
+    if (key === changed || key === 'mensaje') continue
+    if (typeof param === 'string') next.set(key, param)
+    else if (Array.isArray(param)) for (const v of param) next.append(key, v)
+  }
+  if (value !== null) next.set(changed, value)
+
+  const query = next.toString()
+  return query ? `/admin/content?${query}` : '/admin/content'
+}
+
 function toggleHref(
   params: Record<string, string | string[] | undefined>,
   toggled: 'archivados' | 'metricas',
   active: boolean,
 ): string {
-  const next = new URLSearchParams()
-  for (const [key, value] of Object.entries(params)) {
-    if (key === toggled || key === 'mensaje') continue
-    if (typeof value === 'string') next.set(key, value)
-    else if (Array.isArray(value)) for (const v of value) next.append(key, v)
-  }
-  if (!active) next.set(toggled, '1')
-
-  const query = next.toString()
-  return query ? `/admin/content?${query}` : '/admin/content'
+  return contentHref(params, toggled, active ? null : '1')
 }
 
 export default async function ContentPage({
@@ -57,6 +67,7 @@ export default async function ContentPage({
   const filters = parseFilters(params)
   const includeArchived = params.archivados === '1'
   const onlyWithMetrics = params.metricas === '1'
+  const red = typeof params.red === 'string' ? params.red : null
 
   // What `/api/social/[network]/callback` has to say about the connection attempt that
   // just bounced back here. Truncated because the value is a query param: it reaches the
@@ -71,10 +82,15 @@ export default async function ContentPage({
     getPostSeries(filters),
   ])
 
-  // The metrics filter is applied here, not in the query: the rows are already loaded,
-  // and asking the database again for a subset it already handed over would also risk
-  // the two calls disagreeing.
-  const visible = onlyWithMetrics ? withPlatformMetrics(rows) : rows
+  // The metrics and platform filters are applied here, not in the query: the rows are
+  // already loaded, and asking the database again for a subset it already handed over
+  // would also risk the two calls disagreeing.
+  const withMetrics = onlyWithMetrics ? withPlatformMetrics(rows) : rows
+  const visible = red ? withMetrics.filter((row) => row.network === red) : withMetrics
+
+  // Chips come from the unfiltered catalogue so the way back ("Todas", or another
+  // network) never disappears just because the current filter emptied the view.
+  const chipNetworks = networksPresent(rows)
 
   // Derived from the same rows the table renders, so the tiles above never
   // disagree with what's listed below — including when `archivados=1` or
@@ -95,11 +111,11 @@ export default async function ContentPage({
   const unpasted = unpastedCount(rows)
   const withoutMetrics = withoutPlatformMetricsCount(rows)
 
-  // Fed `visible` rather than `rows`, though the two are provably the same set here:
-  // `periodChange` nulls `current` and `change` together (see `social/delta.ts`), so a
-  // row with no cumulative `views` cannot carry a `viewsChange` above zero, and the
-  // metrics filter can never remove a row this ranking would have kept. Passing the
-  // displayed set keeps the panel honest by construction rather than by that argument.
+  // Fed `visible` so the panel ranks exactly what the table shows: the platform filter
+  // narrows it on purpose, and the metrics filter provably removes nothing this ranking
+  // would keep (`periodChange` nulls `current` and `change` together — see
+  // `social/delta.ts` — so a row with no cumulative `views` cannot carry a
+  // `viewsChange` above zero).
   const topPosts = topPostsByGain(visible, 10)
 
   // Spanish inflects the noun, the possessive and the verb together, so the singular is
@@ -188,16 +204,40 @@ export default async function ContentPage({
             </div>
           }
         >
+          {chipNetworks.length > 1 ? (
+            <div className="mb-3 flex flex-wrap items-center gap-1.5">
+              {[null, ...chipNetworks].map((network) => {
+                const active = red === network
+                return (
+                  <Link
+                    key={network ?? 'todas'}
+                    href={contentHref(params, 'red', network)}
+                    className={cn(
+                      'rounded-full px-2.5 py-1 font-mono text-[0.68rem] transition-colors',
+                      active
+                        ? 'bg-white/[0.14] text-fg'
+                        : 'bg-white/[0.05] text-fg-faint hover:text-fg',
+                    )}
+                  >
+                    {network === null ? 'Todas' : networkLabel(network)}
+                  </Link>
+                )
+              })}
+            </div>
+          ) : null}
           {/*
             An empty `visible` with a non-empty `rows` is the filter's doing, not an
             empty catalogue. `PostTable`'s own empty state would tell someone whose
             posts are all pre-conversion to go connect a network and sync — which they
             already did, and which would not change a thing.
           */}
-          {onlyWithMetrics && visible.length === 0 && rows.length > 0 ? (
+          {visible.length === 0 && rows.length > 0 ? (
             <Empty>
-              El filtro dejó la lista vacía: ninguna publicación tiene métricas de la red en
-              este período.
+              {red && onlyWithMetrics
+                ? `El filtro dejó la lista vacía: ninguna publicación de ${networkLabel(red)} tiene métricas de la red en este período.`
+                : red
+                  ? `No hay publicaciones de ${networkLabel(red)} en este período.`
+                  : 'El filtro dejó la lista vacía: ninguna publicación tiene métricas de la red en este período.'}
             </Empty>
           ) : (
             <PostTable rows={visible} />

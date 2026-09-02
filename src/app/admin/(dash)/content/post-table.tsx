@@ -31,8 +31,16 @@ function pct(value: number | null, digits = 1): string {
   return value === null ? '—' : `${value.toFixed(digits)}%`
 }
 
+// The default cut: enough to read the leaders of the current sort without scrolling
+// a whole catalogue. Expanding is a view preference, so it lives in client state and
+// resets on reload rather than in the URL.
+const PREVIEW_COUNT = 20
+
 export function PostTable({ rows }: { rows: PostRow[] }) {
   const { sorted, sortKey, descending, toggle } = useSortedRows(rows, 'views')
+  const [expanded, setExpanded] = useState(false)
+  const visible = expanded ? sorted : sorted.slice(0, PREVIEW_COUNT)
+  const hidden = sorted.length - visible.length
 
   if (rows.length === 0) {
     return (
@@ -91,7 +99,7 @@ export function PostTable({ rows }: { rows: PostRow[] }) {
           </tr>
         </thead>
         <tbody>
-          {sorted.map((row) => (
+          {visible.map((row) => (
             <tr
               key={row.id}
               className={cn(
@@ -177,6 +185,21 @@ export function PostTable({ rows }: { rows: PostRow[] }) {
           ))}
         </tbody>
       </table>
+      {hidden > 0 || expanded ? (
+        <div className="border-t border-white/[0.06] pt-2 text-center">
+          <button
+            type="button"
+            onClick={() => setExpanded(!expanded)}
+            className="rounded px-2 py-1 font-mono text-[0.7rem] uppercase tracking-[0.14em] text-fg-faint transition-colors hover:text-fg"
+          >
+            {expanded
+              ? 'Mostrar menos'
+              : hidden === 1
+                ? 'Ver la publicación restante'
+                : `Ver las ${hidden} restantes`}
+          </button>
+        </div>
+      ) : null}
     </div>
   )
 }
