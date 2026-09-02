@@ -62,8 +62,9 @@ cada red aplica como puede — o ignora sin error.
   - Portada con `videoCount == 0` (contando los tipos diferidos como imagen, como
     la media) → «La portada requiere un video en media.»
   - La URL de portada entra a la misma tubería que la media: extensión de imagen
-    reconocida o tipo diferido; en la descarga el content-type debe ser `image/*`
-    — un video o HTML rechazan la fila con «La portada debe ser una imagen.»
+    reconocida o tipo diferido; si la extensión o el content-type real dicen video,
+    la fila se rechaza con «La portada debe ser una imagen.» Una descarga fallida o
+    un content-type ajeno (HTML, PDF) usan la frase genérica de lectura existente.
   - La descarga usa el mismo timeout (30 s) y re-sube al Blob; la URL guardada en
     `coverUrl` es la del Blob, nunca la de origen.
 - Nota de borde: si `media` trae solo URLs de tipo diferido que resultan ser
