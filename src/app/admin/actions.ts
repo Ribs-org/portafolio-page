@@ -569,7 +569,9 @@ export async function updateScheduledPost(
   }
 
   // La URL nueva gana sobre la conservada; ninguna de las dos = quitarla (null).
-  let coverUrl: string | null = keepPortada || null
+  // Conservar solo coteja contra lo guardado — el mismo trato que keptMedia con sus
+  // ids: el form dice «mantén lo que hay», nunca dicta una URL cruda.
+  let coverUrl: string | null = keepPortada && keepPortada === post.coverUrl ? keepPortada : null
   if (portadaUrl) {
     const stored = await mediaToBlob(portadaUrl, mediaTypeFromUrl(portadaUrl))
     if (!stored) return { error: 'No se pudo leer una media por URL.' }
