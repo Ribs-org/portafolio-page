@@ -223,6 +223,8 @@ export const scheduledPosts = pgTable('scheduled_posts', {
   id: uuid('id').primaryKey().defaultRandom(),
   caption: text('caption').notNull(),
   scheduledAt: timestamp('scheduled_at', { withTimezone: true }).notNull(),
+  // Diseñada, no un fotograma: la aplican los publishers que pueden (IG/FB/YT).
+  coverUrl: text('cover_url'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 })
