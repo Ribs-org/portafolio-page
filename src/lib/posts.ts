@@ -258,7 +258,7 @@ export async function getPostSeries(f: Filters): Promise<PostSeriesPoint[]> {
 }
 
 // TikTok is the one network left without a publisher; YouTube reads by env but writes by OAuth.
-const OAUTH_NETWORKS = new Set(['instagram', 'tiktok', 'facebook', 'youtube'])
+const OAUTH_NETWORKS = new Set(['instagram', 'tiktok', 'facebook', 'youtube', 'threads', 'x'])
 
 export async function getConnections(): Promise<ConnectionRow[]> {
   const accounts = await getDb().select().from(socialAccounts)
