@@ -19,7 +19,7 @@ describe('payloads de contenedores', () => {
   })
 
   it('video: media_type REELS con video_url', () => {
-    expect(reelContainerParams('Hola', video)).toEqual({
+    expect(reelContainerParams('Hola', video, null)).toEqual({
       media_type: 'REELS',
       video_url: 'https://blob.test/b.mp4',
       caption: 'Hola',
@@ -42,6 +42,27 @@ describe('payloads de contenedores', () => {
     expect(carouselParentParams('Hola', ['C1', 'C2', 'C3'])).toEqual({
       media_type: 'CAROUSEL',
       children: 'C1,C2,C3',
+      caption: 'Hola',
+    })
+  })
+})
+
+describe('reelContainerParams con portada', () => {
+  const media = { url: 'https://blob/v.mp4', mediaType: 'video' as const, position: 0 }
+
+  it('con portada agrega cover_url', () => {
+    expect(reelContainerParams('Hola', media, 'https://blob/p.jpg')).toEqual({
+      media_type: 'REELS',
+      video_url: 'https://blob/v.mp4',
+      caption: 'Hola',
+      cover_url: 'https://blob/p.jpg',
+    })
+  })
+
+  it('sin portada el cuerpo queda como siempre', () => {
+    expect(reelContainerParams('Hola', media, null)).toEqual({
+      media_type: 'REELS',
+      video_url: 'https://blob/v.mp4',
       caption: 'Hola',
     })
   })

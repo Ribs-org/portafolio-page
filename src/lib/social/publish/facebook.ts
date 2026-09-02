@@ -51,6 +51,25 @@ export function hasMixedMedia(media: PublishMedia[]): boolean {
 
 const GRAPH = 'https://graph.facebook.com/v23.0'
 
+/**
+ * /videos no acepta una URL de portada — `thumb` viaja en bytes. La portada ya
+ * vive en nuestro Blob; si su descarga falla, el video sale sin ella (best-effort:
+ * jamás se sacrifica el video por la portada) y el motivo queda en el log.
+ */
+async function fetchCoverBlob(coverUrl: string): Promise<Blob | null> {
+  try {
+    const response = await fetch(coverUrl, { signal: AbortSignal.timeout(30_000) })
+    if (!response.ok) {
+      console.error('Portada de Facebook:', response.status, coverUrl.slice(0, 200))
+      return null
+    }
+    return await response.blob()
+  } catch (error) {
+    console.error('Portada de Facebook:', String(error).slice(0, 300))
+    return null
+  }
+}
+
 // Same shape as the Instagram publisher's postForm, duplicated on purpose — the
 // connectors already set that precedent, and sharing it would couple two networks'
 // error logs. Upstream bodies go to the log; callers only see fixed sentences.
@@ -109,10 +128,26 @@ export const facebookPublisher: Publisher = {
     // Single video: /videos answers with the id right away and processes on its own;
     // parking on it reuses the same state machine as Instagram's containers.
     if (media.length === 1 && media[0]!.mediaType === 'video') {
-      const data = await postForm(`${GRAPH}/${input.accountExternalId}/videos`, {
-        ...videoPostParams(input.caption, media[0]!),
-        access_token: token,
-      })
+      const params = { ...videoPostParams(input.caption, media[0]!), access_token: token }
+      const cover = input.coverUrl ? await fetchCoverBlob(input.coverUrl) : null
+      let data: Record<string, unknown> | null
+      if (cover) {
+        const form = new FormData()
+        for (const [key, value] of Object.entries(params)) form.set(key, value)
+        form.set('thumb', cover, 'portada.jpg')
+        const response = await fetch(`${GRAPH}/${input.accountExternalId}/videos`, {
+          method: 'POST',
+          body: form,
+        })
+        if (!response.ok) {
+          console.error('Facebook publish:', response.status, (await response.text()).slice(0, 300))
+          data = null
+        } else {
+          data = await response.json()
+        }
+      } else {
+        data = await postForm(`${GRAPH}/${input.accountExternalId}/videos`, params)
+      }
       const id = data?.id
       if (typeof id !== 'string') return { kind: 'failed', reason: PUBLISH_NETWORK_ERROR }
       return { kind: 'processing', containerId: id }

@@ -1,5 +1,5 @@
 export const CSV_HEADER_ERROR =
-  'El encabezado del CSV debe ser exactamente: fecha,texto,redes,media'
+  'El encabezado del CSV debe ser exactamente: fecha,texto,redes,media — con portada opcional como quinta columna.'
 
 /** RFC 4180 in ~40 lines: quoted fields may hold commas, newlines and "" quotes. */
 export function parseCsv(text: string): string[][] {
@@ -52,17 +52,22 @@ function splitPipe(cell: string): string[] {
 
 export function csvToBatchItems(
   text: string,
-): { items: Array<{ fecha: string; texto: string; redes: string[]; media: string[] }> } | { error: string } {
+): { items: Array<{ fecha: string; texto: string; redes: string[]; media: string[]; portada: string }> } | { error: string } {
   const rows = parseCsv(text)
   const header = rows[0]
   if (
     !header ||
-    header.length !== 4 ||
+    header.length < 4 ||
+    header.length > 5 ||
     header[0] !== 'fecha' ||
     header[1] !== 'texto' ||
     header[2] !== 'redes' ||
     header[3] !== 'media'
   ) {
+    return { error: CSV_HEADER_ERROR }
+  }
+
+  if (header.length === 5 && header[4] !== 'portada') {
     return { error: CSV_HEADER_ERROR }
   }
 
@@ -72,6 +77,7 @@ export function csvToBatchItems(
       texto: (row[1] ?? '').trim(),
       redes: splitPipe(row[2] ?? ''),
       media: splitPipe(row[3] ?? ''),
+      portada: header.length === 5 ? (row[4] ?? '').trim() : '',
     })),
   }
 }

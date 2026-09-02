@@ -68,6 +68,7 @@ export async function publishDue(now: Date = new Date()): Promise<Report> {
     } else {
       outcome = await attempt(target.network, target.id, post.id, target.containerId, {
         caption: target.captionOverride ?? post.caption,
+        coverUrl: post.coverUrl,
       })
     }
 
@@ -94,7 +95,7 @@ async function attempt(
   targetId: string,
   postId: string,
   containerId: string | null,
-  content: { caption: string },
+  content: { caption: string; coverUrl: string | null },
 ): Promise<PublishOutcome> {
   const db = getDb()
   const publisher = PUBLISHERS.find((p) => p.network === network)
@@ -125,6 +126,7 @@ async function attempt(
       containerId,
       token,
       accountExternalId: account.externalId,
+      coverUrl: content.coverUrl,
     })
   } catch (error) {
     // A publisher that throws (network hiccup, DNS, anything before Meta answered) is
