@@ -65,6 +65,10 @@ cada red aplica como puede — o ignora sin error.
     reconocida o tipo diferido; si la extensión o el content-type real dicen video,
     la fila se rechaza con «La portada debe ser una imagen.» Una descarga fallida o
     un content-type ajeno (HTML, PDF) usan la frase genérica de lectura existente.
+  - La portada se restringe a **JPG/PNG** (por extensión y por content-type real):
+    gif/webp → «La portada debe ser JPG o PNG.» Graph puede rechazar thumbs
+    exóticos, y en FB/IG la portada viaja en el mismo POST del video — un formato
+    indigesto tumbaría el video entero tras los reintentos.
   - La descarga usa el mismo timeout (30 s) y re-sube al Blob; la URL guardada en
     `coverUrl` es la del Blob, nunca la de origen.
 - Nota de borde: si `media` trae solo URLs de tipo diferido que resultan ser
