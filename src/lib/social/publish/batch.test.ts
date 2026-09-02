@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest'
-import { mediaTypeFromUrl, typeFromContentType, validateBatchItem, type BatchItem } from './batch'
+import {
+  mediaTypeFromUrl,
+  typeFromContentType,
+  validateBatchItem,
+  PORTADA_NEEDS_VIDEO,
+  PORTADA_NOT_IMAGE,
+  type BatchItem,
+} from './batch'
 
 const now = new Date('2026-09-02T12:00:00Z')
 const base: BatchItem = {
@@ -93,5 +100,42 @@ describe('typeFromContentType', () => {
     expect(typeFromContentType('application/pdf')).toBeNull()
     expect(typeFromContentType('text/html; charset=utf-8')).toBeNull()
     expect(typeFromContentType('')).toBeNull()
+  })
+})
+
+describe('portada en validateBatchItem', () => {
+  const conVideo = { ...base, redes: ['facebook'], media: ['https://ej.com/v.mp4'] }
+
+  it('portada con video en media pasa', () => {
+    expect(
+      validateBatchItem({ ...conVideo, portada: 'https://ej.com/p.jpg' }, now),
+    ).toBeNull()
+  })
+
+  it('portada sin ningún video posible es la frase fija', () => {
+    expect(
+      validateBatchItem({ ...base, media: ['https://ej.com/a.jpg'], redes: ['facebook'], portada: 'https://ej.com/p.jpg' }, now),
+    ).toBe(PORTADA_NEEDS_VIDEO)
+    expect(validateBatchItem({ ...base, portada: 'https://ej.com/p.jpg' }, now)).toBe(
+      PORTADA_NEEDS_VIDEO,
+    )
+  })
+
+  it('media de tipo diferido mantiene viva la portada: el content-type decidirá', () => {
+    const drive = 'https://drive.usercontent.google.com/download?id=x&export=download'
+    expect(
+      validateBatchItem({ ...base, redes: ['facebook'], media: [drive], portada: 'https://ej.com/p.jpg' }, now),
+    ).toBeNull()
+  })
+
+  it('portada con extensión de video es la otra frase fija', () => {
+    expect(
+      validateBatchItem({ ...conVideo, portada: 'https://ej.com/p.mp4' }, now),
+    ).toBe(PORTADA_NOT_IMAGE)
+  })
+
+  it('portada vacía o ausente no exige nada', () => {
+    expect(validateBatchItem({ ...conVideo, portada: '' }, now)).toBeNull()
+    expect(validateBatchItem(conVideo, now)).toBeNull()
   })
 })

@@ -21,13 +21,23 @@ function parseFecha(fecha: string): Date | null {
   return fromZonedInput(isoDateTime, ZONE)
 }
 
-export type BatchItem = { fecha: string; texto: string; redes: string[]; media: string[] }
+export type BatchItem = {
+  fecha: string
+  texto: string
+  redes: string[]
+  media: string[]
+  /** URL pública de imagen; vacía o ausente = sin portada. Solo válida con video. */
+  portada?: string
+}
 
 export type BatchResult =
   | { index: number; ok: true; postId: string }
   | { index: number; ok: false; error: string }
 
 export const MAX_BATCH_ITEMS = 50
+
+export const PORTADA_NEEDS_VIDEO = 'La portada requiere un video en media.'
+export const PORTADA_NOT_IMAGE = 'La portada debe ser una imagen.'
 
 // The five networks with a publisher; tiktok reads but cannot post yet. Twin of
 // ENABLED in the composer (schedule/composer.tsx) — update both together.
@@ -83,6 +93,16 @@ export function validateBatchItem(item: BatchItem, now: Date): string | null {
   for (const url of item.media) {
     if (mediaTypeFromUrl(url) === 'video') videoCount++
     else imageCount++
+  }
+
+  const portada = item.portada?.trim()
+  if (portada) {
+    if (mediaTypeFromUrl(portada) === 'video') return PORTADA_NOT_IMAGE
+    // Un tipo diferido en media puede resultar video (un link de Drive), así que
+    // solo se rechaza aquí cuando TODA la media es imagen segura; la re-validación
+    // post-descarga da el veredicto final con los tipos reales.
+    const videoPossible = item.media.some((url) => mediaTypeFromUrl(url) !== 'image')
+    if (!videoPossible) return PORTADA_NEEDS_VIDEO
   }
 
   return validateScheduleDraft(
@@ -174,9 +194,31 @@ export async function scheduleBatch(items: BatchItem[]): Promise<BatchResult[]> 
         results.push({ index, ok: false, error: shapeError })
         continue
       }
+
+      // La portada sigue la misma tubería que la media, con dos veredictos propios:
+      // los tipos reales deben incluir un video, y la portada misma debe ser imagen.
+      const portada = item.portada?.trim()
+      let coverUrl: string | null = null
+      if (portada) {
+        if (!uploaded.some((m) => m.mediaType === 'video')) {
+          results.push({ index, ok: false, error: PORTADA_NEEDS_VIDEO })
+          continue
+        }
+        const stored = await mediaToBlob(portada, mediaTypeFromUrl(portada))
+        if (!stored) {
+          results.push({ index, ok: false, error: 'No se pudo leer una media de la fila.' })
+          continue
+        }
+        if (stored.mediaType !== 'image') {
+          results.push({ index, ok: false, error: PORTADA_NOT_IMAGE })
+          continue
+        }
+        coverUrl = stored.url
+      }
+
       const [post] = await db
         .insert(scheduledPosts)
-        .values({ caption: item.texto, scheduledAt })
+        .values({ caption: item.texto, scheduledAt, coverUrl })
         .returning()
       if (uploaded.length > 0) {
         await db.insert(scheduledPostMedia).values(

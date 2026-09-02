@@ -32,6 +32,7 @@ export async function POST(request: Request) {
         texto: typeof p.texto === 'string' ? p.texto : '',
         redes: Array.isArray(p.redes) ? p.redes.map(String) : [],
         media: Array.isArray(p.media) ? p.media.map(String) : [],
+        portada: typeof p.portada === 'string' ? p.portada : '',
       }
     })
   } catch {
