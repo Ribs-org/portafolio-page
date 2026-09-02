@@ -11,6 +11,8 @@ import { LINK_KINDS, type LinkKind } from '@/db/schema'
 import { SITE_TIMEZONE } from '@/lib/analytics'
 import { createSession, destroySession, isAuthenticated, passwordMatches } from '@/lib/auth'
 import { normalizeCampaignTag } from '@/lib/social/campaign'
+import { csvToBatchItems } from '@/lib/social/publish/csv'
+import { scheduleBatch, MAX_BATCH_ITEMS } from '@/lib/social/publish/batch'
 import { validateScheduleDraft } from '@/lib/social/publish/validate'
 import { fromZonedInput, normalizeUrl, slugify } from '@/lib/utils'
 
@@ -475,4 +477,34 @@ export async function deleteScheduledPost(postId: string): Promise<FormState> {
   await db.delete(scheduledPosts).where(eq(scheduledPosts.id, postId))
   revalidatePath('/admin/schedule')
   return { ok: true }
+}
+
+/* ---------------------------------------------------------- batch upload -- */
+
+export type BatchRow = { fila: number; ok: boolean; detalle: string }
+export type BatchState = { error?: string; filas?: BatchRow[] }
+
+export async function uploadBatch(_prev: BatchState, formData: FormData): Promise<BatchState> {
+  await requireAuth()
+
+  const file = formData.get('archivo')
+  if (!(file instanceof File) || file.size === 0) return { error: 'Adjunta un archivo CSV.' }
+
+  const parsed = csvToBatchItems(await file.text())
+  if ('error' in parsed) return { error: parsed.error }
+  if (parsed.items.length === 0) return { error: 'El CSV no trae filas de posts.' }
+  if (parsed.items.length > MAX_BATCH_ITEMS) {
+    return { error: `Máximo ${MAX_BATCH_ITEMS} posts por lote.` }
+  }
+
+  const resultados = await scheduleBatch(parsed.items)
+  revalidatePath('/admin/schedule')
+  return {
+    // +2: la fila 1 del archivo es el encabezado, y la gente cuenta desde 1.
+    filas: resultados.map((r) => ({
+      fila: r.index + 2,
+      ok: r.ok,
+      detalle: r.ok ? 'Programado' : r.error,
+    })),
+  }
 }
