@@ -501,9 +501,12 @@ export async function updateScheduledPost(
     keptTypes.filter((t) => t === 'image').length + (files.length - fileVideo) + urls.length
   const preVideos = keptTypes.filter((t) => t === 'video').length + fileVideo
   if (pendingNetworks.length === 0) {
-    // El post ya se publicó en todas las redes elegidas: solo queda corregir texto o
-    // media, y esas redes ya no tienen reglas que imponer. Igual exige una fecha
-    // legible antes de persistir.
+    // Sin pendientes hay dos casos: todo publicado (válido — solo se corrige texto o
+    // media) o un form que desmarcó todas las redes de un post nunca publicado, lo
+    // que dejaría un post huérfano sin destinos. El validador saltado habría dicho
+    // exactamente esto:
+    if (publishedNetworks.size === 0) return { error: 'Elige al menos una plataforma.' }
+    // Igual exige una fecha legible antes de persistir.
     if (!scheduledAt) return { error: 'La fecha no se entendió.' }
   } else {
     const preError = validateScheduleDraft(
