@@ -6,6 +6,7 @@ import {
   topPostsByGain,
   unpastedCount,
   withPlatformMetrics,
+  networksPresent,
   withoutPlatformMetricsCount,
   type PostRow,
 } from './posts-kpis'
@@ -325,5 +326,29 @@ describe('topPostsByGain', () => {
     topPostsByGain(rows, 10)
 
     expect(rows.map((r) => r.id)).toEqual(['a', 'b'])
+  })
+})
+
+describe('networksPresent', () => {
+  it('lista cada red una sola vez, en el orden canónico del catálogo', () => {
+    const rows = [
+      row({ id: 'a', network: 'tiktok' }),
+      row({ id: 'b', network: 'instagram' }),
+      row({ id: 'c', network: 'tiktok' }),
+      row({ id: 'd', network: 'youtube' }),
+    ]
+    expect(networksPresent(rows)).toEqual(['instagram', 'tiktok', 'youtube'])
+  })
+
+  it('una red fuera del orden canónico va al final, en orden de llegada', () => {
+    const rows = [
+      row({ id: 'a', network: 'mastodon' }),
+      row({ id: 'b', network: 'x' }),
+    ]
+    expect(networksPresent(rows)).toEqual(['x', 'mastodon'])
+  })
+
+  it('sin filas no hay chips', () => {
+    expect(networksPresent([])).toEqual([])
   })
 })
