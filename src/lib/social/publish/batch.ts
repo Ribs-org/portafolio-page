@@ -36,13 +36,25 @@ const PUBLISHABLE = new Set(['instagram', 'facebook', 'youtube', 'threads', 'x']
 const IMAGE_EXTENSIONS = new Set(['jpg', 'jpeg', 'png', 'gif', 'webp'])
 const VIDEO_EXTENSIONS = new Set(['mp4', 'mov', 'webm'])
 
-/** By extension, cheaply, before any download; the real content-type re-checks later. */
+/** By extension, cheaply, before any download; null means the content-type decides. */
 export function mediaTypeFromUrl(url: string): 'image' | 'video' | null {
   const path = url.split('?')[0] ?? ''
   const extension = path.split('.').pop()?.toLowerCase() ?? ''
   if (IMAGE_EXTENSIONS.has(extension)) return 'image'
   if (VIDEO_EXTENSIONS.has(extension)) return 'video'
   return null
+}
+
+// Subtypes whose conventional extension is not the subtype itself.
+const EXTENSION_BY_SUBTYPE: Record<string, string> = { jpeg: 'jpg', quicktime: 'mov' }
+
+/** The download's content-type, resolved to a media type and a blob-name extension. */
+export function typeFromContentType(
+  contentType: string,
+): { mediaType: 'image' | 'video'; extension: string } | null {
+  const [type, subtype = ''] = (contentType.split(';')[0] ?? '').trim().toLowerCase().split('/')
+  if (type !== 'image' && type !== 'video') return null
+  return { mediaType: type, extension: EXTENSION_BY_SUBTYPE[subtype] ?? (subtype || 'bin') }
 }
 
 /**
@@ -61,13 +73,16 @@ export function validateBatchItem(item: BatchItem, now: Date): string | null {
     return 'Hay redes repetidas en la fila.'
   }
 
+  // A URL with no recognizable extension (a Drive link) counts as an image here and
+  // gets its real type from the download's content-type, which re-runs these rules.
+  // Image is the safe guess: the only type-dependent rules are X's, and for X any
+  // count that fails as images fails as videos too — so nothing valid is rejected
+  // early, and nothing invalid slips past the re-check.
   let imageCount = 0
   let videoCount = 0
   for (const url of item.media) {
-    const type = mediaTypeFromUrl(url)
-    if (!type) return 'No puedo inferir el tipo de una media por su URL.'
-    if (type === 'image') imageCount++
-    else videoCount++
+    if (mediaTypeFromUrl(url) === 'video') videoCount++
+    else imageCount++
   }
 
   return validateScheduleDraft(
@@ -78,7 +93,7 @@ export function validateBatchItem(item: BatchItem, now: Date): string | null {
 
 async function mediaToBlob(
   url: string,
-  expected: 'image' | 'video',
+  expected: 'image' | 'video' | null,
 ): Promise<{ url: string; mediaType: 'image' | 'video' } | null> {
   let response: Response
   try {
@@ -94,17 +109,19 @@ async function mediaToBlob(
     return null
   }
   const contentType = response.headers.get('content-type') ?? ''
-  // The extension promised one thing; the server must agree, or the row is refused —
-  // a PDF renamed .jpg would otherwise reach Meta as an "image".
-  if (!contentType.startsWith(`${expected}/`)) {
+  // The server's content-type is the truth: with an extension it must agree (a PDF
+  // renamed .jpg would otherwise reach Meta as an "image"); without one — a Drive
+  // link — it decides the type. Anything but image/* or video/* refuses the row,
+  // which is also what catches Drive's HTML interstitial pages.
+  const detected = typeFromContentType(contentType)
+  if (!detected || (expected && detected.mediaType !== expected)) {
     console.error('Content-type inesperado en la media del lote:', contentType, url.slice(0, 200))
     return null
   }
-  const extension = (url.split('?')[0] ?? '').split('.').pop()?.toLowerCase() ?? 'bin'
-  const blob = await put(`scheduled/${randomUUID()}.${extension}`, await response.blob(), {
+  const blob = await put(`scheduled/${randomUUID()}.${detected.extension}`, await response.blob(), {
     access: 'public',
   })
-  return { url: blob.url, mediaType: expected }
+  return { url: blob.url, mediaType: detected.mediaType }
 }
 
 /**
@@ -128,7 +145,7 @@ export async function scheduleBatch(items: BatchItem[]): Promise<BatchResult[]> 
       const uploaded: Array<{ url: string; mediaType: 'image' | 'video' }> = []
       let mediaFailed = false
       for (const url of item.media) {
-        const stored = await mediaToBlob(url, mediaTypeFromUrl(url)!)
+        const stored = await mediaToBlob(url, mediaTypeFromUrl(url))
         if (!stored) {
           results.push({ index, ok: false, error: 'No se pudo leer una media de la fila.' })
           mediaFailed = true
@@ -139,6 +156,24 @@ export async function scheduleBatch(items: BatchItem[]): Promise<BatchResult[]> 
       if (mediaFailed) continue
 
       const scheduledAt = parseFecha(item.fecha)!
+
+      // Deferred types are now real: re-run the composer's rules with the true
+      // image/video split — a Drive link that turned out to be a video where only
+      // images fit fails here, with the same fixed sentence the composer would use.
+      const shapeError = validateScheduleDraft(
+        {
+          caption: item.texto,
+          imageCount: uploaded.filter((m) => m.mediaType === 'image').length,
+          videoCount: uploaded.filter((m) => m.mediaType === 'video').length,
+          networks: item.redes,
+          scheduledAt,
+        },
+        now,
+      )
+      if (shapeError) {
+        results.push({ index, ok: false, error: shapeError })
+        continue
+      }
       const [post] = await db
         .insert(scheduledPosts)
         .values({ caption: item.texto, scheduledAt })
