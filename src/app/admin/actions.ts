@@ -5,15 +5,16 @@ import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { headers } from 'next/headers'
 import { put } from '@vercel/blob'
-import { and, eq, max, ne, sql } from 'drizzle-orm'
+import { and, asc, eq, inArray, max, ne, sql } from 'drizzle-orm'
 import { getDb, links, profiles, socialAccounts, socialPosts, scheduledPosts, scheduledPostTargets, scheduledPostMedia } from '@/db'
 import { LINK_KINDS, type LinkKind } from '@/db/schema'
 import { SITE_TIMEZONE } from '@/lib/analytics'
 import { createSession, destroySession, isAuthenticated, passwordMatches } from '@/lib/auth'
 import { normalizeCampaignTag } from '@/lib/social/campaign'
 import { csvToBatchItems } from '@/lib/social/publish/csv'
-import { scheduleBatch, MAX_BATCH_ITEMS } from '@/lib/social/publish/batch'
+import { scheduleBatch, MAX_BATCH_ITEMS, mediaToBlob, mediaTypeFromUrl } from '@/lib/social/publish/batch'
 import { validateScheduleDraft } from '@/lib/social/publish/validate'
+import { diffMedia, diffTargets } from '@/lib/social/publish/edit'
 import { fromZonedInput, normalizeUrl, slugify } from '@/lib/utils'
 
 export type FormState = { error?: string; ok?: boolean }
@@ -433,6 +434,195 @@ export async function createScheduledPost(_prev: FormState, formData: FormData):
 
   revalidatePath('/admin/schedule')
   return { ok: true }
+}
+
+export async function updateScheduledPost(
+  postId: string,
+  _prev: FormState,
+  formData: FormData,
+): Promise<FormState> {
+  await requireAuth()
+  const db = getDb()
+
+  const [post] = await db.select().from(scheduledPosts).where(eq(scheduledPosts.id, postId))
+  if (!post) return { error: 'El post ya no existe.' }
+
+  const targets = await db
+    .select()
+    .from(scheduledPostTargets)
+    .where(eq(scheduledPostTargets.postId, postId))
+  if (targets.some((t) => t.status === 'publishing')) {
+    return { error: 'Hay una publicación en curso. Vuelve en un minuto.' }
+  }
+  // El claim del cron solo bumpa updatedAt (el status sigue 'scheduled' durante el
+  // vuelo): este mapa es lo único que hace visible, en los writes de abajo, un claim
+  // que ocurrió entre esta lectura y el write — si el cron claimeó, el write no-opea
+  // y el target conserva su historia en vez de que la pisemos.
+  const readTargets = new Map(targets.map((t) => [t.id, t]))
+
+  const existingMedia = await db
+    .select()
+    .from(scheduledPostMedia)
+    .where(eq(scheduledPostMedia.postId, postId))
+    .orderBy(asc(scheduledPostMedia.position))
+
+  const caption = String(formData.get('caption') ?? '').trim()
+  const networks = formData.getAll('networks').map(String)
+  const scheduledAt = fromZonedInput(String(formData.get('scheduledAt') ?? ''), SITE_TIMEZONE)
+  const keptIds = formData.getAll('keptMedia').map(String)
+  const files = formData.getAll('media').filter((f): f is File => f instanceof File && f.size > 0)
+  const urls = String(formData.get('mediaUrls') ?? '')
+    .split(/\r?\n/)
+    .map((u) => u.trim())
+    .filter(Boolean)
+
+  // Editar un post cuya hora ya pasó (p.ej. corregir el texto que X rechazó) no debe
+  // exigir mover la fecha: si la fecha no cambió, se permite guardar en el pasado — el
+  // re-arm lo manda al próximo cron, el "reintenta ahora" natural.
+  const dateUnchanged = scheduledAt !== null && scheduledAt.getTime() === post.scheduledAt.getTime()
+
+  // Una red ya publicada no debe imponer sus límites (280 de X, media obligatoria de
+  // IG) a lo que aún queda por salir: solo lo pendiente entra a la validación.
+  const publishedNetworks = new Set(targets.filter((t) => t.status === 'published').map((t) => t.network))
+  const pendingNetworks = networks.filter((n) => !publishedNetworks.has(n))
+
+  const targetsPlan = diffTargets(targets, networks)
+  if ('error' in targetsPlan) return { error: targetsPlan.error }
+
+  // Pre-validation before touching storage: kept media with their stored types, files
+  // with their real types, URLs counted as images — the batch's deferred-type rule
+  // (image is the guess that never falsely rejects; the re-check below settles it).
+  const typeById = new Map(existingMedia.map((m) => [m.id, m.mediaType]))
+  const keptTypes = keptIds
+    .map((id) => typeById.get(id))
+    .filter((t): t is 'image' | 'video' => t === 'image' || t === 'video')
+  const fileVideo = files.filter((f) => f.type.startsWith('video/')).length
+  const preImages =
+    keptTypes.filter((t) => t === 'image').length + (files.length - fileVideo) + urls.length
+  const preVideos = keptTypes.filter((t) => t === 'video').length + fileVideo
+  if (pendingNetworks.length === 0) {
+    // Sin pendientes hay dos casos: todo publicado (válido — solo se corrige texto o
+    // media) o un form que desmarcó todas las redes de un post nunca publicado, lo
+    // que dejaría un post huérfano sin destinos. El validador saltado habría dicho
+    // exactamente esto:
+    if (publishedNetworks.size === 0) return { error: 'Elige al menos una plataforma.' }
+    // Igual exige una fecha legible antes de persistir.
+    if (!scheduledAt) return { error: 'La fecha no se entendió.' }
+  } else {
+    const preError = validateScheduleDraft(
+      { caption, imageCount: preImages, videoCount: preVideos, networks: pendingNetworks, scheduledAt },
+      new Date(),
+      { allowPast: dateUnchanged },
+    )
+    if (preError) return { error: preError }
+  }
+
+  // Las URLs se resuelven primero: mediaToBlob es la falla más probable (enlace roto,
+  // host que no responde). Si falla acá, no quedan blobs de archivos huérfanos — el
+  // loop de put() de archivos corre después, solo si las URLs ya resolvieron.
+  const urlMedia: Array<{ url: string; mediaType: 'image' | 'video' }> = []
+  for (const url of urls) {
+    const stored = await mediaToBlob(url, mediaTypeFromUrl(url))
+    if (!stored) return { error: 'No se pudo leer una media por URL.' }
+    urlMedia.push(stored)
+  }
+  const fileMedia: Array<{ url: string; mediaType: 'image' | 'video' }> = []
+  for (const file of files) {
+    const blob = await put(`scheduled/${randomUUID()}-${file.name}`, file, { access: 'public' })
+    fileMedia.push({ url: blob.url, mediaType: file.type.startsWith('video/') ? 'video' : 'image' })
+  }
+  const added = [...fileMedia, ...urlMedia]
+
+  const mediaPlan = diffMedia(existingMedia.map((m) => m.id), keptIds, added)
+
+  // Re-check with the real types now that every URL resolved (a Drive link that
+  // turned out to be a video where only images fit fails here, nothing saved).
+  const finalTypes = mediaPlan.order.map((entry) =>
+    entry.kind === 'kept' ? typeById.get(entry.id)! : entry.mediaType,
+  )
+  if (pendingNetworks.length > 0) {
+    const error = validateScheduleDraft(
+      {
+        caption,
+        imageCount: finalTypes.filter((t) => t === 'image').length,
+        videoCount: finalTypes.filter((t) => t === 'video').length,
+        networks: pendingNetworks,
+        scheduledAt,
+      },
+      new Date(),
+      { allowPast: dateUnchanged },
+    )
+    if (error) return { error }
+  }
+
+  // Sequential writes (neon-http has no interactive transactions); worst-case cut
+  // leaves media updated with old targets — the same partial-failure profile already
+  // accepted in createScheduledPost. Every target write carries its status guard y el
+  // updatedAt leído arriba (readTargets), so a cron claim between the read above and
+  // here makes the write no-op instead of clobbering the in-flight attempt.
+  await db
+    .update(scheduledPosts)
+    .set({ caption, scheduledAt: scheduledAt!, updatedAt: new Date() })
+    .where(eq(scheduledPosts.id, postId))
+
+  if (mediaPlan.deleteIds.length > 0) {
+    await db.delete(scheduledPostMedia).where(inArray(scheduledPostMedia.id, mediaPlan.deleteIds))
+  }
+  for (const [position, entry] of mediaPlan.order.entries()) {
+    if (entry.kind === 'kept') {
+      await db.update(scheduledPostMedia).set({ position }).where(eq(scheduledPostMedia.id, entry.id))
+    } else {
+      await db.insert(scheduledPostMedia).values({
+        postId,
+        blobUrl: entry.url,
+        mediaType: entry.mediaType,
+        position,
+      })
+    }
+  }
+
+  if (targetsPlan.create.length > 0) {
+    await db
+      .insert(scheduledPostTargets)
+      .values(targetsPlan.create.map((network) => ({ postId, network })))
+  }
+  for (const id of targetsPlan.deleteIds) {
+    await db.delete(scheduledPostTargets).where(
+      and(
+        eq(scheduledPostTargets.id, id),
+        inArray(scheduledPostTargets.status, ['scheduled', 'failed']),
+        eq(scheduledPostTargets.updatedAt, readTargets.get(id)!.updatedAt),
+      ),
+    )
+  }
+  for (const id of targetsPlan.rearmIds) {
+    // containerId/externalId son residuos del intento fallido (el handle async de Meta,
+    // el id remoto a medio crear): el rearm parte de cero, como rescheduleTarget.
+    await db
+      .update(scheduledPostTargets)
+      .set({
+        status: 'scheduled',
+        attemptCount: 0,
+        lastError: null,
+        containerId: null,
+        externalId: null,
+        updatedAt: new Date(),
+      })
+      .where(
+        and(
+          eq(scheduledPostTargets.id, id),
+          eq(scheduledPostTargets.status, 'failed'),
+          eq(scheduledPostTargets.updatedAt, readTargets.get(id)!.updatedAt),
+        ),
+      )
+  }
+
+  revalidatePath('/admin/schedule')
+
+  // Only our own schedule views are valid return targets; anything else in `volver`
+  // (a crafted form) falls back to the plain page.
+  const volver = String(formData.get('volver') ?? '')
+  redirect(volver.startsWith('/admin/schedule') ? volver : '/admin/schedule')
 }
 
 export async function rescheduleTarget(targetId: string, localDatetime: string): Promise<FormState> {
