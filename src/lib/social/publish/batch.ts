@@ -91,7 +91,7 @@ export function validateBatchItem(item: BatchItem, now: Date): string | null {
   )
 }
 
-async function mediaToBlob(
+export async function mediaToBlob(
   url: string,
   expected: 'image' | 'video' | null,
 ): Promise<{ url: string; mediaType: 'image' | 'video' } | null> {
