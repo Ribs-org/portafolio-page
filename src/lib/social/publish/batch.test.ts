@@ -56,4 +56,12 @@ describe('validateBatchItem', () => {
       ),
     ).toMatch(/video/)
   })
+
+  it('rechaza redes repetidas: el destino es único por post', () => {
+    expect(validateBatchItem({ ...base, redes: ['x', 'x'] }, now)).toMatch(/repetidas/)
+  })
+
+  it('rechaza fechas ISO con zona o segundos: solo YYYY-MM-DD HH:MM', () => {
+    expect(validateBatchItem({ ...base, fecha: '2026-09-03T10:00:00Z' }, now)).toMatch(/YYYY-MM-DD/)
+  })
 })

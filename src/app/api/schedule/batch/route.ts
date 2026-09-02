@@ -17,6 +17,12 @@ export async function POST(request: Request) {
   try {
     const body = (await request.json()) as { posts?: unknown[] }
     if (!Array.isArray(body.posts)) throw new Error('sin posts')
+    if (body.posts.length > MAX_BATCH_ITEMS) {
+      return NextResponse.json(
+        { error: `Máximo ${MAX_BATCH_ITEMS} posts por lote.` },
+        { status: 400 },
+      )
+    }
     // Shape-normalized at the door: a string where an array belongs must become an
     // invalid row with a sentence, never a crash inside the batch loop.
     posts = body.posts.map((raw) => {
@@ -31,12 +37,6 @@ export async function POST(request: Request) {
   } catch {
     return NextResponse.json(
       { error: 'El cuerpo debe ser JSON con { posts: [...] }.' },
-      { status: 400 },
-    )
-  }
-  if (posts.length > MAX_BATCH_ITEMS) {
-    return NextResponse.json(
-      { error: `Máximo ${MAX_BATCH_ITEMS} posts por lote.` },
       { status: 400 },
     )
   }

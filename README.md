@@ -338,6 +338,7 @@ es el mismo en los dos casos, cambia solo quién lo dispara.
 `POST /api/schedule/batch` con header `Authorization: Bearer <SCHEDULE_API_KEY>` y
 cuerpo `{ "posts": [{ "fecha": "2026-09-03 10:00", "texto": "Hola", "redes": ["x"], "media": [] }] }`
 (máximo 50). Responde el resultado por item; las filas rechazadas traen su motivo.
+Si la función alcanza su tiempo máximo a mitad de un lote, la respuesta se pierde pero las filas ya procesadas quedan programadas — re-enviar el lote vuelve a programar las que habían entrado (no hay deduplicación), así que conviene reintentar solo las filas pendientes.
 
 ## Estructura
 

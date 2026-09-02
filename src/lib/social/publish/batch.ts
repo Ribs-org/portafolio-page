@@ -14,6 +14,9 @@ const ZONE = env('SITE_TIMEZONE') ?? 'America/Santiago'
  * Returns null if the date cannot be parsed.
  */
 function parseFecha(fecha: string): Date | null {
+  // fromZonedInput slices to 16 chars, which would silently discard a Z or seconds
+  // an API caller sent — reinterpreting their UTC instant as site wall-clock time.
+  if (!/^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}$/.test(fecha.trim())) return null
   const isoDateTime = fecha.replace(' ', 'T')
   return fromZonedInput(isoDateTime, ZONE)
 }
@@ -26,7 +29,8 @@ export type BatchResult =
 
 export const MAX_BATCH_ITEMS = 50
 
-// The five networks with a publisher; tiktok reads but cannot post yet.
+// The five networks with a publisher; tiktok reads but cannot post yet. Twin of
+// ENABLED in the composer (schedule/composer.tsx) — update both together.
 const PUBLISHABLE = new Set(['instagram', 'facebook', 'youtube', 'threads', 'x'])
 
 const IMAGE_EXTENSIONS = new Set(['jpg', 'jpeg', 'png', 'gif', 'webp'])
@@ -53,6 +57,10 @@ export function validateBatchItem(item: BatchItem, now: Date): string | null {
     if (!PUBLISHABLE.has(red)) return `Red desconocida o sin publicación: ${red}.`
   }
 
+  if (new Set(item.redes).size !== item.redes.length) {
+    return 'Hay redes repetidas en la fila.'
+  }
+
   let imageCount = 0
   let videoCount = 0
   for (const url of item.media) {
@@ -72,7 +80,15 @@ async function mediaToBlob(
   url: string,
   expected: 'image' | 'video',
 ): Promise<{ url: string; mediaType: 'image' | 'video' } | null> {
-  const response = await fetch(url)
+  let response: Response
+  try {
+    // Third-party hosting named in a spreadsheet cell: a host that stalls must cost
+    // this row thirty seconds, not the whole batch's 240s budget.
+    response = await fetch(url, { signal: AbortSignal.timeout(30_000) })
+  } catch (error) {
+    console.error('No se pudo descargar la media del lote:', String(error).slice(0, 200), url.slice(0, 200))
+    return null
+  }
   if (!response.ok) {
     console.error('No se pudo descargar la media del lote:', response.status, url.slice(0, 200))
     return null

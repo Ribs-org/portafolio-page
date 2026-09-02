@@ -69,7 +69,7 @@ export function csvToBatchItems(
   return {
     items: rows.slice(1).map((row) => ({
       fecha: (row[0] ?? '').trim(),
-      texto: row[1] ?? '',
+      texto: (row[1] ?? '').trim(),
       redes: splitPipe(row[2] ?? ''),
       media: splitPipe(row[3] ?? ''),
     })),
