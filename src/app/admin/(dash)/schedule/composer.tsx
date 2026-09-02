@@ -6,8 +6,8 @@ import { SOCIAL_NETWORKS } from '@/db/schema'
 import { networkLabel } from '@/lib/networks'
 import { cn } from '@/lib/utils'
 
-// Phases 1–3 publish; the rest of the checkboxes exist but wait.
-const ENABLED = new Set(['instagram', 'facebook', 'youtube'])
+// Every network but TikTok publishes; its checkbox waits for a publisher.
+const ENABLED = new Set(['instagram', 'facebook', 'youtube', 'threads', 'x'])
 
 export function Composer() {
   const [state, action, pending] = useActionState(createScheduledPost, {})

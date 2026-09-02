@@ -3,6 +3,8 @@ const PREFIXES: Record<string, string> = {
   tiktok: 'tt',
   youtube: 'yt',
   facebook: 'fb',
+  threads: 'th',
+  x: 'x',
 }
 
 const MAX_LENGTH = 48
