@@ -454,6 +454,11 @@ export async function updateScheduledPost(
   if (targets.some((t) => t.status === 'publishing')) {
     return { error: 'Hay una publicación en curso. Vuelve en un minuto.' }
   }
+  // El claim del cron solo bumpa updatedAt (el status sigue 'scheduled' durante el
+  // vuelo): este mapa es lo único que hace visible, en los writes de abajo, un claim
+  // que ocurrió entre esta lectura y el write — si el cron claimeó, el write no-opea
+  // y el target conserva su historia en vez de que la pisemos.
+  const readTargets = new Map(targets.map((t) => [t.id, t]))
 
   const existingMedia = await db
     .select()
@@ -471,6 +476,16 @@ export async function updateScheduledPost(
     .map((u) => u.trim())
     .filter(Boolean)
 
+  // Editar un post cuya hora ya pasó (p.ej. corregir el texto que X rechazó) no debe
+  // exigir mover la fecha: si la fecha no cambió, se permite guardar en el pasado — el
+  // re-arm lo manda al próximo cron, el "reintenta ahora" natural.
+  const dateUnchanged = scheduledAt !== null && scheduledAt.getTime() === post.scheduledAt.getTime()
+
+  // Una red ya publicada no debe imponer sus límites (280 de X, media obligatoria de
+  // IG) a lo que aún queda por salir: solo lo pendiente entra a la validación.
+  const publishedNetworks = new Set(targets.filter((t) => t.status === 'published').map((t) => t.network))
+  const pendingNetworks = networks.filter((n) => !publishedNetworks.has(n))
+
   const targetsPlan = diffTargets(targets, networks)
   if ('error' in targetsPlan) return { error: targetsPlan.error }
 
@@ -485,22 +500,35 @@ export async function updateScheduledPost(
   const preImages =
     keptTypes.filter((t) => t === 'image').length + (files.length - fileVideo) + urls.length
   const preVideos = keptTypes.filter((t) => t === 'video').length + fileVideo
-  const preError = validateScheduleDraft(
-    { caption, imageCount: preImages, videoCount: preVideos, networks, scheduledAt },
-    new Date(),
-  )
-  if (preError) return { error: preError }
-
-  const added: Array<{ url: string; mediaType: 'image' | 'video' }> = []
-  for (const file of files) {
-    const blob = await put(`scheduled/${randomUUID()}-${file.name}`, file, { access: 'public' })
-    added.push({ url: blob.url, mediaType: file.type.startsWith('video/') ? 'video' : 'image' })
+  if (pendingNetworks.length === 0) {
+    // El post ya se publicó en todas las redes elegidas: solo queda corregir texto o
+    // media, y esas redes ya no tienen reglas que imponer. Igual exige una fecha
+    // legible antes de persistir.
+    if (!scheduledAt) return { error: 'La fecha no se entendió.' }
+  } else {
+    const preError = validateScheduleDraft(
+      { caption, imageCount: preImages, videoCount: preVideos, networks: pendingNetworks, scheduledAt },
+      new Date(),
+      { allowPast: dateUnchanged },
+    )
+    if (preError) return { error: preError }
   }
+
+  // Las URLs se resuelven primero: mediaToBlob es la falla más probable (enlace roto,
+  // host que no responde). Si falla acá, no quedan blobs de archivos huérfanos — el
+  // loop de put() de archivos corre después, solo si las URLs ya resolvieron.
+  const urlMedia: Array<{ url: string; mediaType: 'image' | 'video' }> = []
   for (const url of urls) {
     const stored = await mediaToBlob(url, mediaTypeFromUrl(url))
     if (!stored) return { error: 'No se pudo leer una media por URL.' }
-    added.push(stored)
+    urlMedia.push(stored)
   }
+  const fileMedia: Array<{ url: string; mediaType: 'image' | 'video' }> = []
+  for (const file of files) {
+    const blob = await put(`scheduled/${randomUUID()}-${file.name}`, file, { access: 'public' })
+    fileMedia.push({ url: blob.url, mediaType: file.type.startsWith('video/') ? 'video' : 'image' })
+  }
+  const added = [...fileMedia, ...urlMedia]
 
   const mediaPlan = diffMedia(existingMedia.map((m) => m.id), keptIds, added)
 
@@ -509,23 +537,30 @@ export async function updateScheduledPost(
   const finalTypes = mediaPlan.order.map((entry) =>
     entry.kind === 'kept' ? typeById.get(entry.id)! : entry.mediaType,
   )
-  const error = validateScheduleDraft(
-    {
-      caption,
-      imageCount: finalTypes.filter((t) => t === 'image').length,
-      videoCount: finalTypes.filter((t) => t === 'video').length,
-      networks,
-      scheduledAt,
-    },
-    new Date(),
-  )
-  if (error) return { error }
+  if (pendingNetworks.length > 0) {
+    const error = validateScheduleDraft(
+      {
+        caption,
+        imageCount: finalTypes.filter((t) => t === 'image').length,
+        videoCount: finalTypes.filter((t) => t === 'video').length,
+        networks: pendingNetworks,
+        scheduledAt,
+      },
+      new Date(),
+      { allowPast: dateUnchanged },
+    )
+    if (error) return { error }
+  }
 
   // Sequential writes (neon-http has no interactive transactions); worst-case cut
   // leaves media updated with old targets — the same partial-failure profile already
-  // accepted in createScheduledPost. Every target write carries its status guard so
-  // a cron claim between the read above and here loses nothing but this edit's touch.
-  await db.update(scheduledPosts).set({ caption, scheduledAt: scheduledAt! }).where(eq(scheduledPosts.id, postId))
+  // accepted in createScheduledPost. Every target write carries its status guard y el
+  // updatedAt leído arriba (readTargets), so a cron claim between the read above and
+  // here makes the write no-op instead of clobbering the in-flight attempt.
+  await db
+    .update(scheduledPosts)
+    .set({ caption, scheduledAt: scheduledAt!, updatedAt: new Date() })
+    .where(eq(scheduledPosts.id, postId))
 
   if (mediaPlan.deleteIds.length > 0) {
     await db.delete(scheduledPostMedia).where(inArray(scheduledPostMedia.id, mediaPlan.deleteIds))
@@ -548,19 +583,35 @@ export async function updateScheduledPost(
       .insert(scheduledPostTargets)
       .values(targetsPlan.create.map((network) => ({ postId, network })))
   }
-  if (targetsPlan.deleteIds.length > 0) {
+  for (const id of targetsPlan.deleteIds) {
     await db.delete(scheduledPostTargets).where(
       and(
-        inArray(scheduledPostTargets.id, targetsPlan.deleteIds),
+        eq(scheduledPostTargets.id, id),
         inArray(scheduledPostTargets.status, ['scheduled', 'failed']),
+        eq(scheduledPostTargets.updatedAt, readTargets.get(id)!.updatedAt),
       ),
     )
   }
   for (const id of targetsPlan.rearmIds) {
+    // containerId/externalId son residuos del intento fallido (el handle async de Meta,
+    // el id remoto a medio crear): el rearm parte de cero, como rescheduleTarget.
     await db
       .update(scheduledPostTargets)
-      .set({ status: 'scheduled', attemptCount: 0, lastError: null, updatedAt: new Date() })
-      .where(and(eq(scheduledPostTargets.id, id), eq(scheduledPostTargets.status, 'failed')))
+      .set({
+        status: 'scheduled',
+        attemptCount: 0,
+        lastError: null,
+        containerId: null,
+        externalId: null,
+        updatedAt: new Date(),
+      })
+      .where(
+        and(
+          eq(scheduledPostTargets.id, id),
+          eq(scheduledPostTargets.status, 'failed'),
+          eq(scheduledPostTargets.updatedAt, readTargets.get(id)!.updatedAt),
+        ),
+      )
   }
 
   revalidatePath('/admin/schedule')
