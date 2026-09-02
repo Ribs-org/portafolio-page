@@ -5,15 +5,16 @@ import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { headers } from 'next/headers'
 import { put } from '@vercel/blob'
-import { and, eq, max, ne, sql } from 'drizzle-orm'
+import { and, asc, eq, inArray, max, ne, sql } from 'drizzle-orm'
 import { getDb, links, profiles, socialAccounts, socialPosts, scheduledPosts, scheduledPostTargets, scheduledPostMedia } from '@/db'
 import { LINK_KINDS, type LinkKind } from '@/db/schema'
 import { SITE_TIMEZONE } from '@/lib/analytics'
 import { createSession, destroySession, isAuthenticated, passwordMatches } from '@/lib/auth'
 import { normalizeCampaignTag } from '@/lib/social/campaign'
 import { csvToBatchItems } from '@/lib/social/publish/csv'
-import { scheduleBatch, MAX_BATCH_ITEMS } from '@/lib/social/publish/batch'
+import { scheduleBatch, MAX_BATCH_ITEMS, mediaToBlob, mediaTypeFromUrl } from '@/lib/social/publish/batch'
 import { validateScheduleDraft } from '@/lib/social/publish/validate'
+import { diffMedia, diffTargets } from '@/lib/social/publish/edit'
 import { fromZonedInput, normalizeUrl, slugify } from '@/lib/utils'
 
 export type FormState = { error?: string; ok?: boolean }
@@ -433,6 +434,141 @@ export async function createScheduledPost(_prev: FormState, formData: FormData):
 
   revalidatePath('/admin/schedule')
   return { ok: true }
+}
+
+export async function updateScheduledPost(
+  postId: string,
+  _prev: FormState,
+  formData: FormData,
+): Promise<FormState> {
+  await requireAuth()
+  const db = getDb()
+
+  const [post] = await db.select().from(scheduledPosts).where(eq(scheduledPosts.id, postId))
+  if (!post) return { error: 'El post ya no existe.' }
+
+  const targets = await db
+    .select()
+    .from(scheduledPostTargets)
+    .where(eq(scheduledPostTargets.postId, postId))
+  if (targets.some((t) => t.status === 'publishing')) {
+    return { error: 'Hay una publicación en curso. Vuelve en un minuto.' }
+  }
+
+  const existingMedia = await db
+    .select()
+    .from(scheduledPostMedia)
+    .where(eq(scheduledPostMedia.postId, postId))
+    .orderBy(asc(scheduledPostMedia.position))
+
+  const caption = String(formData.get('caption') ?? '').trim()
+  const networks = formData.getAll('networks').map(String)
+  const scheduledAt = fromZonedInput(String(formData.get('scheduledAt') ?? ''), SITE_TIMEZONE)
+  const keptIds = formData.getAll('keptMedia').map(String)
+  const files = formData.getAll('media').filter((f): f is File => f instanceof File && f.size > 0)
+  const urls = String(formData.get('mediaUrls') ?? '')
+    .split(/\r?\n/)
+    .map((u) => u.trim())
+    .filter(Boolean)
+
+  const targetsPlan = diffTargets(targets, networks)
+  if ('error' in targetsPlan) return { error: targetsPlan.error }
+
+  // Pre-validation before touching storage: kept media with their stored types, files
+  // with their real types, URLs counted as images — the batch's deferred-type rule
+  // (image is the guess that never falsely rejects; the re-check below settles it).
+  const typeById = new Map(existingMedia.map((m) => [m.id, m.mediaType]))
+  const keptTypes = keptIds
+    .map((id) => typeById.get(id))
+    .filter((t): t is 'image' | 'video' => t === 'image' || t === 'video')
+  const fileVideo = files.filter((f) => f.type.startsWith('video/')).length
+  const preImages =
+    keptTypes.filter((t) => t === 'image').length + (files.length - fileVideo) + urls.length
+  const preVideos = keptTypes.filter((t) => t === 'video').length + fileVideo
+  const preError = validateScheduleDraft(
+    { caption, imageCount: preImages, videoCount: preVideos, networks, scheduledAt },
+    new Date(),
+  )
+  if (preError) return { error: preError }
+
+  const added: Array<{ url: string; mediaType: 'image' | 'video' }> = []
+  for (const file of files) {
+    const blob = await put(`scheduled/${randomUUID()}-${file.name}`, file, { access: 'public' })
+    added.push({ url: blob.url, mediaType: file.type.startsWith('video/') ? 'video' : 'image' })
+  }
+  for (const url of urls) {
+    const stored = await mediaToBlob(url, mediaTypeFromUrl(url))
+    if (!stored) return { error: 'No se pudo leer una media por URL.' }
+    added.push(stored)
+  }
+
+  const mediaPlan = diffMedia(existingMedia.map((m) => m.id), keptIds, added)
+
+  // Re-check with the real types now that every URL resolved (a Drive link that
+  // turned out to be a video where only images fit fails here, nothing saved).
+  const finalTypes = mediaPlan.order.map((entry) =>
+    entry.kind === 'kept' ? typeById.get(entry.id)! : entry.mediaType,
+  )
+  const error = validateScheduleDraft(
+    {
+      caption,
+      imageCount: finalTypes.filter((t) => t === 'image').length,
+      videoCount: finalTypes.filter((t) => t === 'video').length,
+      networks,
+      scheduledAt,
+    },
+    new Date(),
+  )
+  if (error) return { error }
+
+  // Sequential writes (neon-http has no interactive transactions); worst-case cut
+  // leaves media updated with old targets — the same partial-failure profile already
+  // accepted in createScheduledPost. Every target write carries its status guard so
+  // a cron claim between the read above and here loses nothing but this edit's touch.
+  await db.update(scheduledPosts).set({ caption, scheduledAt: scheduledAt! }).where(eq(scheduledPosts.id, postId))
+
+  if (mediaPlan.deleteIds.length > 0) {
+    await db.delete(scheduledPostMedia).where(inArray(scheduledPostMedia.id, mediaPlan.deleteIds))
+  }
+  for (const [position, entry] of mediaPlan.order.entries()) {
+    if (entry.kind === 'kept') {
+      await db.update(scheduledPostMedia).set({ position }).where(eq(scheduledPostMedia.id, entry.id))
+    } else {
+      await db.insert(scheduledPostMedia).values({
+        postId,
+        blobUrl: entry.url,
+        mediaType: entry.mediaType,
+        position,
+      })
+    }
+  }
+
+  if (targetsPlan.create.length > 0) {
+    await db
+      .insert(scheduledPostTargets)
+      .values(targetsPlan.create.map((network) => ({ postId, network })))
+  }
+  if (targetsPlan.deleteIds.length > 0) {
+    await db.delete(scheduledPostTargets).where(
+      and(
+        inArray(scheduledPostTargets.id, targetsPlan.deleteIds),
+        inArray(scheduledPostTargets.status, ['scheduled', 'failed']),
+      ),
+    )
+  }
+  for (const id of targetsPlan.rearmIds) {
+    await db
+      .update(scheduledPostTargets)
+      .set({ status: 'scheduled', attemptCount: 0, lastError: null, updatedAt: new Date() })
+      .where(and(eq(scheduledPostTargets.id, id), eq(scheduledPostTargets.status, 'failed')))
+  }
+
+  revalidatePath('/admin/schedule')
+
+  // Only our own schedule views are valid return targets; anything else in `volver`
+  // (a crafted form) falls back to the plain page.
+  const volver = String(formData.get('volver') ?? '')
+  redirect(volver.startsWith('/admin/schedule') ? volver : '/admin/schedule')
 }
 
 export async function rescheduleTarget(targetId: string, localDatetime: string): Promise<FormState> {
