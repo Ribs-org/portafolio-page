@@ -422,9 +422,11 @@ export async function createScheduledPost(_prev: FormState, formData: FormData):
     .insert(scheduledPosts)
     .values({ caption, scheduledAt: scheduledAt! })
     .returning()
-  await db.insert(scheduledPostMedia).values(
-    uploaded.map((m, position) => ({ postId: post!.id, blobUrl: m.url, mediaType: m.mediaType, position })),
-  )
+  if (uploaded.length > 0) {
+    await db.insert(scheduledPostMedia).values(
+      uploaded.map((m, position) => ({ postId: post!.id, blobUrl: m.url, mediaType: m.mediaType, position })),
+    )
+  }
   await db.insert(scheduledPostTargets).values(networks.map((network) => ({ postId: post!.id, network })))
 
   revalidatePath('/admin/schedule')

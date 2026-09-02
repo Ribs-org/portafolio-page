@@ -23,6 +23,18 @@ export function validateScheduleDraft(draft: ScheduleDraft, now: Date): string |
   if (files === 0 && draft.networks.some((n) => MEDIA_REQUIRED.has(n))) {
     return 'Instagram y YouTube necesitan al menos un archivo.'
   }
+  if (files === 0 && draft.caption.length === 0) {
+    return 'Escribe un texto o adjunta un archivo.'
+  }
+  if (draft.networks.includes('x') && draft.videoCount > 0) {
+    return 'X aún no recibe video desde el calendario.'
+  }
+  if (draft.networks.includes('x') && draft.imageCount > 4) {
+    return 'X recibe hasta cuatro imágenes.'
+  }
+  if (draft.networks.includes('threads') && files > 1) {
+    return 'Threads recibe un solo archivo por post.'
+  }
   if (files > MAX_CAROUSEL_ITEMS) return 'Máximo diez archivos por publicación.'
   if (draft.networks.length === 0) return 'Elige al menos una plataforma.'
   if (!draft.scheduledAt) return 'La fecha no se entendió.'

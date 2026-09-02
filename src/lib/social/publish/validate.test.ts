@@ -83,4 +83,22 @@ describe('validación por destino (Threads y X)', () => {
   it('un texto largo sin X ni Threads marcados sigue valiendo hasta 2200', () => {
     expect(validateScheduleDraft({ ...base, caption: 'x'.repeat(2200) }, now)).toBeNull()
   })
+
+  it('rechaza el post totalmente vacío', () => {
+    expect(
+      validateScheduleDraft({ ...base, imageCount: 0, caption: '', networks: ['x'] }, now),
+    ).toMatch(/texto|archivo/)
+  })
+
+  it('rechaza las formas que X y Threads no aceptan, al programar', () => {
+    expect(
+      validateScheduleDraft({ ...base, imageCount: 0, videoCount: 1, networks: ['x'] }, now),
+    ).toMatch(/video/)
+    expect(
+      validateScheduleDraft({ ...base, imageCount: 5, networks: ['x'] }, now),
+    ).toMatch(/cuatro/)
+    expect(
+      validateScheduleDraft({ ...base, imageCount: 2, networks: ['threads'] }, now),
+    ).toMatch(/un solo archivo/)
+  })
 })
