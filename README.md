@@ -306,6 +306,7 @@ Vercel y bajan con `vercel env pull .env.local`.
 | `X_CLIENT_ID` | Conectar X para publicar (OAuth 2.0 + PKCE) | El Client ID de la app en developer.x.com |
 | `X_CLIENT_SECRET` | El secreto de esa app | Junto con el anterior |
 | `CRON_SECRET` | Autoriza las corridas programadas (sync diario y publicación cada 5 minutos) | No — la pone Vercel solo, al declarar el cron |
+| `SCHEDULE_API_KEY` | Autoriza `POST /api/schedule/batch` (carga masiva por API) | Sin ella el endpoint queda cerrado; genérala igual que `CRON_SECRET` |
 | `RESEND_API_KEY` | Enviar el email de aviso cuando una publicación programada falla | La provisiona la integración de Resend del marketplace de Vercel |
 | `PUBLISH_ALERT_TO` | A qué correo llega el aviso de fallo | Sin ella no se envía ningún email; el calendario sigue mostrando el fallo |
 | `PUBLISH_ALERT_FROM` | Remitente del aviso | Opcional; default `onboarding@resend.dev` |
@@ -331,6 +332,12 @@ La cadencia real de `/api/cron/publish-social` la da un pinger externo (por ejem
 diarios, así que `vercel.json` declara apenas una corrida diaria de respaldo. En plan
 Pro puedes cambiar ese schedule a `*/5 * * * *` y prescindir del pinger: el endpoint
 es el mismo en los dos casos, cambia solo quién lo dispara.
+
+### Carga masiva por API
+
+`POST /api/schedule/batch` con header `Authorization: Bearer <SCHEDULE_API_KEY>` y
+cuerpo `{ "posts": [{ "fecha": "2026-09-03 10:00", "texto": "Hola", "redes": ["x"], "media": [] }] }`
+(máximo 50). Responde el resultado por item; las filas rechazadas traen su motivo.
 
 ## Estructura
 
