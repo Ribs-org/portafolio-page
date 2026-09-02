@@ -21,6 +21,13 @@ describe('dayKey y hourLabel', () => {
     expect(dayKey(d, ZONE)).toBe('2026-09-07')
     expect(hourLabel(d, ZONE)).toBe('23:30')
   })
+
+  it('antes del cambio de horario (6 sep) Chile sigue en UTC-4', () => {
+    // 15:00 UTC del 5 sep = 11:00 del 5 sep en Chile (UTC-4, aún invierno).
+    const d = new Date('2026-09-05T15:00:00Z')
+    expect(dayKey(d, ZONE)).toBe('2026-09-05')
+    expect(hourLabel(d, ZONE)).toBe('11:00')
+  })
 })
 
 describe('mondayOf y mondayOfKey', () => {
