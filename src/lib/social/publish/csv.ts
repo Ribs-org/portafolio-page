@@ -77,7 +77,7 @@ export function csvToBatchItems(
       texto: (row[1] ?? '').trim(),
       redes: splitPipe(row[2] ?? ''),
       media: splitPipe(row[3] ?? ''),
-      portada: (row[4] ?? '').trim(),
+      portada: header.length === 5 ? (row[4] ?? '').trim() : '',
     })),
   }
 }

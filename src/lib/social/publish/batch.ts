@@ -38,6 +38,7 @@ export const MAX_BATCH_ITEMS = 50
 
 export const PORTADA_NEEDS_VIDEO = 'La portada requiere un video en media.'
 export const PORTADA_NOT_IMAGE = 'La portada debe ser una imagen.'
+export const PORTADA_FORMAT = 'La portada debe ser JPG o PNG.'
 
 // The five networks with a publisher; tiktok reads but cannot post yet. Twin of
 // ENABLED in the composer (schedule/composer.tsx) — update both together.
@@ -45,13 +46,44 @@ const PUBLISHABLE = new Set(['instagram', 'facebook', 'youtube', 'threads', 'x']
 
 const IMAGE_EXTENSIONS = new Set(['jpg', 'jpeg', 'png', 'gif', 'webp'])
 const VIDEO_EXTENSIONS = new Set(['mp4', 'mov', 'webm'])
+// Graph puede rechazar un thumb gif/webp, y como en FB/IG la portada viaja en el POST
+// del video, un formato indigesto tumba el video entero tras los 3 reintentos.
+const COVER_EXTENSIONS = new Set(['jpg', 'jpeg', 'png'])
+
+function extensionFromUrl(url: string): string {
+  const path = url.split('?')[0] ?? ''
+  return path.split('.').pop()?.toLowerCase() ?? ''
+}
 
 /** By extension, cheaply, before any download; null means the content-type decides. */
 export function mediaTypeFromUrl(url: string): 'image' | 'video' | null {
-  const path = url.split('?')[0] ?? ''
-  const extension = path.split('.').pop()?.toLowerCase() ?? ''
+  const extension = extensionFromUrl(url)
   if (IMAGE_EXTENSIONS.has(extension)) return 'image'
   if (VIDEO_EXTENSIONS.has(extension)) return 'video'
+  return null
+}
+
+/**
+ * Portada verdict by extension alone, before any download: a video extension is
+ * always rejected, and a recognized image extension outside JPG/PNG (gif/webp) is
+ * rejected too. An unrecognized extension returns null — still deferred, same as
+ * mediaTypeFromUrl.
+ */
+export function portadaExtensionError(url: string): string | null {
+  const type = mediaTypeFromUrl(url)
+  if (type === 'video') return PORTADA_NOT_IMAGE
+  if (type === 'image' && !COVER_EXTENSIONS.has(extensionFromUrl(url))) return PORTADA_FORMAT
+  return null
+}
+
+/**
+ * Same verdict once the download is in hand: the real media type first, then the
+ * extension typeFromContentType derived — stored.url ends in it, so no need to widen
+ * mediaToBlob's public shape just to carry it separately.
+ */
+export function portadaTypeError(stored: { url: string; mediaType: 'image' | 'video' }): string | null {
+  if (stored.mediaType !== 'image') return PORTADA_NOT_IMAGE
+  if (!COVER_EXTENSIONS.has(extensionFromUrl(stored.url))) return PORTADA_FORMAT
   return null
 }
 
@@ -97,7 +129,8 @@ export function validateBatchItem(item: BatchItem, now: Date): string | null {
 
   const portada = item.portada?.trim()
   if (portada) {
-    if (mediaTypeFromUrl(portada) === 'video') return PORTADA_NOT_IMAGE
+    const extensionError = portadaExtensionError(portada)
+    if (extensionError) return extensionError
     // Un tipo diferido en media puede resultar video (un link de Drive), así que
     // solo se rechaza aquí cuando TODA la media es imagen segura; la re-validación
     // post-descarga da el veredicto final con los tipos reales.
@@ -204,13 +237,17 @@ export async function scheduleBatch(items: BatchItem[]): Promise<BatchResult[]> 
           results.push({ index, ok: false, error: PORTADA_NEEDS_VIDEO })
           continue
         }
-        const stored = await mediaToBlob(portada, mediaTypeFromUrl(portada))
+        // expected=null: deja que el content-type decida, así un .jpg cuyo content-type
+        // real es video cae en PORTADA_NOT_IMAGE en vez de heredar la sospecha por
+        // extensión.
+        const stored = await mediaToBlob(portada, null)
         if (!stored) {
           results.push({ index, ok: false, error: 'No se pudo leer una media de la fila.' })
           continue
         }
-        if (stored.mediaType !== 'image') {
-          results.push({ index, ok: false, error: PORTADA_NOT_IMAGE })
+        const typeError = portadaTypeError(stored)
+        if (typeError) {
+          results.push({ index, ok: false, error: typeError })
           continue
         }
         coverUrl = stored.url

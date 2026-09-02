@@ -17,8 +17,9 @@ import {
   MAX_BATCH_ITEMS,
   mediaToBlob,
   mediaTypeFromUrl,
+  portadaExtensionError,
+  portadaTypeError,
   PORTADA_NEEDS_VIDEO,
-  PORTADA_NOT_IMAGE,
 } from '@/lib/social/publish/batch'
 import { validateScheduleDraft } from '@/lib/social/publish/validate'
 import { diffMedia, diffTargets } from '@/lib/social/publish/edit'
@@ -526,8 +527,9 @@ export async function updateScheduledPost(
     if (preError) return { error: preError }
   }
 
-  if (portadaUrl && mediaTypeFromUrl(portadaUrl) === 'video') {
-    return { error: PORTADA_NOT_IMAGE }
+  if (portadaUrl) {
+    const extensionError = portadaExtensionError(portadaUrl)
+    if (extensionError) return { error: extensionError }
   }
 
   // Las URLs se resuelven primero: mediaToBlob es la falla más probable (enlace roto,
@@ -568,18 +570,25 @@ export async function updateScheduledPost(
     if (error) return { error }
   }
 
-  // La URL nueva gana sobre la conservada; ninguna de las dos = quitarla (null).
   // Conservar solo coteja contra lo guardado — el mismo trato que keptMedia con sus
   // ids: el form dice «mantén lo que hay», nunca dicta una URL cruda.
-  let coverUrl: string | null = keepPortada && keepPortada === post.coverUrl ? keepPortada : null
-  if (portadaUrl) {
-    const stored = await mediaToBlob(portadaUrl, mediaTypeFromUrl(portadaUrl))
-    if (!stored) return { error: 'No se pudo leer una media por URL.' }
-    if (stored.mediaType !== 'image') return { error: PORTADA_NOT_IMAGE }
-    coverUrl = stored.url
-  }
-  if (coverUrl && !finalTypes.includes('video')) {
+  const portadaKept = Boolean(keepPortada) && keepPortada === post.coverUrl
+
+  // El chequeo de video corre ANTES de descargar/subir la portada nueva — igual que en
+  // el lote (batch.ts): si el resultado ya es una portada sin video, no vale la pena
+  // pagar esa descarga.
+  if ((portadaUrl || portadaKept) && !finalTypes.includes('video')) {
     return { error: PORTADA_NEEDS_VIDEO }
+  }
+
+  // La URL nueva gana sobre la conservada; ninguna de las dos = quitarla (null).
+  let coverUrl: string | null = portadaKept ? keepPortada : null
+  if (portadaUrl) {
+    const stored = await mediaToBlob(portadaUrl, null)
+    if (!stored) return { error: 'No se pudo leer una media por URL.' }
+    const typeError = portadaTypeError(stored)
+    if (typeError) return { error: typeError }
+    coverUrl = stored.url
   }
 
   // Sequential writes (neon-http has no interactive transactions); worst-case cut

@@ -5,6 +5,7 @@ import {
   validateBatchItem,
   PORTADA_NEEDS_VIDEO,
   PORTADA_NOT_IMAGE,
+  PORTADA_FORMAT,
   type BatchItem,
 } from './batch'
 
@@ -137,5 +138,18 @@ describe('portada en validateBatchItem', () => {
   it('portada vacía o ausente no exige nada', () => {
     expect(validateBatchItem({ ...conVideo, portada: '' }, now)).toBeNull()
     expect(validateBatchItem(conVideo, now)).toBeNull()
+  })
+
+  it('portada gif o webp: formato no aceptado por Graph', () => {
+    expect(validateBatchItem({ ...conVideo, portada: 'https://ej.com/p.gif' }, now)).toBe(
+      PORTADA_FORMAT,
+    )
+    expect(validateBatchItem({ ...conVideo, portada: 'https://ej.com/p.webp' }, now)).toBe(
+      PORTADA_FORMAT,
+    )
+  })
+
+  it('portada png pasa igual que jpg', () => {
+    expect(validateBatchItem({ ...conVideo, portada: 'https://ej.com/p.png' }, now)).toBeNull()
   })
 })

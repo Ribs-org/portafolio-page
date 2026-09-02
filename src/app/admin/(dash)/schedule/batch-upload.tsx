@@ -4,9 +4,10 @@ import { useActionState } from 'react'
 import { uploadBatch } from '@/app/admin/actions'
 import { cn } from '@/lib/utils'
 
-const PLANTILLA = `fecha,texto,redes,media
-2026-09-03 10:00,"Mi primer post en lote",threads|x,
-2026-09-03 18:30,"Con foto, y con coma",instagram|facebook,https://ejemplo.com/foto.jpg`
+const PLANTILLA = `fecha,texto,redes,media,portada
+2026-09-03 10:00,"Mi primer post en lote",threads|x,,
+2026-09-03 18:30,"Con foto, y con coma",instagram|facebook,https://ejemplo.com/foto.jpg,
+2026-09-08 19:00,"Mi corto",instagram|youtube,https://ejemplo.com/corto.mp4,https://ejemplo.com/portada.jpg`
 
 export function BatchUpload() {
   const [state, action, pending] = useActionState(uploadBatch, {})
@@ -18,7 +19,8 @@ export function BatchUpload() {
       <form action={action} className="mt-4 space-y-4">
         <p className="text-[0.8rem] leading-relaxed text-fg-faint">
           Una fila por post: fecha en tu zona horaria, texto entre comillas si lleva
-          comas, redes y URLs de media separadas por <code>|</code>. Máximo 50 filas.
+          comas, redes y URLs de media separadas por <code>|</code>, y portada
+          (opcional, JPG/PNG, solo con video) como quinta columna. Máximo 50 filas.
         </p>
         <pre className="overflow-x-auto rounded-lg bg-white/[0.06] p-3 text-xs text-fg-muted">{PLANTILLA}</pre>
 

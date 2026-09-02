@@ -74,6 +74,13 @@ describe('portada en el CSV', () => {
     expect(result.items[0]!.portada).toBe('')
   })
 
+  it('con encabezado de 4 columnas, una quinta celda de más en la fila no es portada', () => {
+    const text = 'fecha,texto,redes,media\n2026-09-08 19:00,Hola,threads,,https://ej.com/no-es-portada.jpg'
+    const result = csvToBatchItems(text)
+    if ('error' in result) throw new Error(result.error)
+    expect(result.items[0]!.portada).toBe('')
+  })
+
   it('cinco columnas con otro nombre final rechazan el lote', () => {
     const result = csvToBatchItems('fecha,texto,redes,media,cover\n')
     expect(result).toHaveProperty('error')
