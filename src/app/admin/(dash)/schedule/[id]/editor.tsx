@@ -20,6 +20,7 @@ export function Editor({
   scheduledAtLocal,
   targets,
   media,
+  coverUrl,
 }: {
   postId: string
   volver: string
@@ -27,12 +28,14 @@ export function Editor({
   scheduledAtLocal: string
   targets: Array<{ network: string; status: string }>
   media: MediaRow[]
+  coverUrl: string | null
 }) {
   const publishing = targets.some((t) => t.status === 'publishing')
   const published = new Set(targets.filter((t) => t.status === 'published').map((t) => t.network))
   const initialNetworks = new Set(targets.map((t) => t.network))
 
   const [kept, setKept] = useState<MediaRow[]>(media)
+  const [keptCover, setKeptCover] = useState(coverUrl)
   const [state, formAction, pending] = useActionState<FormState, FormData>(
     updateScheduledPost.bind(null, postId),
     {},
@@ -165,6 +168,31 @@ export function Editor({
                 name="mediaUrls"
                 rows={2}
                 placeholder="https://…"
+                className="mt-1 w-full rounded-xl bg-white/[0.05] px-3 py-2 text-xs text-fg outline-none"
+              />
+            </label>
+          </div>
+
+          <div>
+            <span className="mb-1 block font-mono text-[0.65rem] uppercase tracking-[0.14em] text-fg-faint">
+              Portada (solo para video)
+            </span>
+            {keptCover ? (
+              <div className="mb-2 flex items-center gap-3 rounded-xl bg-white/[0.04] p-2">
+                <input type="hidden" name="keepPortada" value={keptCover} />
+                <Image src={keptCover} alt="" width={48} height={48} unoptimized className="h-12 w-12 rounded object-cover" />
+                <span className="flex-1 truncate text-xs text-fg-faint">{keptCover}</span>
+                <button type="button" onClick={() => setKeptCover(null)} className="text-xs text-fg-faint hover:text-fg">
+                  Quitar
+                </button>
+              </div>
+            ) : null}
+            <label className="block text-sm">
+              {keptCover ? 'Cambiar por URL' : 'Agregar por URL'}
+              <input
+                type="text"
+                name="portadaUrl"
+                placeholder="https://…/portada.jpg"
                 className="mt-1 w-full rounded-xl bg-white/[0.05] px-3 py-2 text-xs text-fg outline-none"
               />
             </label>
