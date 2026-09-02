@@ -258,7 +258,7 @@ export async function getPostSeries(f: Filters): Promise<PostSeriesPoint[]> {
 }
 
 // TikTok is the one network left without a publisher; YouTube reads by env but writes by OAuth.
-const OAUTH_NETWORKS = new Set(['instagram', 'tiktok', 'facebook', 'youtube'])
+const OAUTH_NETWORKS = new Set(['instagram', 'tiktok', 'facebook', 'youtube', 'threads', 'x'])
 
 export async function getConnections(): Promise<ConnectionRow[]> {
   const accounts = await getDb().select().from(socialAccounts)
@@ -277,7 +277,7 @@ export async function getConnections(): Promise<ConnectionRow[]> {
       //
       // An OAuth network keeps its row through a disconnect on purpose — the identity has
       // to outlive the credentials so the callback can still refuse a different account —
-      // so only a stored token means connected. All four networks are OAuth now: YouTube
+      // so only a stored token means connected. All six networks are OAuth now: YouTube
       // reads by env (its API key) but writes by OAuth, so for it too `connected` means
       // the write credential — the access token — is on file, not just the row existing.
       connected: usesOAuth ? Boolean(account?.accessToken) : Boolean(account),

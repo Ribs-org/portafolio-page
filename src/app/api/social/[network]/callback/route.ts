@@ -220,6 +220,122 @@ async function youtubeCredential(code: string, redirectUri: string): Promise<Cre
   }
 }
 
+async function threadsCredential(code: string, redirectUri: string): Promise<Credential> {
+  const appId = env('THREADS_APP_ID')
+  const appSecret = env('THREADS_APP_SECRET')
+  if (!appId || !appSecret) {
+    throw new OAuthError('Faltan las credenciales de Threads (THREADS_APP_ID / THREADS_APP_SECRET).')
+  }
+
+  const short = await fetch('https://graph.threads.net/oauth/access_token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({
+      client_id: appId,
+      client_secret: appSecret,
+      grant_type: 'authorization_code',
+      redirect_uri: redirectUri,
+      code,
+    }),
+  })
+  if (!short.ok) {
+    console.error('Threads rechazó el código:', short.status, (await short.text()).slice(0, 300))
+    throw new OAuthError('Threads rechazó el código. Inténtalo de nuevo.')
+  }
+  const shortData = (await short.json()) as { access_token?: string }
+  if (!shortData.access_token) throw new OAuthError('Threads no devolvió token.')
+
+  // Same two-step dance as Instagram: the code buys an hour, th_exchange_token buys
+  // the ~60 days worth storing.
+  const long = await fetch(
+    `https://graph.threads.net/access_token?grant_type=th_exchange_token&client_secret=${appSecret}&access_token=${shortData.access_token}`,
+  )
+  if (!long.ok) {
+    console.error('Threads no canjeó el token largo:', long.status, (await long.text()).slice(0, 300))
+    throw new OAuthError('Threads no canjeó el token largo. Inténtalo de nuevo.')
+  }
+  const longData = (await long.json()) as { access_token?: string; expires_in?: number }
+  if (!longData.access_token) throw new OAuthError('Threads no devolvió el token largo.')
+
+  const me = await fetch(
+    `https://graph.threads.net/v1.0/me?fields=id,username&access_token=${longData.access_token}`,
+  )
+  if (!me.ok) {
+    console.error('No se pudo leer el perfil de Threads:', me.status, (await me.text()).slice(0, 300))
+    throw new OAuthError('No se pudo leer el perfil de Threads.')
+  }
+  const profile = (await me.json()) as { id?: string; username?: string }
+  if (!profile.id) throw new OAuthError('Threads no devolvió el perfil.')
+
+  return {
+    accessToken: longData.access_token,
+    refreshToken: null,
+    expiresAt: new Date(Date.now() + (longData.expires_in ?? 5184000) * 1000),
+    externalId: profile.id,
+    handle: profile.username ?? null,
+  }
+}
+
+async function xCredential(
+  code: string,
+  redirectUri: string,
+  pkceVerifier: string | undefined,
+): Promise<Credential> {
+  const clientId = env('X_CLIENT_ID')
+  const clientSecret = env('X_CLIENT_SECRET')
+  if (!clientId || !clientSecret) {
+    throw new OAuthError('Faltan las credenciales de X (X_CLIENT_ID / X_CLIENT_SECRET).')
+  }
+  if (!pkceVerifier) {
+    throw new OAuthError('La conexión con X expiró. Inténtalo de nuevo.')
+  }
+
+  const basic = Buffer.from(`${clientId}:${clientSecret}`).toString('base64')
+  const exchange = await fetch('https://api.x.com/2/oauth2/token', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded',
+      Authorization: `Basic ${basic}`,
+    },
+    body: new URLSearchParams({
+      code,
+      grant_type: 'authorization_code',
+      redirect_uri: redirectUri,
+      code_verifier: pkceVerifier,
+    }),
+  })
+  if (!exchange.ok) {
+    console.error('X rechazó el código:', exchange.status, (await exchange.text()).slice(0, 300))
+    throw new OAuthError('X rechazó el código. Inténtalo de nuevo.')
+  }
+  const tokens = (await exchange.json()) as {
+    access_token?: string
+    refresh_token?: string
+    expires_in?: number
+  }
+  if (!tokens.access_token) throw new OAuthError('X no devolvió token.')
+  // The two-hour token is useless without its refresh companion.
+  if (!tokens.refresh_token) throw new OAuthError('X no entregó el token de refresco. Inténtalo de nuevo.')
+
+  const me = await fetch('https://api.x.com/2/users/me', {
+    headers: { Authorization: `Bearer ${tokens.access_token}` },
+  })
+  if (!me.ok) {
+    console.error('No se pudo leer la cuenta de X:', me.status, (await me.text()).slice(0, 300))
+    throw new OAuthError('No se pudo leer la cuenta de X.')
+  }
+  const user = (await me.json()) as { data?: { id?: string; username?: string } }
+  if (!user.data?.id) throw new OAuthError('X no devolvió la cuenta.')
+
+  return {
+    accessToken: tokens.access_token,
+    refreshToken: tokens.refresh_token,
+    expiresAt: new Date(Date.now() + (tokens.expires_in ?? 7200) * 1000),
+    externalId: user.data.id,
+    handle: user.data.username ?? null,
+  }
+}
+
 async function tiktokCredential(code: string, redirectUri: string): Promise<Credential> {
   const clientKey = env('TIKTOK_CLIENT_KEY')
   const clientSecret = env('TIKTOK_CLIENT_SECRET')
@@ -255,10 +371,17 @@ async function tiktokCredential(code: string, redirectUri: string): Promise<Cred
   }
 }
 
-async function fetchCredential(network: string, code: string, redirectUri: string): Promise<Credential> {
+async function fetchCredential(
+  network: string,
+  code: string,
+  redirectUri: string,
+  pkceVerifier?: string,
+): Promise<Credential> {
   if (network === 'instagram') return instagramCredential(code, redirectUri)
   if (network === 'facebook') return facebookCredential(code, redirectUri)
   if (network === 'youtube') return youtubeCredential(code, redirectUri)
+  if (network === 'threads') return threadsCredential(code, redirectUri)
+  if (network === 'x') return xCredential(code, redirectUri, pkceVerifier)
   if (network === 'tiktok') return tiktokCredential(code, redirectUri)
   throw new OAuthError('Esa red no usa OAuth.')
 }
@@ -292,7 +415,10 @@ export async function GET(
   const redirectUri = `${url.origin}/api/social/${network}/callback`
 
   try {
-    const credential = await fetchCredential(network, code, redirectUri)
+    const pkceVerifier = request.headers
+      .get('cookie')
+      ?.match(/(?:^|;\s*)x_pkce_verifier=([^;]+)/)?.[1]
+    const credential = await fetchCredential(network, code, redirectUri, pkceVerifier)
 
     // Refuse to move a connected network onto a different account.
     //

@@ -91,6 +91,19 @@ export const facebookPublisher: Publisher = {
     }
 
     const media = [...input.media].sort((a, b) => a.position - b.position)
+
+    // A text-only post goes straight to /feed — the gift the per-target validation
+    // paid for when Threads and X made file-less posts legal.
+    if (media.length === 0) {
+      const data = await postForm(`${GRAPH}/${input.accountExternalId}/feed`, {
+        message: input.caption,
+        access_token: token,
+      })
+      const id = data?.id
+      if (typeof id !== 'string') return { kind: 'failed', reason: FACEBOOK_REJECTED }
+      return { kind: 'published', externalId: id }
+    }
+
     if (hasMixedMedia(media)) return { kind: 'failed', reason: FACEBOOK_MIXED_MEDIA }
 
     // Single video: /videos answers with the id right away and processes on its own;

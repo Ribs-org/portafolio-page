@@ -25,7 +25,7 @@ describe('campaignTagFor', () => {
   })
 
   it('cae a la red misma como prefijo cuando no la conoce', () => {
-    expect(campaignTagFor('threads', 'abc')).toBe('threads-abc')
+    expect(campaignTagFor('unknown', 'abc')).toBe('unknown-abc')
   })
 })
 
@@ -34,6 +34,16 @@ describe('campaignTagFor facebook', () => {
     expect(campaignTagFor('facebook', '61550000000001_1020304050607080')).toBe(
       'fb-61550000000001_1020304050607080',
     )
+  })
+})
+
+describe('campaignTagFor threads y x', () => {
+  it('acuña th- para threads', () => {
+    expect(campaignTagFor('threads', '18000000000000001')).toBe('th-18000000000000001')
+  })
+
+  it('acuña x- para x', () => {
+    expect(campaignTagFor('x', '1830000000000000000')).toBe('x-1830000000000000000')
   })
 })
 
