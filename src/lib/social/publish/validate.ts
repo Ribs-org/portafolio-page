@@ -18,7 +18,11 @@ const MEDIA_REQUIRED = new Set(['instagram', 'youtube'])
  * The composer's whole rulebook, pure so it is testable and shared: the server action
  * runs it as the real gate. Returns a fixed sentence or null.
  */
-export function validateScheduleDraft(draft: ScheduleDraft, now: Date): string | null {
+export function validateScheduleDraft(
+  draft: ScheduleDraft,
+  now: Date,
+  opts?: { allowPast?: boolean },
+): string | null {
   const files = draft.imageCount + draft.videoCount
   if (files === 0 && draft.networks.some((n) => MEDIA_REQUIRED.has(n))) {
     return 'Instagram y YouTube necesitan al menos un archivo.'
@@ -38,7 +42,12 @@ export function validateScheduleDraft(draft: ScheduleDraft, now: Date): string |
   if (files > MAX_CAROUSEL_ITEMS) return 'Máximo diez archivos por publicación.'
   if (draft.networks.length === 0) return 'Elige al menos una plataforma.'
   if (!draft.scheduledAt) return 'La fecha no se entendió.'
-  if (draft.scheduledAt.getTime() <= now.getTime()) return 'La hora debe estar en el futuro.'
+  // Editar un post cuya hora ya pasó (corregir el texto que X rechazó) no debe exigir
+  // mover la fecha; guardar con fecha pasada re-armada publica en el próximo cron —
+  // el "reintenta ahora" natural.
+  if (!opts?.allowPast && draft.scheduledAt.getTime() <= now.getTime()) {
+    return 'La hora debe estar en el futuro.'
+  }
   if (draft.networks.includes('x') && draft.caption.length > X_CAPTION_LIMIT) {
     return 'El texto excede los 280 caracteres de X.'
   }

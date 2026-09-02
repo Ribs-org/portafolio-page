@@ -40,6 +40,22 @@ describe('validateScheduleDraft', () => {
     expect(validateScheduleDraft({ ...base, scheduledAt: null }, now)).toMatch(/fecha/)
   })
 
+  it('rechaza una hora pasada sin opts', () => {
+    expect(
+      validateScheduleDraft({ ...base, scheduledAt: new Date('2026-08-31T11:59:00Z') }, now),
+    ).toBe('La hora debe estar en el futuro.')
+  })
+
+  it('acepta la misma fecha pasada con allowPast: true', () => {
+    expect(
+      validateScheduleDraft(
+        { ...base, scheduledAt: new Date('2026-08-31T11:59:00Z') },
+        now,
+        { allowPast: true },
+      ),
+    ).toBeNull()
+  })
+
   it('rechaza un caption sobre el límite de Instagram', () => {
     expect(validateScheduleDraft({ ...base, caption: 'x'.repeat(2201) }, now)).toMatch(/largo/)
   })
