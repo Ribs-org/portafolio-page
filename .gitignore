@@ -45,3 +45,4 @@ next-env.d.ts
 /.claude/worktrees/
 /.superpowers/
 scripts/bots-marcados-*.json
+scripts/fb-ids-*.json
