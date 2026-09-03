@@ -1,7 +1,7 @@
 import 'server-only'
 import { createHash } from 'node:crypto'
 import { and, eq, inArray, isNull } from 'drizzle-orm'
-import { getDb, postMetrics, socialAccounts, socialPosts } from '@/db'
+import { accountMetrics, getDb, postMetrics, socialAccounts, socialPosts } from '@/db'
 import type { SocialAccount } from '@/db'
 import { localDay } from '../analytics'
 import { env } from '../env'
@@ -141,6 +141,23 @@ export async function syncNetwork(network: string): Promise<number> {
     for (const post of fetched) {
       const id = await upsertPost(post, network)
       await writeSnapshot(id, post, day)
+    }
+
+    // Extra deliberado: las métricas de cuenta nunca deben tumbar la sincronización
+    // de publicaciones que sí funcionó, así que su fallo muere acá mismo.
+    if (connector.fetchAccountMetrics) {
+      try {
+        const values = await connector.fetchAccountMetrics(account as SocialAccount, token)
+        await db
+          .insert(accountMetrics)
+          .values({ network, day, ...values })
+          .onConflictDoUpdate({
+            target: [accountMetrics.network, accountMetrics.day],
+            set: { ...values, capturedAt: new Date() },
+          })
+      } catch (error) {
+        console.error(`[sync] métricas de cuenta de ${network}:`, String(error).slice(0, 300))
+      }
     }
 
     const known = await db
