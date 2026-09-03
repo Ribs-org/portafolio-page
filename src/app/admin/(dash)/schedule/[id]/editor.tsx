@@ -138,13 +138,21 @@ export function Editor({
                   <li key={m.id} className="flex items-center gap-3 rounded-xl bg-white/[0.04] p-2">
                     <input type="hidden" name="keptMedia" value={m.id} />
                     {m.mediaType === 'image' ? (
-                      <Image src={m.blobUrl} alt="" width={48} height={48} unoptimized className="h-12 w-12 rounded object-cover" />
+                      <Image src={m.blobUrl} alt="" width={48} height={48} unoptimized className="h-12 w-12 shrink-0 rounded object-cover" />
                     ) : (
-                      <span className="flex h-12 w-12 items-center justify-center rounded bg-white/[0.08] font-mono text-[0.6rem] text-fg-faint">
-                        video
-                      </span>
+                      // preload="metadata" paints the first frame without pulling the
+                      // whole file; controls make it a real in-place preview.
+                      <video
+                        src={m.blobUrl}
+                        controls
+                        preload="metadata"
+                        muted
+                        playsInline
+                        className="h-24 w-40 shrink-0 rounded bg-black object-contain"
+                      />
                     )}
-                    <span className="flex-1 truncate text-xs text-fg-faint">{m.blobUrl}</span>
+                    <span className="min-w-0 flex-1 truncate text-xs text-fg-faint">{m.blobUrl}</span>
+                    <MediaActions url={m.blobUrl} />
                     <button type="button" onClick={() => move(index, -1)} className="text-fg-faint hover:text-fg">↑</button>
                     <button type="button" onClick={() => move(index, 1)} className="text-fg-faint hover:text-fg">↓</button>
                     <button
@@ -180,8 +188,9 @@ export function Editor({
             {keptCover ? (
               <div className="mb-2 flex items-center gap-3 rounded-xl bg-white/[0.04] p-2">
                 <input type="hidden" name="keepPortada" value={keptCover} />
-                <Image src={keptCover} alt="" width={48} height={48} unoptimized className="h-12 w-12 rounded object-cover" />
-                <span className="flex-1 truncate text-xs text-fg-faint">{keptCover}</span>
+                <Image src={keptCover} alt="" width={48} height={48} unoptimized className="h-12 w-12 shrink-0 rounded object-cover" />
+                <span className="min-w-0 flex-1 truncate text-xs text-fg-faint">{keptCover}</span>
+                <MediaActions url={keptCover} />
                 <button type="button" onClick={() => setKeptCover(null)} className="text-xs text-fg-faint hover:text-fg">
                   Quitar
                 </button>
@@ -227,5 +236,42 @@ export function Editor({
         </fieldset>
       </form>
     </div>
+  )
+}
+
+/**
+ * Open-in-new-tab plus copy-to-clipboard for a Blob URL. The clipboard guard is the
+ * CampaignCell precedent: an insecure context leaves `navigator.clipboard` undefined
+ * and reading `.writeText` off it throws synchronously, past any `.catch`.
+ */
+function MediaActions({ url }: { url: string }) {
+  const [copied, setCopied] = useState(false)
+  const [failed, setFailed] = useState(false)
+
+  function copy() {
+    const clipboard = navigator.clipboard
+    if (!clipboard) {
+      setFailed(true)
+      return
+    }
+    clipboard
+      .writeText(url)
+      .then(() => {
+        setCopied(true)
+        setFailed(false)
+        setTimeout(() => setCopied(false), 1500)
+      })
+      .catch(() => setFailed(true))
+  }
+
+  return (
+    <span className="flex shrink-0 items-center gap-2">
+      <a href={url} target="_blank" rel="noreferrer" className="text-xs text-fg-faint transition-colors hover:text-fg">
+        Abrir ↗
+      </a>
+      <button type="button" onClick={copy} className="text-xs text-fg-faint transition-colors hover:text-fg">
+        {copied ? '✓ copiada' : failed ? 'no se pudo copiar' : 'Copiar URL'}
+      </button>
+    </span>
   )
 }
