@@ -194,10 +194,14 @@ describe('hasNoPlatformMetrics', () => {
   })
 
   it('ignora las métricas que ninguna columna muestra', () => {
-    // A row carrying only `shares`/`saves`/`reach` still reads as blank in the table,
-    // so it belongs with the rows that step back — consulting those fields would leave
-    // a visually empty row looking undimmed and unexplained.
-    expect(hasNoPlatformMetrics(row({ shares: 9, saves: 4, reach: 100 }))).toBe(true)
+    // Una fila que solo trae `saves`/`reach` se sigue leyendo vacía en la tabla, así
+    // que pertenece al grupo que se atenúa: consultarlas dejaría una fila visualmente
+    // vacía sin atenuar y sin explicación.
+    expect(hasNoPlatformMetrics(row({ saves: 4, reach: 100 }))).toBe(true)
+  })
+
+  it('los compartidos sí rescatan la fila: tienen columna propia', () => {
+    expect(hasNoPlatformMetrics(row({ shares: 9 }))).toBe(false)
   })
 
   it('las visitas propias no rescatan a una fila sin métricas de la red', () => {

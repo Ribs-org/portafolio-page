@@ -10,12 +10,13 @@ import { networkLabel } from '@/lib/networks'
 import { hasNoPlatformMetrics, type PostRow } from '@/lib/posts-kpis'
 import { cn, formatNumber } from '@/lib/utils'
 
-type Column = 'views' | 'likes' | 'comments' | 'visits' | 'clicks' | 'ctr' | 'pull'
+type Column = 'views' | 'likes' | 'comments' | 'shares' | 'visits' | 'clicks' | 'ctr' | 'pull'
 
 const COLUMNS: Array<{ key: Column; label: string; hint?: string }> = [
   { key: 'views', label: 'Views' },
   { key: 'likes', label: 'Likes' },
   { key: 'comments', label: 'Coment.' },
+  { key: 'shares', label: 'Compart.' },
   { key: 'visits', label: 'Visitas' },
   { key: 'clicks', label: 'Clicks' },
   { key: 'ctr', label: 'CTR' },
@@ -172,6 +173,9 @@ export function PostTable({ rows }: { rows: PostRow[] }) {
               </td>
               <td className="py-2 text-right font-mono tabular-nums text-fg-muted">
                 {num(row.comments)}
+              </td>
+              <td className="py-2 text-right font-mono tabular-nums text-fg-muted">
+                {num(row.shares)}
               </td>
               <td className="py-2 text-right font-mono tabular-nums">{num(row.visits)}</td>
               <td className="py-2 text-right font-mono tabular-nums text-fg-muted">
