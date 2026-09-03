@@ -21,6 +21,7 @@ export function Editor({
   targets,
   media,
   coverUrl,
+  atributos,
 }: {
   postId: string
   volver: string
@@ -29,6 +30,7 @@ export function Editor({
   targets: Array<{ network: string; status: string }>
   media: MediaRow[]
   coverUrl: string | null
+  atributos: string
 }) {
   const publishing = targets.some((t) => t.status === 'publishing')
   const published = new Set(targets.filter((t) => t.status === 'published').map((t) => t.network))
@@ -206,6 +208,19 @@ export function Editor({
               />
             </label>
           </div>
+
+          <label className="block">
+            <span className="mb-1 block font-mono text-[0.65rem] uppercase tracking-[0.14em] text-fg-faint">
+              Atributos (JSON del editor de contenido)
+            </span>
+            <textarea
+              name="atributos"
+              defaultValue={atributos}
+              rows={3}
+              placeholder='{"hook": "pregunta-polemica", "tema": "negocios"}'
+              className="w-full rounded-xl bg-white/[0.05] px-3 py-2 font-mono text-xs text-fg outline-none"
+            />
+          </label>
 
           {state.error ? <p className="text-sm text-red-400">{state.error}</p> : null}
           {deleteError ? <p className="text-sm text-red-400">{deleteError}</p> : null}

@@ -43,6 +43,7 @@ export default async function EditScheduledPostPage({
       targets={targets.map((t) => ({ network: t.network, status: t.status }))}
       media={media.map((m) => ({ id: m.id, blobUrl: m.blobUrl, mediaType: m.mediaType }))}
       coverUrl={post.coverUrl}
+      atributos={post.atributos ? JSON.stringify(post.atributos, null, 2) : ''}
     />
   )
 }
