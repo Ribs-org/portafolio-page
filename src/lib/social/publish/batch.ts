@@ -1,6 +1,7 @@
 import { env } from '@/lib/env'
 import { fromZonedInput } from '@/lib/utils'
 import { validateScheduleDraft } from './validate'
+import { validateAtributos } from './atributos'
 import { put } from '@vercel/blob'
 import { getDb, scheduledPosts, scheduledPostMedia, scheduledPostTargets } from '@/db'
 import { randomUUID } from 'node:crypto'
@@ -28,6 +29,8 @@ export type BatchItem = {
   media: string[]
   /** URL pública de imagen; vacía o ausente = sin portada. Solo válida con video. */
   portada?: string
+  /** JSON plano libre del editor-LLM; se valida con validateAtributos. */
+  atributos?: unknown
 }
 
 export type BatchResult =
@@ -137,6 +140,9 @@ export function validateBatchItem(item: BatchItem, now: Date): string | null {
     const videoPossible = item.media.some((url) => mediaTypeFromUrl(url) !== 'image')
     if (!videoPossible) return PORTADA_NEEDS_VIDEO
   }
+
+  const atributosCheck = validateAtributos(item.atributos)
+  if ('error' in atributosCheck) return atributosCheck.error
 
   return validateScheduleDraft(
     { caption: item.texto, imageCount, videoCount, networks: item.redes, scheduledAt },
@@ -253,9 +259,12 @@ export async function scheduleBatch(items: BatchItem[]): Promise<BatchResult[]> 
         coverUrl = stored.url
       }
 
+      const atributosCheck = validateAtributos(item.atributos)
+      const atributos = 'error' in atributosCheck ? null : atributosCheck.atributos
+
       const [post] = await db
         .insert(scheduledPosts)
-        .values({ caption: item.texto, scheduledAt, coverUrl })
+        .values({ caption: item.texto, scheduledAt, coverUrl, atributos })
         .returning()
       if (uploaded.length > 0) {
         await db.insert(scheduledPostMedia).values(

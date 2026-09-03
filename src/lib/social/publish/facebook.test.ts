@@ -8,6 +8,7 @@ import {
   photoPostParams,
   unpublishedPhotoParams,
   videoPostParams,
+  storyId,
 } from './facebook'
 
 const image = { url: 'https://blob.test/a.jpg', mediaType: 'image' as const, position: 0 }
@@ -75,5 +76,20 @@ describe('hasMixedMedia', () => {
 
   it('la frase del rechazo nombra a Facebook, no a otra red', () => {
     expect(FACEBOOK_REJECTED).toBe('Facebook rechazó la publicación.')
+  })
+})
+
+describe('storyId', () => {
+  it('prefiere el post_id: es el espacio de ids que guardan las métricas', () => {
+    expect(storyId({ post_id: '1203923749477794_122107507743448275' }, '1372222415120746')).toBe(
+      '1203923749477794_122107507743448275',
+    )
+  })
+
+  it('sin post_id usable cae al id propio: publicar vale más que el calce', () => {
+    expect(storyId({}, 'v-1')).toBe('v-1')
+    expect(storyId({ post_id: '' }, 'v-1')).toBe('v-1')
+    expect(storyId({ post_id: 42 }, 'v-1')).toBe('v-1')
+    expect(storyId(null, 'v-1')).toBe('v-1')
   })
 })

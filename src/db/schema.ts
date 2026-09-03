@@ -4,6 +4,7 @@ import {
   doublePrecision,
   index,
   integer,
+  jsonb,
   pgTable,
   text,
   timestamp,
@@ -225,6 +226,9 @@ export const scheduledPosts = pgTable('scheduled_posts', {
   scheduledAt: timestamp('scheduled_at', { withTimezone: true }).notNull(),
   // Diseñada, no un fotograma: la aplican los publishers que pueden (IG/FB/YT).
   coverUrl: text('cover_url'),
+  // La taxonomía libre del editor-LLM ({"hook": "...", "tema": "..."}); el
+  // endpoint de métricas la devuelve junto a los números para cerrar su loop.
+  atributos: jsonb('atributos'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 })
