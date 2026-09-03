@@ -33,6 +33,8 @@ export async function POST(request: Request) {
         redes: Array.isArray(p.redes) ? p.redes.map(String) : [],
         media: Array.isArray(p.media) ? p.media.map(String) : [],
         portada: typeof p.portada === 'string' ? p.portada : '',
+        // Crudo a propósito: la validación con frase fija vive en validateBatchItem.
+        atributos: p.atributos,
       }
     })
   } catch {

@@ -22,6 +22,7 @@ import {
   PORTADA_NEEDS_VIDEO,
 } from '@/lib/social/publish/batch'
 import { validateScheduleDraft } from '@/lib/social/publish/validate'
+import { validateAtributos, ATRIBUTOS_ERROR, type Atributos } from '@/lib/social/publish/atributos'
 import { diffMedia, diffTargets } from '@/lib/social/publish/edit'
 import { fromZonedInput, normalizeUrl, slugify } from '@/lib/utils'
 
@@ -486,6 +487,20 @@ export async function updateScheduledPost(
   const keepPortada = String(formData.get('keepPortada') ?? '').trim()
   const portadaUrl = String(formData.get('portadaUrl') ?? '').trim()
 
+  const atributosRaw = String(formData.get('atributos') ?? '').trim()
+  let atributos: Atributos | null = null
+  if (atributosRaw) {
+    let parsed: unknown
+    try {
+      parsed = JSON.parse(atributosRaw)
+    } catch {
+      return { error: ATRIBUTOS_ERROR }
+    }
+    const check = validateAtributos(parsed)
+    if ('error' in check) return { error: check.error }
+    atributos = check.atributos
+  }
+
   // Editar un post cuya hora ya pasó (p.ej. corregir el texto que X rechazó) no debe
   // exigir mover la fecha: si la fecha no cambió, se permite guardar en el pasado — el
   // re-arm lo manda al próximo cron, el "reintenta ahora" natural.
@@ -598,7 +613,7 @@ export async function updateScheduledPost(
   // here makes the write no-op instead of clobbering the in-flight attempt.
   await db
     .update(scheduledPosts)
-    .set({ caption, scheduledAt: scheduledAt!, coverUrl, updatedAt: new Date() })
+    .set({ caption, scheduledAt: scheduledAt!, coverUrl, atributos, updatedAt: new Date() })
     .where(eq(scheduledPosts.id, postId))
 
   if (mediaPlan.deleteIds.length > 0) {

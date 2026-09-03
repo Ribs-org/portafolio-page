@@ -21,6 +21,8 @@ export type ConnectionRow = {
 export type PostRow = {
   id: string
   network: string
+  /** El id del post en la red — la llave que une métricas con lo programado. */
+  externalId: string
   permalink: string | null
   caption: string | null
   thumbnailUrl: string | null
@@ -31,6 +33,8 @@ export type PostRow = {
    * in two different zones, and the day boundary belongs to neither of them.
    */
   publishedLabel: string
+  /** Crudo para la API de métricas; la tabla humana usa publishedLabel. */
+  publishedAt: Date
   campaign: string
   /** Deleted on the network. Hidden unless the view asks for them. */
   archived: boolean

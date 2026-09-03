@@ -306,7 +306,7 @@ Vercel y bajan con `vercel env pull .env.local`.
 | `X_CLIENT_ID` | Conectar X para publicar (OAuth 2.0 + PKCE) | El Client ID de la app en developer.x.com |
 | `X_CLIENT_SECRET` | El secreto de esa app | Junto con el anterior |
 | `CRON_SECRET` | Autoriza las corridas programadas (sync diario y publicación cada 5 minutos) | No — la pone Vercel solo, al declarar el cron |
-| `SCHEDULE_API_KEY` | Autoriza `POST /api/schedule/batch` (carga masiva por API) | Sin ella el endpoint queda cerrado; genérala igual que `CRON_SECRET` |
+| `SCHEDULE_API_KEY` | Autoriza `POST /api/schedule/batch` (carga masiva) y `GET /api/metrics/posts` (métricas) | Sin ella ambos endpoints quedan cerrados; genérala igual que `CRON_SECRET` |
 | `RESEND_API_KEY` | Enviar el email de aviso cuando una publicación programada falla | La provisiona la integración de Resend del marketplace de Vercel |
 | `PUBLISH_ALERT_TO` | A qué correo llega el aviso de fallo | Sin ella no se envía ningún email; el calendario sigue mostrando el fallo |
 | `PUBLISH_ALERT_FROM` | Remitente del aviso | Opcional; default `onboarding@resend.dev` |
@@ -339,6 +339,32 @@ es el mismo en los dos casos, cambia solo quién lo dispara.
 cuerpo `{ "posts": [{ "fecha": "2026-09-03 10:00", "texto": "Hola", "redes": ["x"], "media": [] }] }`
 (máximo 50). Responde el resultado por item; las filas rechazadas traen su motivo.
 Si la función alcanza su tiempo máximo a mitad de un lote, la respuesta se pierde pero las filas ya procesadas quedan programadas — re-enviar el lote vuelve a programar las que habían entrado (no hay deduplicación), así que conviene reintentar solo las filas pendientes.
+
+Cada item acepta además `atributos`: un objeto plano de valores simples
+(`{"hook": "pregunta-polemica", "tema": "negocios", "serie": "mut"}`, máximo 20
+claves) que el sistema guarda sin interpretar y devuelve junto a las métricas. Es la
+taxonomía de quien crea el contenido: sirve para correlacionar decisiones creativas
+con resultados. El CSV no lo lleva; el editor de un post programado lo muestra y
+permite corregirlo.
+
+### Métricas por API
+
+`GET /api/metrics/posts` con el mismo `Authorization: Bearer <SCHEDULE_API_KEY>`.
+Parámetros opcionales: `desde` y `hasta` (`YYYY-MM-DD` en la zona del sitio, ambos
+inclusive; por defecto los últimos 30 días) y `red` (una de las conocidas).
+
+Devuelve `{ truncado, posts: [...] }` con una fila por publicación **publicada dentro
+del rango** — no por métrica movida en él: un video de agosto que crece en septiembre
+aparece en una consulta de agosto, no de septiembre. Cada fila trae red, `externalId`,
+permalink, texto, `publicadoEl` (ISO con offset del sitio), la etiqueta `?s=`, sus
+`atributos` (o `null` si el post no salió del calendario) y `metricas`: `views`
+(acumulado), `viewsGanadas` (dentro del rango), `likes`, `comentarios`, `compartidos`,
+`alcance`, `visitasAlSitio`, `clicks`, `ctr` y `arrastre`. Un `null` significa que la
+red no reportó ese número — nunca cero. `truncado: true` avisa que el tope de filas
+mordió y la respuesta es parcial.
+
+Las métricas las trae la sincronización diaria, así que lo publicado hoy aparece con
+números recién al día siguiente.
 
 ## Estructura
 

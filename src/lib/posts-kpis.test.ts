@@ -16,11 +16,13 @@ function row(overrides: Partial<PostRow>): PostRow {
   return {
     id: 'post-1',
     network: 'instagram',
+    externalId: 'ext-1',
     permalink: null,
     caption: null,
     thumbnailUrl: null,
     mediaType: null,
     publishedLabel: '1 ago',
+    publishedAt: new Date('2026-08-01T12:00:00Z'),
     campaign: 'reel-1',
     archived: false,
     views: null,
