@@ -135,10 +135,14 @@ export async function getPostRows(
     const snapshotsOf = (key: 'views' | 'likes' | 'comments' | 'shares' | 'saves' | 'reach'): Snapshot[] =>
       list.map((s) => ({ day: s.day, value: s[key] }))
 
-    const views = periodChange(snapshotsOf('views'), from, to)
-    const likes = periodChange(snapshotsOf('likes'), from, to)
-    const comments = periodChange(snapshotsOf('comments'), from, to)
-    const shares = periodChange(snapshotsOf('shares'), from, to)
+    // Sin esto, la primera sincronización de un catálogo viejo cargaría toda su
+    // historia como crecimiento de la ventana que la contiene.
+    const publishedDay = localDay(post.publishedAt)
+
+    const views = periodChange(snapshotsOf('views'), from, to, publishedDay)
+    const likes = periodChange(snapshotsOf('likes'), from, to, publishedDay)
+    const comments = periodChange(snapshotsOf('comments'), from, to, publishedDay)
+    const shares = periodChange(snapshotsOf('shares'), from, to, publishedDay)
     const pasted = seen.has(post.campaign)
     const traffic = visitMap.get(post.campaign)
     const visitCount = pasted ? (traffic?.total ?? 0) : null
