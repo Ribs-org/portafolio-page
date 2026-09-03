@@ -1,4 +1,7 @@
+import { asc } from 'drizzle-orm'
 import Link from 'next/link'
+import { AccountCards } from './accounts'
+import { accountMetrics, getDb } from '@/db'
 import { BarList } from '@/components/charts/bar-list'
 import { CampaignTable } from '@/components/charts/campaign-table'
 import { Donut } from '@/components/charts/donut'
@@ -9,6 +12,7 @@ import { StatTile, delta } from '@/components/charts/stat-tile'
 import { seriesColor } from '@/components/charts/theme'
 import { TrafficChart } from '@/components/charts/traffic-chart'
 import { FilterBar } from '@/components/filter-bar'
+import { buildAccountCards } from '@/lib/account-stats'
 import {
   SITE_TIMEZONE,
   getBrowsers,
@@ -25,6 +29,7 @@ import {
   getRecentVisits,
   getTimeSeries,
   getTopLinks,
+  localDay,
   previousPeriod,
 } from '@/lib/analytics'
 import { parseFilters } from '@/lib/filters'
@@ -101,6 +106,21 @@ export default async function AnalyticsPage({
     getFunnel(filters, kpis),
   ])
 
+  const accountRows = await getDb()
+    .select({
+      network: accountMetrics.network,
+      day: accountMetrics.day,
+      followers: accountMetrics.followers,
+      profileViews: accountMetrics.profileViews,
+      reach: accountMetrics.reach,
+    })
+    .from(accountMetrics)
+    .orderBy(asc(accountMetrics.day))
+  // Sin filtro de fecha a propósito: la variación necesita la lectura anterior a la
+  // ventana, y la tabla crece una fila por red y día — nada que paginar.
+
+  const cards = buildAccountCards(accountRows, localDay(filters.from), localDay(filters.to))
+
   return (
     <>
       <header className="mb-6">
@@ -120,6 +140,13 @@ export default async function AnalyticsPage({
       </div>
 
       <div className="mt-4 grid gap-4">
+        <Panel
+          title="Tus cuentas"
+          hint="Seguidores por red, con lo ganado en el período. Visitas al perfil y alcance son del último día leído — Instagram es la única que los entrega hoy."
+        >
+          <AccountCards cards={cards} />
+        </Panel>
+
         <Panel title="Tráfico en el tiempo" hint="Visitas y clicks, comparables en la misma escala">
           <TrafficChart data={series} />
         </Panel>
