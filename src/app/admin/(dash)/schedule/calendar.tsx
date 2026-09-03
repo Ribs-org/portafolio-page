@@ -69,11 +69,25 @@ export function WeekCalendar({
                 {dayLabel(day, index)}
               </p>
               <div className="space-y-2">
-                {(grouped.get(day) ?? []).map(({ post, targets, media }) => (
+                {(grouped.get(day) ?? []).map(({ post, targets, media }) => {
+                  // The card wears the post's aggregate verdict — same palette as the
+                  // list chips. A failure anywhere outranks everything (it needs the
+                  // eye); all-green means done; anything in between stays neutral.
+                  const failed = targets.some((t) => t.status === 'failed')
+                  const allPublished =
+                    targets.length > 0 && targets.every((t) => t.status === 'published')
+                  return (
                   <Link
                     key={post.id}
                     href={`/admin/schedule/${post.id}?volver=${encodeURIComponent(volver)}`}
-                    className="block rounded-lg bg-white/[0.05] p-2 transition-colors hover:bg-white/[0.1]"
+                    className={cn(
+                      'block rounded-lg p-2 transition-colors',
+                      failed
+                        ? 'bg-red-500/15 hover:bg-red-500/25'
+                        : allPublished
+                          ? 'bg-emerald-500/15 hover:bg-emerald-500/25'
+                          : 'bg-white/[0.05] hover:bg-white/[0.1]',
+                    )}
                   >
                     <p className="font-mono text-[0.65rem] text-fg-faint">
                       {hourLabel(post.scheduledAt, zone)}
@@ -123,7 +137,8 @@ export function WeekCalendar({
                       ))}
                     </div>
                   </Link>
-                ))}
+                  )
+                })}
               </div>
             </div>
           ))}
