@@ -333,6 +333,15 @@ diarios, así que `vercel.json` declara apenas una corrida diaria de respaldo. E
 Pro puedes cambiar ese schedule a `*/5 * * * *` y prescindir del pinger: el endpoint
 es el mismo en los dos casos, cambia solo quién lo dispara.
 
+### Guía para el editor de contenido
+
+`public/docs/api-editor.md` documenta ambos endpoints en detalle, escrito para que un
+LLM que crea contenido lo lea entero y no necesite explicaciones: contratos, reglas
+por red, todas las frases de error y qué significa cada métrica. Se sirve tal cual en
+<https://www.vicente-pareja.cl/docs/api-editor.md>. No contiene secretos — la clave
+viaja aparte — pero es público: si prefieres que no lo sea, muévelo fuera de
+`public/`.
+
 ### Carga masiva por API
 
 `POST /api/schedule/batch` con header `Authorization: Bearer <SCHEDULE_API_KEY>` y
