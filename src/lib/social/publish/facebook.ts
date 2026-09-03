@@ -38,9 +38,17 @@ export function videoPostParams(caption: string, media: PublishMedia): Record<st
  * never join a post's attributes to how it actually did. The fallback keeps a publish
  * from failing over a missing field: a wrong-space id still beats losing the post.
  */
-export function storyId(payload: Record<string, unknown> | null, fallback: string): string {
+export function storyId(
+  payload: Record<string, unknown> | null,
+  pageId: string,
+  fallback: string,
+): string {
   const postId = payload?.post_id
-  return typeof postId === 'string' && postId.length > 0 ? postId : fallback
+  if (typeof postId !== 'string' || postId.length === 0) return fallback
+  // Graph responde el post_id pelado, pero /published_posts —de donde salen las
+  // métricas— los lista como `páginaID_postID`. Componerlo es lo que hace que las
+  // dos mitades del sistema hablen del mismo post. Si ya viene compuesto, se deja.
+  return postId.includes('_') ? postId : `${pageId}_${postId}`
 }
 
 /**
@@ -119,7 +127,7 @@ export const facebookPublisher: Publisher = {
       const verdict = classifyVideoStatus(payload)
       if (verdict === 'error') return { kind: 'failed', reason: FACEBOOK_REJECTED }
       if (verdict === 'processing') return { kind: 'processing', containerId: input.containerId }
-      return { kind: 'published', externalId: storyId(payload, input.containerId) }
+      return { kind: 'published', externalId: storyId(payload, input.accountExternalId, input.containerId) }
     }
 
     const media = [...input.media].sort((a, b) => a.position - b.position)
@@ -175,7 +183,7 @@ export const facebookPublisher: Publisher = {
       const id = data?.id
       if (typeof id !== 'string') return { kind: 'failed', reason: FACEBOOK_REJECTED }
       // /photos answers with the photo's own id; its `post_id` is the feed story.
-      return { kind: 'published', externalId: storyId(data, id) }
+      return { kind: 'published', externalId: storyId(data, input.accountExternalId, id) }
     }
 
     // Several photos: upload each unpublished, then one /feed post attaches them all.

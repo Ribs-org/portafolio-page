@@ -80,16 +80,22 @@ describe('hasMixedMedia', () => {
 })
 
 describe('storyId', () => {
-  it('prefiere el post_id: es el espacio de ids que guardan las métricas', () => {
-    expect(storyId({ post_id: '1203923749477794_122107507743448275' }, '1372222415120746')).toBe(
+  const PAGE = '1203923749477794'
+
+  it('compone páginaID_postID: es el espacio de ids que guardan las métricas', () => {
+    expect(storyId({ post_id: '122107507743448275' }, PAGE, '1372222415120746')).toBe(
       '1203923749477794_122107507743448275',
     )
   })
 
+  it('un post_id ya compuesto se respeta tal cual', () => {
+    expect(storyId({ post_id: `${PAGE}_999` }, PAGE, 'v-1')).toBe(`${PAGE}_999`)
+  })
+
   it('sin post_id usable cae al id propio: publicar vale más que el calce', () => {
-    expect(storyId({}, 'v-1')).toBe('v-1')
-    expect(storyId({ post_id: '' }, 'v-1')).toBe('v-1')
-    expect(storyId({ post_id: 42 }, 'v-1')).toBe('v-1')
-    expect(storyId(null, 'v-1')).toBe('v-1')
+    expect(storyId({}, PAGE, 'v-1')).toBe('v-1')
+    expect(storyId({ post_id: '' }, PAGE, 'v-1')).toBe('v-1')
+    expect(storyId({ post_id: 42 }, PAGE, 'v-1')).toBe('v-1')
+    expect(storyId(null, PAGE, 'v-1')).toBe('v-1')
   })
 })
