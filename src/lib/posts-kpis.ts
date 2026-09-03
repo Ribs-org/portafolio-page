@@ -126,12 +126,14 @@ export function unpastedCount(rows: PostRow[]): number {
  * withholds insights for anything published before the account became professional, so
  * whole stretches of an older catalogue land here at once.
  *
- * Only `views`, `likes` and `comments` are consulted: no column renders `shares`,
- * `saves` or `reach`, so a row carrying one of those and nothing else would still read
- * as blank to the person looking at it.
+ * Consulta las cuatro métricas que la tabla dibuja. `saves` y `reach` quedan fuera a
+ * propósito: no tienen columna, así que una fila que solo trajera una de ellas
+ * seguiría leyéndose vacía para quien la mira.
  */
 export function hasNoPlatformMetrics(row: PostRow): boolean {
-  return row.views === null && row.likes === null && row.comments === null
+  return (
+    row.views === null && row.likes === null && row.comments === null && row.shares === null
+  )
 }
 
 export function withoutPlatformMetricsCount(rows: PostRow[]): number {
