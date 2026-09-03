@@ -101,23 +101,22 @@ export default async function AnalyticsPage({
 
   const campaignPosts = await getCampaignPosts(campaigns.map((c) => c.campaign))
 
-  const [topLinks, funnel] = await Promise.all([
+  const [topLinks, funnel, accountRows] = await Promise.all([
     getTopLinks(filters, kpis.visits),
     getFunnel(filters, kpis),
+    // Sin filtro de fecha a propósito: la variación necesita la lectura anterior a la
+    // ventana, y la tabla crece una fila por red y día — nada que paginar.
+    getDb()
+      .select({
+        network: accountMetrics.network,
+        day: accountMetrics.day,
+        followers: accountMetrics.followers,
+        profileViews: accountMetrics.profileViews,
+        reach: accountMetrics.reach,
+      })
+      .from(accountMetrics)
+      .orderBy(asc(accountMetrics.day)),
   ])
-
-  const accountRows = await getDb()
-    .select({
-      network: accountMetrics.network,
-      day: accountMetrics.day,
-      followers: accountMetrics.followers,
-      profileViews: accountMetrics.profileViews,
-      reach: accountMetrics.reach,
-    })
-    .from(accountMetrics)
-    .orderBy(asc(accountMetrics.day))
-  // Sin filtro de fecha a propósito: la variación necesita la lectura anterior a la
-  // ventana, y la tabla crece una fila por red y día — nada que paginar.
 
   const cards = buildAccountCards(accountRows, localDay(filters.from), localDay(filters.to))
 
