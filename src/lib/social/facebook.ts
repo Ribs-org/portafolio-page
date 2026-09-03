@@ -1,12 +1,15 @@
 import type { SocialAccount } from '@/db'
 import {
+  NO_ACCOUNT_METRICS,
   NO_METRICS,
   MAX_POSTS_PER_SYNC,
+  type AccountMetricValues,
   type Connector,
   type FetchedBatch,
   type FetchedPost,
   type PostMetricValues,
 } from './connector'
+import { normalizeFacebookAccount } from './account-metrics'
 import { decryptToken } from './crypto'
 
 /** El `me/accounts?fields=id,name,access_token` payload. */
@@ -278,5 +281,18 @@ export const facebookConnector: Connector = {
     }
 
     return { posts, windowWasCapped }
+  },
+
+  /** Solo el nodo de la página: sus insights están deprecadas y responden vacío. */
+  async fetchAccountMetrics(
+    account: SocialAccount,
+    token: string,
+  ): Promise<AccountMetricValues> {
+    const id = account.externalId
+    if (!id) return NO_ACCOUNT_METRICS
+    const profile = await getJson(
+      `${GRAPH}/${id}?fields=followers_count,fan_count&access_token=${token}`,
+    ).catch(() => ({}))
+    return normalizeFacebookAccount(profile as never)
   },
 }
