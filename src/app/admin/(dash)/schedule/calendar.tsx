@@ -88,10 +88,26 @@ export function WeekCalendar({
                           unoptimized
                           className="mt-1 h-16 w-full rounded object-cover"
                         />
+                      ) : post.coverUrl ? (
+                        // The designed cover IS the video's preview when there is one.
+                        <Image
+                          src={post.coverUrl}
+                          alt=""
+                          width={120}
+                          height={64}
+                          unoptimized
+                          className="mt-1 h-16 w-full rounded object-cover"
+                        />
                       ) : (
-                        <span className="mt-1 block rounded bg-white/[0.08] px-1.5 py-0.5 font-mono text-[0.6rem] text-fg-faint">
-                          video
-                        </span>
+                        // No controls (the whole card is a link); preload="metadata"
+                        // paints the first frame without pulling the file.
+                        <video
+                          src={media[0].blobUrl}
+                          preload="metadata"
+                          muted
+                          playsInline
+                          className="mt-1 h-16 w-full rounded bg-black object-cover"
+                        />
                       )
                     ) : null}
                     <p className="mt-1 line-clamp-2 text-[0.75rem] leading-snug text-fg">
