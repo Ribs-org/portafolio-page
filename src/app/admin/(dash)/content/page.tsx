@@ -36,7 +36,7 @@ export const dynamic = 'force-dynamic'
 function contentHref(
   params: Record<string, string | string[] | undefined>,
   changed: string,
-  value: string | null,
+  value: string | string[] | null,
 ): string {
   const next = new URLSearchParams()
   for (const [key, param] of Object.entries(params)) {
@@ -44,7 +44,8 @@ function contentHref(
     if (typeof param === 'string') next.set(key, param)
     else if (Array.isArray(param)) for (const v of param) next.append(key, v)
   }
-  if (value !== null) next.set(changed, value)
+  if (Array.isArray(value)) for (const v of value) next.append(changed, v)
+  else if (value !== null) next.set(changed, value)
 
   const query = next.toString()
   return query ? `/admin/content?${query}` : '/admin/content'
@@ -52,10 +53,16 @@ function contentHref(
 
 function toggleHref(
   params: Record<string, string | string[] | undefined>,
-  toggled: 'archivados' | 'metricas',
+  toggled: 'archivados' | 'metricas' | 'anteriores',
   active: boolean,
 ): string {
   return contentHref(params, toggled, active ? null : '1')
+}
+
+/** Reads a repeatable query key (`?red=a&red=b`) as a list. */
+function listParam(value: string | string[] | undefined): string[] {
+  if (typeof value === 'string') return [value]
+  return Array.isArray(value) ? value : []
 }
 
 export default async function ContentPage({
@@ -67,7 +74,11 @@ export default async function ContentPage({
   const filters = parseFilters(params)
   const includeArchived = params.archivados === '1'
   const onlyWithMetrics = params.metricas === '1'
-  const red = typeof params.red === 'string' ? params.red : null
+  const redes = listParam(params.red)
+  // El rango acota qué se publicó, que es lo que uno espera al decir «esta semana».
+  // «Incluir anteriores» recupera la otra lectura: lo viejo que sigue teniendo
+  // actividad dentro de la ventana.
+  const incluirAnteriores = params.anteriores === '1'
 
   // What `/api/social/[network]/callback` has to say about the connection attempt that
   // just bounced back here. Truncated because the value is a query param: it reaches the
@@ -78,7 +89,11 @@ export default async function ContentPage({
   const [profiles, connections, rows, series] = await Promise.all([
     getAllProfiles(),
     getConnections(),
-    getPostRows(filters, includeArchived),
+    getPostRows(
+      filters,
+      includeArchived,
+      incluirAnteriores ? {} : { publishedFrom: filters.from, publishedTo: filters.to },
+    ),
     getPostSeries(filters),
   ])
 
@@ -86,7 +101,8 @@ export default async function ContentPage({
   // already loaded, and asking the database again for a subset it already handed over
   // would also risk the two calls disagreeing.
   const withMetrics = onlyWithMetrics ? withPlatformMetrics(rows) : rows
-  const visible = red ? withMetrics.filter((row) => row.network === red) : withMetrics
+  const visible =
+    redes.length > 0 ? withMetrics.filter((row) => redes.includes(row.network)) : withMetrics
 
   // Chips come from the unfiltered catalogue so the way back ("Todas", or another
   // network) never disappears just because the current filter emptied the view.
@@ -186,9 +202,15 @@ export default async function ContentPage({
       <div className="mt-4 grid gap-4">
         <Panel
           title="Tus posts"
-          hint="Ordena por cualquier columna. Arrastre es visitas sobre views ganadas en el período — lo que ninguna de las dos plataformas calcula sola. La columna Views muestra el acumulado, con lo ganado al lado."
+          hint="Lo publicado dentro del rango elegido; «Incluir anteriores» suma lo más viejo que siga teniendo actividad. Ordena por cualquier columna. La columna Views muestra el acumulado, con lo ganado al lado — y un «—» cuando el post existía antes de la primera medición y su crecimiento no se puede saber. Arrastre es visitas sobre views ganadas."
           action={
             <div className="flex items-center gap-3">
+              <Link
+                href={toggleHref(params, 'anteriores', incluirAnteriores)}
+                className="text-[0.75rem] text-fg-faint transition-colors hover:text-fg"
+              >
+                {incluirAnteriores ? 'Solo del período' : 'Incluir anteriores'}
+              </Link>
               <Link
                 href={toggleHref(params, 'metricas', onlyWithMetrics)}
                 className="text-[0.75rem] text-fg-faint transition-colors hover:text-fg"
@@ -206,12 +228,26 @@ export default async function ContentPage({
         >
           {chipNetworks.length > 1 ? (
             <div className="mb-3 flex flex-wrap items-center gap-1.5">
-              {[null, ...chipNetworks].map((network) => {
-                const active = red === network
+              <Link
+                href={contentHref(params, 'red', null)}
+                className={cn(
+                  'rounded-full px-2.5 py-1 font-mono text-[0.68rem] transition-colors',
+                  redes.length === 0
+                    ? 'bg-white/[0.14] text-fg'
+                    : 'bg-white/[0.05] text-fg-faint hover:text-fg',
+                )}
+              >
+                Todas
+              </Link>
+              {chipNetworks.map((network) => {
+                const active = redes.includes(network)
+                // Cada chip suma o resta su red: elegir Instagram y Facebook a la vez
+                // es un caso normal, no una excepción.
+                const next = active ? redes.filter((r) => r !== network) : [...redes, network]
                 return (
                   <Link
-                    key={network ?? 'todas'}
-                    href={contentHref(params, 'red', network)}
+                    key={network}
+                    href={contentHref(params, 'red', next.length > 0 ? next : null)}
                     className={cn(
                       'rounded-full px-2.5 py-1 font-mono text-[0.68rem] transition-colors',
                       active
@@ -219,7 +255,7 @@ export default async function ContentPage({
                         : 'bg-white/[0.05] text-fg-faint hover:text-fg',
                     )}
                   >
-                    {network === null ? 'Todas' : networkLabel(network)}
+                    {networkLabel(network)}
                   </Link>
                 )
               })}
@@ -231,12 +267,12 @@ export default async function ContentPage({
             posts are all pre-conversion to go connect a network and sync — which they
             already did, and which would not change a thing.
           */}
-          {visible.length === 0 && rows.length > 0 ? (
+          {visible.length === 0 ? (
             <Empty>
-              {red && onlyWithMetrics
-                ? `El filtro dejó la lista vacía: ninguna publicación de ${networkLabel(red)} tiene métricas de la red en este período.`
-                : red
-                  ? `No hay publicaciones de ${networkLabel(red)} en este período.`
+              {rows.length === 0
+                ? 'No publicaste nada en este período. Amplía el rango, o activa «Incluir anteriores» para ver lo que sigue teniendo actividad.'
+                : redes.length > 0
+                  ? `El filtro dejó la lista vacía: nada de ${redes.map(networkLabel).join(' ni ')} en este período.`
                   : 'El filtro dejó la lista vacía: ninguna publicación tiene métricas de la red en este período.'}
             </Empty>
           ) : (

@@ -65,3 +65,39 @@ describe('periodChange', () => {
     })
   })
 })
+
+describe('periodChange con fecha de publicación', () => {
+  const sinPrevio: Snapshot[] = [{ day: '2026-08-26', value: 2220 }]
+
+  it('publicado dentro del período: todo su acumulado lo ganó ahí', () => {
+    expect(periodChange(sinPrevio, '2026-08-20', '2026-09-03', '2026-08-25')).toEqual({
+      current: 2220,
+      change: 2220,
+      isNew: true,
+    })
+  })
+
+  it('publicado antes y nunca medido antes: el crecimiento es desconocido, no su historia entera', () => {
+    expect(periodChange(sinPrevio, '2026-08-20', '2026-09-03', '2026-02-04')).toEqual({
+      current: 2220,
+      change: null,
+      isNew: false,
+    })
+  })
+
+  it('con lectura previa la fecha de publicación no cambia nada', () => {
+    expect(periodChange(snapshots, '2026-08-05', '2026-08-25', '2026-01-01')).toEqual({
+      current: 900,
+      change: 800,
+      isNew: false,
+    })
+  })
+
+  it('sin fecha de publicación conserva el comportamiento anterior', () => {
+    expect(periodChange(sinPrevio, '2026-08-20', '2026-09-03')).toEqual({
+      current: 2220,
+      change: 2220,
+      isNew: true,
+    })
+  })
+})
