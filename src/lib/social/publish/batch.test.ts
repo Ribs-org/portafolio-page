@@ -8,6 +8,7 @@ import {
   PORTADA_FORMAT,
   type BatchItem,
 } from './batch'
+import { ATRIBUTOS_ERROR } from './atributos'
 
 const now = new Date('2026-09-02T12:00:00Z')
 const base: BatchItem = {
@@ -151,5 +152,17 @@ describe('portada en validateBatchItem', () => {
 
   it('portada png pasa igual que jpg', () => {
     expect(validateBatchItem({ ...conVideo, portada: 'https://ej.com/p.png' }, now)).toBeNull()
+  })
+})
+
+describe('atributos en validateBatchItem', () => {
+  it('un objeto plano pasa; uno inválido es la frase fija', () => {
+    expect(validateBatchItem({ ...base, atributos: { hook: 'dato-duro' } }, now)).toBeNull()
+    expect(validateBatchItem({ ...base, atributos: ['hook'] }, now)).toBe(ATRIBUTOS_ERROR)
+    expect(validateBatchItem({ ...base, atributos: { a: { b: 1 } } }, now)).toBe(ATRIBUTOS_ERROR)
+  })
+
+  it('sin atributos no exige nada', () => {
+    expect(validateBatchItem(base, now)).toBeNull()
   })
 })
