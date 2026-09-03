@@ -32,6 +32,18 @@ export function videoPostParams(caption: string, media: PublishMedia): Record<st
 }
 
 /**
+ * The feed story id (`{pageId}_{postId}`) — the id space the read connector stores in
+ * socialPosts (it lists `/{page}/published_posts`). A video's own id and a photo's own
+ * id live in different spaces, so recording those instead means the metrics API can
+ * never join a post's attributes to how it actually did. The fallback keeps a publish
+ * from failing over a missing field: a wrong-space id still beats losing the post.
+ */
+export function storyId(payload: Record<string, unknown> | null, fallback: string): string {
+  const postId = payload?.post_id
+  return typeof postId === 'string' && postId.length > 0 ? postId : fallback
+}
+
+/**
  * Only 'ready' and 'error' are verdicts. Everything else — processing, upload_complete,
  * an absent field — keeps waiting: same anti-guessing rule as Instagram's containers.
  */
@@ -94,7 +106,7 @@ export const facebookPublisher: Publisher = {
     // Resuming: a previous run posted the video and Facebook was still processing it.
     if (input.containerId) {
       const response = await fetch(
-        `${GRAPH}/${input.containerId}?fields=status&access_token=${token}`,
+        `${GRAPH}/${input.containerId}?fields=status,post_id&access_token=${token}`,
       )
       if (!response.ok) {
         console.error('Facebook video status:', response.status, (await response.text()).slice(0, 300))
@@ -103,10 +115,11 @@ export const facebookPublisher: Publisher = {
         // cut still bounds how long this can wait.
         return { kind: 'processing', containerId: input.containerId }
       }
-      const verdict = classifyVideoStatus(await response.json())
+      const payload = (await response.json()) as Record<string, unknown>
+      const verdict = classifyVideoStatus(payload)
       if (verdict === 'error') return { kind: 'failed', reason: FACEBOOK_REJECTED }
       if (verdict === 'processing') return { kind: 'processing', containerId: input.containerId }
-      return { kind: 'published', externalId: input.containerId }
+      return { kind: 'published', externalId: storyId(payload, input.containerId) }
     }
 
     const media = [...input.media].sort((a, b) => a.position - b.position)
@@ -161,7 +174,8 @@ export const facebookPublisher: Publisher = {
       })
       const id = data?.id
       if (typeof id !== 'string') return { kind: 'failed', reason: FACEBOOK_REJECTED }
-      return { kind: 'published', externalId: id }
+      // /photos answers with the photo's own id; its `post_id` is the feed story.
+      return { kind: 'published', externalId: storyId(data, id) }
     }
 
     // Several photos: upload each unpublished, then one /feed post attaches them all.
