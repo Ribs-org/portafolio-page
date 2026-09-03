@@ -74,12 +74,22 @@ function firstDefined(params: URLSearchParams, ...keys: string[]): string | null
   return null
 }
 
-export function buildVisitContext(headers: Headers, params: URLSearchParams): VisitContext {
+/**
+ * `referrerOverride` sirve a la baliza del navegador: el `referer` de esa petición es
+ * la propia página, así que el referente externo real lo manda el cliente desde
+ * `document.referrer`. En el render del servidor no se pasa y manda la cabecera.
+ */
+export function buildVisitContext(
+  headers: Headers,
+  params: URLSearchParams,
+  referrerOverride?: string | null,
+): VisitContext {
   const userAgent = headers.get('user-agent') ?? ''
   const ua = UAParser(userAgent)
 
   const utmSource = clean(firstDefined(params, 'utm_source', 'source'), 100)
-  const referrer = clean(headers.get('referer'), 500)
+  const referrer =
+    referrerOverride === undefined ? clean(headers.get('referer'), 500) : clean(referrerOverride, 500)
 
   // `?s=` is the short campaign tag meant to be typed by hand into a bio link.
   const campaign = clean(

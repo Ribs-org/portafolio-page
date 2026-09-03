@@ -1,9 +1,7 @@
 import 'server-only'
-import { randomUUID } from 'node:crypto'
 import { and, asc, eq, isNull, or, gte, lte } from 'drizzle-orm'
-import { getDb, links, profiles, visits } from '@/db'
+import { getDb, links, profiles } from '@/db'
 import type { Link, Profile } from '@/db'
-import { buildVisitContext, type VisitContext } from './tracking'
 
 export async function getProfileBySlug(slug: string): Promise<Profile | null> {
   const [row] = await getDb().select().from(profiles).where(eq(profiles.slug, slug)).limit(1)
@@ -48,26 +46,5 @@ export async function getAllLinks(profileId: string): Promise<Link[]> {
     .orderBy(asc(links.position))
 }
 
-export type PreparedVisit = { id: string; context: VisitContext }
-
-/**
- * Builds the visit row without touching the database, so the render can embed the id
- * in the HTML immediately. Pair with `persistVisit` inside `after()`.
- */
-export function prepareVisit(
-  headers: Headers,
-  params: URLSearchParams,
-): PreparedVisit {
-  return { id: randomUUID(), context: buildVisitContext(headers, params) }
-}
-
-/** Analytics must never break the public page, so every failure is swallowed. */
-export async function persistVisit(profileId: string, visit: PreparedVisit): Promise<void> {
-  try {
-    await getDb()
-      .insert(visits)
-      .values({ id: visit.id, profileId, ...visit.context })
-  } catch (error) {
-    console.error('[analytics] failed to record visit', error)
-  }
-}
+// La visita ya no se escribe en el render: la registra `/api/track/visit` cuando la
+// baliza del navegador confirma que hubo alguien. Ver `visit-tracker.tsx`.
