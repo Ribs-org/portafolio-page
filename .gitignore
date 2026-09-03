@@ -44,3 +44,4 @@ next-env.d.ts
 # claude scratch
 /.claude/worktrees/
 /.superpowers/
+scripts/bots-marcados-*.json
