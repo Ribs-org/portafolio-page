@@ -132,11 +132,13 @@ export async function getPostRows(f: Filters, includeArchived = false): Promise<
     return {
       id: post.id,
       network: post.network,
+      externalId: post.externalId,
       permalink: post.permalink,
       caption: post.caption,
       thumbnailUrl: post.thumbnailUrl,
       mediaType: post.mediaType,
       publishedLabel: PUBLISHED.format(post.publishedAt),
+      publishedAt: post.publishedAt,
       campaign: post.campaign,
       archived: post.archivedAt !== null,
       views: views.current,
