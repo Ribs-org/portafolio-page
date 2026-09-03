@@ -1,32 +1,30 @@
-import { headers } from 'next/headers'
 import Link from 'next/link'
-import { after } from 'next/server'
 import type { Metadata } from 'next'
+import { randomUUID } from 'node:crypto'
 import { ClickTracker } from '@/components/click-tracker'
+import { VisitTracker } from '@/components/visit-tracker'
 import { ProfileView } from '@/components/profile-view'
 import type { Profile } from '@/db'
-import { getVisibleLinks, persistVisit, prepareVisit } from './profiles'
-import { searchParamsFrom } from './tracking'
+import { getVisibleLinks } from './profiles'
 
 export type SearchParams = Record<string, string | string[] | undefined>
 
 /**
- * Renders a public profile and records the visit.
- *
- * The visit id is generated in-process and embedded in the HTML immediately, while
- * the database write happens in `after()` — the page never waits on analytics.
+ * Renders a public profile. The visit id is minted here and embedded in the HTML, but
+ * the row is written only when `VisitTracker` reports back from the browser: counting
+ * on render counted every crawler that fetched the page. `searchParams` stays in the
+ * signature because Next needs the page to read it to opt out of static rendering.
  */
 export async function renderProfile(profile: Profile, searchParams: SearchParams) {
-  const requestHeaders = await headers()
+  void searchParams
   const links = await getVisibleLinks(profile.id)
-
-  const visit = prepareVisit(requestHeaders, searchParamsFrom(searchParams))
-  after(() => persistVisit(profile.id, visit))
+  const visitId = randomUUID()
 
   return (
     <>
       <ProfileView profile={profile} links={links} />
-      <ClickTracker visitId={visit.id} profileId={profile.id} />
+      <VisitTracker visitId={visitId} profileId={profile.id} />
+      <ClickTracker visitId={visitId} profileId={profile.id} />
     </>
   )
 }
