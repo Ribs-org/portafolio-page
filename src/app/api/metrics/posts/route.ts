@@ -10,6 +10,10 @@ import type { Atributos } from '@/lib/social/publish/atributos'
 
 export const dynamic = 'force-dynamic'
 
+// Un mes de la parrilla actual (20 posts/día × 3 redes) cabe holgado; `truncado`
+// avisa cuando el tope mordió, para que nadie concluya sobre datos a medias.
+const MAX_POSTS = 2000
+
 export async function GET(request: Request) {
   const key = env('SCHEDULE_API_KEY')
   // Sin llave configurada el endpoint queda cerrado — molde del batch.
@@ -31,15 +35,15 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: `Red desconocida: ${red}.` }, { status: 400 })
   }
 
-  // Mismo motor que el panel: acumulado + ganado en la ventana, visitas por ?s=.
-  const rows = (
-    await getPostRows({ from: rango.from, to: rango.to, profileId: null, includeBots: false })
-  ).filter(
-    (row) =>
-      (red === null || row.network === red) &&
-      row.publishedAt.getTime() >= rango.from.getTime() &&
-      row.publishedAt.getTime() <= rango.to.getTime(),
+  // Mismo motor que el panel: acumulado + ganado en la ventana, visitas por ?s=. La
+  // ventana viaja además como filtro de publicación, para que el tope acote lo pedido
+  // y no las 200 filas más nuevas del catálogo entero.
+  const all = await getPostRows(
+    { from: rango.from, to: rango.to, profileId: null, includeBots: false },
+    false,
+    { publishedFrom: rango.from, publishedTo: rango.to, limit: MAX_POSTS },
   )
+  const rows = red === null ? all : all.filter((row) => row.network === red)
 
   // Los atributos del calendario, unidos por (red, externalId) en memoria: un post
   // orgánico simplemente no aparece aquí y sale con atributos null.
@@ -66,6 +70,7 @@ export async function GET(request: Request) {
   }
 
   return NextResponse.json({
+    truncado: all.length >= MAX_POSTS,
     posts: rows.map((row) =>
       buildMetricPost(row, atributosByKey.get(`${row.network}:${row.externalId}`) ?? null, SITE_TIMEZONE),
     ),

@@ -40,17 +40,32 @@ const PUBLISHED = new Intl.DateTimeFormat('es', {
   timeZone: SITE_TIMEZONE,
 })
 
-export async function getPostRows(f: Filters, includeArchived = false): Promise<PostRow[]> {
+/**
+ * `opts` exists for the metrics API: the panel wants the latest 200 posts whatever
+ * their date, but an API caller asking for a month needs the window pushed into the
+ * query — otherwise the newest 200 rows are all it can ever see, and a request for
+ * an older month comes back empty with no way to tell that from "nothing happened".
+ */
+export async function getPostRows(
+  f: Filters,
+  includeArchived = false,
+  opts: { publishedFrom?: Date; publishedTo?: Date; limit?: number } = {},
+): Promise<PostRow[]> {
   const db = getDb()
   const from = localDay(f.from)
   const to = localDay(f.to)
 
+  const postConds: SQL[] = []
+  if (!includeArchived) postConds.push(isNull(socialPosts.archivedAt))
+  if (opts.publishedFrom) postConds.push(gte(socialPosts.publishedAt, opts.publishedFrom))
+  if (opts.publishedTo) postConds.push(lte(socialPosts.publishedAt, opts.publishedTo))
+
   const posts = await db
     .select()
     .from(socialPosts)
-    .where(includeArchived ? undefined : isNull(socialPosts.archivedAt))
+    .where(postConds.length > 0 ? and(...postConds) : undefined)
     .orderBy(desc(socialPosts.publishedAt))
-    .limit(200)
+    .limit(opts.limit ?? 200)
 
   if (posts.length === 0) return []
 
