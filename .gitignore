@@ -46,3 +46,7 @@ next-env.d.ts
 /.superpowers/
 scripts/bots-marcados-*.json
 scripts/fb-ids-*.json
+
+# app Expo
+mobile/node_modules
+mobile/.expo
