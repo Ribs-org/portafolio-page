@@ -32,7 +32,8 @@ export async function GET(request: Request) {
       .select({ post: scheduledPosts, target: scheduledPostTargets })
       .from(scheduledPosts)
       .innerJoin(scheduledPostTargets, eq(scheduledPostTargets.postId, scheduledPosts.id))
-      .where(and(gt(scheduledPosts.scheduledAt, new Date(now.getTime() - 864e5)), lte(scheduledPosts.scheduledAt, now)))
+      // La misma ventana que el rango «hoy», sin volver a escribir la regla.
+      .where(and(gt(scheduledPosts.scheduledAt, parseRango('hoy', now).from), lte(scheduledPosts.scheduledAt, now)))
       .orderBy(asc(scheduledPosts.scheduledAt)),
     db
       .select({ post: scheduledPosts, target: scheduledPostTargets })
@@ -60,8 +61,13 @@ export async function GET(request: Request) {
     return [...mapa.values()]
   }
 
-  const ultimoPorRed = new Map<string, number | null>()
-  for (const fila of seguidores) ultimoPorRed.set(fila.network, fila.followers)
+  // La última lectura *conocida* por red, no la última fila. Una sincronización que
+  // falla a medias graba el día con `followers: null` (cada llamada de la red trae su
+  // propio catch), y tomar esa fila borraría un conteo que sí sabíamos de antes.
+  const ultimoPorRed = new Map<string, number>()
+  for (const fila of seguidores) {
+    if (fila.followers !== null) ultimoPorRed.set(fila.network, fila.followers)
+  }
   const seguidoresTotal = [...ultimoPorRed.values()].reduce<number | null>(
     (total, valor) => (valor === null ? total : (total ?? 0) + valor),
     null,
