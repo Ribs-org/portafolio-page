@@ -4,6 +4,7 @@ import {
   PUBLISH_REJECTED,
   isStaleProcessing,
   resolveOutcome,
+  mediaParaBorrar,
 } from './publisher'
 
 describe('resolveOutcome', () => {
@@ -59,5 +60,30 @@ describe('isStaleProcessing', () => {
 
   it('a las 24 horas exactas ya venció', () => {
     expect(isStaleProcessing(new Date('2026-08-30T12:00:00Z'), base)).toBe(true)
+  })
+})
+
+describe('mediaParaBorrar', () => {
+  const video = { id: 'm1', mediaType: 'video' as const, blobUrl: 'https://blob/v.mp4' }
+  const foto = { id: 'm2', mediaType: 'image' as const, blobUrl: 'https://blob/f.jpg' }
+
+  it('con todos los destinos publicados, el video ya cumplió: se borra', () => {
+    expect(
+      mediaParaBorrar([{ status: 'published' }, { status: 'published' }], [video, foto]),
+    ).toEqual([video])
+  })
+
+  it('las fotos se conservan: pesan poco y son la memoria visual del calendario', () => {
+    expect(mediaParaBorrar([{ status: 'published' }], [foto])).toEqual([])
+  })
+
+  it('mientras quede un destino sin publicar, no se toca nada', () => {
+    for (const pendiente of ['scheduled', 'publishing', 'failed']) {
+      expect(mediaParaBorrar([{ status: 'published' }, { status: pendiente }], [video])).toEqual([])
+    }
+  })
+
+  it('un post sin destinos no se considera publicado', () => {
+    expect(mediaParaBorrar([], [video])).toEqual([])
   })
 })

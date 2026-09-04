@@ -8,11 +8,13 @@ import {
 } from '@/db'
 import { CONNECTORS } from '@/lib/social'
 import { PUBLISHERS } from './index'
+import { del } from '@vercel/blob'
 import {
   NO_PUBLISH_TOKEN,
   PUBLISH_NETWORK_ERROR,
   STALE_PROCESSING,
   isStaleProcessing,
+  mediaParaBorrar,
   resolveOutcome,
   type PublishOutcome,
 } from './publisher'
@@ -78,8 +80,10 @@ export async function publishDue(now: Date = new Date()): Promise<Report> {
       .set({ ...patch, updatedAt: now })
       .where(eq(scheduledPostTargets.id, target.id))
 
-    if (patch.status === 'published') report.published++
-    else if (patch.status === 'publishing') report.processing++
+    if (patch.status === 'published') {
+      report.published++
+      await limpiarMedia(post.id)
+    } else if (patch.status === 'publishing') report.processing++
     else if (patch.status === 'scheduled') report.retried++
     else {
       report.failed++
@@ -88,6 +92,35 @@ export async function publishDue(now: Date = new Date()): Promise<Report> {
   }
 
   return report
+}
+
+/**
+ * Devuelve al almacenamiento el espacio del video cuando el post ya salió en todas
+ * sus redes. Se llama tras cada destino publicado porque solo entonces puede haberse
+ * completado el último; la regla de qué borrar vive en `mediaParaBorrar`.
+ *
+ * Falla en silencio a propósito: no poder borrar un archivo no es motivo para
+ * arruinar una publicación que sí funcionó. Lo que quede se recupera la próxima vez
+ * que el post pase por acá, o a mano.
+ */
+async function limpiarMedia(postId: string): Promise<void> {
+  try {
+    const db = getDb()
+    const [targets, media] = await Promise.all([
+      db
+        .select({ status: scheduledPostTargets.status })
+        .from(scheduledPostTargets)
+        .where(eq(scheduledPostTargets.postId, postId)),
+      db.select().from(scheduledPostMedia).where(eq(scheduledPostMedia.postId, postId)),
+    ])
+
+    for (const item of mediaParaBorrar(targets, media)) {
+      await del(item.blobUrl)
+      await db.delete(scheduledPostMedia).where(eq(scheduledPostMedia.id, item.id))
+    }
+  } catch (error) {
+    console.error('No se pudo liberar la media publicada:', String(error).slice(0, 300))
+  }
 }
 
 async function attempt(
