@@ -44,6 +44,29 @@ describe('normalizeInstagramAccount', () => {
   it('una respuesta sin `data` no revienta', () => {
     expect(normalizeInstagramAccount({}, { followers_count: 7 }).followers).toBe(7)
   })
+
+  it('elige la entrada por `end_time` mayor, no por posición', () => {
+    // La mayor `end_time` no es la última del array: Graph no garantiza el orden.
+    const desordenado = {
+      data: [
+        {
+          name: 'reach',
+          values: [
+            { value: 3206, end_time: '2026-09-03T00:00:00+0000' },
+            { value: 130, end_time: '2026-09-01T00:00:00+0000' },
+          ],
+        },
+      ],
+    }
+    expect(normalizeInstagramAccount(desordenado, {}).reach).toBe(3206)
+  })
+
+  it('sin `end_time` en ninguna entrada, conserva el orden posicional', () => {
+    const sinFecha = {
+      data: [{ name: 'reach', values: [{ value: 130 }, { value: 3206 }] }],
+    }
+    expect(normalizeInstagramAccount(sinFecha, {}).reach).toBe(3206)
+  })
 })
 
 describe('normalizeFacebookAccount', () => {

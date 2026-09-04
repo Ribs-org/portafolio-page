@@ -14,20 +14,32 @@ function toNumber(value: unknown): number | null {
 type InstagramEntry = {
   name?: string
   total_value?: { value?: unknown }
-  values?: Array<{ value?: unknown }>
+  values?: Array<{ value?: unknown; end_time?: string }>
 }
 
 /**
  * Graph mezcla dos formas en el mismo array: las métricas nuevas responden
  * `total_value` y las clásicas una serie `values`, de la que interesa la última
  * lectura — la del día que se está sincronizando.
+ *
+ * Esa lectura se elige por `end_time`, no por posición: Graph cierra cada ventana
+ * diaria con `end_time` a medianoche de la zona de la cuenta, así que la mayor es la
+ * última jornada completa — la que corresponde guardar. Si ninguna entrada trae
+ * `end_time`, se conserva el comportamiento anterior (última posición del array).
  */
 function instagramValue(entries: InstagramEntry[], name: string): number | null {
   const entry = entries.find((e) => e.name === name)
   if (!entry) return null
   if (entry.total_value) return toNumber(entry.total_value.value)
-  const last = entry.values?.at(-1)
-  return last ? toNumber(last.value) : null
+  const values = entry.values ?? []
+  const dated = values.filter((v): v is { value?: unknown; end_time: string } =>
+    typeof v.end_time === 'string' && v.end_time !== '',
+  )
+  const chosen =
+    dated.length > 0
+      ? dated.reduce((max, v) => (v.end_time > max.end_time ? v : max))
+      : values.at(-1)
+  return chosen ? toNumber(chosen.value) : null
 }
 
 export function normalizeInstagramAccount(
