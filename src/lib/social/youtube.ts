@@ -2,11 +2,14 @@ import type { SocialAccount } from '@/db'
 import { env } from '../env'
 import {
   MAX_POSTS_PER_SYNC,
+  NO_ACCOUNT_METRICS,
   NO_METRICS,
+  type AccountMetricValues,
   type Connector,
   type FetchedBatch,
   type FetchedPost,
 } from './connector'
+import { normalizeYoutubeAccount } from './account-metrics'
 
 export type YouTubeVideo = {
   id: string
@@ -140,5 +143,21 @@ export const youtubeConnector: Connector = {
       posts,
       windowWasCapped: ids.length >= MAX_POSTS_PER_SYNC || moreToPage,
     }
+  },
+
+  // `ensureCredential` above never hands back an OAuth token for this connector — only
+  // the read-side API key — so `token` here is that key, same as `uploadsPlaylistId`.
+  // channels.list authenticates it the same way: a `key=` query param, not a header.
+  async fetchAccountMetrics(
+    account: SocialAccount,
+    token: string,
+  ): Promise<AccountMetricValues> {
+    const id = account.externalId
+    if (!id) return NO_ACCOUNT_METRICS
+    const payload = await getJson(
+      `https://www.googleapis.com/youtube/v3/channels?part=statistics&id=${id}&key=${token}`,
+    ).catch(() => ({}))
+    const stats = (payload as { items?: Array<{ statistics?: unknown }> }).items?.[0]?.statistics
+    return normalizeYoutubeAccount((stats ?? {}) as never)
   },
 }

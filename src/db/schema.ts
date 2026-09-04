@@ -213,6 +213,36 @@ export const postMetrics = pgTable(
   (t) => [unique('post_metrics_post_day_key').on(t.postId, t.day), index('post_metrics_day_idx').on(t.day)],
 )
 
+/**
+ * Cómo va la cuenta, no cada publicación. Dos clases de columna conviven acá y no
+ * deben mezclarse: los contadores acumulados (seguidores, views totales) se leen
+ * enteros cada día y su crecimiento sale por diferencia, mientras que los valores del
+ * día vienen ya calculados por la red. Sumar los primeros como si fueran los segundos
+ * daría un total de seguidores que crece cada 24 horas.
+ */
+export const accountMetrics = pgTable(
+  'account_metrics',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    network: text('network').notNull(),
+    day: date('day').notNull(),
+    // Acumulados
+    followers: integer('followers'),
+    totalViews: integer('total_views'),
+    videoCount: integer('video_count'),
+    // Valores del día
+    profileViews: integer('profile_views'),
+    reach: integer('reach'),
+    views: integer('views'),
+    accountsEngaged: integer('accounts_engaged'),
+    capturedAt: timestamp('captured_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    unique('account_metrics_network_day_key').on(t.network, t.day),
+    index('account_metrics_day_idx').on(t.day),
+  ],
+)
+
 export const TARGET_STATUSES = ['scheduled', 'publishing', 'published', 'failed'] as const
 export type TargetStatus = (typeof TARGET_STATUSES)[number]
 

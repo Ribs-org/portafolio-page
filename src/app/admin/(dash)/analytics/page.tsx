@@ -1,4 +1,7 @@
+import { asc } from 'drizzle-orm'
 import Link from 'next/link'
+import { AccountCards, AccountSeriesChart } from './accounts'
+import { accountMetrics, getDb } from '@/db'
 import { BarList } from '@/components/charts/bar-list'
 import { CampaignTable } from '@/components/charts/campaign-table'
 import { Donut } from '@/components/charts/donut'
@@ -9,6 +12,7 @@ import { StatTile, delta } from '@/components/charts/stat-tile'
 import { seriesColor } from '@/components/charts/theme'
 import { TrafficChart } from '@/components/charts/traffic-chart'
 import { FilterBar } from '@/components/filter-bar'
+import { buildAccountCards, buildAccountSeries } from '@/lib/account-stats'
 import {
   SITE_TIMEZONE,
   getBrowsers,
@@ -25,6 +29,7 @@ import {
   getRecentVisits,
   getTimeSeries,
   getTopLinks,
+  localDay,
   previousPeriod,
 } from '@/lib/analytics'
 import { parseFilters } from '@/lib/filters'
@@ -96,10 +101,27 @@ export default async function AnalyticsPage({
 
   const campaignPosts = await getCampaignPosts(campaigns.map((c) => c.campaign))
 
-  const [topLinks, funnel] = await Promise.all([
+  const [topLinks, funnel, accountRows] = await Promise.all([
     getTopLinks(filters, kpis.visits),
     getFunnel(filters, kpis),
+    // Sin filtro de fecha a propósito: la variación necesita la lectura anterior a la
+    // ventana, y la tabla crece una fila por red y día — nada que paginar.
+    getDb()
+      .select({
+        network: accountMetrics.network,
+        day: accountMetrics.day,
+        followers: accountMetrics.followers,
+        profileViews: accountMetrics.profileViews,
+        reach: accountMetrics.reach,
+      })
+      .from(accountMetrics)
+      .orderBy(asc(accountMetrics.day), asc(accountMetrics.network)),
   ])
+
+  const accountFrom = localDay(filters.from)
+  const accountTo = localDay(filters.to)
+  const cards = buildAccountCards(accountRows, accountFrom, accountTo)
+  const accountSeries = buildAccountSeries(accountRows, accountFrom, accountTo)
 
   return (
     <>
@@ -120,6 +142,16 @@ export default async function AnalyticsPage({
       </div>
 
       <div className="mt-4 grid gap-4">
+        <Panel
+          title="Tus cuentas"
+          hint="Seguidores por red, con lo ganado en el período. Visitas al perfil y alcance son del último día leído — Instagram es la única que los entrega hoy."
+        >
+          <AccountCards cards={cards} />
+          <div className="mt-4">
+            <AccountSeriesChart series={accountSeries} />
+          </div>
+        </Panel>
+
         <Panel title="Tráfico en el tiempo" hint="Visitas y clicks, comparables en la misma escala">
           <TrafficChart data={series} />
         </Panel>

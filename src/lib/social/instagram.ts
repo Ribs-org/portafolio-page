@@ -2,12 +2,15 @@ import type { SocialAccount } from '@/db'
 import { env } from '../env'
 import {
   MAX_POSTS_PER_SYNC,
+  NO_ACCOUNT_METRICS,
   NO_METRICS,
+  type AccountMetricValues,
   type Connector,
   type FetchedBatch,
   type FetchedPost,
   type PostMetricValues,
 } from './connector'
+import { normalizeInstagramAccount } from './account-metrics'
 import { decryptToken } from './crypto'
 
 // Instagram API with Facebook Login, not Instagram Login: the owner's app lives in a
@@ -371,5 +374,33 @@ export const instagramConnector: Connector = {
       posts,
       windowWasCapped: media.length >= MAX_POSTS_PER_SYNC || next !== '',
     }
+  },
+
+  /**
+   * Two calls because they're two different shapes: the new metrics demand
+   * metric_type=total_value and the classic ones reject it. Each piece stands on its
+   * own — Instagram dropping one must not erase the others.
+   */
+  async fetchAccountMetrics(
+    account: SocialAccount,
+    token: string,
+  ): Promise<AccountMetricValues> {
+    const id = account.externalId
+    if (!id) return NO_ACCOUNT_METRICS
+
+    const nuevas = `${GRAPH}/${id}/insights?metric=profile_views,views,accounts_engaged&metric_type=total_value&period=day&access_token=${token}`
+    const clasicas = `${GRAPH}/${id}/insights?metric=reach&period=day&access_token=${token}`
+    const perfil = `${GRAPH}/${id}?fields=followers_count&access_token=${token}`
+
+    const [a, b, c] = await Promise.all([
+      getJson(nuevas).catch(() => ({})),
+      getJson(clasicas).catch(() => ({})),
+      getJson(perfil).catch(() => ({})),
+    ])
+    const data = [
+      ...((a as { data?: unknown[] }).data ?? []),
+      ...((b as { data?: unknown[] }).data ?? []),
+    ]
+    return normalizeInstagramAccount({ data } as never, c as never)
   },
 }
