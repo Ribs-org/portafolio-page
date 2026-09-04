@@ -1,12 +1,10 @@
 import { NextResponse } from 'next/server'
-import { and, eq, inArray, isNotNull } from 'drizzle-orm'
-import { getDb, scheduledPosts, scheduledPostTargets } from '@/db'
 import { SOCIAL_NETWORKS } from '@/db/schema'
 import { SITE_TIMEZONE } from '@/lib/analytics'
 import { env } from '@/lib/env'
 import { buildMetricPost, parseRango } from '@/lib/metrics-api'
+import { attributesFor } from '@/lib/post-attributes'
 import { getPostRows } from '@/lib/posts'
-import type { Atributos } from '@/lib/social/publish/atributos'
 
 export const dynamic = 'force-dynamic'
 
@@ -47,27 +45,7 @@ export async function GET(request: Request) {
 
   // Los atributos del calendario, unidos por (red, externalId) en memoria: un post
   // orgánico simplemente no aparece aquí y sale con atributos null.
-  const externalIds = rows.map((row) => row.externalId)
-  const atributosByKey = new Map<string, Atributos | null>()
-  if (externalIds.length > 0) {
-    const scheduled = await getDb()
-      .select({
-        network: scheduledPostTargets.network,
-        externalId: scheduledPostTargets.externalId,
-        atributos: scheduledPosts.atributos,
-      })
-      .from(scheduledPostTargets)
-      .innerJoin(scheduledPosts, eq(scheduledPostTargets.postId, scheduledPosts.id))
-      .where(
-        and(
-          isNotNull(scheduledPostTargets.externalId),
-          inArray(scheduledPostTargets.externalId, externalIds),
-        ),
-      )
-    for (const s of scheduled) {
-      atributosByKey.set(`${s.network}:${s.externalId}`, (s.atributos as Atributos | null) ?? null)
-    }
-  }
+  const atributosByKey = await attributesFor(rows)
 
   return NextResponse.json({
     truncado: all.length >= MAX_POSTS,
