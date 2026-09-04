@@ -36,7 +36,7 @@ export default function Contenido() {
   const { data, cargando, error, sello, refrescar } = useScreenData<Posts>(
     `posts:rango=${rango}`,
     `/api/mobile/posts?rango=${rango}`,
-    token ?? '',
+    token,
     salir,
   )
 

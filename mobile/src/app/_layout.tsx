@@ -16,11 +16,15 @@ export default function RootLayout() {
       router.replace('/login')
       return
     }
-    // El candado del dispositivo: si el teléfono no tiene huella ni PIN, no se
-    // inventa una barrera propia — el token ya está en el llavero del sistema.
-    const puede = await LocalAuthentication.hasHardwareAsync()
-    const inscrito = puede ? await LocalAuthentication.isEnrolledAsync() : false
-    if (inscrito) {
+    // El candado del dispositivo: `hasHardwareAsync`/`isEnrolledAsync` solo ven
+    // biometría (huella o cara), así que un teléfono con solo PIN o patrón
+    // pasaba directo sin pedir nada — pese a que el README promete que ese
+    // candado también protege. `getEnrolledLevelAsync` cubre los tres: PIN,
+    // patrón y biometría. Si no hay nada inscrito (`SecurityLevel.NONE`), no
+    // se inventa una barrera propia — el token ya está en el llavero del
+    // sistema.
+    const nivel = await LocalAuthentication.getEnrolledLevelAsync()
+    if (nivel !== LocalAuthentication.SecurityLevel.NONE) {
       const { success } = await LocalAuthentication.authenticateAsync({
         promptMessage: 'Desbloquea para ver tus números',
       })

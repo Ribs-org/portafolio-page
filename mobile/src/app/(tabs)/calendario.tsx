@@ -29,7 +29,7 @@ export default function Calendario() {
   const { data, cargando, error, sello, refrescar } = useScreenData<CalendarioData>(
     'calendario',
     '/api/mobile/schedule',
-    token ?? '',
+    token,
     salir,
   )
 

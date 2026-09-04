@@ -36,7 +36,7 @@ export default function Resumen() {
   const { data, cargando, error, sello, refrescar } = useScreenData<Overview>(
     `overview:${rango}`,
     `/api/mobile/overview?rango=${rango}`,
-    token ?? '',
+    token,
     salir,
   )
 

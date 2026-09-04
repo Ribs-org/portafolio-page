@@ -29,7 +29,7 @@ export default function Cuentas() {
   const { data, cargando, error, sello, refrescar } = useScreenData<CuentasData>(
     `cuentas:${RANGO}`,
     `/api/mobile/accounts?rango=${RANGO}`,
-    token ?? '',
+    token,
     salir,
   )
 
