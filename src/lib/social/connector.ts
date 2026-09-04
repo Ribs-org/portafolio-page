@@ -9,6 +9,26 @@ export type PostMetricValues = {
   reach: number | null
 }
 
+export type AccountMetricValues = {
+  followers: number | null
+  totalViews: number | null
+  videoCount: number | null
+  profileViews: number | null
+  reach: number | null
+  views: number | null
+  accountsEngaged: number | null
+}
+
+export const NO_ACCOUNT_METRICS: AccountMetricValues = {
+  followers: null,
+  totalViews: null,
+  videoCount: null,
+  profileViews: null,
+  reach: null,
+  views: null,
+  accountsEngaged: null,
+}
+
 export type FetchedPost = {
   externalId: string
   permalink: string | null
@@ -45,6 +65,11 @@ export type Connector = {
   /** Returns the usable credential, refreshing it first when it is close to expiring. */
   ensureCredential(account: SocialAccount): Promise<string | null>
   fetchPosts(account: SocialAccount, token: string | null): Promise<FetchedBatch>
+  /**
+   * Cómo va la cuenta hoy. Opcional: una red que no lo implemente simplemente no
+   * aporta fila, y ninguna implementación debe lanzar por una métrica ausente.
+   */
+  fetchAccountMetrics?(account: SocialAccount, token: string): Promise<AccountMetricValues>
 }
 
 /**
