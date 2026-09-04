@@ -22,13 +22,3 @@ export function shortDate(iso: string): string {
   return `${Number(iso.slice(8, 10))} ${mes}, ${iso.slice(11, 16)}`
 }
 
-/** Igual que `shortDate` pero relativa a ahora, para listas donde el orden ya se ve. */
-export function timeAgo(iso: string, now: number = Date.now()): string {
-  const then = new Date(iso).getTime()
-  if (Number.isNaN(then)) return '—'
-  const edad = now - then
-  if (edad < 60_000) return 'recién'
-  if (edad < 3600_000) return `hace ${Math.floor(edad / 60_000)} min`
-  if (edad < 86_400_000) return `hace ${Math.floor(edad / 3600_000)} h`
-  return `hace ${Math.floor(edad / 86_400_000)} d`
-}
