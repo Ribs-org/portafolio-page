@@ -64,7 +64,12 @@ export default function Cuentas() {
                 ? ' · — en el período'
                 : cuenta.seguidoresGanados === 0
                   ? ' · sin cambio'
-                  : ` · +${num(cuenta.seguidoresGanados)} en el período`}
+                  : // El backend acota a cero, así que esto no debería verse hoy: es
+                    // defensa para que un negativo salga con su propio signo («-5»)
+                    // en vez de duplicado («+-5»).
+                    cuenta.seguidoresGanados < 0
+                    ? ` · ${num(cuenta.seguidoresGanados)} en el período`
+                    : ` · +${num(cuenta.seguidoresGanados)} en el período`}
             </Text>
             <Text style={{ color: COLORES.tenue, fontSize: 12, marginTop: 4 }}>
               Visitas al perfil{cuenta.dia ? ` (${cuenta.dia})` : ''}: {num(cuenta.visitasAlPerfil)} ·

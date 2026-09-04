@@ -1,56 +1,71 @@
-# Welcome to your Expo app 👋
+# Vicente · Números
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+Esta es la app para el celular de Vicente. Muestra, de un vistazo, los números de
+sus redes (Instagram, Facebook, YouTube): seguidores, alcance, publicaciones
+recientes y el detalle de cada post. Los datos son los mismos que ve el panel web,
+leídos desde `https://www.vicente-pareja.cl/api/mobile/*`.
 
-## Get started
+No se publica en Google Play ni en la App Store. Se instala directamente en el
+teléfono desde un archivo `.apk` que se genera bajo pedido.
 
-1. Install dependencies
+## Qué necesitas
+
+Una cuenta gratuita en [expo.dev](https://expo.dev). Basta con registrarse una vez
+con un correo; no cuesta nada y no requiere tarjeta.
+
+## Cómo generar el instalable (`.apk`)
+
+Cada vez que se quiera una versión nueva de la app (por ejemplo, después de un
+cambio), hay que "construirla":
+
+1. Abre una terminal en la carpeta `mobile/` de este proyecto.
+2. Ejecuta:
 
    ```bash
-   npm install
+   npx eas-cli build -p android --profile preview
    ```
 
-2. Start the app
+3. La primera vez te va a pedir iniciar sesión con tu cuenta de Expo (el correo y
+   la contraseña que creaste en expo.dev). Las veces siguientes ya queda
+   recordado.
+4. El comando se demora unos minutos (se construye en los servidores de Expo, no
+   en tu computador). Al terminar, imprime un link (algo como
+   `https://expo.dev/artifacts/eas/....apk`).
 
-   ```bash
-   npx expo start
-   ```
+## Cómo instalarla en el teléfono
 
-In the output, you'll find options to open the app in a
+1. Abre ese link **desde el navegador del teléfono** (no hace falta cable ni
+   computador: puedes mandarte el link por WhatsApp o correo y abrirlo ahí mismo).
+2. El teléfono va a descargar un archivo `.apk` y, al abrirlo, Android va a pedir
+   permiso para "instalar apps desconocidas" (porque no viene de Google Play).
+   Se acepta una vez; queda guardado para la próxima.
+3. Termina la instalación como cualquier app. Va a aparecer un ícono llamado
+   "Vicente · Números".
 
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
+## Cómo entrar
 
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
+La primera vez que se abre, pide la **misma contraseña del panel web**. Se escribe
+una sola vez: después la sesión queda abierta. Si el teléfono tiene huella
+digital o PIN configurado, la app usa ese candado para protegerse cada vez que se
+abre — no hay que volver a escribir la contraseña.
 
-## Get a fresh project
+## Si se pierde el teléfono
 
-When you're ready, run:
+Para revocar el acceso de un teléfono perdido o robado, sin tener que hacer nada
+más:
 
-```bash
-npm run reset-project
-```
+1. Entra al proyecto en Vercel.
+2. Sube en 1 la variable de entorno `MOBILE_TOKEN_VERSION` (por defecto vale `1`;
+   súbela a `2`).
+3. Eso invalida de inmediato todas las sesiones de la app ya abiertas en
+   cualquier teléfono — van a pedir la contraseña de nuevo la próxima vez que se
+   abran.
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+Este paso **no afecta** las conexiones con Instagram, Facebook o YouTube: no hace
+falta volver a autorizar nada de eso, solo se cierra el acceso desde el celular.
 
-### Other setup steps
+## Qué no hace todavía
 
-- To set up ESLint for linting, run `npx expo lint`, or follow our guide on ["Using ESLint and Prettier"](https://docs.expo.dev/guides/using-eslint/)
-- If you'd like to set up unit testing, follow our guide on ["Unit Testing with Jest"](https://docs.expo.dev/develop/unit-testing/)
-- Learn more about the TypeScript setup in this template in our guide on ["Using TypeScript"](https://docs.expo.dev/guides/typescript/)
-
-## Learn more
-
-To learn more about developing your project with Expo, look at the following resources:
-
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
-
-## Join the community
-
-Join our community of developers creating universal apps.
-
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+- No publica ni programa contenido: es solo para mirar números.
+- No manda notificaciones (no avisa solo cuando hay un dato nuevo).
+- No existe versión para iPhone, solo Android.
