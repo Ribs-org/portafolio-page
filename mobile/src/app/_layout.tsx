@@ -35,6 +35,11 @@ export default function RootLayout() {
   }, [router])
 
   useEffect(() => {
+    // La regla ve una función que llama setState desde un efecto y no puede mirar
+    // más allá del primer `await`: acá nada se fija de forma síncrona — primero se
+    // lee el llavero y, si corresponde, el candado del dispositivo. Un arranque
+    // asíncrono es exactamente el caso que un efecto existe para cubrir.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     void arrancar()
   }, [arrancar])
 

@@ -14,7 +14,10 @@ export function useScreenData<T>(
   onSesionCaducada: () => void,
 ) {
   const [data, setData] = useState<T | null>(null)
-  const [savedAt, setSavedAt] = useState<number | null>(null)
+  // El sello se calcula al guardar, no al dibujar: `Date.now()` durante el render es
+  // impuro y el compilador de React puede rehacerlo cuando se le antoje, dando una
+  // antigüedad que salta sola. Acá se fija una vez por lectura, que es cuando cambia.
+  const [sello, setSello] = useState<string | null>(null)
   const [cargando, setCargando] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -22,8 +25,9 @@ export function useScreenData<T>(
     setCargando(true)
     try {
       const fresco = await apiGet<T>(path, token)
+      const cuando = Date.now()
       setData(fresco)
-      setSavedAt(Date.now())
+      setSello(freshness(cuando, cuando).etiqueta)
       setError(null)
       await writeCache(key, fresco)
     } catch (e) {
@@ -44,7 +48,7 @@ export function useScreenData<T>(
     readCache<T>(key).then((guardado) => {
       if (vivo && guardado) {
         setData(guardado.data)
-        setSavedAt(guardado.savedAt)
+        setSello(freshness(guardado.savedAt, Date.now()).etiqueta)
         setCargando(false)
       }
       void refrescar()
@@ -54,5 +58,5 @@ export function useScreenData<T>(
     }
   }, [key, refrescar])
 
-  return { data, cargando, error, sello: freshness(savedAt, Date.now()).etiqueta, refrescar }
+  return { data, cargando, error, sello, refrescar }
 }
