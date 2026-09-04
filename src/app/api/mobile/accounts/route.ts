@@ -29,8 +29,22 @@ export async function GET(request: Request) {
 
   const desde = localDay(from)
   const hasta = localDay(to)
-  return NextResponse.json({
-    cuentas: buildAccountCards(filas, desde, hasta),
-    serie: buildAccountSeries(filas, desde, hasta),
-  })
+
+  // Mismos datos que account-stats.ts arma para el panel, traducidos al español que
+  // habla el resto de la API móvil (account-stats.ts sigue sirviendo al panel web).
+  const cuentas = buildAccountCards(filas, desde, hasta).map((cuenta) => ({
+    red: cuenta.network,
+    seguidores: cuenta.followers,
+    seguidoresGanados: cuenta.followersChange,
+    visitasAlPerfil: cuenta.profileViews,
+    alcance: cuenta.reach,
+    dia: cuenta.dayLabel,
+  }))
+  const serie = buildAccountSeries(filas, desde, hasta).map((punto) => ({
+    fecha: punto.date,
+    visitasAlPerfil: punto.profileViews,
+    alcance: punto.reach,
+  }))
+
+  return NextResponse.json({ desde, hasta, cuentas, serie })
 }

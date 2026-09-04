@@ -6,6 +6,10 @@ export type Rango = (typeof RANGOS)[number]
 
 const DIAS: Record<Rango, number> = { hoy: 1, '7d': 7, '30d': 30 }
 
+// Iguala al tope de la API del editor-LLM (src/app/api/metrics/posts/route.ts): mismo
+// catálogo, misma parrilla — no hay razón para que el móvil vea menos posts que el editor.
+export const MAX_POSTS = 2000
+
 /**
  * Un rango ilegible cae en 7d en vez de fallar: en un teléfono, una pantalla vacía
  * por un parámetro mal escrito es peor que una ventana distinta a la pedida.

@@ -3,7 +3,7 @@ import { and, asc, eq, gt, lte } from 'drizzle-orm'
 import { accountMetrics, getDb, scheduledPosts, scheduledPostTargets } from '@/db'
 import { SITE_TIMEZONE, getKpis, localDay } from '@/lib/analytics'
 import { isoInZone } from '@/lib/metrics-api'
-import { parseRango, requireMobile } from '@/lib/mobile-api'
+import { MAX_POSTS, parseRango, requireMobile } from '@/lib/mobile-api'
 import { getPostRows } from '@/lib/posts'
 import { postKpisFrom } from '@/lib/posts-kpis'
 
@@ -22,7 +22,7 @@ export async function GET(request: Request) {
   // Las mismas funciones del panel: nada se recalcula acá.
   const [kpis, rows, seguidores, hoy, proximos] = await Promise.all([
     getKpis(filters),
-    getPostRows(filters, false, { publishedFrom: from, publishedTo: to, limit: 500 }),
+    getPostRows(filters, false, { publishedFrom: from, publishedTo: to, limit: MAX_POSTS }),
     // Última lectura de seguidores por red, sumada: el total que el dueño reconoce.
     db
       .select({ network: accountMetrics.network, followers: accountMetrics.followers, day: accountMetrics.day })
@@ -76,6 +76,9 @@ export async function GET(request: Request) {
   return NextResponse.json({
     desde: localDay(from),
     hasta: localDay(to),
+    // Igual que la API del editor: si el tope mordió, la app lo sabe en vez de
+    // subestimar en silencio las views ganadas de la ventana.
+    truncado: rows.length >= MAX_POSTS,
     kpis: {
       viewsGanadas: contenido.views,
       visitasAlSitio: kpis.visits,

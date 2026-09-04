@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server'
 import { SOCIAL_NETWORKS } from '@/db/schema'
-import { SITE_TIMEZONE } from '@/lib/analytics'
+import { SITE_TIMEZONE, localDay } from '@/lib/analytics'
 import { buildMetricPost } from '@/lib/metrics-api'
-import { parseRango, requireMobile } from '@/lib/mobile-api'
+import { MAX_POSTS, parseRango, requireMobile } from '@/lib/mobile-api'
 import { attributesFor } from '@/lib/post-attributes'
 import { getPostRows } from '@/lib/posts'
 
@@ -26,12 +26,17 @@ export async function GET(request: Request) {
   const todas = await getPostRows({ from, to, profileId: null, includeBots: false }, false, {
     publishedFrom: from,
     publishedTo: to,
-    limit: 500,
+    limit: MAX_POSTS,
   })
   const rows = redes.length > 0 ? todas.filter((row) => redes.includes(row.network)) : todas
   const atributos = await attributesFor(rows)
 
   return NextResponse.json({
+    desde: localDay(from),
+    hasta: localDay(to),
+    // Sobre lo traído antes del filtro por red, igual que `all` en la API del editor:
+    // el tope acota el catálogo completo, no lo que quedó tras filtrar.
+    truncado: todas.length >= MAX_POSTS,
     posts: rows.map((row) => ({
       ...buildMetricPost(row, atributos.get(`${row.network}:${row.externalId}`) ?? null, SITE_TIMEZONE),
       // Lo único que la app necesita y el shape del editor-LLM no lleva.
