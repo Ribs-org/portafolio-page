@@ -12,7 +12,7 @@ quede con tus números.
 | `/<slug>` | Cualquier otro perfil. El privado usa un slug que no se adivina |
 | `/admin` | Tu panel: resumen, analítica y editor |
 
-Corre en planes gratis: Next.js 16 en Vercel, Postgres en Neon, y la media en Cloudflare R2
+Corre en planes gratis: Next.js 16 en Vercel, Postgres en Neon y la media en Cloudflare R2
 (10 GB gratis, egress $0).
 
 ---
@@ -78,7 +78,7 @@ npm run db:setup             # crea las tablas y siembra dos perfiles de ejemplo
 
 ### 5. Redespliega
 
-Las variables de la base de datos no entran en un deploy que ya terminó. En Vercel:
+Las variables que agregaste (Neon y R2) no entran en un deploy que ya terminó. En Vercel:
 **Deployments → ⋯ del último → Redeploy**. O desde la terminal:
 
 ```bash
