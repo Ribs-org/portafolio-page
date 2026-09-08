@@ -1181,3 +1181,24 @@ las filas viejas pareciendo huérfanos, y el barrido se los llevaría al pasar l
 gracia. Es una propiedad de guardar URLs completas en vez de claves, no una regresión.
 Si algún día se cambia `R2_PUBLIC_BASE`, hay que reescribir las cinco columnas en la
 misma maniobra.
+
+## Cierre — 2026-09-08
+
+Ejecutado y verificado en producción. **91 filas migradas, cero apuntando a Vercel
+Blob.** El bucket quedó con 90 archivos y 1.122 MB, servidos por
+`https://media-bucket.vicente-pareja.cl`.
+
+Se corrigió sobre la marcha algo que el diagnóstico tenía mal: el script con que se midió
+cruzaba los archivos contra **una sola** columna (`scheduled_post_media.blob_url`), así
+que contó las 66 portadas de `scheduled_posts.cover_url` como huérfanas. Los huérfanos
+reales eran ~7, no 74. No cambia el diseño —el espacio siempre fueron los videos, y las
+dos fugas que tapa el barrido son reales— pero el barrido recupera mucho menos de lo
+anunciado.
+
+También se retiraron ya los patrones de `blob.vercel-storage.com` y el andamio de la
+migración, en el commit que el plan preveía para eso.
+
+Queda pendiente, del dueño: eliminar el store de Blob desde el panel de Vercel, retirar
+`BLOB_READ_WRITE_TOKEN`, y probar el ciclo completo con un video real (encolar, publicar,
+confirmar que Meta lo descargó desde el dominio propio y que `limpiarMedia` liberó el
+archivo).
