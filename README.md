@@ -55,7 +55,9 @@ En tu proyecto de Vercel, pestaña **Storage**:
 - **Almacenamiento de media** — no es de Vercel: un bucket de Cloudflare R2, porque
   su plan gratis son 10 GB con egress $0 y los videos programados no caben en menos.
   En dash.cloudflare.com → R2: crea el bucket, cuélgale un subdominio propio y emite
-  un token con permiso solo sobre él. Después carga `R2_ACCOUNT_ID`,
+  un token con permiso solo sobre él. No lo compartas con nada más: un barrido diario
+  borra del bucket todo lo que la base de datos no referencia, así que cualquier otra
+  cosa que guardes ahí dura menos de 24 horas. Después carga `R2_ACCOUNT_ID`,
   `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET` y `R2_PUBLIC_BASE` (ver
   `.env.example`). Opcional: sin esto todo funciona, solo que no puedes subir media.
 
