@@ -102,13 +102,17 @@ async function main() {
   let migradas = 0
   let fallidas = 0
   for (const item of lista) {
-    const key = keyDesdeBlob(item.url)
     if (!aplicar) {
-      console.log(`  ${item.etiqueta}  →  ${key}`)
+      console.log(`  ${item.etiqueta}  →  ${keyDesdeBlob(item.url)}`)
       continue
     }
     try {
-      const respuesta = await fetch(item.url)
+      // Dentro del try: es un script de un solo uso sobre producción, una fila
+      // malformada debe fallar sola y quedar reportada, no abortar la corrida entera.
+      const key = keyDesdeBlob(item.url)
+      // Igual que mediaToBlob en batch.ts: una descarga colgada no debe trabar toda
+      // la corrida.
+      const respuesta = await fetch(item.url, { signal: AbortSignal.timeout(30_000) })
       if (!respuesta.ok) throw new Error(`descarga ${respuesta.status}`)
       const contentType = respuesta.headers.get('content-type') ?? 'application/octet-stream'
       const nueva = await guardar(key, await respuesta.blob(), contentType)

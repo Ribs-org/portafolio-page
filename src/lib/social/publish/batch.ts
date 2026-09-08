@@ -92,14 +92,39 @@ export function portadaTypeError(stored: { url: string; mediaType: 'image' | 'vi
 
 // Subtypes whose conventional extension is not the subtype itself.
 const EXTENSION_BY_SUBTYPE: Record<string, string> = { jpeg: 'jpg', quicktime: 'mov' }
+// Inverse, for the extension → MIME subtype direction (tipoArchivo, below).
+const SUBTYPE_BY_EXTENSION: Record<string, string> = { jpg: 'jpeg', mov: 'quicktime' }
 
-/** The download's content-type, resolved to a media type and a blob-name extension. */
+/**
+ * El content-type de la descarga, resuelto a un tipo de media, una extensión para el
+ * nombre del blob, y `tipo` — el `tipo/subtipo` canónico, sin parámetros como
+ * `; charset=…`, listo para pasarle a Meta o YouTube como content-type del objeto.
+ */
 export function typeFromContentType(
   contentType: string,
-): { mediaType: 'image' | 'video'; extension: string } | null {
+): { mediaType: 'image' | 'video'; extension: string; tipo: string } | null {
   const [type, subtype = ''] = (contentType.split(';')[0] ?? '').trim().toLowerCase().split('/')
   if (type !== 'image' && type !== 'video') return null
-  return { mediaType: type, extension: EXTENSION_BY_SUBTYPE[subtype] ?? (subtype || 'bin') }
+  return {
+    mediaType: type,
+    extension: EXTENSION_BY_SUBTYPE[subtype] ?? (subtype || 'bin'),
+    tipo: `${type}/${subtype}`,
+  }
+}
+
+/**
+ * `file.type` real, o el que corresponde a su extensión cuando el navegador no lo dio
+ * (pasa con algunos .mov y con archivos que llegan por apps que no lo setean). Sin
+ * esto `guardar` recibía un content-type vacío y el archivo terminaba sirviéndose sin
+ * uno. Reutiliza las extensiones que este módulo ya reconoce en vez de mantener una
+ * segunda lista.
+ */
+export function tipoArchivo(file: File): string {
+  if (file.type) return file.type
+  const extension = extensionFromUrl(file.name)
+  if (IMAGE_EXTENSIONS.has(extension)) return `image/${SUBTYPE_BY_EXTENSION[extension] ?? extension}`
+  if (VIDEO_EXTENSIONS.has(extension)) return `video/${SUBTYPE_BY_EXTENSION[extension] ?? extension}`
+  return ''
 }
 
 /**
@@ -180,7 +205,10 @@ export async function mediaToBlob(
   const publicUrl = await guardar(
     `scheduled/${randomUUID()}.${detected.extension}`,
     await response.blob(),
-    contentType,
+    // El canónico que typeFromContentType ya parseó, no el header crudo: sin sus
+    // parámetros (`; charset=binary` y similares) para que Meta y YouTube lean un
+    // tipo limpio al descargar la media desde acá.
+    detected.tipo,
   )
   return { url: publicUrl, mediaType: detected.mediaType }
 }

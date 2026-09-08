@@ -19,6 +19,7 @@ import {
   mediaTypeFromUrl,
   portadaExtensionError,
   portadaTypeError,
+  tipoArchivo,
   PORTADA_NEEDS_VIDEO,
 } from '@/lib/social/publish/batch'
 import { validateScheduleDraft } from '@/lib/social/publish/validate'
@@ -292,13 +293,14 @@ export async function uploadImage(formData: FormData): Promise<{ url?: string; e
   if (!ALLOWED_TYPES.includes(file.type)) return { error: 'Formato no soportado.' }
 
   try {
-    const url = await guardar(`uploads/${randomUUID()}-${file.name}`, file, file.type)
+    const url = await guardar(`uploads/${randomUUID()}-${file.name}`, file, tipoArchivo(file))
     return { url }
   } catch (error) {
-    console.error('[upload] failed', error)
     // Sin configuración el panel debe decir qué falta, no un genérico: es el mismo
-    // trato que daba la guarda del token de Vercel Blob que esto reemplaza.
+    // trato que daba la guarda del token de Vercel Blob que esto reemplaza. Se revisa
+    // antes de loguear: una simple falta de configuración no es una falla real.
     if (error instanceof Error && error.message === SIN_ALMACEN) return { error: SIN_ALMACEN }
+    console.error('[upload] failed', error)
     return { error: 'No se pudo subir la imagen.' }
   }
 }
@@ -421,7 +423,7 @@ export async function createScheduledPost(_prev: FormState, formData: FormData):
   const uploaded: Array<{ url: string; mediaType: 'image' | 'video' }> = []
   for (const file of files) {
     // Público a propósito: la Graph API de Instagram descarga la media desde esta URL.
-    const url = await guardar(`scheduled/${randomUUID()}-${file.name}`, file, file.type)
+    const url = await guardar(`scheduled/${randomUUID()}-${file.name}`, file, tipoArchivo(file))
     uploaded.push({ url, mediaType: file.type.startsWith('video/') ? 'video' : 'image' })
   }
 
@@ -544,8 +546,8 @@ export async function updateScheduledPost(
   }
 
   // Las URLs se resuelven primero: mediaToBlob es la falla más probable (enlace roto,
-  // host que no responde). Si falla acá, no quedan blobs de archivos huérfanos — el
-  // loop de put() de archivos corre después, solo si las URLs ya resolvieron.
+  // host que no responde). Si falla acá, no quedan archivos huérfanos en el almacén
+  // — el loop de guardar() de archivos corre después, solo si las URLs ya resolvieron.
   const urlMedia: Array<{ url: string; mediaType: 'image' | 'video' }> = []
   for (const url of urls) {
     const stored = await mediaToBlob(url, mediaTypeFromUrl(url))
@@ -554,7 +556,7 @@ export async function updateScheduledPost(
   }
   const fileMedia: Array<{ url: string; mediaType: 'image' | 'video' }> = []
   for (const file of files) {
-    const url = await guardar(`scheduled/${randomUUID()}-${file.name}`, file, file.type)
+    const url = await guardar(`scheduled/${randomUUID()}-${file.name}`, file, tipoArchivo(file))
     fileMedia.push({ url, mediaType: file.type.startsWith('video/') ? 'video' : 'image' })
   }
   const added = [...fileMedia, ...urlMedia]
