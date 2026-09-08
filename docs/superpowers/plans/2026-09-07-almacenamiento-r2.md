@@ -1138,3 +1138,46 @@ La rama de trabajo sale de `contenido-presentacion`. Recordar que producción de
 | 135 MB de huérfanos sin forma de recuperarlos | Barrido diario en el cron de publicación |
 | Borrar un post dejaba su video para siempre | El barrido lo recoge al día siguiente |
 | Quitar una media en el editor dejaba su archivo | Ídem |
+
+---
+
+## Estado al 2026-09-08
+
+Ejecutado en la rama `almacen-r2` (`d6a4e59..09ee093`, 10 commits). 336 pruebas, lint y
+typecheck verdes.
+
+**Hecho:** tareas 1, 2, 3, 6 completas; tarea 5 solo sus pasos 1-8 (el código).
+
+**Pendiente, y bloqueado en la preparación manual de Cloudflare:**
+
+- Tarea 4 entera (crear el bucket, colgarle el subdominio, emitir el token, cargar las
+  cinco variables, desplegar, probar la subida y el cron).
+- Tarea 5 pasos 9-15 (dry-run, migración real, verificación, prueba del ciclo completo
+  con video, eliminar el store de Vercel Blob, borrar el andamio de la migración).
+- Tarea 6 paso 2 (`npm run blobs:auditar`, que necesita las credenciales) y paso 4 (el PR).
+
+**Dos cambios que la revisión final obligó, y que el plan de arriba no anticipaba:**
+
+1. **Los patrones de `blob.vercel-storage.com` en `next.config.ts` NO se quitaron.** El
+   paso 5 de la tarea 2 decía quitarlos, pero con el orden «desplegar primero, migrar
+   después» las URLs guardadas siguen apuntando ahí durante toda la ventana, y el
+   optimizador de imágenes de Next responde 400 para un host ausente de
+   `remotePatterns` — el perfil público perdería avatar e imágenes de links. Se quitan
+   en el mismo commit que borra `src/lib/storage-migracion.ts` y
+   `scripts/migrate-blobs.ts` (tarea 5, paso 15), que es cuando ninguna fila puede ya
+   referenciar ese host.
+
+2. **El barrido compara claves, no URLs.** Como lo describía la tarea 3, si
+   `R2_PUBLIC_BASE` cambiara alguna vez, ninguna URL guardada cruzaría con las
+   compuestas, el conjunto de referencias quedaría lleno de cadenas que no coinciden, y
+   la guarda de «conjunto vacío = no borrar nada» no se dispararía: la siguiente corrida
+   borraba el bucket entero. Ahora cada URL referenciada se resuelve con `keyDesdeUrl`
+   contra la base actual y las que no resuelven se descartan, así que una base
+   equivocada produce un conjunto vacío y el barrido no borra nada.
+
+**Riesgo residual anotado, no resuelto:** una migración *parcial* de base —algunas filas
+compuestas con la base vieja y otras con la nueva, sin backfill— dejaría los objetos de
+las filas viejas pareciendo huérfanos, y el barrido se los llevaría al pasar la hora de
+gracia. Es una propiedad de guardar URLs completas en vez de claves, no una regresión.
+Si algún día se cambia `R2_PUBLIC_BASE`, hay que reescribir las cinco columnas en la
+misma maniobra.
