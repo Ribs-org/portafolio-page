@@ -50,6 +50,16 @@ function config(): Config | null {
   return bucket && base ? { bucket, base: sinBarra(base) } : null
 }
 
+/**
+ * La base pública con la que este módulo compone y descompone URLs, o null sin R2
+ * configurado. `storage-gc.ts` la necesita para resolver a qué key apunta cada URL
+ * referenciada en la base de datos — expuesta acá en vez de releer `R2_PUBLIC_BASE`
+ * en otro archivo, para que las dos lecturas no puedan desincronizarse nunca.
+ */
+export function basePublica(): string | null {
+  return config()?.base ?? null
+}
+
 let cliente: S3Client | null = null
 
 function getCliente(): S3Client {
@@ -78,7 +88,15 @@ export async function guardar(key: string, body: Blob | Buffer, contentType: str
   // calcularlo aparte. Un video de 50 MB en memoria cabe de sobra en la función.
   const cuerpo = Buffer.isBuffer(body) ? body : Buffer.from(await body.arrayBuffer())
   await getCliente().send(
-    new PutObjectCommand({ Bucket: conf.bucket, Key: key, Body: cuerpo, ContentType: contentType }),
+    new PutObjectCommand({
+      Bucket: conf.bucket,
+      Key: key,
+      Body: cuerpo,
+      ContentType: contentType,
+      // Cada key lleva un UUID: nunca cambia de contenido, así que cachearla para
+      // siempre es seguro. R2 no pone un default largo por su cuenta.
+      CacheControl: 'public, max-age=31536000, immutable',
+    }),
   )
   return urlPublica(conf.base, key)
 }
@@ -115,7 +133,11 @@ export async function listar(): Promise<ObjetoAlmacenado[]> {
         key: o.Key,
         url: urlPublica(conf.base, o.Key),
         size: o.Size ?? 0,
-        uploadedAt: o.LastModified ?? new Date(0),
+        // Sin fecha, se asume recién subido: en un predicado que borra, el default
+        // seguro es tratar la edad desconocida como "todavía dentro de la gracia",
+        // no como "viejo de sobra". R2 siempre manda LastModified, así que esto es
+        // teórico.
+        uploadedAt: o.LastModified ?? new Date(),
       })
     }
     token = pagina.IsTruncated ? pagina.NextContinuationToken : undefined

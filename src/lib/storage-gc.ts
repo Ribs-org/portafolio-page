@@ -1,5 +1,5 @@
 import { getDb, links, profiles, scheduledPostMedia, scheduledPosts } from '@/db'
-import { borrar, listar, type ObjetoAlmacenado } from '@/lib/storage'
+import { basePublica, borrar, keyDesdeUrl, listar, type ObjetoAlmacenado } from '@/lib/storage'
 
 /**
  * Entre el `guardar()` y el `insert()` de la fila hay una ventana real. Una hora es
@@ -13,11 +13,17 @@ export type Barrido = { borrados: number; bytes: number; error?: string }
 /**
  * La regla: se va lo que ninguna fila referencia y lleva más de `graciaMs` subido.
  *
+ * `referenciadas` son keys del almacén, no URLs completas —comparar por key es lo
+ * que hace que un cambio en la base pública (R2_PUBLIC_BASE) no vacíe el bucket: si
+ * la base con la que se compuso una URL guardada ya no coincide con la actual,
+ * `keyDesdeUrl` la resuelve a null en vez de a una key que nunca va a calzar, y
+ * `keysReferenciadas` la descarta antes de llegar acá.
+ *
  * El conjunto vacío es el caso peligroso y se trata aparte. Un bucket con objetos y
  * cero referencias no es un estado que esta app produzca —cada archivo nace junto a
- * la fila que lo apunta—, así que es mucho más probable una lectura fallida que un
- * bucket legítimamente huérfano. Ante la duda no se borra: postergar el barrido un
- * día no cuesta nada, vaciar el bucket no tiene vuelta.
+ * la fila que lo apunta—, así que es mucho más probable una lectura fallida (o, ahora,
+ * un cambio de base) que un bucket legítimamente huérfano. Ante la duda no se borra:
+ * postergar el barrido un día no cuesta nada, vaciar el bucket no tiene vuelta.
  */
 export function objetosABorrar(
   objetos: ObjetoAlmacenado[],
@@ -27,7 +33,22 @@ export function objetosABorrar(
 ): ObjetoAlmacenado[] {
   if (referenciadas.size === 0) return []
   const limite = ahora.getTime() - graciaMs
-  return objetos.filter((o) => !referenciadas.has(o.url) && o.uploadedAt.getTime() < limite)
+  return objetos.filter((o) => !referenciadas.has(o.key) && o.uploadedAt.getTime() < limite)
+}
+
+/**
+ * Resuelve URLs guardadas en la base de datos a keys del almacén actual. Una URL que
+ * no resuelve —de otra base, o de un host ajeno como una miniatura de Instagram—
+ * devuelve null y se descarta: exactamente las URLs que no deben proteger ningún
+ * objeto.
+ */
+export function keysReferenciadas(urls: Set<string>, base: string): Set<string> {
+  const keys = new Set<string>()
+  for (const url of urls) {
+    const key = keyDesdeUrl(base, url)
+    if (key) keys.add(key)
+  }
+  return keys
 }
 
 /**
@@ -63,7 +84,12 @@ async function urlsReferenciadas(): Promise<Set<string>> {
  */
 export async function barrerHuerfanos(ahora: Date = new Date()): Promise<Barrido> {
   try {
-    const [objetos, referenciadas] = await Promise.all([listar(), urlsReferenciadas()])
+    const [objetos, urls] = await Promise.all([listar(), urlsReferenciadas()])
+    // listar() ya lanzó SIN_ALMACEN si no hay base configurada, así que en la
+    // práctica esto siempre es no-null acá. El `?? new Set()` es solo para que el
+    // tipo cierre sin forzar un throw redundante.
+    const base = basePublica()
+    const referenciadas = base ? keysReferenciadas(urls, base) : new Set<string>()
     let borrados = 0
     let bytes = 0
     for (const objeto of objetosABorrar(objetos, referenciadas, ahora)) {
