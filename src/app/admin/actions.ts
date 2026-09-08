@@ -4,7 +4,7 @@ import { randomUUID } from 'node:crypto'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { headers } from 'next/headers'
-import { put } from '@vercel/blob'
+import { guardar, SIN_ALMACEN } from '@/lib/storage'
 import { and, asc, eq, inArray, max, ne, sql } from 'drizzle-orm'
 import { getDb, links, profiles, socialAccounts, socialPosts, scheduledPosts, scheduledPostTargets, scheduledPostMedia } from '@/db'
 import { LINK_KINDS, type LinkKind } from '@/db/schema'
@@ -291,18 +291,14 @@ export async function uploadImage(formData: FormData): Promise<{ url?: string; e
   if (file.size > MAX_UPLOAD_BYTES) return { error: 'La imagen supera los 8 MB.' }
   if (!ALLOWED_TYPES.includes(file.type)) return { error: 'Formato no soportado.' }
 
-  if (!process.env.BLOB_READ_WRITE_TOKEN) {
-    return { error: 'Falta configurar Vercel Blob (BLOB_READ_WRITE_TOKEN).' }
-  }
-
   try {
-    const blob = await put(`uploads/${randomUUID()}-${file.name}`, file, {
-      access: 'public',
-      contentType: file.type,
-    })
-    return { url: blob.url }
+    const url = await guardar(`uploads/${randomUUID()}-${file.name}`, file, file.type)
+    return { url }
   } catch (error) {
     console.error('[upload] failed', error)
+    // Sin configuración el panel debe decir qué falta, no un genérico: es el mismo
+    // trato que daba la guarda del token de Vercel Blob que esto reemplaza.
+    if (error instanceof Error && error.message === SIN_ALMACEN) return { error: SIN_ALMACEN }
     return { error: 'No se pudo subir la imagen.' }
   }
 }
@@ -424,9 +420,9 @@ export async function createScheduledPost(_prev: FormState, formData: FormData):
 
   const uploaded: Array<{ url: string; mediaType: 'image' | 'video' }> = []
   for (const file of files) {
-    // Public on purpose: Instagram's Graph API fetches the media from this URL.
-    const blob = await put(`scheduled/${randomUUID()}-${file.name}`, file, { access: 'public' })
-    uploaded.push({ url: blob.url, mediaType: file.type.startsWith('video/') ? 'video' : 'image' })
+    // Público a propósito: la Graph API de Instagram descarga la media desde esta URL.
+    const url = await guardar(`scheduled/${randomUUID()}-${file.name}`, file, file.type)
+    uploaded.push({ url, mediaType: file.type.startsWith('video/') ? 'video' : 'image' })
   }
 
   const db = getDb()
@@ -558,8 +554,8 @@ export async function updateScheduledPost(
   }
   const fileMedia: Array<{ url: string; mediaType: 'image' | 'video' }> = []
   for (const file of files) {
-    const blob = await put(`scheduled/${randomUUID()}-${file.name}`, file, { access: 'public' })
-    fileMedia.push({ url: blob.url, mediaType: file.type.startsWith('video/') ? 'video' : 'image' })
+    const url = await guardar(`scheduled/${randomUUID()}-${file.name}`, file, file.type)
+    fileMedia.push({ url, mediaType: file.type.startsWith('video/') ? 'video' : 'image' })
   }
   const added = [...fileMedia, ...urlMedia]
 

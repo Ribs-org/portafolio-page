@@ -8,7 +8,7 @@ import {
 } from '@/db'
 import { CONNECTORS } from '@/lib/social'
 import { PUBLISHERS } from './index'
-import { del } from '@vercel/blob'
+import { borrar } from '@/lib/storage'
 import {
   NO_PUBLISH_TOKEN,
   PUBLISH_NETWORK_ERROR,
@@ -115,7 +115,7 @@ async function limpiarMedia(postId: string): Promise<void> {
     ])
 
     for (const item of mediaParaBorrar(targets, media)) {
-      await del(item.blobUrl)
+      await borrar(item.blobUrl)
       await db.delete(scheduledPostMedia).where(eq(scheduledPostMedia.id, item.id))
     }
   } catch (error) {

@@ -2,7 +2,7 @@ import { env } from '@/lib/env'
 import { fromZonedInput } from '@/lib/utils'
 import { validateScheduleDraft } from './validate'
 import { validateAtributos } from './atributos'
-import { put } from '@vercel/blob'
+import { guardar } from '@/lib/storage'
 import { getDb, scheduledPosts, scheduledPostMedia, scheduledPostTargets } from '@/db'
 import { randomUUID } from 'node:crypto'
 
@@ -177,10 +177,12 @@ export async function mediaToBlob(
     console.error('Content-type inesperado en la media del lote:', contentType, url.slice(0, 200))
     return null
   }
-  const blob = await put(`scheduled/${randomUUID()}.${detected.extension}`, await response.blob(), {
-    access: 'public',
-  })
-  return { url: blob.url, mediaType: detected.mediaType }
+  const publicUrl = await guardar(
+    `scheduled/${randomUUID()}.${detected.extension}`,
+    await response.blob(),
+    contentType,
+  )
+  return { url: publicUrl, mediaType: detected.mediaType }
 }
 
 /**
