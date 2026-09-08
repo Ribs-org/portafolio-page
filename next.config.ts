@@ -29,6 +29,13 @@ const nextConfig: NextConfig = {
       // del perfil público (src/components/profile-view.tsx) deja de renderizar,
       // pero el build no se rompe.
       ...(hostnameR2 ? [{ protocol: 'https' as const, hostname: hostnameR2 }] : []),
+      // Transitorios: la migración de Vercel Blob a R2 (scripts/migrate-blobs.ts)
+      // todavía no corrió, así que toda URL en la base de datos hoy sigue apuntando
+      // acá. Deben quedarse hasta que la migración termine — se borran en el mismo
+      // commit que borra src/lib/storage-migracion.ts y scripts/migrate-blobs.ts,
+      // que es cuando ninguna fila puede referenciar ya este host.
+      { protocol: 'https', hostname: '**.public.blob.vercel-storage.com' },
+      { protocol: 'https', hostname: '**.blob.vercel-storage.com' },
       // Post thumbnails from the connected networks. Rendered with `unoptimized`:
       // these URLs expire in hours, so caching an optimized copy just goes stale.
       { protocol: 'https', hostname: '**.cdninstagram.com' },
