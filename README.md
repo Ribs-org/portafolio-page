@@ -12,8 +12,8 @@ quede con tus números.
 | `/<slug>` | Cualquier otro perfil. El privado usa un slug que no se adivina |
 | `/admin` | Tu panel: resumen, analítica y editor |
 
-Corre entero en el plan gratis de Vercel: Next.js 16, Postgres en Neon y Vercel Blob para
-las imágenes.
+Corre en planes gratis: Next.js 16 en Vercel, Postgres en Neon, y la media en Cloudflare R2
+(10 GB gratis, egress $0).
 
 ---
 
@@ -52,8 +52,12 @@ datos"**. Es lo esperado: todavía no hay base de datos. Sigue.
 En tu proyecto de Vercel, pestaña **Storage**:
 
 - **Create Database → Neon** — inyecta `DATABASE_URL` sola. Obligatoria.
-- **Create → Blob** — inyecta `BLOB_READ_WRITE_TOKEN` sola. Opcional: sin ella todo
-  funciona, solo que no puedes subir fotos desde el panel.
+- **Almacenamiento de media** — no es de Vercel: un bucket de Cloudflare R2, porque
+  su plan gratis son 10 GB con egress $0 y los videos programados no caben en menos.
+  En dash.cloudflare.com → R2: crea el bucket, cuélgale un subdominio propio y emite
+  un token con permiso solo sobre él. Después carga `R2_ACCOUNT_ID`,
+  `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET` y `R2_PUBLIC_BASE` (ver
+  `.env.example`). Opcional: sin esto todo funciona, solo que no puedes subir media.
 
 ### 4. Crea las tablas
 
@@ -74,7 +78,7 @@ npm run db:setup             # crea las tablas y siembra dos perfiles de ejemplo
 
 ### 5. Redespliega
 
-Las variables que agregaron Neon y Blob no entran en un deploy que ya terminó. En Vercel:
+Las variables de la base de datos no entran en un deploy que ya terminó. En Vercel:
 **Deployments → ⋯ del último → Redeploy**. O desde la terminal:
 
 ```bash
@@ -289,7 +293,11 @@ Vercel y bajan con `vercel env pull .env.local`.
 | `ADMIN_PASSWORD` | Contraseña del panel | Sí |
 | `AUTH_SECRET` | Firma de la cookie de sesión | Sí |
 | `FINGERPRINT_SALT` | Sal del hash de visitante | Sí |
-| `BLOB_READ_WRITE_TOKEN` | Subida de imágenes | No — sin ella no puedes subir fotos |
+| `R2_ACCOUNT_ID` | ID de tu cuenta de Cloudflare | No — sin ella no puedes subir media |
+| `R2_ACCESS_KEY_ID` | Llave de acceso para R2 | No — sin ella no puedes subir media |
+| `R2_SECRET_ACCESS_KEY` | Llave secreta para R2 | No — sin ella no puedes subir media |
+| `R2_BUCKET` | Nombre del bucket de R2 | No — sin ella no puedes subir media |
+| `R2_PUBLIC_BASE` | URL pública del bucket de R2 | No — sin ella no puedes subir media |
 | `SITE_TIMEZONE` | Zona en la que el dashboard agrupa los días | No — por defecto `America/Santiago` |
 | `YOUTUBE_API_KEY` | Métricas de YouTube | No — sin ella esa red aparece como no conectada |
 | `YOUTUBE_CHANNEL_ID` | Métricas de YouTube | No — sin ella esa red aparece como no conectada |
