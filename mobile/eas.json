@@ -3,10 +3,12 @@
   "build": {
     "preview": {
       "android": { "buildType": "apk" },
-      "distribution": "internal"
+      "distribution": "internal",
+      "channel": "preview"
     },
     "production": {
-      "android": { "buildType": "app-bundle" }
+      "android": { "buildType": "app-bundle" },
+      "channel": "production"
     }
   }
 }

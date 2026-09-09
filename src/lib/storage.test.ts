@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest'
-import { keyDesdeUrl, urlPublica } from './storage'
+import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { SIN_ALMACEN, existe, keyDesdeUrl, urlParaSubir, urlPublica } from './storage'
 
 const BASE = 'https://media.ejemplo.com'
 
@@ -49,5 +49,43 @@ describe('keyDesdeUrl', () => {
 
   it('devuelve null si el percent-encoding está roto', () => {
     expect(keyDesdeUrl(BASE, `${BASE}/scheduled/%E0%A4%A.mp4`)).toBeNull()
+  })
+})
+
+describe('sin R2 configurado', () => {
+  const guardado: Record<string, string | undefined> = {}
+  const VARS = ['R2_BUCKET', 'R2_PUBLIC_BASE', 'R2_ACCOUNT_ID', 'R2_ACCESS_KEY_ID', 'R2_SECRET_ACCESS_KEY']
+
+  beforeEach(() => {
+    for (const v of VARS) {
+      guardado[v] = process.env[v]
+      delete process.env[v]
+    }
+  })
+  afterEach(() => {
+    for (const v of VARS) {
+      if (guardado[v] !== undefined) process.env[v] = guardado[v]
+    }
+  })
+
+  it('urlParaSubir lanza la misma frase que guardar()', async () => {
+    await expect(urlParaSubir('scheduled/a.mp4', 'video/mp4')).rejects.toThrow(SIN_ALMACEN)
+  })
+
+  it('existe() es falso: sin almacén nada existe', async () => {
+    expect(await existe('https://media.ejemplo.com/scheduled/a.mp4')).toBe(false)
+  })
+})
+
+describe('existe con una URL ajena', () => {
+  it('es falso sin tocar la red, igual que borrar() no toca lo ajeno', async () => {
+    process.env.R2_BUCKET = 'b'
+    process.env.R2_PUBLIC_BASE = BASE
+    try {
+      expect(await existe('https://scontent.cdninstagram.com/v/foto.jpg')).toBe(false)
+    } finally {
+      delete process.env.R2_BUCKET
+      delete process.env.R2_PUBLIC_BASE
+    }
   })
 })

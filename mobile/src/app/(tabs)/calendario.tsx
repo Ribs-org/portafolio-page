@@ -1,6 +1,6 @@
 import { useCallback } from 'react'
 import { Text, View } from 'react-native'
-import { useRouter } from 'expo-router'
+import { useFocusEffect, useRouter } from 'expo-router'
 import {
   COLORES,
   Cargando,
@@ -26,12 +26,16 @@ export default function Calendario() {
     router.replace('/login')
   }, [router])
 
-  const { data, cargando, error, sello, refrescar } = useScreenData<CalendarioData>(
+  const { data, cargando, error, sello, refrescar, refrescarSiVieja } = useScreenData<CalendarioData>(
     'calendario',
     '/api/mobile/schedule',
     token,
     salir,
   )
+
+  // Al volver a esta pestaña: si Publicar acaba de crear un post, o la caché ya es
+  // vieja, refresca sola. Es lo que hace aparecer el post recién programado.
+  useFocusEffect(refrescarSiVieja)
 
   if (!data && cargando) return <Cargando />
   if (!data) {

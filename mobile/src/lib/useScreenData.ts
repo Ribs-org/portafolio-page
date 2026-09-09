@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { SesionCaducada, apiGet } from './api'
 import { freshness, readCache, writeCache } from './cache'
+import { huboCambioDesde } from './cambios'
 
 /**
  * El patrón de las cuatro pantallas: muestra lo último que se supo apenas abre y
@@ -20,6 +21,9 @@ export function useScreenData<T>(
   const [sello, setSello] = useState<string | null>(null)
   const [cargando, setCargando] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  // Cuándo se guardó lo que está en pantalla, para decidir al recibir foco si vale
+  // la pena refrescar. Un ref y no un estado: cambiarlo no debe redibujar nada.
+  const guardadoEn = useRef<number | null>(null)
 
   const refrescar = useCallback(async () => {
     // Sin token no hay con qué pedir: `useToken()` devuelve `null` en el primer
@@ -33,6 +37,7 @@ export function useScreenData<T>(
     try {
       const fresco = await apiGet<T>(path, token)
       const cuando = Date.now()
+      guardadoEn.current = cuando
       setData(fresco)
       setSello(freshness(cuando, cuando).etiqueta)
       setError(null)
@@ -62,6 +67,7 @@ export function useScreenData<T>(
       // que ya no existe cuando la lectura de caché resuelve tarde.
       if (!vivo) return
       if (guardado) {
+        guardadoEn.current = guardado.savedAt
         setData(guardado.data)
         setSello(freshness(guardado.savedAt, Date.now()).etiqueta)
         setCargando(false)
@@ -86,5 +92,15 @@ export function useScreenData<T>(
     void refrescar()
   }, [token, refrescar])
 
-  return { data, cargando, error, sello, refrescar }
+  /**
+   * Para `useFocusEffect`: refresca al volver a una pestaña solo si la caché pasó de
+   * fresca, o si la app escribió algo (un post nuevo) después de guardarla. Sin esto,
+   * el post recién programado no aparecería en Calendario hasta tirar para refrescar.
+   */
+  const refrescarSiVieja = useCallback(() => {
+    const cuando = guardadoEn.current
+    if (!freshness(cuando, Date.now()).fresca || huboCambioDesde(cuando)) void refrescar()
+  }, [refrescar])
+
+  return { data, cargando, error, sello, refrescar, refrescarSiVieja }
 }

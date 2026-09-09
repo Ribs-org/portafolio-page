@@ -1,6 +1,6 @@
 import { useCallback, useState } from 'react'
 import { Pressable, Text, View } from 'react-native'
-import { useRouter } from 'expo-router'
+import { useFocusEffect, useRouter } from 'expo-router'
 import {
   COLORES,
   Cargando,
@@ -33,12 +33,16 @@ export default function Resumen() {
     router.replace('/login')
   }, [router])
 
-  const { data, cargando, error, sello, refrescar } = useScreenData<Overview>(
+  const { data, cargando, error, sello, refrescar, refrescarSiVieja } = useScreenData<Overview>(
     `overview:${rango}`,
     `/api/mobile/overview?rango=${rango}`,
     token,
     salir,
   )
+
+  // Al volver a esta pestaña: si Publicar acaba de crear un post, o la caché ya es
+  // vieja, refresca sola. Es lo que hace aparecer el post recién programado.
+  useFocusEffect(refrescarSiVieja)
 
   if (!data && cargando) return <Cargando />
   if (!data) {

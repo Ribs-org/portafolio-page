@@ -3,7 +3,19 @@ import { and, asc, eq, gt, inArray, lte } from 'drizzle-orm'
 import { getDb, scheduledPosts, scheduledPostMedia, scheduledPostTargets } from '@/db'
 import { SITE_TIMEZONE } from '@/lib/analytics'
 import { isoInZone } from '@/lib/metrics-api'
-import { requireMobile } from '@/lib/mobile-api'
+import {
+  ARCHIVO_AJENO,
+  ARCHIVO_FALTANTE,
+  CUERPO_ILEGIBLE,
+  NO_SE_GUARDO,
+  parseBorradorMovil,
+  parseMediaMovil,
+  requireMobile,
+  resolverCuando,
+} from '@/lib/mobile-api'
+import { crearPostProgramado } from '@/lib/social/publish/crear'
+import { validateScheduleDraft } from '@/lib/social/publish/validate'
+import { basePublica, existe, keyDesdeUrl } from '@/lib/storage'
 
 export const dynamic = 'force-dynamic'
 
@@ -63,4 +75,73 @@ export async function GET(request: Request) {
   }
 
   return NextResponse.json({ posts: [...mapa.values()] })
+}
+
+/**
+ * El post con sus archivos ya en R2. Antes de crear: que cada URL sea del almacén
+ * propio y bajo `scheduled/` (un cuerpo forjado no puede apuntar a cualquier URL de
+ * internet), que `cuando` y el resto del borrador pasen las reglas de
+ * `validateScheduleDraft` — el tope de diez archivos y cada regla son gratis, así que
+ * van antes —, y por último que cada objeto exista en R2 (un HEAD es un viaje de ida y
+ * vuelta, y no vale la pena pagarlo si el post ya iba a rechazarse por otra razón).
+ */
+export async function POST(request: Request) {
+  if (!(await requireMobile(request))) {
+    return new NextResponse('No autorizado', { status: 401 })
+  }
+
+  let body: unknown
+  try {
+    body = await request.json()
+  } catch {
+    return NextResponse.json({ error: CUERPO_ILEGIBLE }, { status: 400 })
+  }
+  const borrador = parseBorradorMovil(body)
+  if ('error' in borrador) return NextResponse.json({ error: borrador.error }, { status: 400 })
+  const media = parseMediaMovil(body)
+  if ('error' in media) return NextResponse.json({ error: media.error }, { status: 400 })
+
+  const base = basePublica()
+  for (const m of media) {
+    const key = base ? keyDesdeUrl(base, m.url) : null
+    if (!key || !key.startsWith('scheduled/')) {
+      return NextResponse.json({ error: ARCHIVO_AJENO }, { status: 400 })
+    }
+  }
+
+  const now = new Date()
+  const scheduledAt = resolverCuando(borrador.ahora, borrador.cuando, now)
+  const error = validateScheduleDraft(
+    {
+      caption: borrador.texto,
+      imageCount: media.filter((m) => m.mediaType === 'image').length,
+      videoCount: media.filter((m) => m.mediaType === 'video').length,
+      networks: borrador.redes,
+      scheduledAt,
+    },
+    now,
+  )
+  if (error) return NextResponse.json({ error }, { status: 400 })
+
+  try {
+    for (const m of media) {
+      if (!(await existe(m.url))) return NextResponse.json({ error: ARCHIVO_FALTANTE }, { status: 400 })
+    }
+  } catch (error) {
+    console.error('schedule/existe:', String(error).slice(0, 300))
+    return NextResponse.json({ error: NO_SE_GUARDO }, { status: 500 })
+  }
+
+  try {
+    const id = await crearPostProgramado({
+      caption: borrador.texto,
+      scheduledAt: scheduledAt!,
+      media,
+      networks: borrador.redes,
+    })
+    return NextResponse.json({ id, cuando: isoInZone(scheduledAt!, SITE_TIMEZONE) })
+  } catch (dbError) {
+    console.error('schedule/crear:', String(dbError).slice(0, 300))
+    return NextResponse.json({ error: NO_SE_GUARDO }, { status: 500 })
+  }
 }
