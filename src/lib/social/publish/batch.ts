@@ -45,7 +45,7 @@ export const PORTADA_FORMAT = 'La portada debe ser JPG o PNG.'
 
 // The five networks with a publisher; tiktok reads but cannot post yet. Twin of
 // ENABLED in the composer (schedule/composer.tsx) — update both together.
-const PUBLISHABLE = new Set(['instagram', 'facebook', 'youtube', 'threads', 'x'])
+export const PUBLISHABLE = new Set(['instagram', 'facebook', 'youtube', 'threads', 'x'])
 
 const IMAGE_EXTENSIONS = new Set(['jpg', 'jpeg', 'png', 'gif', 'webp'])
 const VIDEO_EXTENSIONS = new Set(['mp4', 'mov', 'webm'])
