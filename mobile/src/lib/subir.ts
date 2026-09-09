@@ -87,20 +87,24 @@ export async function ejecutarEnvio(args: {
         await subirArchivo(archivo, destino, (p) => despachar({ tipo: 'progreso', progreso: p }), signal)
         subidas[i] = { url: destino.publica, mediaType: destino.mediaType }
       } catch (e) {
+        // La sesión caducada y el rechazo del servidor pesan más que una cancelación
+        // que llegó al mismo tiempo: un 401 siempre sube como `SesionCaducada`, nunca
+        // se lo traga un `signal.aborted` que coincida por casualidad.
+        if (e instanceof SesionCaducada) throw e
+        if (e instanceof RechazoApi) {
+          despachar({ tipo: 'rechazado', mensaje: e.message })
+          return subidas
+        }
         if (signal.aborted) {
           despachar({ tipo: 'cancelar' })
           return subidas
         }
-        if (e instanceof SesionCaducada) throw e
-        if (e instanceof RechazoApi) despachar({ tipo: 'rechazado', mensaje: e.message })
-        else {
-          console.warn('subida:', String(e).slice(0, 300))
-          despachar({
-            tipo: 'fallo',
-            mensaje: SIN_SENAL_SUBIDA,
-            retomar: { paso: 'subiendo', indice: i, total, progreso: 0 },
-          })
-        }
+        console.warn('subida:', String(e).slice(0, 300))
+        despachar({
+          tipo: 'fallo',
+          mensaje: SIN_SENAL_SUBIDA,
+          retomar: { paso: 'subiendo', indice: i, total, progreso: 0 },
+        })
         return subidas
       }
     }
