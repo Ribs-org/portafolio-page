@@ -299,7 +299,7 @@ export const scheduledPostTargets = pgTable(
   ],
 )
 
-/** One row per file, already living in Vercel Blob; `position` orders the carousel. */
+/** One row per file, already living in Cloudflare R2; `position` orders the carousel. */
 export const scheduledPostMedia = pgTable(
   'scheduled_post_media',
   {

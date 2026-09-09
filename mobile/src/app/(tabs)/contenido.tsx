@@ -3,6 +3,7 @@ import { Pressable, Text, View } from 'react-native'
 import { Image } from 'expo-image'
 import { useRouter } from 'expo-router'
 import {
+  Chip,
   COLORES,
   Cargando,
   ErrorConReintento,
@@ -125,21 +126,5 @@ export default function Contenido() {
         ))
       )}
     </Pantalla>
-  )
-}
-
-export function Chip({ texto, activo, onPress }: { texto: string; activo: boolean; onPress: () => void }) {
-  return (
-    <Pressable
-      onPress={onPress}
-      style={{
-        paddingHorizontal: 12,
-        paddingVertical: 6,
-        borderRadius: 999,
-        backgroundColor: activo ? COLORES.tarjeta : 'transparent',
-      }}
-    >
-      <Text style={{ color: activo ? COLORES.texto : COLORES.tenue, fontSize: 12 }}>{texto}</Text>
-    </Pressable>
   )
 }
