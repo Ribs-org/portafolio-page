@@ -1,13 +1,25 @@
 import {
   DeleteObjectCommand,
+  HeadObjectCommand,
   ListObjectsV2Command,
   PutObjectCommand,
   S3Client,
 } from '@aws-sdk/client-s3'
+import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
 import { env } from '@/lib/env'
 
 /** Misma forma que la frase que daba el Blob ausente: el panel sigue diciendo lo mismo. */
 export const SIN_ALMACEN = 'Falta configurar Cloudflare R2 (R2_*).'
+
+/**
+ * Cada key lleva un UUID: nunca cambia de contenido, así que cachearla para siempre es
+ * seguro. R2 no pone un default largo por su cuenta. Compartido entre `guardar` y la
+ * subida firmada para que un objeto subido desde el teléfono quede igual que uno subido
+ * por el servidor.
+ */
+export const CACHE_INMUTABLE = 'public, max-age=31536000, immutable'
+/** Una hora: un video de 200 MB por datos móviles cabe de sobra, y un link filtrado muere solo. */
+const SUBIDA_SEGUNDOS = 3600
 
 export type ObjetoAlmacenado = { key: string; url: string; size: number; uploadedAt: Date }
 
@@ -93,12 +105,53 @@ export async function guardar(key: string, body: Blob | Buffer, contentType: str
       Key: key,
       Body: cuerpo,
       ContentType: contentType,
-      // Cada key lleva un UUID: nunca cambia de contenido, así que cachearla para
-      // siempre es seguro. R2 no pone un default largo por su cuenta.
-      CacheControl: 'public, max-age=31536000, immutable',
+      CacheControl: CACHE_INMUTABLE,
     }),
   )
   return urlPublica(conf.base, key)
+}
+
+/**
+ * Un PUT firmado para que el teléfono suba directo a R2, sin pasar por la función.
+ * `Content-Type` y `Cache-Control` viajan dentro de la firma: el cliente tiene que
+ * mandarlos tal cual o R2 responde 403, y a cambio nadie puede colar otro tipo.
+ */
+export async function urlParaSubir(
+  key: string,
+  contentType: string,
+): Promise<{ subir: string; publica: string }> {
+  const conf = config()
+  if (!conf) throw new Error(SIN_ALMACEN)
+  const subir = await getSignedUrl(
+    getCliente(),
+    new PutObjectCommand({
+      Bucket: conf.bucket,
+      Key: key,
+      ContentType: contentType,
+      CacheControl: CACHE_INMUTABLE,
+    }),
+    { expiresIn: SUBIDA_SEGUNDOS },
+  )
+  return { subir, publica: urlPublica(conf.base, key) }
+}
+
+/**
+ * Si el objeto está en el bucket. Falso ante una URL ajena o sin almacén: lo que no es
+ * nuestro no puede «existir» para un post. Cualquier otro error de R2 sube, porque no
+ * es lo mismo «no está» que «no pude preguntar».
+ */
+export async function existe(url: string): Promise<boolean> {
+  const conf = config()
+  if (!conf) return false
+  const key = keyDesdeUrl(conf.base, url)
+  if (!key) return false
+  try {
+    await getCliente().send(new HeadObjectCommand({ Bucket: conf.bucket, Key: key }))
+    return true
+  } catch (error) {
+    if ((error as { name?: string }).name === 'NotFound') return false
+    throw error
+  }
 }
 
 /**
