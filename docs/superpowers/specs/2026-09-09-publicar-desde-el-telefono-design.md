@@ -141,7 +141,7 @@ en hora de Chile como el resto de las lecturas móviles.
 | `src/lib/storage.ts` | `urlParaSubir(key, contentType)` → `{ subir, publica }` con `getSignedUrl` de `@aws-sdk/s3-request-presigner`; `existe(url)` → HEAD, `false` ante URL ajena o `NotFound` |
 | `src/lib/social/publish/crear.ts` | `crearPostProgramado({ caption, scheduledAt, media, networks })` → `id`. Las tres inserciones que hoy viven en `createScheduledPost` |
 | `src/app/admin/actions.ts` | `createScheduledPost` pasa a llamar al helper; nada más cambia |
-| `src/lib/mobile-api.ts` | lo puro de las rutas nuevas: `keyParaSubida(nombre, tipo)`, `parseBorradorMovil(body)` y `resolverCuando(ahora, cuando, now)` |
+| `src/lib/mobile-api.ts` | lo puro de las rutas nuevas: `prepararSubida(nombre, tipo, bytes, uuid)`, `parseBorradorMovil(body)`, `parseConteos(body)`, `parseMediaMovil(body)` y `resolverCuando(ahora, cuando, now)` |
 | `package.json` | entra `@aws-sdk/s3-request-presigner` |
 
 ## La app
@@ -196,8 +196,8 @@ listo → chequeando → subiendo (archivo i de n, progreso) → creando → hec
   de este sigue valiendo una hora.
 - **Creando:** `POST /schedule` con las URLs. Un 400 muestra la frase; los archivos
   quedan en R2 hasta que el barrido los borre si el usuario desiste.
-- **Hecho:** se vacía el formulario, se borran las cachés `calendario` y `resumen`
-  (ambas muestran lo programado) y la app salta a la pestaña Calendario.
+- **Hecho:** se vacía el formulario, se anota en memoria que la app escribió algo
+  (`lib/cambios.ts`) y la app salta a la pestaña Calendario.
 
 Un botón «Cancelar» durante la subida aborta el PUT en curso (`AbortSignal`) y vuelve a
 `listo`; lo ya subido lo recoge el barrido.
@@ -211,12 +211,15 @@ la puerta.
 
 ### Lo que cambia en las pantallas existentes
 
-Solo Calendario: refresca al recibir foco (`useFocusEffect`) cuando su caché no es
-fresca según `freshness`. Es lo que hace que, al saltar desde Publicar con la caché
-recién borrada, el post nuevo aparezca sin tirar para refrescar.
+Calendario y Resumen (ambas muestran lo programado): refrescan al recibir foco
+(`useFocusEffect`) cuando su caché dejó de ser fresca según `freshness` **o** fue
+guardada antes del último cambio que anotó la app. Es lo que hace que, al saltar desde
+Publicar, el post nuevo aparezca sin tirar para refrescar, aunque la caché en memoria
+de esa pestaña tenga menos de cinco minutos.
 
-`lib/cache.ts` gana `clearCache(key)`. `lib/api.ts` gana `apiPost<T>(path, token, body)`
-con el mismo trato del 401 que `apiGet`.
+`lib/useScreenData.ts` gana `refrescarSiVieja`. `lib/api.ts` gana
+`apiPost<T>(path, token, body)` con el mismo trato del 401 que `apiGet`, y un
+`RechazoApi` para el 400 con frase.
 
 ## Manejo de errores
 
