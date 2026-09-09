@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { publishDue } from '@/lib/social/publish/run'
+import { barrerHuerfanos } from '@/lib/storage-gc'
 import { env } from '@/lib/env'
 
 export const dynamic = 'force-dynamic'
@@ -19,7 +20,11 @@ export async function GET(request: Request) {
     // Failed targets answer 200 on purpose: each one wrote its own lastError and the
     // calendar shows it. A non-2xx here means the orchestrator itself broke.
     const report = await publishDue()
-    return NextResponse.json({ report })
+    // Después de publicar, no antes: `limpiarMedia` acaba de liberar los videos del
+    // día y el barrido no tiene por qué esperar otras 24 horas para verlo. No hace
+    // falta envolverlo: `barrerHuerfanos` no lanza nunca.
+    const barrido = await barrerHuerfanos()
+    return NextResponse.json({ report, barrido })
   } catch (error) {
     console.error('Falló la corrida de publicación:', error)
     return NextResponse.json({ error: 'La publicación falló por completo.' }, { status: 500 })

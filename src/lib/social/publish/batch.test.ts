@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   mediaTypeFromUrl,
+  tipoArchivo,
   typeFromContentType,
   validateBatchItem,
   PORTADA_NEEDS_VIDEO,
@@ -89,19 +90,56 @@ describe('validateBatchItem', () => {
 
 describe('typeFromContentType', () => {
   it('mapea image/* y video/* a tipo y extensión, tolerando parámetros', () => {
-    expect(typeFromContentType('image/jpeg')).toEqual({ mediaType: 'image', extension: 'jpg' })
-    expect(typeFromContentType('image/png')).toEqual({ mediaType: 'image', extension: 'png' })
+    expect(typeFromContentType('image/jpeg')).toEqual({
+      mediaType: 'image',
+      extension: 'jpg',
+      tipo: 'image/jpeg',
+    })
+    expect(typeFromContentType('image/png')).toEqual({
+      mediaType: 'image',
+      extension: 'png',
+      tipo: 'image/png',
+    })
     expect(typeFromContentType('video/mp4; codecs=avc1')).toEqual({
       mediaType: 'video',
       extension: 'mp4',
+      tipo: 'video/mp4',
     })
-    expect(typeFromContentType('video/quicktime')).toEqual({ mediaType: 'video', extension: 'mov' })
+    expect(typeFromContentType('video/quicktime')).toEqual({
+      mediaType: 'video',
+      extension: 'mov',
+      tipo: 'video/quicktime',
+    })
+  })
+
+  it('el tipo canónico descarta los parámetros (charset, codecs)', () => {
+    // Es lo que llega a guardar() como ContentType: sin esto Meta y YouTube recibían
+    // "video/mp4; charset=binary" en vez de "video/mp4".
+    expect(typeFromContentType('video/mp4; charset=binary')?.tipo).toBe('video/mp4')
   })
 
   it('cualquier otro content-type es null: la fila se rechaza al descargar', () => {
     expect(typeFromContentType('application/pdf')).toBeNull()
     expect(typeFromContentType('text/html; charset=utf-8')).toBeNull()
     expect(typeFromContentType('')).toBeNull()
+  })
+})
+
+describe('tipoArchivo', () => {
+  it('usa file.type cuando el navegador lo dio', () => {
+    const file = new File(['x'], 'video.mov', { type: 'video/quicktime' })
+    expect(tipoArchivo(file)).toBe('video/quicktime')
+  })
+
+  it('sin file.type, lo infiere de la extensión', () => {
+    expect(tipoArchivo(new File(['x'], 'foto.jpg', { type: '' }))).toBe('image/jpeg')
+    expect(tipoArchivo(new File(['x'], 'foto.png', { type: '' }))).toBe('image/png')
+    expect(tipoArchivo(new File(['x'], 'clip.mp4', { type: '' }))).toBe('video/mp4')
+    expect(tipoArchivo(new File(['x'], 'clip.mov', { type: '' }))).toBe('video/quicktime')
+  })
+
+  it('sin file.type y con extensión desconocida, devuelve vacío', () => {
+    expect(tipoArchivo(new File(['x'], 'archivo.raro', { type: '' }))).toBe('')
   })
 })
 

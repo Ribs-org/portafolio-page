@@ -18,7 +18,7 @@ const TARGET = join(ROOT, '.env.local')
 /** Filled in automatically. Everything else has to come from a human or an integration. */
 const GENERATED = ['AUTH_SECRET', 'FINGERPRINT_SALT'] as const
 
-/** Required for the app to boot. SITE_TIMEZONE and BLOB_READ_WRITE_TOKEN degrade gracefully. */
+/** Required for the app to boot. SITE_TIMEZONE and the R2_* variables degrade gracefully. */
 const REQUIRED = ['DATABASE_URL', 'ADMIN_PASSWORD', 'AUTH_SECRET', 'FINGERPRINT_SALT'] as const
 
 const secret = () => randomBytes(32).toString('base64url')
@@ -48,7 +48,7 @@ function create() {
   console.log('Te falta llenar a mano:')
   console.log('  DATABASE_URL          → la copias de Neon, o `vercel env pull .env.local`')
   console.log('  ADMIN_PASSWORD        → la eliges tú, es la puerta a /admin')
-  console.log('  BLOB_READ_WRITE_TOKEN → opcional, solo para subir imágenes\n')
+  console.log('  R2_*                  → opcional, solo para subir imágenes (ver .env.example)\n')
   console.log('Después:')
   console.log('  npm run db:setup      → crea las tablas y siembra los perfiles')
   console.log('  npm run dev           → http://localhost:3000')
