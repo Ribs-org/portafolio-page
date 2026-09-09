@@ -72,11 +72,11 @@ La rama es `publicar-movil`, nacida de `almacen-r2`: usa `src/lib/storage.ts`, q
   - `resolverCuando(ahora: boolean, cuando: string | null, now: Date): Date | null`
   - Constantes: `MAX_BYTES_SUBIDA`, `AHORA_MS`, `TIPO_NO_PUBLICABLE`, `ARCHIVO_MUY_GRANDE`, `ARCHIVO_AJENO`, `ARCHIVO_FALTANTE`, `CUERPO_ILEGIBLE`, `NO_SE_GUARDO`.
 
-- [ ] **Step 1: Exportar `PUBLISHABLE`**
+- [x] **Step 1: Exportar `PUBLISHABLE`**
 
 En `src/lib/social/publish/batch.ts`, línea 48, cambia `const PUBLISHABLE` por `export const PUBLISHABLE`. Nada más.
 
-- [ ] **Step 2: Escribir los tests que fallan**
+- [x] **Step 2: Escribir los tests que fallan**
 
 Agrega al final de `src/lib/mobile-api.test.ts` (conserva el `describe('parseRango')` existente y sus imports; amplía el import):
 
@@ -258,12 +258,12 @@ describe('resolverCuando', () => {
 })
 ```
 
-- [ ] **Step 3: Verificar que fallan**
+- [x] **Step 3: Verificar que fallan**
 
 Run: `npx vitest run src/lib/mobile-api.test.ts`
 Expected: FAIL — `prepararSubida` y compañía no existen.
 
-- [ ] **Step 4: Implementar**
+- [x] **Step 4: Implementar**
 
 Agrega al final de `src/lib/mobile-api.ts` (amplía el import de arriba con `typeFromContentType` y `PUBLISHABLE`):
 
@@ -379,7 +379,7 @@ export function resolverCuando(ahora: boolean, cuando: string | null, now: Date)
 }
 ```
 
-- [ ] **Step 5: Verde y commit**
+- [x] **Step 5: Verde y commit**
 
 Run: `npx vitest run src/lib/mobile-api.test.ts src/lib/social/publish/batch.test.ts`
 Expected: PASS, todos.
@@ -402,12 +402,12 @@ git commit -m "Agrega lo puro de la subida desde el teléfono: key, borrador y f
 - Consumes: `config()`, `getCliente()`, `urlPublica`, `keyDesdeUrl`, `SIN_ALMACEN` ya en el archivo.
 - Produces (Task 4): `urlParaSubir(key: string, contentType: string): Promise<{ subir: string; publica: string }>`; `existe(url: string): Promise<boolean>`; `CACHE_INMUTABLE: string`.
 
-- [ ] **Step 1: Instalar el firmador**
+- [x] **Step 1: Instalar el firmador**
 
 Run: `npm install @aws-sdk/s3-request-presigner`
 Expected: entra en `dependencies` de `package.json`, misma familia que `@aws-sdk/client-s3`.
 
-- [ ] **Step 2: Escribir los tests que fallan**
+- [x] **Step 2: Escribir los tests que fallan**
 
 Agrega al final de `src/lib/storage.test.ts` (amplía el import):
 
@@ -454,12 +454,12 @@ describe('existe con una URL ajena', () => {
 })
 ```
 
-- [ ] **Step 3: Verificar que fallan**
+- [x] **Step 3: Verificar que fallan**
 
 Run: `npx vitest run src/lib/storage.test.ts`
 Expected: FAIL — `existe` y `urlParaSubir` no existen.
 
-- [ ] **Step 4: Implementar**
+- [x] **Step 4: Implementar**
 
 En `src/lib/storage.ts`:
 
@@ -527,7 +527,7 @@ export async function existe(url: string): Promise<boolean> {
 }
 ```
 
-- [ ] **Step 5: Verde y commit**
+- [x] **Step 5: Verde y commit**
 
 Run: `npx vitest run src/lib/storage.test.ts src/lib/storage-gc.test.ts && npm run typecheck`
 Expected: PASS y sin errores de tipos.
@@ -550,7 +550,7 @@ git commit -m "Firma subidas directas a R2 y comprueba que un objeto existe"
 
 No hay test nuevo: son tres inserciones de Drizzle, y el repo no prueba escrituras de base. La verificación es que el compositor web sigue compilando sobre el helper y el lint pasa.
 
-- [ ] **Step 1: El helper**
+- [x] **Step 1: El helper**
 
 ```ts
 // src/lib/social/publish/crear.ts
@@ -592,7 +592,7 @@ export async function crearPostProgramado(input: {
 }
 ```
 
-- [ ] **Step 2: El compositor web lo usa**
+- [x] **Step 2: El compositor web lo usa**
 
 En `src/app/admin/actions.ts`, agrega el import `import { crearPostProgramado } from '@/lib/social/publish/crear'` junto a los otros de `publish/`, y reemplaza en `createScheduledPost` el bloque que va desde `const db = getDb()` hasta el `await db.insert(scheduledPostTargets)…` (líneas 431-440) por:
 
@@ -602,7 +602,7 @@ En `src/app/admin/actions.ts`, agrega el import `import { crearPostProgramado } 
 
 `uploaded` ya tiene la forma `Array<{ url: string; mediaType: 'image' | 'video' }>`. Deja el `revalidatePath` y el `return { ok: true }` como están. No quites imports de `scheduledPosts`, `scheduledPostMedia` ni `scheduledPostTargets` de `actions.ts`: `updateScheduledPost` los sigue usando.
 
-- [ ] **Step 3: Verificar y commitear**
+- [x] **Step 3: Verificar y commitear**
 
 Run: `npm run typecheck && npm run lint && npm test`
 Expected: sin errores; ningún test cambia.
@@ -625,7 +625,7 @@ git commit -m "Comparte la inserción de un post programado entre el panel y la 
 - Consumes: Task 1 (`prepararSubida`, `parseBorradorMovil`, `parseConteos`, `parseMediaMovil`, `resolverCuando`, frases), Task 2 (`urlParaSubir`, `existe`, `basePublica`, `keyDesdeUrl`, `SIN_ALMACEN`), Task 3 (`crearPostProgramado`), `requireMobile`, `validateScheduleDraft`, `isoInZone`, `SITE_TIMEZONE`.
 - Produces (la app, Tasks 7-8): los tres contratos HTTP del spec.
 
-- [ ] **Step 1: El chequeo del borrador**
+- [x] **Step 1: El chequeo del borrador**
 
 ```ts
 // src/app/api/mobile/schedule/check/route.ts
@@ -678,7 +678,7 @@ export async function POST(request: Request) {
 }
 ```
 
-- [ ] **Step 2: La URL firmada**
+- [x] **Step 2: La URL firmada**
 
 ```ts
 // src/app/api/mobile/upload-url/route.ts
@@ -720,7 +720,7 @@ export async function POST(request: Request) {
 }
 ```
 
-- [ ] **Step 3: La creación**
+- [x] **Step 3: La creación**
 
 En `src/app/api/mobile/schedule/route.ts`, amplía los imports:
 
@@ -812,7 +812,7 @@ export async function POST(request: Request) {
 
 `scheduledAt!` es seguro: `validateScheduleDraft` devuelve «La fecha no se entendió.» cuando es null, y ya retornamos.
 
-- [ ] **Step 4: Verificar y commitear**
+- [x] **Step 4: Verificar y commitear**
 
 Run: `npm test && npm run typecheck && npm run lint && npx next build`
 Expected: verde, y en la tabla del build aparecen `/api/mobile/schedule/check` y `/api/mobile/upload-url`.
@@ -832,14 +832,14 @@ git commit -m "Agrega el chequeo, la URL firmada y la creación de posts desde l
 **Interfaces:**
 - Produces (Tasks 7-8): `expo-image-picker`, `expo-file-system`, `@react-native-community/datetimepicker`, `expo-updates` instalados en las versiones que fija el SDK 57.
 
-- [ ] **Step 1: Instalar con la herramienta de Expo, no con npm**
+- [x] **Step 1: Instalar con la herramienta de Expo, no con npm**
 
 Desde `mobile/`:
 
 Run: `npx expo install expo-image-picker expo-file-system @react-native-community/datetimepicker expo-updates`
 Expected: los cuatro entran en `dependencies` con las versiones que el SDK 57 fija. Si alguno pide confirmación de versión, acepta la que propone Expo.
 
-- [ ] **Step 2: `app.json`**
+- [x] **Step 2: `app.json`**
 
 Dentro de `expo`:
 
@@ -862,7 +862,7 @@ Dentro de `expo`:
 No agregues `updates.url` ni `extra.eas.projectId` a mano: los escribe
 `eas update:configure` con la cuenta del dueño (Task 9 lo documenta).
 
-- [ ] **Step 3: `eas.json`**
+- [x] **Step 3: `eas.json`**
 
 ```json
 {
@@ -881,7 +881,7 @@ No agregues `updates.url` ni `extra.eas.projectId` a mano: los escribe
 }
 ```
 
-- [ ] **Step 4: Verificar y commitear**
+- [x] **Step 4: Verificar y commitear**
 
 Desde `mobile/`: `npx tsc --noEmit && npx vitest run && npm run lint`
 Expected: verde; nada usa todavía los módulos nuevos.
@@ -911,7 +911,7 @@ git commit -m "Instala galería, subida desde disco, selector de fecha y actuali
   - Constantes: `MAX_BYTES`, `MAX_ARCHIVOS = 10`, `REDES_PUBLICABLES`, `TIPO_NO_PUBLICABLE`, `ARCHIVO_MUY_GRANDE`, `SIN_SENAL`, `SIN_SENAL_SUBIDA`.
 - Produces, de `cambios.ts`: `anotarCambio(now?: number): void`, `huboCambioDesde(savedAt: number | null): boolean`.
 
-- [ ] **Step 1: Tests de `publicar.ts`**
+- [x] **Step 1: Tests de `publicar.ts`**
 
 ```ts
 // mobile/src/lib/publicar.test.ts
@@ -1066,7 +1066,7 @@ describe('puedeEnviar', () => {
 })
 ```
 
-- [ ] **Step 2: Tests de `cambios.ts`**
+- [x] **Step 2: Tests de `cambios.ts`**
 
 ```ts
 // mobile/src/lib/cambios.test.ts
@@ -1091,12 +1091,12 @@ describe('cambios', () => {
 })
 ```
 
-- [ ] **Step 3: Verificar que fallan**
+- [x] **Step 3: Verificar que fallan**
 
 Desde `mobile/`: `npx vitest run`
 Expected: FAIL — los módulos no existen.
 
-- [ ] **Step 4: Implementar `publicar.ts`**
+- [x] **Step 4: Implementar `publicar.ts`**
 
 ```ts
 // mobile/src/lib/publicar.ts
@@ -1250,7 +1250,7 @@ export function puedeEnviar(texto: string, archivos: number): boolean {
 }
 ```
 
-- [ ] **Step 5: Implementar `cambios.ts`**
+- [x] **Step 5: Implementar `cambios.ts`**
 
 ```ts
 // mobile/src/lib/cambios.ts
@@ -1272,7 +1272,7 @@ export function huboCambioDesde(savedAt: number | null): boolean {
 }
 ```
 
-- [ ] **Step 6: Verde y commit**
+- [x] **Step 6: Verde y commit**
 
 Desde `mobile/`: `npx vitest run && npx tsc --noEmit && npm run lint`
 Expected: PASS.
@@ -1302,7 +1302,7 @@ git commit -m "Agrega lo puro de publicar desde la app: archivos, pasos del env�
 
 Sin tests: son llamadas de red y un bucle que las encadena; lo que decide algo está en Task 6. La verificación es el chequeo de tipos.
 
-- [ ] **Step 1: `apiPost` y `RechazoApi`**
+- [x] **Step 1: `apiPost` y `RechazoApi`**
 
 Agrega al final de `mobile/src/lib/api.ts`:
 
@@ -1326,7 +1326,7 @@ export async function apiPost<T>(path: string, token: string, body: unknown): Pr
 }
 ```
 
-- [ ] **Step 2: `refrescarSiVieja` en `useScreenData`**
+- [x] **Step 2: `refrescarSiVieja` en `useScreenData`**
 
 En `mobile/src/lib/useScreenData.ts`:
 
@@ -1358,7 +1358,7 @@ En `mobile/src/lib/useScreenData.ts`:
 
 6. Cambia el `return` por `return { data, cargando, error, sello, refrescar, refrescarSiVieja }`.
 
-- [ ] **Step 3: El orquestador**
+- [x] **Step 3: El orquestador**
 
 ```ts
 // mobile/src/lib/subir.ts
@@ -1491,7 +1491,7 @@ Si `tsc` reclama por la forma de `onProgress` o de `upload` en la versión insta
 y ajusta los nombres a lo que declara; el comportamiento (PUT, cabeceras, progreso,
 `AbortSignal`) es el documentado para el SDK 57.
 
-- [ ] **Step 4: Verificar y commitear**
+- [x] **Step 4: Verificar y commitear**
 
 Desde `mobile/`: `npx tsc --noEmit && npx vitest run && npm run lint`
 Expected: verde.
@@ -1515,7 +1515,7 @@ git commit -m "Agrega el cliente de escritura y el orquestador de la subida dire
 **Interfaces:**
 - Consumes: Task 6 y Task 7 completas; `useToken`, `clearToken`, `NOMBRE_RED`, `COLORES`, `Tarjeta`.
 
-- [ ] **Step 1: Mudar `Chip` y agregar `Miniatura` y `Boton` a `ui.tsx`**
+- [x] **Step 1: Mudar `Chip` y agregar `Miniatura` y `Boton` a `ui.tsx`**
 
 1. En `mobile/src/app/(tabs)/contenido.tsx`, borra la función `export function Chip(…)` del final del archivo y agrega `Chip` al import de `'../../components/ui'`.
 2. En `mobile/src/components/ui.tsx`, agrega arriba `import { Image } from 'expo-image'` (la misma que usa contenido, no la de react-native), y al final del archivo:
@@ -1616,7 +1616,7 @@ export function Boton({
 }
 ```
 
-- [ ] **Step 2: La pantalla**
+- [x] **Step 2: La pantalla**
 
 ```tsx
 // mobile/src/app/(tabs)/publicar.tsx
@@ -1893,7 +1893,7 @@ versión 9 lo renombró y el evento ya no trae `type`; en ese caso, sin chequear
 Si el lint no reclama por el efecto de «hecho», quita el `eslint-disable-next-line`:
 un disable que no silencia nada es ruido.
 
-- [ ] **Step 3: La quinta pestaña**
+- [x] **Step 3: La quinta pestaña**
 
 En `mobile/src/app/(tabs)/_layout.tsx`, entre `contenido` y `cuentas`:
 
@@ -1901,7 +1901,7 @@ En `mobile/src/app/(tabs)/_layout.tsx`, entre `contenido` y `cuentas`:
       <Tabs.Screen name="publicar" options={{ title: 'Publicar' }} />
 ```
 
-- [ ] **Step 4: Calendario y Resumen refrescan al recibir foco**
+- [x] **Step 4: Calendario y Resumen refrescan al recibir foco**
 
 En `mobile/src/app/(tabs)/calendario.tsx`:
 
@@ -1917,7 +1917,7 @@ En `mobile/src/app/(tabs)/calendario.tsx`:
 
 Lo mismo, línea por línea, en `mobile/src/app/(tabs)/index.tsx` (Resumen muestra «qué viene»).
 
-- [ ] **Step 5: Verificar y commitear**
+- [x] **Step 5: Verificar y commitear**
 
 Desde `mobile/`: `npx tsc --noEmit && npx vitest run && npm run lint`
 Expected: verde.
@@ -1935,7 +1935,7 @@ git commit -m "Agrega la pestaña Publicar y el refresco al volver al calendario
 - Modify: `mobile/README.md`
 - Modify: `docs/superpowers/plans/2026-09-09-publicar-desde-el-telefono.md` (marcar tareas)
 
-- [ ] **Step 1: El README**
+- [x] **Step 1: El README**
 
 1. En la lista de la introducción, después de «el detalle de cada post», agrega: «y
    desde la versión 1.1 también **publica**: eliges fotos o un video de la galería,
@@ -2008,13 +2008,13 @@ portada, etiquetar con atributos, y editar o borrar lo ya programado.
    contenido: es solo para mirar números.») por «No pone portada ni atributos, y no
    edita lo ya programado: eso sigue en el panel.».
 
-- [ ] **Step 2: Verificación final, ambos lados**
+- [x] **Step 2: Verificación final, ambos lados**
 
 Desde la raíz: `npm test && npm run typecheck && npm run lint && npx next build`
 Desde `mobile/`: `npx tsc --noEmit && npx vitest run && npm run lint`
 Expected: todo verde.
 
-- [ ] **Step 3: Marcar el plan y commitear**
+- [x] **Step 3: Marcar el plan y commitear**
 
 Marca `[x]` cada step cumplido en este plan.
 
