@@ -127,7 +127,11 @@ export function Chip({ texto, activo, onPress }: { texto: string; activo: boolea
   )
 }
 
-/** Un archivo elegido: la imagen o un bloque con «video», y una equis para quitarlo. */
+/**
+ * Un archivo elegido: la imagen o un bloque con «video», y una equis para quitarlo.
+ * Sin `onQuitar` la equis no se dibuja: es como el envío en curso marca un archivo
+ * que ya viaja como no removible.
+ */
 export function Miniatura({
   uri,
   esVideo,
@@ -135,7 +139,7 @@ export function Miniatura({
 }: {
   uri: string
   esVideo: boolean
-  onQuitar: () => void
+  onQuitar?: () => void
 }) {
   return (
     <View style={{ width: 72, height: 72 }}>
@@ -155,23 +159,25 @@ export function Miniatura({
       ) : (
         <Image source={{ uri }} style={{ width: 72, height: 72, borderRadius: 10 }} />
       )}
-      <Pressable
-        onPress={onQuitar}
-        hitSlop={8}
-        style={{
-          position: 'absolute',
-          top: -6,
-          right: -6,
-          width: 22,
-          height: 22,
-          borderRadius: 11,
-          backgroundColor: COLORES.fondo,
-          alignItems: 'center',
-          justifyContent: 'center',
-        }}
-      >
-        <Text style={{ color: COLORES.texto, fontSize: 12 }}>✕</Text>
-      </Pressable>
+      {onQuitar ? (
+        <Pressable
+          onPress={onQuitar}
+          hitSlop={8}
+          style={{
+            position: 'absolute',
+            top: -6,
+            right: -6,
+            width: 22,
+            height: 22,
+            borderRadius: 11,
+            backgroundColor: COLORES.fondo,
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
+          <Text style={{ color: COLORES.texto, fontSize: 12 }}>✕</Text>
+        </Pressable>
+      ) : null}
     </View>
   )
 }

@@ -78,13 +78,17 @@ export default function Publicar() {
     }
     setAviso(null)
     setArchivos([...archivos, ...nuevos].slice(0, MAX_ARCHIVOS))
-    // Archivos distintos, subidas distintas: lo subido antes ya no corresponde.
+    // Archivos distintos, subidas distintas: lo subido antes ya no corresponde. Y un
+    // reintento pendiente apuntaba a índices de la lista vieja, así que también se
+    // descarta: se vuelve a listo y el próximo envío arranca del chequeo.
     subidas.current = []
+    despachar({ tipo: 'cancelar' })
   }
 
   function quitar(indice: number) {
     setArchivos(archivos.filter((_, i) => i !== indice))
     subidas.current = []
+    despachar({ tipo: 'cancelar' })
   }
 
   function alternarRed(red: string) {
@@ -180,6 +184,7 @@ export default function Publicar() {
     setArchivos([])
     setRedes(['instagram'])
     setFecha(proximaHoraEnPunto(new Date()))
+    setAviso(null)
     subidas.current = []
     ultimoBorrador.current = null
     router.navigate('/(tabs)/calendario')
@@ -221,7 +226,12 @@ export default function Publicar() {
 
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12, alignItems: 'center' }}>
         {archivos.map((a, i) => (
-          <Miniatura key={`${a.uri}:${i}`} uri={a.uri} esVideo={a.mediaType === 'video'} onQuitar={() => quitar(i)} />
+          <Miniatura
+            key={`${a.uri}:${i}`}
+            uri={a.uri}
+            esVideo={a.mediaType === 'video'}
+            onQuitar={ocupado ? undefined : () => quitar(i)}
+          />
         ))}
         {archivos.length < MAX_ARCHIVOS && !ocupado ? (
           <Chip texto="＋ Fotos o video" activo={false} onPress={() => void elegir()} />
