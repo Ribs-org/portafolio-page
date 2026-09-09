@@ -1,5 +1,6 @@
 import { ActivityIndicator, Pressable, RefreshControl, ScrollView, Text, View } from 'react-native'
 import type { ReactNode } from 'react'
+import { Image } from 'expo-image'
 import { num } from '../lib/format'
 
 export const COLORES = {
@@ -108,4 +109,98 @@ export function PuntoEstado({ estado }: { estado: string }) {
 
 export function Numero({ children }: { children: number | null }) {
   return <Text style={{ color: COLORES.suave, fontSize: 13 }}>{num(children)}</Text>
+}
+
+export function Chip({ texto, activo, onPress }: { texto: string; activo: boolean; onPress: () => void }) {
+  return (
+    <Pressable
+      onPress={onPress}
+      style={{
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        borderRadius: 999,
+        backgroundColor: activo ? COLORES.tarjeta : 'transparent',
+      }}
+    >
+      <Text style={{ color: activo ? COLORES.texto : COLORES.tenue, fontSize: 12 }}>{texto}</Text>
+    </Pressable>
+  )
+}
+
+/** Un archivo elegido: la imagen o un bloque con «video», y una equis para quitarlo. */
+export function Miniatura({
+  uri,
+  esVideo,
+  onQuitar,
+}: {
+  uri: string
+  esVideo: boolean
+  onQuitar: () => void
+}) {
+  return (
+    <View style={{ width: 72, height: 72 }}>
+      {esVideo ? (
+        <View
+          style={{
+            width: 72,
+            height: 72,
+            borderRadius: 10,
+            backgroundColor: '#ffffff10',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
+          <Text style={{ color: COLORES.suave, fontSize: 11 }}>video</Text>
+        </View>
+      ) : (
+        <Image source={{ uri }} style={{ width: 72, height: 72, borderRadius: 10 }} />
+      )}
+      <Pressable
+        onPress={onQuitar}
+        hitSlop={8}
+        style={{
+          position: 'absolute',
+          top: -6,
+          right: -6,
+          width: 22,
+          height: 22,
+          borderRadius: 11,
+          backgroundColor: COLORES.fondo,
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+      >
+        <Text style={{ color: COLORES.texto, fontSize: 12 }}>✕</Text>
+      </Pressable>
+    </View>
+  )
+}
+
+export function Boton({
+  texto,
+  onPress,
+  deshabilitado,
+  destacado,
+}: {
+  texto: string
+  onPress: () => void
+  deshabilitado?: boolean
+  destacado?: boolean
+}) {
+  return (
+    <Pressable
+      onPress={onPress}
+      disabled={deshabilitado}
+      style={{
+        flex: 1,
+        backgroundColor: destacado ? COLORES.verde : COLORES.tarjeta,
+        borderRadius: 12,
+        padding: 14,
+        alignItems: 'center',
+        opacity: deshabilitado ? 0.5 : 1,
+      }}
+    >
+      <Text style={{ color: destacado ? COLORES.fondo : COLORES.texto, fontWeight: '600' }}>{texto}</Text>
+    </Pressable>
+  )
 }
