@@ -124,10 +124,10 @@ Orden de comprobación:
 1. Cada `url` debe ser del almacén propio (`keyDesdeUrl(basePublica(), url)`) y su key
    empezar con `scheduled/`. Si no: `Un archivo no es del almacén.` Esto es lo que
    impide que un cuerpo forjado apunte a cualquier URL de internet.
-2. Cada objeto debe existir (`existe(url)`, un HEAD). Si no: `Falta subir un archivo.`
-3. `cuando`: `ahora` lo fija en el instante actual más 60 s; si no, `new Date(cuando)`
+2. `cuando`: `ahora` lo fija en el instante actual más 60 s; si no, `new Date(cuando)`
    y una fecha ilegible da `La fecha no se entendió.`
-4. `validateScheduleDraft` con los conteos de `media` y `now`.
+3. `validateScheduleDraft` con los conteos de `media` y `now`.
+4. Cada objeto debe existir (`existe(url)`, un HEAD). Si no: `Falta subir un archivo.`
 5. `crearPostProgramado` escribe `scheduled_posts`, `scheduled_post_media` y
    `scheduled_post_targets`. Un fallo de base: `No se pudo guardar. Intenta de nuevo.`
 

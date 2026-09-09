@@ -1,7 +1,7 @@
 import { File } from 'expo-file-system'
 
 import { RechazoApi, SesionCaducada, apiPost } from './api'
-import { SIN_SENAL, SIN_SENAL_SUBIDA, type Elegido, type Evento, type Retomar } from './publicar'
+import { ARCHIVO_FALTANTE, SIN_SENAL, SIN_SENAL_SUBIDA, type Elegido, type Evento, type Retomar } from './publicar'
 
 export type BorradorApp = { texto: string; redes: string[]; cuando: string | null; ahora: boolean }
 export type SubidaHecha = { url: string; mediaType: 'image' | 'video' }
@@ -119,8 +119,13 @@ export async function ejecutarEnvio(args: {
     despachar({ tipo: 'hecho' })
   } catch (e) {
     if (e instanceof SesionCaducada) throw e
-    if (e instanceof RechazoApi) despachar({ tipo: 'rechazado', mensaje: e.message })
-    else despachar({ tipo: 'fallo', mensaje: SIN_SENAL, retomar: { paso: 'creando' } })
+    if (e instanceof RechazoApi) {
+      despachar({ tipo: 'rechazado', mensaje: e.message })
+      // El barrido diario borra lo no referenciado a la hora: si el servidor dice que
+      // falta un archivo, las URLs que ya teníamos pueden apuntar a objetos muertos.
+      // Se devuelven todas en null para que el próximo intento las vuelva a subir.
+      if (e.message === ARCHIVO_FALTANTE) return archivos.map(() => null)
+    } else despachar({ tipo: 'fallo', mensaje: SIN_SENAL, retomar: { paso: 'creando' } })
   }
   return subidas
 }

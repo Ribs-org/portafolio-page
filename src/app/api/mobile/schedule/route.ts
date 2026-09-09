@@ -78,10 +78,12 @@ export async function GET(request: Request) {
 }
 
 /**
- * El post con sus archivos ya en R2. Dos comprobaciones antes de las reglas: que cada
- * URL sea del almacén propio y bajo `scheduled/` (un cuerpo forjado no puede apuntar a
- * cualquier URL de internet), y que el objeto exista (un post que referencia una subida
- * que nunca terminó fallaría en el publisher con tres reintentos y un error confuso).
+ * El post con sus archivos ya en R2. Antes de crear: que cada URL sea del almacén
+ * propio y bajo `scheduled/` (un cuerpo forjado no puede apuntar a cualquier URL de
+ * internet), que `cuando` y el resto del borrador pasen las reglas de
+ * `validateScheduleDraft` — el tope de diez archivos y cada regla son gratis, así que
+ * van antes —, y por último que cada objeto exista en R2 (un HEAD es un viaje de ida y
+ * vuelta, y no vale la pena pagarlo si el post ya iba a rechazarse por otra razón).
  */
 export async function POST(request: Request) {
   if (!(await requireMobile(request))) {
@@ -106,14 +108,6 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: ARCHIVO_AJENO }, { status: 400 })
     }
   }
-  try {
-    for (const m of media) {
-      if (!(await existe(m.url))) return NextResponse.json({ error: ARCHIVO_FALTANTE }, { status: 400 })
-    }
-  } catch (error) {
-    console.error('schedule/existe:', String(error).slice(0, 300))
-    return NextResponse.json({ error: NO_SE_GUARDO }, { status: 500 })
-  }
 
   const now = new Date()
   const scheduledAt = resolverCuando(borrador.ahora, borrador.cuando, now)
@@ -128,6 +122,15 @@ export async function POST(request: Request) {
     now,
   )
   if (error) return NextResponse.json({ error }, { status: 400 })
+
+  try {
+    for (const m of media) {
+      if (!(await existe(m.url))) return NextResponse.json({ error: ARCHIVO_FALTANTE }, { status: 400 })
+    }
+  } catch (error) {
+    console.error('schedule/existe:', String(error).slice(0, 300))
+    return NextResponse.json({ error: NO_SE_GUARDO }, { status: 500 })
+  }
 
   try {
     const id = await crearPostProgramado({

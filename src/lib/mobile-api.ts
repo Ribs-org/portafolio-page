@@ -48,6 +48,10 @@ const MAX_NOMBRE = 100
  * Qué key y qué content-type tendrá un archivo que el teléfono está por subir. Solo el
  * nombre base: una ruta dentro de la key sería una carpeta nueva que el barrido no
  * espera. El uuid llega de afuera para que esto sea puro.
+ *
+ * `bytes` en 0 significa "el teléfono no sabe el tamaño" (la galería no siempre lo
+ * reporta) y no bloquea la subida: el PUT prefirmado nunca exigió un Content-Length,
+ * así que el tope de abajo es solo una cortesía, no una garantía de seguridad.
  */
 export function prepararSubida(
   nombre: string,
@@ -57,7 +61,7 @@ export function prepararSubida(
 ): { key: string; mediaType: 'image' | 'video'; tipo: string } | { error: string } {
   const resuelto = typeFromContentType(tipo)
   if (!resuelto) return { error: TIPO_NO_PUBLICABLE }
-  if (typeof bytes !== 'number' || !Number.isFinite(bytes) || bytes <= 0) return { error: CUERPO_ILEGIBLE }
+  if (typeof bytes !== 'number' || !Number.isFinite(bytes) || bytes < 0) return { error: CUERPO_ILEGIBLE }
   if (bytes > MAX_BYTES_SUBIDA) return { error: ARCHIVO_MUY_GRANDE }
 
   const base = nombre.split(/[\\/]/).pop()?.trim() ?? ''

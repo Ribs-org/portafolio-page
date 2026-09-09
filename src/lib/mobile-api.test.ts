@@ -80,13 +80,17 @@ describe('prepararSubida', () => {
     expect(prepararSubida('x', '', 10, UUID)).toEqual({ error: TIPO_NO_PUBLICABLE })
   })
 
-  it('rechaza más de 500 MB y tamaños que no son un número positivo', () => {
+  it('rechaza más de 500 MB y tamaños que no son un número no negativo', () => {
     expect(prepararSubida('v.mp4', 'video/mp4', MAX_BYTES_SUBIDA + 1, UUID)).toEqual({
       error: ARCHIVO_MUY_GRANDE,
     })
     expect(prepararSubida('v.mp4', 'video/mp4', MAX_BYTES_SUBIDA, UUID)).toMatchObject({ mediaType: 'video' })
-    expect(prepararSubida('v.mp4', 'video/mp4', 0, UUID)).toEqual({ error: CUERPO_ILEGIBLE })
     expect(prepararSubida('v.mp4', 'video/mp4', '12', UUID)).toEqual({ error: CUERPO_ILEGIBLE })
+    expect(prepararSubida('v.mp4', 'video/mp4', -1, UUID)).toEqual({ error: CUERPO_ILEGIBLE })
+  })
+
+  it('un tamaño 0 (galería sin dato) no bloquea: el PUT prefirmado no exige Content-Length', () => {
+    expect(prepararSubida('v.mp4', 'video/mp4', 0, UUID)).toMatchObject({ mediaType: 'video' })
   })
 })
 

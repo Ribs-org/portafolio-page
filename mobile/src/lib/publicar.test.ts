@@ -39,6 +39,12 @@ describe('describirArchivo', () => {
     })
   })
 
+  it('con fileName vacío, también cae al último segmento de la uri', () => {
+    expect(
+      describirArchivo({ uri: 'file:///cache/foto.png', fileName: '', mimeType: 'image/png', fileSize: 1 }),
+    ).toMatchObject({ nombre: 'foto.png' })
+  })
+
   it('rechaza lo que no es imagen ni video, y lo que no tiene ni tipo ni extensión', () => {
     expect(describirArchivo({ uri: 'file:///a/doc.pdf', fileName: 'doc.pdf', mimeType: 'application/pdf', fileSize: 1 })).toEqual({
       error: TIPO_NO_PUBLICABLE,

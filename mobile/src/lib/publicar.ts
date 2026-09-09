@@ -9,6 +9,8 @@ export const TIPO_NO_PUBLICABLE = 'Ese tipo de archivo no se puede publicar.'
 export const ARCHIVO_MUY_GRANDE = 'El archivo supera los 500 MB.'
 export const SIN_SENAL = 'No se pudo conectar. Revisa tu señal.'
 export const SIN_SENAL_SUBIDA = 'No se pudo subir el archivo. Revisa tu señal.'
+/** Copia la frase del servidor (src/lib/mobile-api.ts): la app tiene que reconocerla. */
+export const ARCHIVO_FALTANTE = 'Falta subir un archivo.'
 
 // La misma tabla que tipoArchivo en el sitio (src/lib/social/publish/batch.ts): el
 // selector de Android a veces entrega mimeType vacío para un .mov.
