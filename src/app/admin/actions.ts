@@ -25,6 +25,7 @@ import {
 import { validateScheduleDraft } from '@/lib/social/publish/validate'
 import { validateAtributos, ATRIBUTOS_ERROR, type Atributos } from '@/lib/social/publish/atributos'
 import { diffMedia, diffTargets } from '@/lib/social/publish/edit'
+import { crearPostProgramado } from '@/lib/social/publish/crear'
 import { fromZonedInput, normalizeUrl, slugify } from '@/lib/utils'
 
 export type FormState = { error?: string; ok?: boolean }
@@ -427,17 +428,7 @@ export async function createScheduledPost(_prev: FormState, formData: FormData):
     uploaded.push({ url, mediaType: file.type.startsWith('video/') ? 'video' : 'image' })
   }
 
-  const db = getDb()
-  const [post] = await db
-    .insert(scheduledPosts)
-    .values({ caption, scheduledAt: scheduledAt! })
-    .returning()
-  if (uploaded.length > 0) {
-    await db.insert(scheduledPostMedia).values(
-      uploaded.map((m, position) => ({ postId: post!.id, blobUrl: m.url, mediaType: m.mediaType, position })),
-    )
-  }
-  await db.insert(scheduledPostTargets).values(networks.map((network) => ({ postId: post!.id, network })))
+  await crearPostProgramado({ caption, scheduledAt: scheduledAt!, media: uploaded, networks })
 
   revalidatePath('/admin/schedule')
   return { ok: true }
