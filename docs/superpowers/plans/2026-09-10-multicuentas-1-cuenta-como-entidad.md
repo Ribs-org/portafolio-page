@@ -287,7 +287,7 @@ describe('campaignTagFor con cuenta', () => {
     ).toBe('fb-Gimnasio-123_456')
     expect(
       campaignTagFor('instagram', 'C8xK2Lp', { primaria: false, handle: '@vicente_pareja_j', externalId: '17' }),
-    ).toBe('ig-vicente_-C8xK2Lp')
+    ).toBe('ig-vicente-C8xK2Lp')
   })
 
   it('sin handle usa el id externo de la cuenta, también recortado a ocho', () => {
