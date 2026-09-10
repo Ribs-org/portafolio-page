@@ -14,6 +14,7 @@ import {
   resolverCuando,
 } from '@/lib/mobile-api'
 import { crearPostProgramado } from '@/lib/social/publish/crear'
+import { SinCuenta } from '@/lib/social/cuentas'
 import { validateScheduleDraft } from '@/lib/social/publish/validate'
 import { basePublica, existe, keyDesdeUrl } from '@/lib/storage'
 
@@ -141,6 +142,7 @@ export async function POST(request: Request) {
     })
     return NextResponse.json({ id, cuando: isoInZone(scheduledAt!, SITE_TIMEZONE) })
   } catch (dbError) {
+    if (dbError instanceof SinCuenta) return NextResponse.json({ error: dbError.message }, { status: 400 })
     console.error('schedule/crear:', String(dbError).slice(0, 300))
     return NextResponse.json({ error: NO_SE_GUARDO }, { status: 500 })
   }
