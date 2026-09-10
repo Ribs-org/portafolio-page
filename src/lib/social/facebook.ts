@@ -194,6 +194,29 @@ export function normalizeFacebookPost(
 // which would otherwise starve the length check below and loop forever.
 const MAX_POST_PAGES = 50
 
+/**
+ * Graph's «Please reduce the amount of data you're asking for» (error code 1, served
+ * as a 500). It is not the page nor the token: the response for one page got too heavy,
+ * and it grows with the likes and comments each post carries — so a page size that
+ * worked for months stops working one day without anything changing on our side.
+ */
+export function isTooMuchData(error: unknown): boolean {
+  return error instanceof FacebookHttpError && /"code":\s*1\b/.test(error.message)
+}
+
+// Below this, a page that still answers code 1 is not a size problem.
+const MIN_PAGE_SIZE = 5
+
+/** The same request with half the `limit`; null when there is nothing left to cut. */
+export function halveLimit(url: string): string | null {
+  const match = /([?&])limit=(\d+)/.exec(url)
+  if (!match) return null
+  const current = Number(match[2])
+  if (current <= MIN_PAGE_SIZE) return null
+  const smaller = Math.max(MIN_PAGE_SIZE, Math.floor(current / 2))
+  return url.replace(match[0], `${match[1]}limit=${smaller}`)
+}
+
 export async function collectPublishedPosts(
   firstUrl: string,
   fetchJson: (url: string) => Promise<Record<string, unknown>>,
@@ -203,9 +226,16 @@ export async function collectPublishedPosts(
   let pagesFetched = 0
 
   while (next && posts.length < MAX_POSTS_PER_SYNC && pagesFetched < MAX_POST_PAGES) {
-    const page = (await fetchJson(next)) as {
-      data?: FacebookPost[]
-      paging?: { next?: string }
+    let page: { data?: FacebookPost[]; paging?: { next?: string } }
+    try {
+      page = await fetchJson(next)
+    } catch (error) {
+      // Graph's cursors carry the limit, so a halved page keeps every later page
+      // small too. Retrying the same page costs one call; failing the sync costs the day.
+      const smaller = isTooMuchData(error) ? halveLimit(next) : null
+      if (!smaller) throw error
+      next = smaller
+      continue
     }
     pagesFetched++
 
@@ -223,7 +253,10 @@ export async function collectPublishedPosts(
 }
 
 const GRAPH = 'https://graph.facebook.com/v23.0'
-const PAGE_SIZE = 50
+// 50 answered code 1 on 2026-09-09 once the page's posts carried enough likes and
+// comments; 25 answered fine the same day. The halving above is the net for the day
+// 25 stops being enough.
+const PAGE_SIZE = 25
 const INSIGHTS_CHUNK_SIZE = 5
 
 export const facebookConnector: Connector = {

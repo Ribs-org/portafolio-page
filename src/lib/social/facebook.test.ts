@@ -10,6 +10,8 @@ import {
   pickFacebookPage,
   normalizeFacebookPost,
   collectPublishedPosts,
+  halveLimit,
+  isTooMuchData,
   type FacebookPagesList,
   type FacebookInsights,
   type FacebookPost,
@@ -262,5 +264,66 @@ describe('collectPublishedPosts', () => {
     const { posts, windowWasCapped } = await collectPublishedPosts('https://graph.test/p0', fetchJson)
     expect(posts).toHaveLength(200)
     expect(windowWasCapped).toBe(true)
+  })
+})
+
+describe('página demasiado pesada (Graph code 1)', () => {
+  // El cuerpo literal que devolvió Meta el 2026-09-09, con status 500.
+  const TOO_MUCH = new FacebookHttpError(
+    500,
+    'Facebook 500: {"error":{"code":1,"message":"Please reduce the amount of data you\'re asking for, then retry your request"}}',
+  )
+
+  it('isTooMuchData reconoce el code 1 y nada más', () => {
+    expect(isTooMuchData(TOO_MUCH)).toBe(true)
+    expect(isTooMuchData(new FacebookHttpError(500, 'Facebook 500: {"error":{"code":17}}'))).toBe(false)
+    expect(isTooMuchData(new FacebookHttpError(404, 'Facebook 404: {"error":{"code":100}}'))).toBe(false)
+    expect(isTooMuchData(new Error('code":1'))).toBe(false)
+  })
+
+  it('halveLimit reduce el limit de la URL a la mitad sin tocar el resto', () => {
+    const url = 'https://graph.test/p/published_posts?fields=id,likes.summary(true)&limit=50&access_token=T'
+    expect(halveLimit(url)).toBe(
+      'https://graph.test/p/published_posts?fields=id,likes.summary(true)&limit=25&access_token=T',
+    )
+    expect(halveLimit('https://graph.test/p?limit=25')).toBe('https://graph.test/p?limit=12')
+    expect(halveLimit('https://graph.test/p?limit=6')).toBe('https://graph.test/p?limit=5')
+  })
+
+  it('halveLimit devuelve null en el piso o sin limit: no hay más que recortar', () => {
+    expect(halveLimit('https://graph.test/p?limit=5')).toBeNull()
+    expect(halveLimit('https://graph.test/p?fields=id')).toBeNull()
+  })
+
+  it('collectPublishedPosts reintenta la misma página con la mitad y sigue', async () => {
+    const seen: string[] = []
+    const fetchJson = async (url: string) => {
+      seen.push(url)
+      const limit = Number(/limit=(\d+)/.exec(url)?.[1])
+      if (limit >= 50) throw TOO_MUCH
+      return { data: [{ id: 'a' }, { id: 'b' }], paging: {} }
+    }
+    const { posts, windowWasCapped } = await collectPublishedPosts('https://graph.test/p?limit=50', fetchJson)
+    expect(posts.map((p) => p.id)).toEqual(['a', 'b'])
+    expect(windowWasCapped).toBe(false)
+    expect(seen).toEqual(['https://graph.test/p?limit=50', 'https://graph.test/p?limit=25'])
+  })
+
+  it('en el piso, el code 1 sube tal cual: ya no es un problema de tamaño', async () => {
+    const fetchJson = async () => {
+      throw TOO_MUCH
+    }
+    await expect(collectPublishedPosts('https://graph.test/p?limit=5', fetchJson)).rejects.toBe(TOO_MUCH)
+  })
+
+  it('cualquier otro error sube sin reintento', async () => {
+    const otro = new FacebookHttpError(500, 'Facebook 500: {"error":{"code":2}}')
+    let calls = 0
+    const fetchJson = async () => {
+      calls++
+      throw otro
+    }
+    await expect(collectPublishedPosts('https://graph.test/p?limit=50', fetchJson)).rejects.toBe(otro)
+    expect(calls).toBe(1)
   })
 })
