@@ -124,7 +124,7 @@ async function limpiarMedia(postId: string): Promise<void> {
 }
 
 async function attempt(
-  target: { network: string; accountId: string | null },
+  target: { network: string; accountId: string },
   targetId: string,
   postId: string,
   containerId: string | null,
@@ -141,11 +141,8 @@ async function attempt(
   if (!ensure) return { kind: 'failed', reason: NO_PUBLISH_TOKEN }
 
   // Por la cuenta del destino, no por la red: con dos páginas de Facebook, «la cuenta
-  // de facebook» no dice cuál. La rama por red existe solo para filas de antes del
-  // backfill y muere con la fase 2 de la migración.
-  const [account] = target.accountId
-    ? await db.select().from(socialAccounts).where(eq(socialAccounts.id, target.accountId))
-    : await db.select().from(socialAccounts).where(eq(socialAccounts.network, target.network))
+  // de facebook» no dice cuál.
+  const [account] = await db.select().from(socialAccounts).where(eq(socialAccounts.id, target.accountId))
   const token = account ? await ensure(account) : null
   if (!token || !account?.externalId) return { kind: 'failed', reason: NO_PUBLISH_TOKEN }
 

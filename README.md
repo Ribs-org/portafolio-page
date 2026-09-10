@@ -222,6 +222,27 @@ cuando quieras.
 Después de sincronizar, cada post trae su etiqueta `?s=` lista. Copia el link de la fila,
 pégalo en el post, y de ahí en adelante el cruce es automático.
 
+#### Migrar a multicuentas (una vez, 2026-09)
+
+El esquema pasa a identificar posts, métricas y destinos por cuenta. Con datos ya
+cargados, el orden importa:
+
+1. Con el código de **antes** del cambio corriendo en producción, aplica solo la fase 1
+   del esquema: desde el commit «Agrega account_id a posts, métricas y destinos», `npm run db:push`.
+2. `npm run cuentas:backfill`: asigna cada fila a la única cuenta de su red. Debe
+   terminar en «Filas sin cuenta: 0».
+3. Despliega el código nuevo (merge y promoción a `main`).
+4. Vuelve a correr `npm run cuentas:backfill` (por si una sincronización corrió entre
+   los pasos 2 y 3) y, desde `main`, `npm run db:push` para la fase 2: columnas
+   obligatorias y claves únicas viejas retiradas.
+
+El backfill del paso 4 corre **inmediatamente después del deploy, antes del próximo
+cron**: el pinger de publicación pasa cada 5 minutos y el cron de sincronización a las
+9:00 UTC, y una sincronización entre el deploy y ese backfill tumba toda la cuenta por
+el día — las filas viejas (`account_id` nulo) no chocan con la unique nueva, así que el
+insert cae en la unique vieja de `(network, external_id)`. Por eso conviene desplegar
+lejos de las 9:00 UTC.
+
 ---
 
 ## Atribuir tráfico a una pieza de contenido

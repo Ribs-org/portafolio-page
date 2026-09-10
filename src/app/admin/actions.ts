@@ -343,7 +343,8 @@ export async function syncSocialNow(): Promise<{ ok?: boolean; error?: string }>
   revalidatePath('/admin/content')
 
   const failed = report.filter((r) => !r.ok)
-  if (failed.length === report.length) {
+  // Una instalación sin cuentas conectadas no tiene nada que fallar.
+  if (report.length > 0 && failed.length === report.length) {
     return { error: 'Ninguna red respondió. Revisa las tarjetas de conexión.' }
   }
   return { ok: true }

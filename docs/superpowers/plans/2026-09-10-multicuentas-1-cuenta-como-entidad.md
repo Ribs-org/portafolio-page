@@ -58,7 +58,7 @@ Rama: `multicuentas`, nacida de `main` con el spec ya commiteado.
 - Produces: en `schema.ts`, `accountId: uuid('account_id')` (nullable, FK a `socialAccounts.id`) en `socialPosts`, `accountMetrics`, `scheduledPostTargets`; las cuatro claves únicas nuevas de las constraints globales; `socialAccounts.network` **conserva** su `unique()` hasta Task 7.
 - Produces: de `cuenta.ts`, `primariaDe(cuentas: Array<{ id: string; createdAt: Date }>): string | null` (el id de la de menor `createdAt`), `planBackfill(cuentas: Array<{ id: string; network: string }>): Map<string, string> | { error: string }`, `SIN_CUENTA(network: string): string`.
 
-- [ ] **Step 1: Test que falla**
+- [x] **Step 1: Test que falla**
 
 ```ts
 // src/lib/social/cuenta.test.ts
@@ -107,12 +107,12 @@ describe('SIN_CUENTA', () => {
 })
 ```
 
-- [ ] **Step 2: Verificar que falla**
+- [x] **Step 2: Verificar que falla**
 
 Run: `npx vitest run src/lib/social/cuenta.test.ts`
 Expected: FAIL — el módulo no existe.
 
-- [ ] **Step 3: Lo puro**
+- [x] **Step 3: Lo puro**
 
 ```ts
 // src/lib/social/cuenta.ts
@@ -155,7 +155,7 @@ export function SIN_CUENTA(network: string): string {
 }
 ```
 
-- [ ] **Step 4: Esquema fase 1**
+- [x] **Step 4: Esquema fase 1**
 
 En `src/db/schema.ts`:
 
@@ -194,7 +194,7 @@ export const socialAccounts = pgTable(
 Actualiza el comentario de `socialAccounts` («One connected network…») a «One connected
 account. Several rows can share a network; `(network, external_id)` is the identity.»
 
-- [ ] **Step 5: El script**
+- [x] **Step 5: El script**
 
 ```ts
 // scripts/backfill-cuentas.ts
@@ -248,7 +248,7 @@ main().catch((error) => {
 En `package.json`, junto a `blobs:auditar`:
 `"cuentas:backfill": "dotenv -e .env.local -- tsx scripts/backfill-cuentas.ts",`
 
-- [ ] **Step 6: Verde y commit**
+- [x] **Step 6: Verde y commit**
 
 Run: `npx vitest run src/lib/social/cuenta.test.ts && npm run typecheck`
 Expected: PASS; el typecheck pasa porque `accountId` es opcional y nadie lo escribe todavía.
@@ -269,7 +269,7 @@ git commit -m "Agrega account_id a posts, métricas y destinos, con su backfill"
 **Interfaces:**
 - Produces (Task 3): `type CuentaTag = { primaria: boolean; handle: string | null; externalId: string | null }`; `campaignTagFor(network: string, externalId: string, cuenta?: CuentaTag): string`. Sin `cuenta`, o con `cuenta.primaria === true`, el resultado es idéntico al de hoy.
 
-- [ ] **Step 1: Tests que fallan**
+- [x] **Step 1: Tests que fallan**
 
 Agrega al final de `src/lib/social/campaign.test.ts`:
 
@@ -304,12 +304,12 @@ describe('campaignTagFor con cuenta', () => {
 })
 ```
 
-- [ ] **Step 2: Verificar que falla**
+- [x] **Step 2: Verificar que falla**
 
 Run: `npx vitest run src/lib/social/campaign.test.ts`
 Expected: FAIL — el tercer argumento se ignora.
 
-- [ ] **Step 3: Implementar**
+- [x] **Step 3: Implementar**
 
 En `src/lib/social/campaign.ts`, reemplaza `campaignTagFor` por:
 
@@ -338,7 +338,7 @@ export function campaignTagFor(network: string, externalId: string, cuenta?: Cue
 }
 ```
 
-- [ ] **Step 4: Verde y commit**
+- [x] **Step 4: Verde y commit**
 
 Run: `npx vitest run src/lib/social/campaign.test.ts src/lib/social/sync.test.ts 2>/dev/null; npx vitest run src/lib/social`
 Expected: PASS, todos.
@@ -360,7 +360,7 @@ git commit -m "Distingue cuentas en el tag de campaña sin tocar los ya acuñado
 - Consumes: `campaignTagFor(network, externalId, cuenta)` (Task 2), `primariaDe` (Task 1), `accountId` en el esquema (Task 1).
 - Produces: `syncAccount(account: SocialAccount, primaria: boolean): Promise<number>` reemplaza a `syncNetwork`; `syncAll(): Promise<SyncReport>` con `SyncReport = Array<{ network: string; handle: string | null; ok: boolean; posts: number; error?: string }>`.
 
-- [ ] **Step 1: `insertOrUpdatePost` y `upsertPost` por cuenta**
+- [x] **Step 1: `insertOrUpdatePost` y `upsertPost` por cuenta**
 
 En `src/lib/social/sync.ts`:
 
@@ -377,7 +377,7 @@ En `src/lib/social/sync.ts`:
 5. `upsertPost(post, account: SocialAccount, cuenta: CuentaTag)`: pasa `cuenta` a ambos
    acuñadores y `account` a `insertOrUpdatePost`.
 
-- [ ] **Step 2: `syncAccount`**
+- [x] **Step 2: `syncAccount`**
 
 Reemplaza `syncNetwork` entero por:
 
@@ -459,7 +459,7 @@ export async function syncAccount(account: SocialAccount, primaria: boolean): Pr
 }
 ```
 
-- [ ] **Step 3: `syncAll` itera cuentas**
+- [x] **Step 3: `syncAll` itera cuentas**
 
 Reemplaza `syncAll` por:
 
@@ -511,14 +511,14 @@ export async function syncAll(): Promise<SyncReport> {
 `[socialAccounts.network, socialAccounts.externalId]` (la unique de Task 1) y mantiene
 `set: { externalId: channelId }`. Quita el import de `CONNECTORS` si queda sin uso.
 
-- [ ] **Step 4: Los consumidores del reporte**
+- [x] **Step 4: Los consumidores del reporte**
 
 `syncSocialNow` en `actions.ts` y el cron solo leen `ok`; con `handle` agregado no
 deberían romper. Corre `npm run typecheck`; si algo reclama, ajusta el tipo en el
 consumidor sin cambiar su comportamiento. Nada más usa `syncNetwork` (verifícalo con
 `grep -rn syncNetwork src`).
 
-- [ ] **Step 5: Verificar y commitear**
+- [x] **Step 5: Verificar y commitear**
 
 Run: `npm run typecheck && npx vitest run src/lib/social && npm run lint`
 Expected: verde.
@@ -542,7 +542,7 @@ git commit -m "Sincroniza y archiva por cuenta, no por red"
 - Consumes: `primariaDe`, `SIN_CUENTA` (Task 1).
 - Produces: `cuentasPrimarias(networks: string[]): Promise<Map<string, string>>` (red → id de la cuenta primaria; una red sin cuenta no aparece en el mapa); `class SinCuenta extends Error` con `network`.
 
-- [ ] **Step 1: El helper**
+- [x] **Step 1: El helper**
 
 ```ts
 // src/lib/social/cuentas.ts
@@ -590,7 +590,7 @@ export async function exigirCuentas(networks: string[]): Promise<Map<string, str
 }
 ```
 
-- [ ] **Step 2: `crearPostProgramado`**
+- [x] **Step 2: `crearPostProgramado`**
 
 En `src/lib/social/publish/crear.ts`, importa `exigirCuentas` de `../cuentas` y cambia la
 inserción de targets por:
@@ -608,7 +608,7 @@ Mueve la llamada a `exigirCuentas` **antes** del insert de `scheduledPosts`, par
 `SinCuenta` no deje un post sin destinos. Actualiza el doc del helper: «Lanza `SinCuenta`
 si una red no tiene cuenta conectada; el llamador la traduce a su frase.»
 
-- [ ] **Step 3: Los llamadores de `crearPostProgramado`**
+- [x] **Step 3: Los llamadores de `crearPostProgramado`**
 
 1. `src/app/admin/actions.ts`, `createScheduledPost`: envuelve la llamada:
 ```ts
@@ -626,7 +626,7 @@ si una red no tiene cuenta conectada; el llamador la traduce a su frase.»
     if (dbError instanceof SinCuenta) return NextResponse.json({ error: dbError.message }, { status: 400 })
 ```
 
-- [ ] **Step 4: El lote**
+- [x] **Step 4: El lote**
 
 En `src/lib/social/publish/batch.ts`, en el bucle por item, antes del insert de
 `scheduledPosts` (dentro del mismo `try`): `const cuentas = await exigirCuentas(item.redes)`,
@@ -640,7 +640,7 @@ En el `catch` del item, antes del `console.error`:
       }
 ```
 
-- [ ] **Step 5: El editor**
+- [x] **Step 5: El editor**
 
 En `src/app/admin/actions.ts`, `updateScheduledPost`, el bloque `if (targetsPlan.create.length > 0)`:
 
@@ -662,7 +662,7 @@ En `src/app/admin/actions.ts`, `updateScheduledPost`, el bloque `if (targetsPlan
 Este bloque corre **después** de las escrituras de post y media, igual que hoy; el
 perfil de fallo parcial es el que el comentario de arriba ya acepta.
 
-- [ ] **Step 6: Verificar y commitear**
+- [x] **Step 6: Verificar y commitear**
 
 Run: `npm run typecheck && npm run lint && npm test`
 Expected: verde (los tests de `batch.test.ts` que insertan no existen; los puros siguen).
@@ -682,7 +682,7 @@ git commit -m "Los destinos programados nacen apuntando a una cuenta"
 **Interfaces:**
 - Consumes: `scheduledPostTargets.accountId` (Task 1).
 
-- [ ] **Step 1: `attempt` recibe la cuenta**
+- [x] **Step 1: `attempt` recibe la cuenta**
 
 1. Cambia la firma a `attempt(target: { network: string; accountId: string | null }, targetId, postId, containerId, content)`
    y el llamador en `publishDue` a `attempt(target, target.id, post.id, target.containerId, {...})`.
@@ -697,7 +697,7 @@ git commit -m "Los destinos programados nacen apuntando a una cuenta"
     : await db.select().from(socialAccounts).where(eq(socialAccounts.network, target.network))
 ```
 
-- [ ] **Step 2: Verificar y commitear**
+- [x] **Step 2: Verificar y commitear**
 
 Run: `npm run typecheck && npx vitest run src/lib/social/publish && npm run lint`
 Expected: verde.
@@ -714,7 +714,7 @@ git commit -m "Publica con el token de la cuenta del destino, no de la red"
 **Files:**
 - Modify: `src/app/api/social/[network]/callback/route.ts:449-468`
 
-- [ ] **Step 1: El upsert**
+- [x] **Step 1: El upsert**
 
 El `onConflictDoUpdate` del insert en `socialAccounts` pasa de `target: socialAccounts.network`
 a `target: [socialAccounts.network, socialAccounts.externalId]`. El guard
@@ -726,7 +726,7 @@ entrega 2 lo retira). Agrega encima del insert:
     // sumar cuentas en la entrega 2. Hoy el guard de arriba sigue dejando pasar una sola.
 ```
 
-- [ ] **Step 2: Verificar y commitear**
+- [x] **Step 2: Verificar y commitear**
 
 Run: `npm run typecheck && npm run lint`
 
@@ -743,7 +743,7 @@ git commit -m "Identifica la cuenta conectada por red e id externo"
 - Modify: `src/db/schema.ts`
 - Modify: `README.md` (sección de actualización), este plan (marcar pasos)
 
-- [ ] **Step 1: Esquema final**
+- [x] **Step 1: Esquema final**
 
 En `src/db/schema.ts`:
 1. `socialAccounts.network`: quita `.unique()` y el comentario de Task 1 sobre la fase 2.
@@ -753,7 +753,7 @@ En `src/db/schema.ts`:
 4. En `run.ts`, quita la rama por red de Task 5 (con `accountId` NOT NULL ya no hay
    filas sin cuenta) y su comentario; `target.accountId` pasa a `string`.
 
-- [ ] **Step 2: El runbook en el README**
+- [x] **Step 2: El runbook en el README**
 
 En `README.md`, bajo «Conectar y sincronizar» (la sección que dice `npm run db:push`),
 agrega:
@@ -774,7 +774,7 @@ cargados, el orden importa:
    obligatorias y claves únicas viejas retiradas.
 ```
 
-- [ ] **Step 3: Verificación final y commit**
+- [x] **Step 3: Verificación final y commit**
 
 Run: `npm test && npm run typecheck && npm run lint && npx next build`
 Expected: todo verde.

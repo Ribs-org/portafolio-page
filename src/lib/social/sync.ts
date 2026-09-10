@@ -77,6 +77,7 @@ async function insertOrUpdatePost(
       target: [socialPosts.accountId, socialPosts.externalId],
       // `campaign` is deliberately absent: once the owner edits the tag, it is theirs.
       set: {
+        // Las filas de antes de la migración reciben su cuenta del backfill, no de acá.
         accountId: account.id,
         permalink: post.permalink,
         caption: post.caption,
