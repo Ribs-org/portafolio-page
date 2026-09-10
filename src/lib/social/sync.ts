@@ -77,8 +77,6 @@ async function insertOrUpdatePost(
       target: [socialPosts.accountId, socialPosts.externalId],
       // `campaign` is deliberately absent: once the owner edits the tag, it is theirs.
       set: {
-        // Las filas de antes de la migración reciben su cuenta del backfill, no de acá.
-        accountId: account.id,
         permalink: post.permalink,
         caption: post.caption,
         thumbnailUrl: post.thumbnailUrl,
@@ -209,10 +207,10 @@ export async function syncAll(): Promise<SyncReport> {
     console.error('[sync] no se pudo asegurar la cuenta de YouTube:', String(error).slice(0, 300))
   }
 
-  const cuentas = (await getDb()
+  const cuentas = await getDb()
     .select()
     .from(socialAccounts)
-    .orderBy(asc(socialAccounts.createdAt))) as SocialAccount[]
+    .orderBy(asc(socialAccounts.createdAt))
   // Solo las redes con conector: una fila de threads o x se sincroniza el día que
   // exista su conector, no antes.
   const conConector = cuentas.filter((c) => connectorFor(c.network))

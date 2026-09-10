@@ -420,6 +420,13 @@ export async function GET(
       ?.match(/(?:^|;\s*)x_pkce_verifier=([^;]+)/)?.[1]
     const credential = await fetchCredential(network, code, redirectUri, pkceVerifier)
 
+    // La identidad de una cuenta es (red, id externo): con NULL esa identidad queda
+    // indefinida, y tras la migración un reconectar crearía una segunda fila en vez de
+    // refrescar el token de la que ya existe.
+    if (!credential.externalId) {
+      throw new OAuthError('La red no entregó el id de la cuenta. Vuelve a conectar.')
+    }
+
     // Refuse to move a connected network onto a different account.
     //
     // `external_id` is what the sync fetches posts for, while `social_posts` is keyed on

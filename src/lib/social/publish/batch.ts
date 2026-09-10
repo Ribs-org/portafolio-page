@@ -232,6 +232,10 @@ export async function scheduleBatch(items: BatchItem[]): Promise<BatchResult[]> 
     }
 
     try {
+      // Antes de subir nada: un destino sin cuenta se rechaza acá, no después de gastar
+      // la subida de toda la media de la fila.
+      const cuentas = await exigirCuentas(item.redes)
+
       const uploaded: Array<{ url: string; mediaType: 'image' | 'video' }> = []
       let mediaFailed = false
       for (const url of item.media) {
@@ -292,8 +296,6 @@ export async function scheduleBatch(items: BatchItem[]): Promise<BatchResult[]> 
 
       const atributosCheck = validateAtributos(item.atributos)
       const atributos = 'error' in atributosCheck ? null : atributosCheck.atributos
-
-      const cuentas = await exigirCuentas(item.redes)
 
       const [post] = await db
         .insert(scheduledPosts)

@@ -124,7 +124,7 @@ async function limpiarMedia(postId: string): Promise<void> {
 }
 
 async function attempt(
-  target: { network: string; accountId: string },
+  target: { network: string; accountId: string | null },
   targetId: string,
   postId: string,
   containerId: string | null,
@@ -141,8 +141,13 @@ async function attempt(
   if (!ensure) return { kind: 'failed', reason: NO_PUBLISH_TOKEN }
 
   // Por la cuenta del destino, no por la red: con dos páginas de Facebook, «la cuenta
-  // de facebook» no dice cuál.
-  const [account] = await db.select().from(socialAccounts).where(eq(socialAccounts.id, target.accountId))
+  // de facebook» no dice cuál. La rama por red cubre los destinos que el código viejo
+  // insertó sin cuenta entre el deploy y el backfill de producción; se retira en la
+  // entrega 2, no antes: un destino sin cuenta que cae acá tres veces queda failed
+  // para siempre.
+  const [account] = target.accountId
+    ? await db.select().from(socialAccounts).where(eq(socialAccounts.id, target.accountId))
+    : await db.select().from(socialAccounts).where(eq(socialAccounts.network, target.network))
   const token = account ? await ensure(account) : null
   if (!token || !account?.externalId) return { kind: 'failed', reason: NO_PUBLISH_TOKEN }
 

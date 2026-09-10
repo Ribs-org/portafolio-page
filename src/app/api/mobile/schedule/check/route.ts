@@ -48,9 +48,9 @@ export async function POST(request: Request) {
   // Este chequeo existe para fallar antes de la subida, así que también tiene que saberlo.
   try {
     await exigirCuentas(borrador.redes)
-  } catch (error) {
-    if (error instanceof SinCuenta) return NextResponse.json({ error: error.message }, { status: 400 })
-    throw error
+  } catch (fallo) {
+    if (fallo instanceof SinCuenta) return NextResponse.json({ error: fallo.message }, { status: 400 })
+    throw fallo
   }
 
   return NextResponse.json({ ok: true })
