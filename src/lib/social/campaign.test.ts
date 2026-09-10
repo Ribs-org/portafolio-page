@@ -53,3 +53,44 @@ describe('normalizeCampaignTag', () => {
     expect(normalizeCampaignTag('###???')).toBe('')
   })
 })
+
+describe('campaignTagFor con cuenta', () => {
+  it('la cuenta primaria acuña el tag de siempre', () => {
+    expect(
+      campaignTagFor('facebook', '123_456', { primaria: true, handle: 'Gimnasio', externalId: '99' }),
+    ).toBe('fb-123_456')
+  })
+
+  it('una cuenta secundaria mete su handle corto entre el prefijo y el id', () => {
+    expect(
+      campaignTagFor('facebook', '123_456', { primaria: false, handle: 'Gimnasio Ribs', externalId: '99' }),
+    ).toBe('fb-Gimnasio-123_456')
+    expect(
+      campaignTagFor('instagram', 'C8xK2Lp', { primaria: false, handle: '@vicente_pareja_j', externalId: '17' }),
+    ).toBe('ig-vicente-C8xK2Lp')
+  })
+
+  it('sin handle usa el id externo de la cuenta, también recortado a ocho', () => {
+    expect(
+      campaignTagFor('youtube', 'dQw4w9WgXcQ', { primaria: false, handle: null, externalId: 'UCugxL4FqqBbYHxGmgedfB3w' }),
+    ).toBe('yt-UCugxL4F-dQw4w9WgXcQ')
+  })
+
+  it('sigue acotado a 48 caracteres', () => {
+    expect(
+      campaignTagFor('youtube', 'x'.repeat(200), { primaria: false, handle: 'canal', externalId: null }).length,
+    ).toBeLessThanOrEqual(48)
+  })
+
+  it('un handle que no normaliza a nada cae al id externo', () => {
+    expect(
+      campaignTagFor('instagram', 'C8', { primaria: false, handle: '@🎉🎉', externalId: '17841400' }),
+    ).toBe('ig-17841400-C8')
+  })
+
+  it('sin handle ni id externo, el corto es «alt» y nunca colapsa al tag de la cuenta primaria', () => {
+    expect(
+      campaignTagFor('facebook', '123', { primaria: false, handle: null, externalId: null }),
+    ).toBe('fb-alt-123')
+  })
+})

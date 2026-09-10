@@ -420,6 +420,13 @@ export async function GET(
       ?.match(/(?:^|;\s*)x_pkce_verifier=([^;]+)/)?.[1]
     const credential = await fetchCredential(network, code, redirectUri, pkceVerifier)
 
+    // La identidad de una cuenta es (red, id externo): con NULL esa identidad queda
+    // indefinida, y tras la migración un reconectar crearía una segunda fila en vez de
+    // refrescar el token de la que ya existe.
+    if (!credential.externalId) {
+      throw new OAuthError('La red no entregó el id de la cuenta. Vuelve a conectar.')
+    }
+
     // Refuse to move a connected network onto a different account.
     //
     // `external_id` is what the sync fetches posts for, while `social_posts` is keyed on
@@ -444,6 +451,8 @@ export async function GET(
       )
     }
 
+    // La identidad de una cuenta es (red, id externo), no la red: es lo que permitirá
+    // sumar cuentas en la entrega 2. Hoy el guard de arriba sigue dejando pasar una sola.
     await getDb()
       .insert(socialAccounts)
       .values({
@@ -456,7 +465,7 @@ export async function GET(
         lastSyncError: null,
       })
       .onConflictDoUpdate({
-        target: socialAccounts.network,
+        target: [socialAccounts.network, socialAccounts.externalId],
         set: {
           handle: credential.handle,
           externalId: credential.externalId,

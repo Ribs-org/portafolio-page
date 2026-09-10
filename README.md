@@ -145,6 +145,10 @@ YOUTUBE_API_KEY=AIza...
 YOUTUBE_CHANNEL_ID=UC...
 ```
 
+Cambiar el id ahora no reemplaza la cuenta: crea una segunda fila de YouTube y la
+vieja sigue sincronizando por API key hasta que alguien la borre a mano (la entrega 2
+trae desconectar por cuenta).
+
 ### Instagram — cuenta profesional y página de Facebook
 
 Necesitas una cuenta Business o Creator **ligada a una página de Facebook**. La conexión
@@ -221,6 +225,40 @@ cuando quieras.
 
 Después de sincronizar, cada post trae su etiqueta `?s=` lista. Copia el link de la fila,
 pégalo en el post, y de ahí en adelante el cruce es automático.
+
+#### Migrar a multicuentas (una vez, 2026-09)
+
+El esquema pasa a identificar posts, métricas y destinos por cuenta. Con datos ya
+cargados, el orden importa:
+
+0. `.env.local` debe apuntar a la base de producción (`npx vercel env pull .env.local`);
+   y esta consulta debe devolver cero filas: `select network, external_id from
+   social_accounts where external_id is null;` — una cuenta sin id externo no tiene
+   identidad para la migración; reconéctala antes.
+1. Con el código de **antes** del cambio corriendo en producción, aplica solo la fase 1
+   del esquema: desde el commit `f47bca7`, «Agrega account_id a posts, métricas y
+   destinos, con su backfill», `npm run db:push`.
+2. `npm run cuentas:backfill`: asigna cada fila a la única cuenta de su red. Debe
+   terminar en «Filas sin cuenta: 0».
+3. Despliega el código nuevo (merge y promoción a `main`).
+4. Vuelve a correr `npm run cuentas:backfill` (por si una sincronización corrió entre
+   los pasos 2 y 3) y, desde `main`, `npm run db:push` para la fase 2: columnas
+   obligatorias y claves únicas viejas retiradas.
+
+El backfill del paso 4 corre **inmediatamente después del deploy, antes del próximo
+cron**: el pinger de publicación pasa cada 5 minutos y el cron de sincronización a las
+9:00 UTC, y una sincronización entre el deploy y ese backfill tumba toda la cuenta por
+el día — las filas viejas (`account_id` nulo) no chocan con la unique nueva, así que el
+insert cae en la unique vieja de `(network, external_id)`. Por eso conviene desplegar
+lejos de las 9:00 UTC.
+
+Además del riesgo de sincronización, un post que el código viejo agenda entre el paso 2
+y el 3 consigue su cuenta por el respaldo por red (mismo mecanismo que la publicación,
+más abajo), y sigue así hasta que corre el backfill del paso 4 — por eso **no se
+programa nada entre el paso 2 y el 3**. Y la migración no tiene vuelta atrás: hecho el
+paso 4, revertir el deploy al código viejo lo rompe de inmediato, porque sus
+`ON CONFLICT` apuntan a `social_accounts.network` y a `social_posts (network,
+external_id)`, claves que ya no existen.
 
 ---
 

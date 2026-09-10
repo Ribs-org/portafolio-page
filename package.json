@@ -19,7 +19,8 @@
     "demo:clear": "dotenv -e .env.local -- tsx scripts/demo-data.ts clear",
     "analytics:reset": "dotenv -e .env.local -- tsx scripts/reset-analytics.ts",
     "analytics:check": "dotenv -e .env.local -- tsx scripts/verify.ts",
-    "blobs:auditar": "dotenv -e .env.local -- tsx scripts/blob-audit.ts"
+    "blobs:auditar": "dotenv -e .env.local -- tsx scripts/blob-audit.ts",
+    "cuentas:backfill": "dotenv -e .env.local -- tsx scripts/backfill-cuentas.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1127.0",
