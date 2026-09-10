@@ -268,15 +268,75 @@ parte el rango en trozos más chicos.
 
 ---
 
-# 3. El ciclo completo
+# 3. Leer el calendario — `GET /api/schedule/posts`
 
-1. **Programa** con `atributos` describiendo tus decisiones creativas.
-2. El sistema **publica** a la hora indicada, en cada red. Si un destino falla, se
+```http
+GET /api/schedule/posts?desde=2026-09-10&hasta=2026-09-30
+Authorization: Bearer <SCHEDULE_API_KEY>
+```
+
+Lo que hay en el calendario entre dos días, **por fecha de salida** y sin importar si
+ya salió: programado, publicando, publicado o fallido. Úsalo antes de armar una tanda,
+para no pisar horas ni repetir temas, y después, para saber qué salió y qué falló.
+
+Parámetros, ambos opcionales, `YYYY-MM-DD` en hora de Chile, **ambos inclusive**:
+- `desde`: por defecto hoy.
+- `hasta`: por defecto 30 días después de `desde`.
+
+Un rango pasado vale (lista lo ya publicado). Formato inválido o rango invertido:
+`400` con `El rango de fechas no se entendió (usa YYYY-MM-DD).`
+
+## Respuesta
+
+```json
+{
+  "desde": "2026-09-10",
+  "hasta": "2026-09-30",
+  "posts": [
+    {
+      "id": "3f2a…",
+      "texto": "¿El negocio con más margen del retail?\n\nTe sorprendería.",
+      "fecha": "2026-09-10T09:00:00-03:00",
+      "portada": "https://media.vicente-pareja.cl/scheduled/…jpg",
+      "media": [{ "url": "https://media.vicente-pareja.cl/scheduled/…mp4", "tipo": "video" }],
+      "atributos": { "hook": "pregunta-polemica", "tema": "retail" },
+      "redes": [
+        { "red": "instagram", "estado": "published", "error": null, "externalId": "18114074218999893", "intentos": 1 },
+        { "red": "youtube", "estado": "scheduled", "error": null, "externalId": null, "intentos": 0 },
+        { "red": "x", "estado": "failed", "error": "X aún no recibe video desde el calendario.", "externalId": null, "intentos": 3 }
+      ]
+    }
+  ]
+}
+```
+
+- **`id`** es el `postId` que devolvió el lote al programar.
+- **`fecha`** es la hora de salida, ISO con el offset de Chile. Los posts vienen
+  ordenados por ella.
+- **`media`** viene en el orden del carrusel, ya en el almacén propio (la URL de
+  origen que mandaste no se conserva).
+- **`atributos`** trae exactamente lo que enviaste; `null` si no mandaste ninguno.
+- **`redes`**: un estado por red. `scheduled` espera su hora; `publishing` está en
+  vuelo (Meta procesando un video); `published` salió y `externalId` es su id en la
+  red, el mismo que usa `/api/metrics/posts`; `failed` agotó los tres intentos y
+  `error` dice por qué con una frase fija. `intentos` cuenta los intentos hechos.
+
+Un post `published` en todas sus redes aparece en `/api/metrics/posts` desde la
+sincronización del día siguiente, con `atributos` idénticos: ese es el puente entre
+lo que decidiste y lo que rindió.
+
+---
+
+# 4. El ciclo completo
+
+1. **Mira** `/api/schedule/posts` para saber qué ya está puesto en la ventana.
+2. **Programa** con `atributos` describiendo tus decisiones creativas.
+3. El sistema **publica** a la hora indicada, en cada red. Si un destino falla, se
    reintenta hasta 3 veces; al tercer fallo Vicente recibe un correo y el post queda
-   marcado en rojo en su calendario.
-3. La sincronización diaria trae **métricas reales**.
-4. **Lee** `/api/metrics/posts` sobre un rango con suficiente historia.
-5. **Correlaciona** `atributos` contra `viewsGanadas` y `arrastre`, y decide la
+   marcado en rojo en su calendario, y en `failed` en `/api/schedule/posts`.
+4. La sincronización diaria trae **métricas reales**.
+5. **Lee** `/api/metrics/posts` sobre un rango con suficiente historia.
+6. **Correlaciona** `atributos` contra `viewsGanadas` y `arrastre`, y decide la
    próxima parrilla. Ejemplos de preguntas que el dato responde:
    - ¿qué `hook` gana en views, y cuál gana en visitas al sitio? (rara vez es el mismo)
    - ¿un `tema` rinde distinto según la red?
@@ -287,7 +347,7 @@ patrones. Con menos de ~10 posts por valor de atributo, desconfía de la diferen
 
 ---
 
-# 4. Lo que el sistema NO hace
+# 5. Lo que el sistema NO hace
 
 - **No publica en TikTok** (la app sigue en revisión de la plataforma).
 - **No deduplica**: reenviar el mismo lote programa todo de nuevo.
@@ -300,7 +360,14 @@ patrones. Con menos de ~10 posts por valor de atributo, desconfía de la diferen
 - **No entrega agregados**: este endpoint devuelve filas crudas y el análisis es tuyo,
   a propósito.
 
-# 5. Ejemplos ejecutables
+# 6. Ejemplos ejecutables
+
+Ver qué hay en el calendario las próximas dos semanas:
+
+```bash
+curl -s "https://www.vicente-pareja.cl/api/schedule/posts?hasta=$(date -d '+14 days' +%F)" \
+  -H "Authorization: Bearer $SCHEDULE_API_KEY"
+```
 
 Programar dos posts:
 
