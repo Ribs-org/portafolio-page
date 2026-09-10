@@ -25,12 +25,25 @@ export function normalizeCampaignTag(raw: string): string {
     .slice(0, MAX_LENGTH)
 }
 
+export type CuentaTag = { primaria: boolean; handle: string | null; externalId: string | null }
+
+// Ocho caracteres: suficientes para reconocer «gimnasio» de «personal» a ojo, y pocos
+// para no comerse el presupuesto de 48 del tag entero.
+const HANDLE_CORTO = 8
+
 /**
  * The `?s=` tag a post is born with. Kept short and readable because it ends up
  * pasted by hand into a bio link, and stable because changing it would orphan the
  * traffic already attributed to the old one.
+ *
+ * Una red puede tener varias cuentas. La primaria (la más antigua) conserva el tag de
+ * siempre, porque ya acuñó los suyos; cualquier otra lleva su handle corto para que dos
+ * cuentas jamás compartan tag — el tag es la única llave entre un post y sus visitas.
  */
-export function campaignTagFor(network: string, externalId: string): string {
+export function campaignTagFor(network: string, externalId: string, cuenta?: CuentaTag): string {
   const prefix = PREFIXES[network] ?? network
-  return normalizeCampaignTag(`${prefix}-${externalId}`)
+  if (!cuenta || cuenta.primaria) return normalizeCampaignTag(`${prefix}-${externalId}`)
+  const crudo = cuenta.handle?.replace(/^@/, '') || cuenta.externalId || ''
+  const corto = normalizeCampaignTag(crudo).slice(0, HANDLE_CORTO)
+  return normalizeCampaignTag(`${prefix}-${corto}-${externalId}`)
 }
