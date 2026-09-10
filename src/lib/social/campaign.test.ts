@@ -81,4 +81,16 @@ describe('campaignTagFor con cuenta', () => {
       campaignTagFor('youtube', 'x'.repeat(200), { primaria: false, handle: 'canal', externalId: null }).length,
     ).toBeLessThanOrEqual(48)
   })
+
+  it('un handle que no normaliza a nada cae al id externo', () => {
+    expect(
+      campaignTagFor('instagram', 'C8', { primaria: false, handle: '@🎉🎉', externalId: '17841400' }),
+    ).toBe('ig-17841400-C8')
+  })
+
+  it('sin handle ni id externo, el corto es «alt» y nunca colapsa al tag de la cuenta primaria', () => {
+    expect(
+      campaignTagFor('facebook', '123', { primaria: false, handle: null, externalId: null }),
+    ).toBe('fb-alt-123')
+  })
 })

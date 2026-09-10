@@ -43,7 +43,11 @@ const HANDLE_CORTO = 8
 export function campaignTagFor(network: string, externalId: string, cuenta?: CuentaTag): string {
   const prefix = PREFIXES[network] ?? network
   if (!cuenta || cuenta.primaria) return normalizeCampaignTag(`${prefix}-${externalId}`)
-  const crudo = cuenta.handle?.replace(/^@/, '') || cuenta.externalId || ''
-  const corto = normalizeCampaignTag(crudo).slice(0, HANDLE_CORTO)
+  const deHandle = normalizeCampaignTag(cuenta.handle?.replace(/^@/, '') ?? '')
+  const deId = normalizeCampaignTag(cuenta.externalId ?? '')
+  // Nunca vacío: un corto vacío colapsaría al tag de la primaria. Una cuenta sin handle
+  // ni id externo no sincroniza, así que «alt» es un marcador que casi nadie verá, y el
+  // sufijo hash de sync.ts sigue cubriendo la unique.
+  const corto = (deHandle || deId || 'alt').slice(0, HANDLE_CORTO)
   return normalizeCampaignTag(`${prefix}-${corto}-${externalId}`)
 }
