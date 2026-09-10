@@ -134,21 +134,27 @@ export const SOCIAL_NETWORKS = ['instagram', 'tiktok', 'youtube', 'facebook', 't
 export type SocialNetwork = (typeof SOCIAL_NETWORKS)[number]
 
 /**
- * One connected network. Tokens are stored encrypted — see `lib/social/crypto`.
- * YouTube needs no OAuth, so it lands here with both tokens null and only a channel id.
+ * One connected account. Several rows can share a network; `(network, external_id)` is
+ * the identity. Tokens are stored encrypted — see `lib/social/crypto`. YouTube needs no
+ * OAuth, so it lands here with both tokens null and only a channel id.
  */
-export const socialAccounts = pgTable('social_accounts', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  network: text('network').notNull().unique(),
-  handle: text('handle'),
-  externalId: text('external_id'),
-  accessToken: text('access_token'),
-  refreshToken: text('refresh_token'),
-  expiresAt: timestamp('expires_at', { withTimezone: true }),
-  lastSyncedAt: timestamp('last_synced_at', { withTimezone: true }),
-  lastSyncError: text('last_sync_error'),
-  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-})
+export const socialAccounts = pgTable(
+  'social_accounts',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    // El unique por red se retira en la fase 2 de la migración (multicuentas 1, Task 7).
+    network: text('network').notNull().unique(),
+    handle: text('handle'),
+    externalId: text('external_id'),
+    accessToken: text('access_token'),
+    refreshToken: text('refresh_token'),
+    expiresAt: timestamp('expires_at', { withTimezone: true }),
+    lastSyncedAt: timestamp('last_synced_at', { withTimezone: true }),
+    lastSyncError: text('last_sync_error'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [unique('social_accounts_network_external_key').on(t.network, t.externalId)],
+)
 
 /**
  * A published piece of content.
@@ -166,6 +172,7 @@ export const socialPosts = pgTable(
   {
     id: uuid('id').primaryKey().defaultRandom(),
     network: text('network').notNull(),
+    accountId: uuid('account_id').references(() => socialAccounts.id),
     externalId: text('external_id').notNull(),
     permalink: text('permalink'),
     caption: text('caption'),
@@ -178,6 +185,7 @@ export const socialPosts = pgTable(
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [
+    unique('social_posts_account_external_key').on(t.accountId, t.externalId),
     unique('social_posts_network_external_key').on(t.network, t.externalId),
     index('social_posts_campaign_idx').on(t.campaign),
     index('social_posts_published_idx').on(t.publishedAt),
@@ -225,6 +233,7 @@ export const accountMetrics = pgTable(
   {
     id: uuid('id').primaryKey().defaultRandom(),
     network: text('network').notNull(),
+    accountId: uuid('account_id').references(() => socialAccounts.id),
     day: date('day').notNull(),
     // Acumulados
     followers: integer('followers'),
@@ -238,6 +247,7 @@ export const accountMetrics = pgTable(
     capturedAt: timestamp('captured_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [
+    unique('account_metrics_account_day_key').on(t.accountId, t.day),
     unique('account_metrics_network_day_key').on(t.network, t.day),
     index('account_metrics_day_idx').on(t.day),
   ],
@@ -279,6 +289,7 @@ export const scheduledPostTargets = pgTable(
       .notNull()
       .references(() => scheduledPosts.id, { onDelete: 'cascade' }),
     network: text('network').notNull(),
+    accountId: uuid('account_id').references(() => socialAccounts.id),
     captionOverride: text('caption_override'),
     status: text('status').$type<TargetStatus>().notNull().default('scheduled'),
     containerId: text('container_id'),
@@ -294,6 +305,7 @@ export const scheduledPostTargets = pgTable(
       .defaultNow(),
   },
   (t) => [
+    unique('scheduled_post_targets_post_account_key').on(t.postId, t.accountId),
     unique('scheduled_post_targets_post_network_key').on(t.postId, t.network),
     index('scheduled_post_targets_status_idx').on(t.status),
   ],
