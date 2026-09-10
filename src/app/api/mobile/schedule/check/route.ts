@@ -7,6 +7,7 @@ import {
   resolverCuando,
 } from '@/lib/mobile-api'
 import { validateScheduleDraft } from '@/lib/social/publish/validate'
+import { exigirCuentas, SinCuenta } from '@/lib/social/cuentas'
 
 export const dynamic = 'force-dynamic'
 
@@ -43,5 +44,14 @@ export async function POST(request: Request) {
     now,
   )
   if (error) return NextResponse.json({ error }, { status: 400 })
+
+  // Este chequeo existe para fallar antes de la subida, así que también tiene que saberlo.
+  try {
+    await exigirCuentas(borrador.redes)
+  } catch (error) {
+    if (error instanceof SinCuenta) return NextResponse.json({ error: error.message }, { status: 400 })
+    throw error
+  }
+
   return NextResponse.json({ ok: true })
 }
