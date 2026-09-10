@@ -186,7 +186,10 @@ export const socialPosts = pgTable(
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [
-    unique('social_posts_account_external_key').on(t.accountId, t.externalId),
+    // Las columnas van en el orden físico de la tabla (external_id existe desde antes que
+    // account_id): drizzle-kit introspecta las uniques por ese orden, y declararlas al
+    // revés hace que cada `db:push` quiera recrearlas y pregunte si truncar la tabla.
+    unique('social_posts_account_external_key').on(t.externalId, t.accountId),
     index('social_posts_campaign_idx').on(t.campaign),
     index('social_posts_published_idx').on(t.publishedAt),
   ],
@@ -249,7 +252,8 @@ export const accountMetrics = pgTable(
     capturedAt: timestamp('captured_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [
-    unique('account_metrics_account_day_key').on(t.accountId, t.day),
+    // Orden físico, como en social_posts: ver el comentario de esa unique.
+    unique('account_metrics_account_day_key').on(t.day, t.accountId),
     index('account_metrics_day_idx').on(t.day),
   ],
 )
