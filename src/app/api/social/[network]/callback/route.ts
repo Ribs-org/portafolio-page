@@ -444,6 +444,8 @@ export async function GET(
       )
     }
 
+    // La identidad de una cuenta es (red, id externo), no la red: es lo que permitirá
+    // sumar cuentas en la entrega 2. Hoy el guard de arriba sigue dejando pasar una sola.
     await getDb()
       .insert(socialAccounts)
       .values({
@@ -456,7 +458,7 @@ export async function GET(
         lastSyncError: null,
       })
       .onConflictDoUpdate({
-        target: socialAccounts.network,
+        target: [socialAccounts.network, socialAccounts.externalId],
         set: {
           handle: credential.handle,
           externalId: credential.externalId,
