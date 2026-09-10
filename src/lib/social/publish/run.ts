@@ -68,7 +68,7 @@ export async function publishDue(now: Date = new Date()): Promise<Report> {
       // Skipping the publisher counts the stale check itself as the failed attempt.
       outcome = { kind: 'failed', reason: STALE_PROCESSING }
     } else {
-      outcome = await attempt(target.network, target.id, post.id, target.containerId, {
+      outcome = await attempt(target, target.id, post.id, target.containerId, {
         caption: target.captionOverride ?? post.caption,
         coverUrl: post.coverUrl,
       })
@@ -124,13 +124,14 @@ async function limpiarMedia(postId: string): Promise<void> {
 }
 
 async function attempt(
-  network: string,
+  target: { network: string; accountId: string | null },
   targetId: string,
   postId: string,
   containerId: string | null,
   content: { caption: string; coverUrl: string | null },
 ): Promise<PublishOutcome> {
   const db = getDb()
+  const network = target.network
   const publisher = PUBLISHERS.find((p) => p.network === network)
   if (!publisher) return { kind: 'failed', reason: NO_PUBLISH_TOKEN }
   // The publisher's own credential wins: YouTube reads with an API key but writes
@@ -139,10 +140,12 @@ async function attempt(
   const ensure = publisher.ensureCredential ?? connector?.ensureCredential
   if (!ensure) return { kind: 'failed', reason: NO_PUBLISH_TOKEN }
 
-  const [account] = await db
-    .select()
-    .from(socialAccounts)
-    .where(eq(socialAccounts.network, network))
+  // Por la cuenta del destino, no por la red: con dos páginas de Facebook, «la cuenta
+  // de facebook» no dice cuál. La rama por red existe solo para filas de antes del
+  // backfill y muere con la fase 2 de la migración.
+  const [account] = target.accountId
+    ? await db.select().from(socialAccounts).where(eq(socialAccounts.id, target.accountId))
+    : await db.select().from(socialAccounts).where(eq(socialAccounts.network, target.network))
   const token = account ? await ensure(account) : null
   if (!token || !account?.externalId) return { kind: 'failed', reason: NO_PUBLISH_TOKEN }
 
