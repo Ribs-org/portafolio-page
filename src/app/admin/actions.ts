@@ -26,6 +26,7 @@ import { validateScheduleDraft } from '@/lib/social/publish/validate'
 import { validateAtributos, ATRIBUTOS_ERROR, type Atributos } from '@/lib/social/publish/atributos'
 import { diffMedia, diffTargets } from '@/lib/social/publish/edit'
 import { crearPostProgramado } from '@/lib/social/publish/crear'
+import { SinCuenta, exigirCuentas } from '@/lib/social/cuentas'
 import { fromZonedInput, normalizeUrl, slugify } from '@/lib/utils'
 
 export type FormState = { error?: string; ok?: boolean }
@@ -428,7 +429,12 @@ export async function createScheduledPost(_prev: FormState, formData: FormData):
     uploaded.push({ url, mediaType: file.type.startsWith('video/') ? 'video' : 'image' })
   }
 
-  await crearPostProgramado({ caption, scheduledAt: scheduledAt!, media: uploaded, networks })
+  try {
+    await crearPostProgramado({ caption, scheduledAt: scheduledAt!, media: uploaded, networks })
+  } catch (error) {
+    if (error instanceof SinCuenta) return { error: error.message }
+    throw error
+  }
 
   revalidatePath('/admin/schedule')
   return { ok: true }
@@ -622,9 +628,16 @@ export async function updateScheduledPost(
   }
 
   if (targetsPlan.create.length > 0) {
+    let cuentas: Map<string, string>
+    try {
+      cuentas = await exigirCuentas(targetsPlan.create)
+    } catch (error) {
+      if (error instanceof SinCuenta) return { error: error.message }
+      throw error
+    }
     await db
       .insert(scheduledPostTargets)
-      .values(targetsPlan.create.map((network) => ({ postId, network })))
+      .values(targetsPlan.create.map((network) => ({ postId, network, accountId: cuentas.get(network)! })))
   }
   for (const id of targetsPlan.deleteIds) {
     await db.delete(scheduledPostTargets).where(

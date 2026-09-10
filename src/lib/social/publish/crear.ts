@@ -1,4 +1,5 @@
 import { getDb, scheduledPostMedia, scheduledPosts, scheduledPostTargets } from '@/db'
+import { exigirCuentas } from '../cuentas'
 
 export type MediaSubida = { url: string; mediaType: 'image' | 'video' }
 
@@ -7,6 +8,9 @@ export type MediaSubida = { url: string; mediaType: 'image' | 'video' }
  * espera: el post, su media en posición de carrusel, y un target por red. Compartido
  * por el compositor web y la ruta móvil para que ambos escriban exactamente lo mismo.
  * La media ya vive en el almacén: subirla es problema de quien llama.
+ *
+ * Lanza `SinCuenta` si una red no tiene cuenta conectada; el llamador la traduce a su
+ * frase.
  */
 export async function crearPostProgramado(input: {
   caption: string
@@ -15,6 +19,8 @@ export async function crearPostProgramado(input: {
   networks: string[]
 }): Promise<string> {
   const db = getDb()
+  // Antes de escribir nada: un post sin cuenta a la que salir no debe quedar a medias.
+  const cuentas = await exigirCuentas(input.networks)
   const [post] = await db
     .insert(scheduledPosts)
     .values({ caption: input.caption, scheduledAt: input.scheduledAt })
@@ -31,6 +37,6 @@ export async function crearPostProgramado(input: {
   }
   await db
     .insert(scheduledPostTargets)
-    .values(input.networks.map((network) => ({ postId: post!.id, network })))
+    .values(input.networks.map((network) => ({ postId: post!.id, network, accountId: cuentas.get(network)! })))
   return post!.id
 }

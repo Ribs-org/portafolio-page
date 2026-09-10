@@ -5,6 +5,7 @@ import { validateAtributos } from './atributos'
 import { guardar } from '@/lib/storage'
 import { getDb, scheduledPosts, scheduledPostMedia, scheduledPostTargets } from '@/db'
 import { randomUUID } from 'node:crypto'
+import { SinCuenta, exigirCuentas } from '../cuentas'
 
 // Same derivation as SITE_TIMEZONE in lib/analytics — duplicated here because that
 // module is server-only and this one must stay importable by vitest.
@@ -292,6 +293,8 @@ export async function scheduleBatch(items: BatchItem[]): Promise<BatchResult[]> 
       const atributosCheck = validateAtributos(item.atributos)
       const atributos = 'error' in atributosCheck ? null : atributosCheck.atributos
 
+      const cuentas = await exigirCuentas(item.redes)
+
       const [post] = await db
         .insert(scheduledPosts)
         .values({ caption: item.texto, scheduledAt, coverUrl, atributos })
@@ -308,10 +311,14 @@ export async function scheduleBatch(items: BatchItem[]): Promise<BatchResult[]> 
       }
       await db
         .insert(scheduledPostTargets)
-        .values(item.redes.map((network) => ({ postId: post!.id, network })))
+        .values(item.redes.map((network) => ({ postId: post!.id, network, accountId: cuentas.get(network)! })))
 
       results.push({ index, ok: true, postId: post!.id })
     } catch (error) {
+      if (error instanceof SinCuenta) {
+        results.push({ index, ok: false, error: error.message })
+        continue
+      }
       console.error(`Falló el item ${index} del lote:`, error)
       results.push({ index, ok: false, error: 'No se pudo guardar la fila. Inténtalo de nuevo.' })
     }
