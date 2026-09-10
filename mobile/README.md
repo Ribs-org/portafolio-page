@@ -21,24 +21,30 @@ Solo hace falta cuando cambia algo **nativo** de la app (un módulo nuevo, la ve
 en `app.json`). Los cambios de pantalla y de lógica llegan solos, ver la sección
 siguiente.
 
-1. Abre una terminal en la carpeta `mobile/` de este proyecto.
-2. **La primera vez**, y solo una vez, deja configuradas las actualizaciones por aire:
+1. Abre una terminal **dentro de la carpeta `mobile/`** de este proyecto. Todos los
+   comandos de abajo se corren ahí; corridos desde la raíz crean archivos sueltos
+   que no sirven.
+2. **La primera vez en un computador**, inicia sesión con tu cuenta de Expo:
 
    ```bash
-   npx eas-cli update:configure
+   npx eas-cli login
    ```
 
-   Te pide iniciar sesión con tu cuenta de Expo y escribe dos líneas en `app.json`
-   (`updates.url` y `extra.eas.projectId`). Commitea ese cambio.
+   El proyecto ya está creado y vinculado en la cuenta `vicentepareja` (se hizo el
+   2026-09-10 con `eas init` y `eas update:configure`; `app.json` guarda el id). No
+   hay que volver a hacerlo.
 3. Ejecuta:
 
    ```bash
    npx eas-cli build -p android --profile preview
    ```
 
-4. El comando se demora unos minutos (se construye en los servidores de Expo, no
-   en tu computador). Al terminar, imprime un link (algo como
-   `https://expo.dev/artifacts/eas/....apk`).
+4. El comando sube el proyecto y lo construye en los servidores de Expo, no en tu
+   computador. En el plan gratis puede pasar un rato en cola antes de empezar; en
+   total suele ser entre diez y treinta minutos. Al terminar, imprime un link (algo
+   como `https://expo.dev/artifacts/eas/....apk`). Si cerraste la terminal, el
+   mismo link aparece en
+   [expo.dev/accounts/vicentepareja/projects/vicente-numeros/builds](https://expo.dev/accounts/vicentepareja/projects/vicente-numeros/builds).
 
 ## Cómo mandar un cambio sin reinstalar
 

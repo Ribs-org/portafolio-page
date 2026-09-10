@@ -3,7 +3,9 @@
     "name": "Vicente · Números",
     "slug": "vicente-numeros",
     "version": "1.1.0",
-    "runtimeVersion": { "policy": "appVersion" },
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "vicentenumeros",
@@ -47,6 +49,16 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "b7ba4d91-a97c-456f-9f35-504c39a93dea"
+      }
+    },
+    "owner": "vicentepareja",
+    "updates": {
+      "url": "https://u.expo.dev/b7ba4d91-a97c-456f-9f35-504c39a93dea"
     }
   }
 }
