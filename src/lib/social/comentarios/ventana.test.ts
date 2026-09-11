@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest'
-import { DIAS_VENTANA, MAX_POSTS_POR_PASADA, postsAsondear, recortar } from './ventana'
+import {
+  DIAS_VENTANA,
+  MAX_POSTS_POR_PASADA,
+  PASADAS_YOUTUBE,
+  estadoInicial,
+  postsAsondear,
+  recortar,
+  tocaSondear,
+} from './ventana'
 
 const now = new Date('2026-09-11T12:00:00Z')
 const hace = (dias: number) => new Date(now.getTime() - dias * 864e5)
@@ -97,5 +105,52 @@ describe('recortar', () => {
 
   it('no deja un espacio colgando cuando el corte cae justo ahí', () => {
     expect(recortar('hola mundo', 5)).toBe('hola')
+  })
+})
+
+describe('tocaSondear', () => {
+  // Epoch explícito, calculado a mano: 1789128000000 es 2026-09-11T12:00:00Z, y por caer
+  // en una hora en punto es múltiplo exacto de media hora, o sea de seis pasadas. Nada de
+  // `new Date()` acá: el resultado no puede depender de la hora a la que corra el test.
+  const ARRANQUE = 1_789_128_000_000
+  const PASADA_MS = 5 * 60_000
+  const pasada = (n: number) => new Date(ARRANQUE + n * PASADA_MS)
+
+  it('a instagram y a facebook les toca en todas las pasadas', () => {
+    for (let i = 0; i < PASADAS_YOUTUBE * 2; i++) {
+      expect(tocaSondear('instagram', pasada(i))).toBe(true)
+      expect(tocaSondear('facebook', pasada(i))).toBe(true)
+    }
+  })
+
+  it('a youtube le toca una de cada seis pasadas: media hora entre sondeos', () => {
+    expect(tocaSondear('youtube', pasada(0))).toBe(true)
+    for (let i = 1; i < PASADAS_YOUTUBE; i++) {
+      expect(tocaSondear('youtube', pasada(i))).toBe(false)
+    }
+    expect(tocaSondear('youtube', pasada(PASADAS_YOUTUBE))).toBe(true)
+  })
+
+  it('vale en toda la pasada, no solo en su primer milisegundo', () => {
+    expect(tocaSondear('youtube', new Date(ARRANQUE + PASADA_MS - 1))).toBe(true)
+    expect(tocaSondear('youtube', new Date(ARRANQUE + PASADA_MS))).toBe(false)
+  })
+})
+
+describe('estadoInicial', () => {
+  const cuenta = '17841400000000000'
+
+  it('un comentario del propio dueño entra como propio: nunca a la cola', () => {
+    expect(estadoInicial(cuenta, cuenta)).toBe('propio')
+  })
+
+  it('un comentario de otra persona entra pendiente', () => {
+    expect(estadoInicial('99999', cuenta)).toBe('pendiente')
+  })
+
+  it('sin id de autor o sin id de cuenta no hay con qué reconocer al dueño: pendiente', () => {
+    expect(estadoInicial(null, cuenta)).toBe('pendiente')
+    expect(estadoInicial(cuenta, null)).toBe('pendiente')
+    expect(estadoInicial(null, null)).toBe('pendiente')
   })
 })

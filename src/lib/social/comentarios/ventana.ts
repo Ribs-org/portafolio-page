@@ -1,5 +1,8 @@
-// Qué publicaciones entran en una pasada del sondeo, y cómo se recorta un texto al
-// límite de su red. Puro: sin base, sin red.
+// Qué publicaciones entran en una pasada del sondeo, a qué redes les toca, con qué estado
+// entra un comentario y cómo se recorta un texto al límite de su red. Puro: sin base, sin
+// red.
+
+import type { CommentState } from '@/db/schema'
 
 /** Coincide con el plazo del mensaje privado de Meta, que es lo que viene después. */
 export const DIAS_VENTANA = 7
@@ -11,6 +14,15 @@ export const DIAS_VENTANA = 7
 export const MAX_POSTS_POR_PASADA = 20
 /** La cadencia del cron que llama a esto: de ahí sale el desplazamiento de la rotación. */
 const PASADA_MS = 5 * 60_000
+/**
+ * Cada cuántas pasadas le toca a YouTube: una de cada seis, o sea media hora.
+ * `commentThreads.list` no acepta varios videoId, así que son veinte llamadas por pasada;
+ * en las 288 pasadas del día eso es casi 6.000 unidades de una cuota diaria de 10.000 que
+ * el sondeo comparte con el sync de métricas de `social/youtube.ts`. Agotarla no solo
+ * dejaría la cola sin comentarios: también tumbaría las métricas del día siguiente. Y
+ * como el dueño aprueba cada respuesta a mano, media hora de espera no le cuesta nada.
+ */
+export const PASADAS_YOUTUBE = 6
 
 /** Los ids a sondear, del más nuevo al más viejo, ya acotados por ventana y por tope. */
 export function postsAsondear(
@@ -30,6 +42,26 @@ export function postsAsondear(
   const inicio = (pasada * MAX_POSTS_POR_PASADA) % dentro.length
   const rotadas = [...dentro.slice(inicio), ...dentro.slice(0, inicio)]
   return rotadas.slice(0, MAX_POSTS_POR_PASADA).map((post) => post.externalId)
+}
+
+/** Si a esta red le toca sondeo en la pasada en que cae `now`. */
+export function tocaSondear(network: string, now: Date): boolean {
+  if (network !== 'youtube') return true
+  return Math.floor(now.getTime() / PASADA_MS) % PASADAS_YOUTUBE === 0
+}
+
+/**
+ * Con qué estado entra un comentario recién leído. Un comentario del propio dueño es su
+ * propia respuesta: entra al historial, pero nunca a la cola.
+ */
+export function estadoInicial(
+  autorExternalId: string | null,
+  cuentaExternalId: string | null,
+): CommentState {
+  // Si a alguno de los dos la red no le dio id, no hay con qué reconocer al dueño: a la
+  // cola, que es donde el error se ve y se descarta a mano.
+  if (!autorExternalId || !cuentaExternalId) return 'pendiente'
+  return autorExternalId === cuentaExternalId ? 'propio' : 'pendiente'
 }
 
 /** Sin puntos suspensivos a propósito: esto se publica, no se muestra. */
