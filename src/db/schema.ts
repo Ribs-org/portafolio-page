@@ -400,3 +400,4 @@ export type ScheduledPost = typeof scheduledPosts.$inferSelect
 export type ScheduledPostTarget = typeof scheduledPostTargets.$inferSelect
 export type ScheduledPostMedia = typeof scheduledPostMedia.$inferSelect
 export type PostComment = typeof postComments.$inferSelect
+export type Ajuste = typeof ajustes.$inferSelect
