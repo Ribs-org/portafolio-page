@@ -10,6 +10,13 @@ export function primariaDe(cuentas: Array<{ id: string; createdAt: Date }>): str
   return primaria?.id ?? null
 }
 
+/** Red → sus cuentas, en el orden de llegada. */
+export function agruparPorRed<T extends { network: string }>(cuentas: T[]): Map<string, T[]> {
+  const porRed = new Map<string, T[]>()
+  for (const cuenta of cuentas) porRed.set(cuenta.network, [...(porRed.get(cuenta.network) ?? []), cuenta])
+  return porRed
+}
+
 /**
  * Red → id de cuenta, solo cuando la respuesta es inequívoca. El backfill asigna filas
  * históricas que no dicen de qué cuenta son; con dos cuentas en una red no hay forma

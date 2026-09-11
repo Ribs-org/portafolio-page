@@ -3,7 +3,7 @@
 import { randomUUID } from 'node:crypto'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
-import { headers } from 'next/headers'
+import { cookies, headers } from 'next/headers'
 import { guardar, SIN_ALMACEN } from '@/lib/storage'
 import { and, asc, eq, inArray, max, ne, sql } from 'drizzle-orm'
 import { getDb, links, profiles, socialAccounts, socialPosts, scheduledPosts, scheduledPostTargets, scheduledPostMedia } from '@/db'
@@ -27,6 +27,10 @@ import { validateAtributos, ATRIBUTOS_ERROR, type Atributos } from '@/lib/social
 import { diffMedia, diffTargets } from '@/lib/social/publish/edit'
 import { crearPostProgramado } from '@/lib/social/publish/crear'
 import { SinCuenta, exigirCuentas } from '@/lib/social/cuentas'
+import { guardarCuenta, tokensDePaginas } from '@/lib/social/conectar'
+import { SIN_TOKEN_DE_PAGINA } from '@/lib/social/facebook'
+import { COOKIE_PENDIENTE, LOGIN_VENCIDO, elegidas, leerPendiente } from '@/lib/social/pendiente'
+import { networkLabel } from '@/lib/networks'
 import { fromZonedInput, normalizeUrl, slugify } from '@/lib/utils'
 
 export type FormState = { error?: string; ok?: boolean }
@@ -340,39 +344,86 @@ export async function syncSocialNow(): Promise<{ ok?: boolean; error?: string }>
     return { error: 'No se pudo sincronizar. Intenta de nuevo.' }
   }
 
-  revalidatePath('/admin/content')
+  revalidatePath('/admin/accounts')
 
   const failed = report.filter((r) => !r.ok)
   // Una instalación sin cuentas conectadas no tiene nada que fallar.
   if (report.length > 0 && failed.length === report.length) {
-    return { error: 'Ninguna red respondió. Revisa las tarjetas de conexión.' }
+    return { error: 'Ninguna red respondió. Revisa las tarjetas en Cuentas.' }
   }
   return { ok: true }
 }
 
-export async function disconnectNetwork(network: string): Promise<void> {
+export async function disconnectAccount(accountId: string): Promise<void> {
   await requireAuth()
-
-  // A disconnect revokes the credentials, not the identity.
-  //
-  // Deleting the row threw away `external_id` too, and that is precisely what the
-  // callback compares against to refuse an authorization for a *different* account.
-  // Since "Desconectar y volver a conectar" is the prescribed way to renew a dying
-  // token, the only reconnect path the panel offers was also the one that erased its
-  // own guard before the next connect could use it.
-  //
-  // Posts and metrics survive as well: the traffic they brought really happened.
+  // Revoca credenciales, no identidad: la fila, sus posts y sus métricas se quedan.
   await getDb()
     .update(socialAccounts)
-    .set({
-      accessToken: null,
-      refreshToken: null,
-      expiresAt: null,
-      lastSyncError: null,
-    })
-    .where(eq(socialAccounts.network, network))
+    .set({ accessToken: null, refreshToken: null, expiresAt: null, lastSyncError: null })
+    .where(eq(socialAccounts.id, accountId))
+  revalidatePath('/admin/accounts')
+}
 
-  revalidatePath('/admin/content')
+/**
+ * El final de un login con varias candidatas: crea una fila por cuenta marcada. Lee la
+ * cookie de nuevo en vez de confiar en el formulario, así lo único que el navegador
+ * decide es qué casillas marcó.
+ */
+export async function conectarElegidas(formData: FormData): Promise<void> {
+  await requireAuth()
+  const jar = await cookies()
+  const pendiente = leerPendiente(jar.get(COOKIE_PENDIENTE)?.value)
+  if (!pendiente) redirect(`/admin/accounts?mensaje=${encodeURIComponent(LOGIN_VENCIDO)}`)
+
+  const marcadas = elegidas(pendiente.candidatas, formData.getAll('ids').map(String))
+  if (marcadas.length === 0) {
+    redirect(`/admin/accounts/elegir?mensaje=${encodeURIComponent('Elige al menos una cuenta.')}`)
+  }
+
+  // Facebook: el token de cada página no viajó en la cookie; se pide ahora con el de usuario.
+  let tokens = new Map<string, string>()
+  if (pendiente.network === 'facebook') {
+    try {
+      tokens = await tokensDePaginas(pendiente.accessToken)
+    } catch (error) {
+      console.error('tokensDePaginas:', String(error).slice(0, 300))
+      redirect(`/admin/accounts?mensaje=${encodeURIComponent(SIN_TOKEN_DE_PAGINA)}`)
+    }
+  }
+
+  // No se guarda nada hasta que toda cuenta elegida tenga token, así una falla nunca deja
+  // la conexión a medias.
+  if (pendiente.network === 'facebook' && marcadas.some((c) => !tokens.get(c.externalId))) {
+    redirect(`/admin/accounts?mensaje=${encodeURIComponent(SIN_TOKEN_DE_PAGINA)}`)
+  }
+
+  let fallo: string | null = null
+  try {
+    for (const cuenta of marcadas) {
+      await guardarCuenta(pendiente.network, {
+        externalId: cuenta.externalId,
+        handle: cuenta.handle,
+        accessToken:
+          pendiente.network === 'facebook' ? tokens.get(cuenta.externalId)! : pendiente.accessToken,
+        refreshToken: pendiente.refreshToken,
+        expiresAt: pendiente.expiresAt ? new Date(pendiente.expiresAt) : null,
+      })
+    }
+  } catch (error) {
+    console.error('conectarElegidas:', String(error).slice(0, 300))
+    fallo = 'No se pudo guardar la cuenta. Inténtalo de nuevo.'
+  }
+  // Fuera del try a propósito: redirect() lanza su propio error de navegación, y dentro
+  // el catch lo tragaría como si fuera una falla de la base.
+  if (fallo) redirect(`/admin/accounts?mensaje=${encodeURIComponent(fallo)}`)
+
+  // Con el mismo path con que la puso el callback: borrarla sin path escribe sobre otra
+  // cookie y deja esta viva sus diez minutos.
+  jar.delete({ name: COOKIE_PENDIENTE, path: '/admin/accounts' })
+  revalidatePath('/admin/accounts')
+  const mensaje =
+    marcadas.length === 1 ? `${networkLabel(pendiente.network)} conectado.` : `${marcadas.length} cuentas conectadas.`
+  redirect(`/admin/accounts?mensaje=${encodeURIComponent(mensaje)}`)
 }
 
 export async function updatePostCampaign(

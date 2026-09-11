@@ -8,7 +8,7 @@ import { env } from '../env'
 import { postsToArchive } from './archive'
 import { campaignTagFor, type CuentaTag } from './campaign'
 import type { FetchedPost } from './connector'
-import { primariaDe } from './cuenta'
+import { agruparPorRed, primariaDe } from './cuenta'
 import { connectorFor } from './index'
 
 export type SyncReport = Array<{ network: string; handle: string | null; ok: boolean; posts: number; error?: string }>
@@ -194,9 +194,10 @@ export async function syncAccount(account: SocialAccount, primaria: boolean): Pr
 }
 
 /**
- * Every account runs on its own. One that throws leaves its error on its own row and
- * the others still finish and store their snapshot — which is the whole reason it was
- * defensible to take on several integrations at once.
+ * The networks run in parallel and the accounts of one network in series, so the house
+ * never hits the same API concurrently. Every account runs on its own: one that throws
+ * leaves its error on its own row and the others still finish and store their snapshot —
+ * which is the whole reason it was defensible to take on several integrations at once.
  */
 export async function syncAll(): Promise<SyncReport> {
   // Antes del resto y por su cuenta: una base inalcanzable acá no debe costarle el
@@ -214,23 +215,22 @@ export async function syncAll(): Promise<SyncReport> {
   // Solo las redes con conector: una fila de threads o x se sincroniza el día que
   // exista su conector, no antes.
   const conConector = cuentas.filter((c) => connectorFor(c.network))
-  const porRed = new Map<string, SocialAccount[]>()
-  for (const cuenta of conConector) porRed.set(cuenta.network, [...(porRed.get(cuenta.network) ?? []), cuenta])
-
-  const results = await Promise.allSettled(
-    conConector.map((cuenta) => syncAccount(cuenta, primariaDe(porRed.get(cuenta.network)!) === cuenta.id)),
-  )
-
-  return conConector.map((cuenta, i) => {
-    const result = results[i]!
-    return result.status === 'fulfilled'
-      ? { network: cuenta.network, handle: cuenta.handle, ok: true, posts: result.value }
-      : {
-          network: cuenta.network,
-          handle: cuenta.handle,
-          ok: false,
-          posts: 0,
-          error: result.reason instanceof Error ? result.reason.message : String(result.reason),
+  const porRed = agruparPorRed(conConector)
+  // Redes en paralelo, cuentas de la misma red en serie: la casa nunca pega concurrente
+  // contra Meta (ver run.ts), y cinco páginas de Facebook a la vez sería justo eso.
+  const porRedResuelto = await Promise.all(
+    [...porRed.entries()].map(async ([, cuentas]) => {
+      const primaria = primariaDe(cuentas)
+      const filas: SyncReport = []
+      for (const cuenta of cuentas) {
+        try {
+          filas.push({ network: cuenta.network, handle: cuenta.handle, ok: true, posts: await syncAccount(cuenta, primaria === cuenta.id) })
+        } catch (error) {
+          filas.push({ network: cuenta.network, handle: cuenta.handle, ok: false, posts: 0, error: error instanceof Error ? error.message : String(error) })
         }
-  })
+      }
+      return filas
+    }),
+  )
+  return porRedResuelto.flat()
 }

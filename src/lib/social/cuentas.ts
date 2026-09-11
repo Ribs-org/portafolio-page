@@ -1,8 +1,8 @@
 // La consulta que resuelve red → cuenta mientras el resto del sistema sigue hablando
 // en redes. Sin `server-only`: `crear.ts` lo importa y `actions.ts` ya es server.
-import { asc, inArray } from 'drizzle-orm'
+import { and, asc, inArray, isNotNull } from 'drizzle-orm'
 import { getDb, socialAccounts } from '@/db'
-import { SIN_CUENTA, primariaDe } from './cuenta'
+import { SIN_CUENTA, agruparPorRed, primariaDe } from './cuenta'
 
 export class SinCuenta extends Error {
   constructor(public readonly network: string) {
@@ -11,8 +11,9 @@ export class SinCuenta extends Error {
 }
 
 /**
- * Red → id de su cuenta primaria (la más antigua), para las redes pedidas. Una red sin
- * fila no aparece: quien escribe decide qué frase dar. Hasta que la entrega 3 traiga
+ * Red → id de su cuenta primaria (la más antigua), para las redes pedidas. Solo cuentas
+ * con credencial: una desconectada no puede recibir destinos. Una red sin fila no
+ * aparece: quien escribe decide qué frase dar. Hasta que la entrega 3 traiga
  * `destinos`, «la cuenta de facebook» es esta.
  */
 export async function cuentasPrimarias(networks: string[]): Promise<Map<string, string>> {
@@ -20,10 +21,9 @@ export async function cuentasPrimarias(networks: string[]): Promise<Map<string, 
   const filas = await getDb()
     .select({ id: socialAccounts.id, network: socialAccounts.network, createdAt: socialAccounts.createdAt })
     .from(socialAccounts)
-    .where(inArray(socialAccounts.network, networks))
+    .where(and(inArray(socialAccounts.network, networks), isNotNull(socialAccounts.accessToken)))
     .orderBy(asc(socialAccounts.createdAt))
-  const porRed = new Map<string, Array<{ id: string; createdAt: Date }>>()
-  for (const fila of filas) porRed.set(fila.network, [...(porRed.get(fila.network) ?? []), fila])
+  const porRed = agruparPorRed(filas)
   const resultado = new Map<string, string>()
   for (const [network, cuentas] of porRed) {
     const id = primariaDe(cuentas)
