@@ -125,11 +125,17 @@ export async function redactarPendientes(inicio: number): Promise<RedaccionRepor
 
   // Un fallo aislado entre éxitos sí es del comentario, y esa marca sí corresponde.
   if (!abandonada && fallidos.length > 0) {
-    await db
-      .update(postComments)
-      .set({ draftError: SIN_BORRADOR, updatedAt: new Date() })
-      .where(inArray(postComments.id, fallidos))
-    reporte.fallidos = fallidos.length
+    try {
+      await db
+        .update(postComments)
+        .set({ draftError: SIN_BORRADOR, updatedAt: new Date() })
+        .where(inArray(postComments.id, fallidos))
+      reporte.fallidos = fallidos.length
+    } catch (error) {
+      // Un tropiezo de la base tampoco es un borrador fallido: sin la marca, esas filas
+      // siguen pendientes y la pasada siguiente las vuelve a intentar.
+      console.error('[comentarios] marca de borradores:', String(error).slice(0, 300))
+    }
   }
 
   return reporte
