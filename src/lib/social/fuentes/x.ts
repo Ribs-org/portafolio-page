@@ -1,8 +1,14 @@
 import { env } from '@/lib/env'
-import type { Fuente, PostAjeno } from './fuente'
+import { MIN_LECTURAS, type Fuente, type PostAjeno } from './fuente'
 import { idMayor } from './tope'
 
 const API = 'https://api.x.com/2'
+
+/** Lo más que X entrega en una página. */
+const MAX_POR_PAGINA = 100
+
+/** La primera lectura es para arrancar con material fresco, no para comprarse el archivo. */
+export const PRIMERA_LECTURA = 20
 
 export type XTweetPayload = {
   id?: string
@@ -48,7 +54,9 @@ export const xFuente: Fuente = {
   network: 'x',
 
   async resolverAutor(username) {
-    const body = (await pedir(`/users/by/username/${encodeURIComponent(username)}`)) as {
+    // X quiere el nombre pelado: un `@alguien` tecleado a mano en la fila no resuelve nunca.
+    const limpio = username.replace(/^@/, '')
+    const body = (await pedir(`/users/by/username/${encodeURIComponent(limpio)}`)) as {
       data?: { id?: string }
     }
     const id = body.data?.id
@@ -62,8 +70,10 @@ export const xFuente: Fuente = {
     const params = new URLSearchParams({
       'tweet.fields': 'created_at',
       exclude: 'replies,retweets',
-      // La API acepta entre 5 y 100; el tope del día puede pedir menos que el mínimo.
-      max_results: String(Math.min(Math.max(tope, 5), 100)),
+      // La API acepta entre MIN_LECTURAS y MAX_POR_PAGINA; quien llama ya no pide menos del mínimo.
+      max_results: String(
+        Math.min(Math.max(tope, MIN_LECTURAS), sinceId ? MAX_POR_PAGINA : PRIMERA_LECTURA),
+      ),
     })
     if (sinceId) params.set('since_id', sinceId)
     const body = (await pedir(`/users/${externalId}/tweets?${params}`)) as {

@@ -39,5 +39,5 @@ export type Traida = {
 /** Lo único que el dueño llega a leer cuando una cuenta de su lista dejó de ser legible. */
 export const AUTOR_ILEGIBLE = 'No se pudo leer esta cuenta.'
 
-/** Lo único que el dueño llega a leer cuando el gasto del día llegó a su techo. */
-export const TOPE_ALCANZADO = 'Se alcanzó el tope de lecturas de hoy.'
+/** Menos de esto X no entrega: una página recortada haría saltar la marca sobre lo no visto. */
+export const MIN_LECTURAS = 5

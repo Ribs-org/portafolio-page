@@ -1,14 +1,19 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { normalizeXTweet, xFuente } from './x'
+import { MIN_LECTURAS } from './fuente'
+import { normalizeXTweet, PRIMERA_LECTURA, xFuente } from './x'
 
 const AHORA = new Date(1_789_128_000_000)
 
-/** Una sola respuesta de X, con el token puesto para que `pedir` llegue al fetch. */
+/** Una sola respuesta de X, con el token puesto para que `pedir` llegue al fetch, y las
+ * urls pedidas en orden. */
 function stubX(cuerpo: unknown) {
+  const urls: string[] = []
   vi.stubEnv('X_BEARER_TOKEN', 'token-de-prueba')
-  vi.stubGlobal('fetch', () =>
-    Promise.resolve(new Response(JSON.stringify(cuerpo), { status: 200 })),
-  )
+  vi.stubGlobal('fetch', (url: string) => {
+    urls.push(String(url))
+    return Promise.resolve(new Response(JSON.stringify(cuerpo), { status: 200 }))
+  })
+  return urls
 }
 
 afterEach(() => {
@@ -53,6 +58,24 @@ describe('normalizeXTweet', () => {
 })
 
 describe('xFuente.traer', () => {
+  it('pide sin respuestas ni retuits, desde la marca y acotado', async () => {
+    const urls = stubX({ data: [] })
+
+    await xFuente.traer('9', 'algun_creador', '100', 50)
+    await xFuente.traer('9', 'algun_creador', null, 50)
+    await xFuente.traer('9', 'algun_creador', '100', 1)
+
+    const params = urls.map((url) => new URL(url).searchParams)
+    expect(params[0].get('exclude')).toBe('replies,retweets')
+    expect(params[0].get('since_id')).toBe('100')
+    expect(params[0].get('max_results')).toBe('50')
+    // Sin marca, la primera lectura no se compra el archivo del creador.
+    expect(params[1].has('since_id')).toBe(false)
+    expect(params[1].get('max_results')).toBe(String(PRIMERA_LECTURA))
+    // X no entrega páginas más chicas que el mínimo, aunque se le pida menos.
+    expect(params[2].get('max_results')).toBe(String(MIN_LECTURAS))
+  })
+
   it('cuenta lo que la red entregó, no lo que sobrevivió al normalizador', async () => {
     stubX({
       data: [
