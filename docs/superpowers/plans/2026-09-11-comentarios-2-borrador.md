@@ -297,7 +297,7 @@ const PAPEL =
 
 export function armarPrompt(entrada: EntradaPrompt): { system: string; prompt: string } {
   const { instrucciones, caption, comentario, autor } = entrada
-  const publicacion = caption?.trim() ? caption.trim() : '(la publicación no tiene texto)'
+  const publicacion = caption?.trim() ? caption.trim() : '(publicación sin texto)'
   const quien = autor?.trim() ? `Lo dejó ${autor.trim()}.` : ''
   const prompt = [
     `Publicación:\n${publicacion}`,
