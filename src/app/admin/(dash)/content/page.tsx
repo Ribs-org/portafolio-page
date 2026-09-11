@@ -6,7 +6,7 @@ import { seriesColor } from '@/components/charts/theme'
 import { TrafficChart } from '@/components/charts/traffic-chart'
 import { FilterBar } from '@/components/filter-bar'
 import { parseFilters } from '@/lib/filters'
-import { getConnections, getPostRows, getPostSeries, postKpisFrom } from '@/lib/posts'
+import { getPostRows, getPostSeries, postKpisFrom } from '@/lib/posts'
 import { networkLabel } from '@/lib/networks'
 import {
   activeRows,
@@ -18,7 +18,6 @@ import {
 } from '@/lib/posts-kpis'
 import { getAllProfiles } from '@/lib/profiles'
 import { cn, formatNumber, formatPercent } from '@/lib/utils'
-import { Connections } from './connections'
 import { PostTable } from './post-table'
 
 export const dynamic = 'force-dynamic'
@@ -80,15 +79,8 @@ export default async function ContentPage({
   // actividad dentro de la ventana.
   const incluirAnteriores = params.anteriores === '1'
 
-  // What `/api/social/[network]/callback` has to say about the connection attempt that
-  // just bounced back here. Truncated because the value is a query param: it reaches the
-  // page as text either way, but a hand-crafted link should not get to paste an essay
-  // above the cards.
-  const mensaje = typeof params.mensaje === 'string' ? params.mensaje.slice(0, 200) : null
-
-  const [profiles, connections, rows, series] = await Promise.all([
+  const [profiles, rows, series] = await Promise.all([
     getAllProfiles(),
-    getConnections(),
     getPostRows(
       filters,
       includeArchived,
@@ -161,17 +153,6 @@ export default async function ContentPage({
       </header>
 
       <FilterBar profiles={profiles} />
-
-      {mensaje ? (
-        <p
-          role="status"
-          className="surface mb-4 rounded-2xl px-4 py-3 text-[0.82rem] leading-relaxed text-fg-muted"
-        >
-          {mensaje}
-        </p>
-      ) : null}
-
-      <Connections rows={connections} />
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <StatTile label="Views" value={formatNumber(kpis.views)} hint="Ganadas en el período" />

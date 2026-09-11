@@ -1,11 +1,11 @@
 import 'server-only'
-import { and, desc, eq, gte, inArray, isNull, lte, sql, type SQL } from 'drizzle-orm'
-import { clicks, getDb, postMetrics, SOCIAL_NETWORKS, socialAccounts, socialPosts, visits } from '@/db'
+import { and, asc, desc, eq, gte, inArray, isNull, lte, sql, type SQL } from 'drizzle-orm'
+import { clicks, getDb, postMetrics, socialAccounts, socialPosts, visits } from '@/db'
 import type { Filters, Granularity } from './analytics'
 import { SITE_TIMEZONE, describe, granularityFor, localDay } from './analytics'
 import {
   postKpisFrom,
-  type ConnectionRow,
+  type CuentaRow,
   type PostKpis,
   type PostRow,
 } from './posts-kpis'
@@ -15,7 +15,7 @@ import { periodChange, type Snapshot } from './social/delta'
 // summing function actually live in `posts-kpis.ts`, which stays free of
 // `server-only` so a test file can import it without pulling in the DB layer.
 // Client components must import them from there directly, not from here.
-export type { ConnectionRow, PostKpis, PostRow }
+export type { CuentaRow, PostKpis, PostRow }
 export { postKpisFrom }
 
 export type CampaignPost = {
@@ -278,35 +278,21 @@ export async function getPostSeries(f: Filters): Promise<PostSeriesPoint[]> {
   }))
 }
 
-// TikTok is the one network left without a publisher; YouTube reads by env but writes by OAuth.
-const OAUTH_NETWORKS = new Set(['instagram', 'tiktok', 'facebook', 'youtube', 'threads', 'x'])
-
-export async function getConnections(): Promise<ConnectionRow[]> {
-  const accounts = await getDb().select().from(socialAccounts)
-  const byNetwork = new Map(accounts.map((a) => [a.network, a]))
-
-  // Derived from the schema so this phase and the next ones add networks in one place.
-  return SOCIAL_NETWORKS.map((network) => {
-    const account = byNetwork.get(network)
-    const usesOAuth = OAUTH_NETWORKS.has(network)
-    return {
-      network,
-      handle: account?.handle ?? null,
-      externalId: account?.externalId ?? null,
-      // The two kinds of network answer "connected?" differently, and the row existing
-      // is no longer the answer for either reason it used to be.
-      //
-      // An OAuth network keeps its row through a disconnect on purpose — the identity has
-      // to outlive the credentials so the callback can still refuse a different account —
-      // so only a stored token means connected. All six networks are OAuth now: YouTube
-      // reads by env (its API key) but writes by OAuth, so for it too `connected` means
-      // the write credential — the access token — is on file, not just the row existing.
-      connected: usesOAuth ? Boolean(account?.accessToken) : Boolean(account),
-      lastSyncedAt: account?.lastSyncedAt?.toISOString() ?? null,
-      lastSyncError: account?.lastSyncError ?? null,
-      usesOAuth,
-    }
-  })
+/** Todas las cuentas, en el orden en que se conectaron; la pestaña Cuentas las agrupa por red. */
+export async function getCuentas(): Promise<CuentaRow[]> {
+  const cuentas = await getDb()
+    .select()
+    .from(socialAccounts)
+    .orderBy(asc(socialAccounts.network), asc(socialAccounts.createdAt))
+  return cuentas.map((a) => ({
+    id: a.id,
+    network: a.network,
+    handle: a.handle,
+    externalId: a.externalId,
+    connected: Boolean(a.accessToken),
+    lastSyncedAt: a.lastSyncedAt?.toISOString() ?? null,
+    lastSyncError: a.lastSyncError,
+  }))
 }
 
 /** Lets the analytics campaign table show a post's caption instead of a bare tag. */

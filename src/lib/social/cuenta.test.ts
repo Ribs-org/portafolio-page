@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { SIN_CUENTA, planBackfill, primariaDe } from './cuenta'
+import { SIN_CUENTA, agruparPorRed, planBackfill, primariaDe } from './cuenta'
 
 describe('primariaDe', () => {
   it('la primaria es la más antigua, no la primera de la lista', () => {
@@ -33,6 +33,18 @@ describe('planBackfill', () => {
         { id: 'fb2', network: 'facebook' },
       ]),
     ).toEqual({ error: 'La red facebook tiene 2 cuentas; el backfill necesita exactamente una.' })
+  })
+})
+
+describe('agruparPorRed', () => {
+  it('agrupa conservando el orden de llegada dentro de cada red', () => {
+    const grupos = agruparPorRed([
+      { id: 'a', network: 'facebook' },
+      { id: 'b', network: 'instagram' },
+      { id: 'c', network: 'facebook' },
+    ])
+    expect([...grupos.keys()]).toEqual(['facebook', 'instagram'])
+    expect(grupos.get('facebook')!.map((c) => c.id)).toEqual(['a', 'c'])
   })
 })
 

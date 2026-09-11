@@ -1,30 +1,37 @@
 import { NextResponse } from 'next/server'
-import { eq } from 'drizzle-orm'
-import { getDb, socialAccounts } from '@/db'
 import { isAuthenticated } from '@/lib/auth'
 import { env } from '@/lib/env'
-import { mayConnectAccount } from '@/lib/social/connector'
-import { encryptToken } from '@/lib/social/crypto'
-import { FacebookPageError, pickFacebookPage, type FacebookPagesList } from '@/lib/social/facebook'
+import { networkLabel } from '@/lib/networks'
+import { guardarCuenta } from '@/lib/social/conectar'
 import {
-  InstagramAccountError,
+  NO_FACEBOOK_PAGE,
+  SIN_TOKEN_DE_PAGINA,
+  listFacebookPages,
+  type FacebookPagesList,
+} from '@/lib/social/facebook'
+import {
+  NO_INSTAGRAM_ACCOUNT,
   instagramTokenExpiry,
-  pickInstagramAccount,
+  listInstagramAccounts,
   type FacebookPages,
 } from '@/lib/social/instagram'
 import { oauthStateMatches } from '@/lib/social/oauth-state'
+import { COOKIE_PENDIENTE, PENDIENTE_MAX_AGE, serializarPendiente } from '@/lib/social/pendiente'
 
 export const dynamic = 'force-dynamic'
 
 /** Instagram runs on Facebook Login, so every leg of its OAuth is on the Facebook host. */
 const GRAPH = 'https://graph.facebook.com/v23.0'
 
+/** Como la `Candidata` de la cookie, más el token de página que esa nunca lleva. */
+type CandidataConToken = { externalId: string; handle: string | null; accessToken?: string }
+
 type Credential = {
   accessToken: string
   refreshToken: string | null
   expiresAt: Date | null
-  externalId: string | null
-  handle: string | null
+  /** Lo que el login dejó elegir: una para la mayoría de redes, varias en Meta y Google. */
+  candidatas: CandidataConToken[]
 }
 
 /**
@@ -90,29 +97,13 @@ async function instagramCredential(code: string, redirectUri: string): Promise<C
   )
   if (!pages.ok) throw new OAuthError(`No se pudieron leer las páginas de Facebook: ${pages.status}`)
 
-  let igAccount
-  try {
-    igAccount = pickInstagramAccount(
-      (await pages.json()) as FacebookPages,
-      env('INSTAGRAM_IG_USER_ID'),
-    )
-  } catch (error) {
-    if (!(error instanceof InstagramAccountError)) throw error
-    // The message is one of the connector's own fixed sentences, so it is safe to show.
-    // The candidates are not: they carry usernames Meta sent us, and those only go to
-    // the server log, where they are what the owner needs to pick an id for the variable.
-    if (error.candidates.length > 0) {
-      console.error('Cuentas de Instagram disponibles:', error.candidates)
-    }
-    throw new OAuthError(error.message)
-  }
-
+  const cuentas = listInstagramAccounts((await pages.json()) as FacebookPages)
+  if (cuentas.length === 0) throw new OAuthError(NO_INSTAGRAM_ACCOUNT)
   return {
     accessToken: token,
     refreshToken: null,
     expiresAt: instagramTokenExpiry(exchanged.expiresIn),
-    externalId: igAccount.id,
-    handle: igAccount.username ? `@${igAccount.username}` : null,
+    candidatas: cuentas.map((c) => ({ externalId: c.id, handle: c.username ? `@${c.username}` : null })),
   }
 }
 
@@ -126,36 +117,19 @@ async function facebookCredential(code: string, redirectUri: string): Promise<Cr
     throw new OAuthError(`No se pudieron leer las páginas de Facebook: ${pages.status}`)
   }
 
-  let page
-  try {
-    page = pickFacebookPage((await pages.json()) as FacebookPagesList, env('FACEBOOK_PAGE_ID'))
-  } catch (error) {
-    if (!(error instanceof FacebookPageError)) throw error
-    // The message is one of the connector's own fixed sentences, so it is safe to show.
-    // The candidates also carry each page's access token, so only id and name go to the
-    // server log — never the raw candidates.
-    if (error.candidates.length > 0) {
-      console.error(
-        'Páginas de Facebook disponibles:',
-        error.candidates.map(({ id, name }) => ({ id, name })),
-      )
-    }
-    throw new OAuthError(error.message)
-  }
-
-  if (!page.accessToken) {
-    throw new OAuthError('Facebook no entregó el token de la página. Inténtalo de nuevo.')
-  }
-
+  const paginas = listFacebookPages((await pages.json()) as FacebookPagesList)
+  if (paginas.length === 0) throw new OAuthError(NO_FACEBOOK_PAGE)
+  // Con una sola página el callback la guarda directo, y Facebook lee y publica con el
+  // token de la página, nunca con el de usuario: sin ese token no hay nada que guardar.
+  if (paginas.length === 1 && !paginas[0].accessToken) throw new OAuthError(SIN_TOKEN_DE_PAGINA)
   return {
-    // The page token, not the user token: it is what published_posts and insights are
-    // asked with, and derived from a long-lived user token it does not expire — hence
-    // expiresAt null rather than an invented date.
-    accessToken: page.accessToken,
+    // El token de usuario queda como base; el de cada página viaja en su candidata (una
+    // sola) o se vuelve a pedir en la selección (varias). Derivados de un token largo,
+    // los de página no expiran: por eso expiresAt null y no una fecha inventada.
+    accessToken: exchanged.accessToken,
     refreshToken: null,
     expiresAt: null,
-    externalId: page.id,
-    handle: page.name,
+    candidatas: paginas.map((p) => ({ externalId: p.id, handle: p.name, accessToken: p.accessToken ?? undefined })),
   }
 }
 
@@ -208,15 +182,14 @@ async function youtubeCredential(code: string, redirectUri: string): Promise<Cre
   const data = (await channels.json()) as {
     items?: Array<{ id?: string; snippet?: { title?: string } }>
   }
-  const channel = data.items?.[0]
-  if (!channel?.id) throw new OAuthError('Esta cuenta de Google no tiene canal de YouTube.')
+  const canales = (data.items ?? []).filter((c): c is { id: string; snippet?: { title?: string } } => Boolean(c.id))
+  if (canales.length === 0) throw new OAuthError('Esta cuenta de Google no tiene canal de YouTube.')
 
   return {
     accessToken: tokens.access_token,
     refreshToken: tokens.refresh_token,
     expiresAt: new Date(Date.now() + (tokens.expires_in ?? 3600) * 1000),
-    externalId: channel.id,
-    handle: channel.snippet?.title ?? null,
+    candidatas: canales.map((c) => ({ externalId: c.id, handle: c.snippet?.title ?? null })),
   }
 }
 
@@ -271,8 +244,7 @@ async function threadsCredential(code: string, redirectUri: string): Promise<Cre
     accessToken: longData.access_token,
     refreshToken: null,
     expiresAt: new Date(Date.now() + (longData.expires_in ?? 5184000) * 1000),
-    externalId: profile.id,
-    handle: profile.username ?? null,
+    candidatas: [{ externalId: profile.id, handle: profile.username ?? null }],
   }
 }
 
@@ -331,8 +303,7 @@ async function xCredential(
     accessToken: tokens.access_token,
     refreshToken: tokens.refresh_token,
     expiresAt: new Date(Date.now() + (tokens.expires_in ?? 7200) * 1000),
-    externalId: user.data.id,
-    handle: user.data.username ?? null,
+    candidatas: [{ externalId: user.data.id, handle: user.data.username ?? null }],
   }
 }
 
@@ -361,13 +332,30 @@ async function tiktokCredential(code: string, redirectUri: string): Promise<Cred
     open_id?: string
   }
   if (!data.access_token) throw new OAuthError('TikTok no devolvió token')
+  // La identidad de una cuenta es (red, id externo): sin open_id la fila no tendría
+  // identidad y un reconectar crearía otra en vez de renovar el token de la que ya está.
+  if (!data.open_id) throw new OAuthError('TikTok no devolvió el id de la cuenta. Vuelve a conectar.')
+
+  // El nombre es lo que hace legible la tarjeta — sin él queda un open_id largo — y es
+  // justo para lo que está el scope `user.info.basic`. Si esta llamada falla, la conexión
+  // sigue: se pierde el nombre, no la cuenta.
+  let handle: string | null = null
+  try {
+    const perfil = await fetch('https://open.tiktokapis.com/v2/user/info/?fields=open_id,display_name', {
+      headers: { Authorization: `Bearer ${data.access_token}` },
+    })
+    if (!perfil.ok) throw new Error(`${perfil.status} ${(await perfil.text()).slice(0, 200)}`)
+    const info = (await perfil.json()) as { data?: { user?: { display_name?: string } } }
+    handle = info.data?.user?.display_name ?? null
+  } catch (error) {
+    console.error('No se pudo leer el perfil de TikTok:', String(error).slice(0, 300))
+  }
 
   return {
     accessToken: data.access_token,
     refreshToken: data.refresh_token ?? null,
     expiresAt: new Date(Date.now() + (data.expires_in ?? 86400) * 1000),
-    externalId: data.open_id ?? null,
-    handle: null,
+    candidatas: [{ externalId: data.open_id, handle }],
   }
 }
 
@@ -397,8 +385,13 @@ export async function GET(
   const code = url.searchParams.get('code')
   const state = url.searchParams.get('state')
 
-  const back = (message: string) =>
-    NextResponse.redirect(`${url.origin}/admin/content?mensaje=${encodeURIComponent(message)}`)
+  const back = (message: string) => {
+    const fallo = NextResponse.redirect(`${url.origin}/admin/accounts?mensaje=${encodeURIComponent(message)}`)
+    // Un login que falló tampoco puede dejar una elección anterior viva: esa cookie
+    // mantendría alcanzable un selector abandonado durante sus diez minutos.
+    fallo.cookies.delete({ name: COOKIE_PENDIENTE, path: '/admin/accounts' })
+    return fallo
+  }
 
   if (!code || !state) return back('La red no devolvió el código de autorización.')
 
@@ -420,63 +413,42 @@ export async function GET(
       ?.match(/(?:^|;\s*)x_pkce_verifier=([^;]+)/)?.[1]
     const credential = await fetchCredential(network, code, redirectUri, pkceVerifier)
 
-    // La identidad de una cuenta es (red, id externo): con NULL esa identidad queda
-    // indefinida, y tras la migración un reconectar crearía una segunda fila en vez de
-    // refrescar el token de la que ya existe.
-    if (!credential.externalId) {
-      throw new OAuthError('La red no entregó el id de la cuenta. Vuelve a conectar.')
-    }
-
-    // Refuse to move a connected network onto a different account.
-    //
-    // `external_id` is what the sync fetches posts for, while `social_posts` is keyed on
-    // the network alone. Overwrite the id and the next cron run compares account B's
-    // media against account A's stored posts, finds none of them, and — as long as B
-    // returned something and fewer than MAX_POSTS_PER_SYNC items — archives A's entire
-    // catalogue in a single statement. Reconnecting to A afterwards only clears
-    // `archivedAt` for posts still inside the newest window; everything older stays
-    // archived permanently.
-    //
-    // This stops that happening by accident. It does not make a deliberate switch safe:
-    // changing accounts on purpose destroys the same history in the same way, which is
-    // why the panel offers no way to do it and the message below does not invent one.
-    const [existing] = await getDb()
-      .select({ externalId: socialAccounts.externalId })
-      .from(socialAccounts)
-      .where(eq(socialAccounts.network, network))
-
-    if (!mayConnectAccount(existing?.externalId ?? null, credential.externalId)) {
-      throw new OAuthError(
-        'Esta red ya está conectada a otra cuenta. Cambiarla archivaría las publicaciones de la anterior, así que no se hace desde el panel.',
-      )
-    }
-
-    // La identidad de una cuenta es (red, id externo), no la red: es lo que permitirá
-    // sumar cuentas en la entrega 2. Hoy el guard de arriba sigue dejando pasar una sola.
-    await getDb()
-      .insert(socialAccounts)
-      .values({
-        network,
-        handle: credential.handle,
-        externalId: credential.externalId,
-        accessToken: encryptToken(credential.accessToken),
-        refreshToken: credential.refreshToken ? encryptToken(credential.refreshToken) : null,
+    if (credential.candidatas.length === 1) {
+      const [unica] = credential.candidatas
+      await guardarCuenta(network, {
+        externalId: unica.externalId,
+        handle: unica.handle,
+        // Facebook publica y lee con el token de la página, no con el del usuario; las
+        // demás redes no traen token propio y caen en el del credential.
+        accessToken: unica.accessToken ?? credential.accessToken,
+        refreshToken: credential.refreshToken,
         expiresAt: credential.expiresAt,
-        lastSyncError: null,
       })
-      .onConflictDoUpdate({
-        target: [socialAccounts.network, socialAccounts.externalId],
-        set: {
-          handle: credential.handle,
-          externalId: credential.externalId,
-          accessToken: encryptToken(credential.accessToken),
-          refreshToken: credential.refreshToken ? encryptToken(credential.refreshToken) : null,
-          expiresAt: credential.expiresAt,
-          lastSyncError: null,
-        },
-      })
+      // Una conexión que terminó no puede dejar otra a medias detrás: la cookie de una
+      // elección anterior abandonada seguiría viva diez minutos y confundiría al panel.
+      const hecho = NextResponse.redirect(
+        `${url.origin}/admin/accounts?mensaje=${encodeURIComponent(`${networkLabel(network)} conectado.`)}`,
+      )
+      hecho.cookies.delete({ name: COOKIE_PENDIENTE, path: '/admin/accounts' })
+      return hecho
+    }
 
-    return back(`${network} conectado.`)
+    // Varias candidatas: el dueño elige en el panel. El token de usuario y la lista
+    // viajan cifrados en una cookie corta; los tokens de página no (no cabrían).
+    const response = NextResponse.redirect(`${url.origin}/admin/accounts/elegir`)
+    response.cookies.set(
+      COOKIE_PENDIENTE,
+      serializarPendiente({
+        network,
+        accessToken: credential.accessToken,
+        refreshToken: credential.refreshToken,
+        expiresAt: credential.expiresAt?.toISOString() ?? null,
+        candidatas: credential.candidatas.map(({ externalId, handle }) => ({ externalId, handle })),
+        emitidoEn: Date.now(),
+      }),
+      { httpOnly: true, secure: true, sameSite: 'lax', maxAge: PENDIENTE_MAX_AGE, path: '/admin/accounts' },
+    )
+    return response
   } catch (error) {
     // Only our own OAuthError carries a message we wrote ourselves. Everything else —
     // a non-JSON upstream body breaking `.json()`, a DB write failure — gets logged
