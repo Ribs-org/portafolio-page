@@ -217,7 +217,12 @@ TIKTOK_CLIENT_SECRET=
 El panel puede traer los comentarios nuevos de tus publicaciones de Instagram, Facebook y
 YouTube, y —en las entregas siguientes— proponerte una respuesta que apruebas de un
 toque. El descubrimiento viaja en la misma corrida que publica, cada cinco minutos, y
-mira tus publicaciones de los últimos siete días.
+mira tus publicaciones de los últimos siete días. A YouTube lo mira cada media hora, no
+cada cinco minutos: su cuota diaria es la misma que usa la sincronización de métricas, y
+gastarla acá te dejaría sin las dos cosas.
+
+Después de fusionar, corre `npm run db:push` una vez: la tabla de comentarios es nueva y
+sin ella el sondeo no tiene dónde guardar nada.
 
 Para que funcione hay que **reconectar una vez cada red**, porque el permiso se concede
 en el consentimiento: entra a **Cuentas** y pulsa *Reconectar* en cada tarjeta de
@@ -228,6 +233,10 @@ Los permisos que se agregan son `instagram_manage_comments`, `pages_manage_engag
 en YouTube, `youtube.force-ssl` en vez de `youtube.readonly`. Ninguno necesita trámite
 mientras la app de Meta siga en modo desarrollo y el proyecto de Google en pruebas, con
 tus propias cuentas.
+
+Si al reconectar te sale **«Invalid Scopes»**, es que el caso de uso que da ese permiso no
+está activado en tu app de Meta. Actívalo en el panel de desarrolladores y vuelve a
+intentar.
 
 ### Conectar y sincronizar
 
