@@ -900,7 +900,7 @@ git commit -m "Sondea los comentarios nuevos en cada corrida de publicación"
 **Files:**
 - Modify: `src/app/api/social/[network]/connect/route.ts`, `README.md`, este plan
 
-- [ ] **Step 1: Los permisos**
+- [x] **Step 1: Los permisos**
 
 En `SCOPES`:
 - `instagram`: agrega `,instagram_manage_comments` al final de la cadena.
@@ -917,7 +917,7 @@ Sobre `instagram` y `facebook`, una línea cada uno: el permiso nuevo es el que 
 listar y responder comentarios en las publicaciones propias, y con la app en modo
 desarrollo no necesita revisión de Meta.
 
-- [ ] **Step 2: El README**
+- [x] **Step 2: El README**
 
 En la sección «Analítica de posts», después del bloque de TikTok y antes de «Conectar y
 sincronizar», agrega:
@@ -941,7 +941,7 @@ mientras la app de Meta siga en modo desarrollo y el proyecto de Google en prueb
 tus propias cuentas.
 ```
 
-- [ ] **Step 3: Verificación final y commit**
+- [x] **Step 3: Verificación final y commit**
 
 Run: `npm test && npm run typecheck && npm run lint && npx next build`
 Expected: todo verde.

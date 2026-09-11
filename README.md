@@ -212,6 +212,23 @@ TIKTOK_CLIENT_KEY=
 TIKTOK_CLIENT_SECRET=
 ```
 
+### Responder comentarios
+
+El panel puede traer los comentarios nuevos de tus publicaciones de Instagram, Facebook y
+YouTube, y —en las entregas siguientes— proponerte una respuesta que apruebas de un
+toque. El descubrimiento viaja en la misma corrida que publica, cada cinco minutos, y
+mira tus publicaciones de los últimos siete días.
+
+Para que funcione hay que **reconectar una vez cada red**, porque el permiso se concede
+en el consentimiento: entra a **Cuentas** y pulsa *Reconectar* en cada tarjeta de
+Instagram, Facebook y YouTube. Mientras no lo hagas, esa red simplemente no trae
+comentarios; nada más se rompe.
+
+Los permisos que se agregan son `instagram_manage_comments`, `pages_manage_engagement` y,
+en YouTube, `youtube.force-ssl` en vez de `youtube.readonly`. Ninguno necesita trámite
+mientras la app de Meta siga en modo desarrollo y el proyecto de Google en pruebas, con
+tus propias cuentas.
+
 ### Conectar y sincronizar
 
 Antes que nada, `npm run db:push`: la analítica de posts agrega tablas nuevas, y este
