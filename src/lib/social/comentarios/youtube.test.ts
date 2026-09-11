@@ -35,4 +35,16 @@ describe('normalizeYouTubeThread', () => {
   it('sin comentario de primer nivel devuelve null', () => {
     expect(normalizeYouTubeThread({ id: 'x', snippet: {} }, 'v')).toBeNull()
   })
+
+  it('sin fecha o con fecha basura toma la del descubrimiento, nunca 1970', () => {
+    const antes = Date.now()
+    for (const publishedAt of [undefined, 'ayer por la tarde']) {
+      const c = normalizeYouTubeThread(
+        { snippet: { topLevelComment: { id: 'x', snippet: { textOriginal: 'hola', publishedAt } } } },
+        'v',
+      )
+      expect(c?.publishedAt.getTime()).not.toBeNaN()
+      expect(c?.publishedAt.getTime()).toBeGreaterThanOrEqual(antes)
+    }
+  })
 })

@@ -30,13 +30,15 @@ export function normalizeYouTubeThread(
   const snippet = top?.snippet
   const id = top?.id ?? raw.id
   if (!id || !snippet) return null
+  const fecha = new Date(snippet.publishedAt ?? '')
   return {
     externalId: id,
     postExternalId,
     author: snippet.authorDisplayName ?? null,
     authorExternalId: snippet.authorChannelId?.value ?? null,
     text: snippet.textOriginal ?? '',
-    publishedAt: new Date(snippet.publishedAt ?? 0),
+    // Sin fecha de la red, la del descubrimiento: 1970 hundiría la fila al fondo de la cola.
+    publishedAt: Number.isNaN(fecha.getTime()) ? new Date() : fecha,
   }
 }
 
