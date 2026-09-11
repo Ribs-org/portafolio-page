@@ -26,6 +26,8 @@ export async function redactarPendientes(inicio: number): Promise<RedaccionRepor
     reporte.sinPasarela = true
     return reporte
   }
+  // Sin tiempo no se consulta nada: la pasada siguiente lo va a encontrar igual de pendiente.
+  if (seAcaboElTiempo(inicio, Date.now())) return reporte
   const db = getDb()
 
   const pendientes = await db
@@ -53,35 +55,49 @@ export async function redactarPendientes(inicio: number): Promise<RedaccionRepor
   const instrucciones = normalizarInstrucciones(await leerAjuste(CLAVE_INSTRUCCIONES))
 
   for (const fila of pendientes) {
-    // El mismo tope de la corrida que acota el descubrimiento: lo que no alcanzó espera la
-    // pasada siguiente, que lo va a volver a encontrar igual de pendiente.
     if (seAcaboElTiempo(inicio, Date.now())) break
 
     const comentarista = comentaristaFor(fila.network)
     if (!comentarista) continue
 
-    const [post] = await db
-      .select({ caption: socialPosts.caption })
-      .from(socialPosts)
-      .where(
-        and(
-          eq(socialPosts.accountId, fila.accountId),
-          eq(socialPosts.externalId, fila.postExternalId),
-        ),
-      )
-      .limit(1)
-
+    // Todo el cuerpo va adentro: un tropiezo de la base no es un borrador fallido, así que
+    // la fila queda pendiente y sin marca, y la pasada siguiente la vuelve a tomar.
     try {
-      const crudo = await pedirBorrador({
-        instrucciones,
-        caption: post?.caption ?? null,
-        comentario: fila.text,
-        autor: fila.author,
-      })
-      const borrador = limpiarBorrador(crudo, comentarista.limiteTexto)
-      // Un borrador vacío no sirve de nada en la cola: cuenta como fallo, y el dueño
-      // reintenta o escribe a mano.
-      if (borrador.length === 0) throw new Error('el modelo devolvió una respuesta vacía')
+      const [post] = await db
+        .select({ caption: socialPosts.caption })
+        .from(socialPosts)
+        .where(
+          and(
+            eq(socialPosts.accountId, fila.accountId),
+            eq(socialPosts.externalId, fila.postExternalId),
+          ),
+        )
+        .limit(1)
+
+      let borrador: string
+      try {
+        const crudo = await pedirBorrador({
+          instrucciones,
+          caption: post?.caption ?? null,
+          comentario: fila.text,
+          autor: fila.author,
+        })
+        borrador = limpiarBorrador(crudo, comentarista.limiteTexto)
+        // Un borrador vacío no sirve de nada en la cola: cuenta como fallo, y el dueño
+        // reintenta o escribe a mano.
+        if (borrador.length === 0) throw new Error('el modelo devolvió una respuesta vacía')
+      } catch (error) {
+        // Solo el modelo llega acá: es el único fallo que marca la fila y la saca de las
+        // pasadas siguientes hasta que el dueño reintente.
+        console.error(`[comentarios] borrador ${fila.network}:`, String(error).slice(0, 300))
+        await db
+          .update(postComments)
+          .set({ draftError: SIN_BORRADOR, updatedAt: new Date() })
+          .where(eq(postComments.id, fila.id))
+        reporte.fallidos += 1
+        continue
+      }
+
       await db
         .update(postComments)
         .set({ draft: borrador, draftError: null, updatedAt: new Date() })
@@ -89,11 +105,6 @@ export async function redactarPendientes(inicio: number): Promise<RedaccionRepor
       reporte.redactados += 1
     } catch (error) {
       console.error(`[comentarios] borrador ${fila.network}:`, String(error).slice(0, 300))
-      await db
-        .update(postComments)
-        .set({ draftError: SIN_BORRADOR, updatedAt: new Date() })
-        .where(eq(postComments.id, fila.id))
-      reporte.fallidos += 1
     }
   }
 
