@@ -378,6 +378,75 @@ export const postComments = pgTable(
   ],
 )
 
+export const SOURCE_POST_STATES = ['cruda', 'lista', 'aprobada', 'rechazada', 'fallida'] as const
+export type SourcePostState = (typeof SOURCE_POST_STATES)[number]
+
+/**
+ * La lista curada de creadores que el modo Tinder lee. `since_id` es el control de costo
+ * entero: X cobra por publicación leída, así que la consulta arranca desde el último tuit
+ * ya visto y un creador que no publicó nada sale gratis.
+ */
+export const sourceAuthors = pgTable(
+  'source_authors',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    network: text('network').notNull(),
+    username: text('username').notNull(),
+    // El id numérico de X. Se resuelve una sola vez: si el creador se cambia el nombre de
+    // usuario, el id sigue siendo el mismo y la traída no se entera, que es lo correcto.
+    externalId: text('external_id'),
+    active: boolean('active').notNull().default(true),
+    sinceId: text('since_id'),
+    lastError: text('last_error'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    // `network` se declara antes que `username`, y en una tabla nueva el orden de
+    // declaración es el orden físico: drizzle-kit introspecta las uniques por ese orden.
+    unique('source_authors_network_username_key').on(t.network, t.username),
+  ],
+)
+
+/**
+ * Una ficha por tuit traído. `author_handle` y `url` van copiados para que la baraja se
+ * lea sin join, y `original_text` se guarda porque la ficha muestra el original plegado
+ * debajo del texto reescrito.
+ *
+ * `draft` y `draft_error` los llena la entrega 2; `scheduled_post_id`, la 3.
+ */
+export const sourcePosts = pgTable(
+  'source_posts',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    authorId: uuid('author_id')
+      .notNull()
+      .references(() => sourceAuthors.id, { onDelete: 'cascade' }),
+    network: text('network').notNull(),
+    externalId: text('external_id').notNull(),
+    url: text('url').notNull(),
+    authorHandle: text('author_handle').notNull(),
+    originalText: text('original_text').notNull(),
+    publishedAt: timestamp('published_at', { withTimezone: true }).notNull(),
+    draft: text('draft'),
+    draftError: text('draft_error'),
+    state: text('state').$type<SourcePostState>().notNull().default('cruda'),
+    scheduledPostId: uuid('scheduled_post_id').references(() => scheduledPosts.id, {
+      onDelete: 'set null',
+    }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    // Mismo orden físico que la declaración: `author_id` es la segunda columna y
+    // `external_id` la cuarta. Declararla al revés haría que cada `db:push` futuro
+    // quisiera recrear la tabla.
+    unique('source_posts_author_external_key').on(t.authorId, t.externalId),
+    index('source_posts_state_idx').on(t.state),
+    index('source_posts_published_idx').on(t.publishedAt),
+  ],
+)
+
 /**
  * Preferencias del panel, una fila por clave. Tabla de clave y valor y no columnas en otra
  * tabla porque esta es la primera de varias: lo que se guarda acá no tiene dueño natural
@@ -400,4 +469,6 @@ export type ScheduledPost = typeof scheduledPosts.$inferSelect
 export type ScheduledPostTarget = typeof scheduledPostTargets.$inferSelect
 export type ScheduledPostMedia = typeof scheduledPostMedia.$inferSelect
 export type PostComment = typeof postComments.$inferSelect
+export type SourceAuthor = typeof sourceAuthors.$inferSelect
+export type SourcePost = typeof sourcePosts.$inferSelect
 export type Ajuste = typeof ajustes.$inferSelect
