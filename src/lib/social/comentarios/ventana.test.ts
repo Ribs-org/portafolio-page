@@ -37,18 +37,31 @@ describe('postsAsondear', () => {
     ).toEqual(['dentro'])
   })
 
-  it('corta en el tope por pasada, quedándose con los más nuevos', () => {
-    const muchos = Array.from({ length: MAX_POSTS_POR_PASADA + 5 }, (_, i) => ({
+  it('corta en el tope por pasada, en la tanda que le toca a esa pasada', () => {
+    // Epoch explícito y aritmética a mano, porque cuál es la tanda depende de en qué pasada
+    // cae `now`, no de la hora a la que corra el test: 1_789_128_300_000 es
+    // 2026-09-11T12:05:00Z, que dividido por los 300_000 ms de una pasada da la pasada
+    // 5_963_761 exacta; 5_963_761 * 20 = 119_275_220, que entre las 25 publicaciones de la
+    // ventana deja resto 20. O sea que la tanda arranca en la vigesimoprimera más nueva —p4—
+    // y da la vuelta por la más nueva hasta completar veinte.
+    expect(MAX_POSTS_POR_PASADA).toBe(20)
+    const cuando = new Date(1_789_128_300_000)
+    const muchos = Array.from({ length: 25 }, (_, i) => ({
       externalId: `p${i}`,
-      // p0 es el más viejo; los últimos son los más nuevos.
-      publishedAt: new Date(now.getTime() - (MAX_POSTS_POR_PASADA + 5 - i) * 3600_000),
+      // p0 es la más vieja; p24 la más nueva.
+      publishedAt: new Date(cuando.getTime() - (25 - i) * 3600_000),
     }))
-    // `now` cae en un múltiplo de 25 minutos, donde la rotación arranca en el principio:
-    // por eso la pasada es justo la de los más nuevos.
-    const elegidos = postsAsondear(muchos, now)
-    expect(elegidos).toHaveLength(MAX_POSTS_POR_PASADA)
-    expect(elegidos[0]).toBe(`p${MAX_POSTS_POR_PASADA + 4}`)
-    expect(elegidos).not.toContain('p0')
+
+    const elegidos = postsAsondear(muchos, cuando)
+    expect(elegidos).toHaveLength(20)
+    expect(elegidos).toEqual([
+      'p4',
+      'p3',
+      'p2',
+      'p1',
+      'p0',
+      ...Array.from({ length: 15 }, (_, i) => `p${24 - i}`),
+    ])
   })
 
   it('rota entre pasadas, para que la que no cupo hoy entre en la siguiente', () => {

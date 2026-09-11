@@ -24,7 +24,11 @@ const PASADA_MS = 5 * 60_000
  */
 export const PASADAS_YOUTUBE = 6
 
-/** Los ids a sondear, del más nuevo al más viejo, ya acotados por ventana y por tope. */
+/**
+ * Los ids a sondear, ya acotados por ventana y por tope: de la más nueva a la más vieja y,
+ * cuando hay más publicaciones que tope, con el punto de partida rotado por pasada para que
+ * ninguna se quede sin mirar.
+ */
 export function postsAsondear(
   posts: Array<{ externalId: string; publishedAt: Date }>,
   now: Date,
