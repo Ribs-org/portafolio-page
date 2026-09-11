@@ -1,10 +1,13 @@
 import { instagramConnector } from '../instagram'
 import { COMENTARIO_AUSENTE, type Comentarista, type ComentarioLeido } from './comentarista'
+import { GRAPH_OBJETO_AUSENTE, codigoGraph, pedirGraph } from './graph'
 import { recortar } from './ventana'
 
 const GRAPH = 'https://graph.facebook.com/v23.0'
 /** El mismo tope que un caption: Graph rechaza más. */
 const LIMITE = 2200
+// Salvaguarda de cuota y de tiempo, no promesa de completitud: lo de la página seis se ve en la pasada siguiente.
+const MAX_PAGINAS = 5
 
 export type InstagramCommentPayload = {
   id?: string
@@ -21,6 +24,7 @@ export function normalizeInstagramComment(
 ): ComentarioLeido | null {
   if (!raw.id) return null
   const usuario = raw.from?.username ?? raw.username ?? null
+  const fecha = new Date(raw.timestamp ?? '')
   return {
     externalId: raw.id,
     postExternalId,
@@ -28,17 +32,9 @@ export function normalizeInstagramComment(
     authorExternalId: raw.from?.id ?? null,
     // La columna es NOT NULL y un comentario puede ser solo una imagen o un sticker.
     text: raw.text ?? '',
-    publishedAt: new Date(raw.timestamp ?? 0),
+    // Sin fecha de la red, la del descubrimiento: 1970 hundiría la fila al fondo de la cola.
+    publishedAt: Number.isNaN(fecha.getTime()) ? new Date() : fecha,
   }
-}
-
-async function pedir(url: string): Promise<Record<string, unknown>> {
-  const response = await fetch(url)
-  if (!response.ok) {
-    const body = await response.text()
-    throw new Error(`Instagram ${response.status}: ${body.slice(0, 200)}`)
-  }
-  return response.json()
 }
 
 export const instagramComentarista: Comentarista = {
@@ -51,13 +47,23 @@ export const instagramComentarista: Comentarista = {
 
   async listar(_account, token, postExternalId) {
     const fields = 'id,text,timestamp,username,from'
-    const data = (await pedir(
-      `${GRAPH}/${postExternalId}/comments?fields=${fields}&limit=50&access_token=${token}`,
-    )) as { data?: InstagramCommentPayload[] }
+    // El borde de comentarios va del más viejo al más nuevo: con una sola página, una
+    // publicación de más de cincuenta comentarios nunca dejaría ver los nuevos.
+    let url = `${GRAPH}/${postExternalId}/comments?fields=${fields}&limit=50&access_token=${token}`
     const leidos: ComentarioLeido[] = []
-    for (const raw of data.data ?? []) {
-      const c = normalizeInstagramComment(raw, postExternalId)
-      if (c) leidos.push(c)
+    for (let pagina = 0; pagina < MAX_PAGINAS; pagina++) {
+      const data = (await pedirGraph('Instagram', url)) as {
+        data?: InstagramCommentPayload[]
+        paging?: { next?: string }
+      }
+      for (const raw of data.data ?? []) {
+        const c = normalizeInstagramComment(raw, postExternalId)
+        if (c) leidos.push(c)
+      }
+      // La url del cursor ya viene firmada y con los campos: se usa tal cual.
+      const siguiente = data.paging?.next
+      if (!siguiente) break
+      url = siguiente
     }
     return leidos
   },
@@ -71,6 +77,8 @@ export const instagramComentarista: Comentarista = {
     if (response.status === 404) throw new Error(COMENTARIO_AUSENTE)
     if (!response.ok) {
       const body = await response.text()
+      // Se mira el código y no el estado: al objeto borrado Graph le contesta 400, no 404.
+      if (codigoGraph(body) === GRAPH_OBJETO_AUSENTE) throw new Error(COMENTARIO_AUSENTE)
       throw new Error(`Instagram ${response.status}: ${body.slice(0, 200)}`)
     }
     const body = (await response.json()) as { id?: string }
