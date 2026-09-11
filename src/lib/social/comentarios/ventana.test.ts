@@ -1,11 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import {
   DIAS_VENTANA,
+  MAX_MS_POR_CORRIDA,
   MAX_POSTS_POR_PASADA,
   PASADAS_YOUTUBE,
   estadoInicial,
   postsAsondear,
   recortar,
+  seAcaboElTiempo,
   tocaSondear,
 } from './ventana'
 
@@ -118,6 +120,30 @@ describe('recortar', () => {
 
   it('no deja un espacio colgando cuando el corte cae justo ahí', () => {
     expect(recortar('hola mundo', 5)).toBe('hola')
+  })
+})
+
+describe('seAcaboElTiempo', () => {
+  // Instantes explícitos, no `Date.now()`: el resultado no puede depender de cuánto tarde
+  // el test. 1_789_128_000_000 es 2026-09-11T12:00:00Z.
+  const INICIO = 1_789_128_000_000
+
+  it('la mitad del presupuesto del cron: dos minutos', () => {
+    expect(MAX_MS_POR_CORRIDA).toBe(120_000)
+  })
+
+  it('recién empezada la corrida hay tiempo de sobra', () => {
+    expect(seAcaboElTiempo(INICIO, INICIO)).toBe(false)
+    expect(seAcaboElTiempo(INICIO, INICIO + 1_000)).toBe(false)
+  })
+
+  it('un milisegundo antes del tope todavía se sondea', () => {
+    expect(seAcaboElTiempo(INICIO, INICIO + MAX_MS_POR_CORRIDA - 1)).toBe(false)
+  })
+
+  it('en el tope y pasado el tope se corta', () => {
+    expect(seAcaboElTiempo(INICIO, INICIO + MAX_MS_POR_CORRIDA)).toBe(true)
+    expect(seAcaboElTiempo(INICIO, INICIO + MAX_MS_POR_CORRIDA + 60_000)).toBe(true)
   })
 })
 

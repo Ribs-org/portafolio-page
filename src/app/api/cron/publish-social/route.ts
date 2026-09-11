@@ -7,7 +7,8 @@ import { env } from '@/lib/env'
 export const dynamic = 'force-dynamic'
 // 240 on purpose, below the 5-minute cadence: a run that dies before the next tick
 // can never overlap it, which closes most of the double-publish window the claim in
-// publishDue cannot cover on its own.
+// publishDue cannot cover on its own. El sondeo de comentarios comparte este presupuesto:
+// se lleva la mitad como mucho (ver `MAX_MS_POR_CORRIDA`), porque publicar manda.
 export const maxDuration = 240
 
 export async function GET(request: Request) {
@@ -24,7 +25,10 @@ export async function GET(request: Request) {
     // Después de publicar y antes de barrer: publicar a tiempo manda sobre responder a
     // tiempo, y el sondeo no debe quitarle segundos a la publicación de esta pasada.
     // Su fallo no puede tumbar la corrida, que ya publicó.
-    let comentarios: Awaited<ReturnType<typeof sondearComentarios>> = []
+    let comentarios: Awaited<ReturnType<typeof sondearComentarios>> = {
+      cuentas: [],
+      sinSondear: 0,
+    }
     try {
       comentarios = await sondearComentarios()
     } catch (error) {

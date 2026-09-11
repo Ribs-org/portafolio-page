@@ -12,6 +12,8 @@ export const DIAS_VENTANA = 7
  * el turno a publicar a tiempo.
  */
 export const MAX_POSTS_POR_PASADA = 20
+/** El cron publica antes de sondear y `maxDuration` son 240 s: al sondeo le toca la mitad, porque publicar a tiempo manda. */
+export const MAX_MS_POR_CORRIDA = 120_000
 /** La cadencia del cron que llama a esto: de ahí sale el desplazamiento de la rotación. */
 const PASADA_MS = 5 * 60_000
 /**
@@ -46,6 +48,15 @@ export function postsAsondear(
   const inicio = (pasada * MAX_POSTS_POR_PASADA) % dentro.length
   const rotadas = [...dentro.slice(inicio), ...dentro.slice(0, inicio)]
   return rotadas.slice(0, MAX_POSTS_POR_PASADA).map((post) => post.externalId)
+}
+
+/**
+ * Si la corrida ya gastó su mitad del presupuesto y lo que falta queda para la pasada
+ * siguiente. Las cuentas se recorren siempre en el mismo orden, así que un corte deja
+ * afuera siempre a las mismas: por eso el reporte lleva cuántas quedaron sin sondear.
+ */
+export function seAcaboElTiempo(inicioMs: number, ahoraMs: number): boolean {
+  return ahoraMs - inicioMs >= MAX_MS_POR_CORRIDA
 }
 
 /** Si a esta red le toca sondeo en la pasada en que cae `now`. */
