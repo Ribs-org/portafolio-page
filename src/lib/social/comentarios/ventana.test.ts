@@ -35,10 +35,35 @@ describe('postsAsondear', () => {
       // p0 es el más viejo; los últimos son los más nuevos.
       publishedAt: new Date(now.getTime() - (MAX_POSTS_POR_PASADA + 5 - i) * 3600_000),
     }))
+    // `now` cae en un múltiplo de 25 minutos, donde la rotación arranca en el principio:
+    // por eso la pasada es justo la de los más nuevos.
     const elegidos = postsAsondear(muchos, now)
     expect(elegidos).toHaveLength(MAX_POSTS_POR_PASADA)
     expect(elegidos[0]).toBe(`p${MAX_POSTS_POR_PASADA + 4}`)
     expect(elegidos).not.toContain('p0')
+  })
+
+  it('rota entre pasadas, para que la que no cupo hoy entre en la siguiente', () => {
+    const muchos = Array.from({ length: MAX_POSTS_POR_PASADA + 5 }, (_, i) => ({
+      externalId: `p${i}`,
+      publishedAt: new Date(now.getTime() - (MAX_POSTS_POR_PASADA + 5 - i) * 3600_000),
+    }))
+    const cincoMinutos = 5 * 60_000
+
+    const primera = postsAsondear(muchos, now)
+    const segunda = postsAsondear(muchos, new Date(now.getTime() + cincoMinutos))
+    expect(segunda).toHaveLength(MAX_POSTS_POR_PASADA)
+    expect(new Set(segunda)).not.toEqual(new Set(primera))
+
+    // Ninguna publicación de la ventana se queda sin mirar: basta con dejar correr unas
+    // cuantas pasadas seguidas.
+    const vistas = new Set<string>()
+    for (let i = 0; i < muchos.length; i++) {
+      for (const id of postsAsondear(muchos, new Date(now.getTime() + i * cincoMinutos))) {
+        vistas.add(id)
+      }
+    }
+    expect(vistas.size).toBe(muchos.length)
   })
 
   it('un post del futuro no rompe nada: entra, porque su fecha está dentro', () => {
@@ -61,5 +86,16 @@ describe('recortar', () => {
 
   it('recorta los espacios de los bordes antes de medir', () => {
     expect(recortar('  hola  ', 10)).toBe('hola')
+  })
+
+  it('no parte un emoji por la mitad: cuenta puntos de código', () => {
+    const texto = 'hola 👋🏽 mundo'
+    const resultado = recortar(texto, 6)
+    expect([...resultado]).toHaveLength(6)
+    expect(resultado).toBe([...texto].slice(0, 6).join(''))
+  })
+
+  it('no deja un espacio colgando cuando el corte cae justo ahí', () => {
+    expect(recortar('hola mundo', 5)).toBe('hola')
   })
 })
