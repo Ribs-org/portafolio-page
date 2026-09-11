@@ -1,6 +1,7 @@
 {
   "crons": [
     { "path": "/api/cron/sync-social", "schedule": "0 9 * * *" },
-    { "path": "/api/cron/publish-social", "schedule": "30 9 * * *" }
+    { "path": "/api/cron/publish-social", "schedule": "30 9 * * *" },
+    { "path": "/api/cron/traer-ideas", "schedule": "0 10 * * *" }
   ]
 }

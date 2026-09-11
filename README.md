@@ -253,6 +253,31 @@ Las instrucciones que sigue el modelo se guardan en la base y las vas a editar d
 panel en la entrega siguiente. Hasta entonces rigen las de la casa: responder en español, en
 primera persona, breve y cálido, sin inventar datos ni dar precios.
 
+### Modo Tinder
+
+El panel puede leer los tuits nuevos de una lista de creadores que tú curas y —en las
+entregas siguientes— proponerte una reescritura con tu voz que apruebas de un toque. Nada
+sale publicado sin que lo veas.
+
+Para que funcione necesitas `X_BEARER_TOKEN` en el entorno, que sacas del portal de
+desarrolladores de X, en la misma app que ya usas para publicar. X ya no tiene capa
+gratuita: hay que **activar facturación por uso en la app**. Cobra unos 0,005 dólares por
+publicación leída, así que veinte creadores publicando tres veces al día salen por unos
+nueve dólares al mes.
+
+La traída corre cuatro veces al día, en su propio cron, y solo pide lo publicado desde la
+última vez. Un creador que no publicó nada no cuesta nada. Hay un techo diario de 300
+lecturas como red de seguridad; al alcanzarlo la traída para y sigue al día siguiente sin
+perder nada.
+
+El cron nuevo lo dispara el mismo pinger externo que el de publicación, así que hay que
+darlo de alta en cron-job.org apuntando a `/api/cron/traer-ideas` con el mismo
+`CRON_SECRET`, a las 9, 13, 17 y 21 UTC. Sin esa entrada el endpoint existe y no lo llama
+nadie, y el síntoma sería una baraja vacía sin ningún error a la vista.
+
+Después de fusionar hay que correr `npm run db:push` otra vez, porque las tablas de
+creadores y de fichas son nuevas.
+
 ### Conectar y sincronizar
 
 Antes que nada, `npm run db:push`: la analítica de posts agrega tablas nuevas, y este

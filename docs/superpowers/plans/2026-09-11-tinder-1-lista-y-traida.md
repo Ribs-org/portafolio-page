@@ -69,7 +69,7 @@ y la fila «1 · La lista y la traída» de la tabla de entregas).
 - Produce: `sourceAuthors`, `sourcePosts` (tablas), `SOURCE_POST_STATES`,
   `SourcePostState`, `SourceAuthor`, `SourcePost`.
 
-- [ ] **Paso 1: Los estados**
+- [x] **Paso 1: Los estados**
 
 En `src/db/schema.ts`, junto a `COMMENT_STATES` que ya existe, con el mismo patrón:
 
@@ -78,7 +78,7 @@ export const SOURCE_POST_STATES = ['cruda', 'lista', 'aprobada', 'rechazada', 'f
 export type SourcePostState = (typeof SOURCE_POST_STATES)[number]
 ```
 
-- [ ] **Paso 2: La tabla de creadores**
+- [x] **Paso 2: La tabla de creadores**
 
 `boolean` puede no estar todavía en el import de `drizzle-orm/pg-core` al tope del archivo;
 agrégalo si falta.
@@ -112,7 +112,7 @@ export const sourceAuthors = pgTable(
 )
 ```
 
-- [ ] **Paso 3: La tabla de fichas**
+- [x] **Paso 3: La tabla de fichas**
 
 ```ts
 /**
@@ -159,7 +159,7 @@ export const sourcePosts = pgTable(
 publicación programada desde el calendario, la ficha tiene que sobrevivir, porque su fila es
 lo que impide que el mismo tuit vuelva a entrar.
 
-- [ ] **Paso 4: Los tipos**
+- [x] **Paso 4: Los tipos**
 
 Junto a los demás `$inferSelect` del archivo, siguiendo su patrón exacto:
 
@@ -168,12 +168,12 @@ export type SourceAuthor = typeof sourceAuthors.$inferSelect
 export type SourcePost = typeof sourcePosts.$inferSelect
 ```
 
-- [ ] **Paso 5: Verificar**
+- [x] **Paso 5: Verificar**
 
 Corre `npm run typecheck` y `npm run lint`. **No corras `db:push`**: las tablas son nuevas y
 el push lo hace el controlador al desplegar.
 
-- [ ] **Paso 6: Commit**
+- [x] **Paso 6: Commit**
 
 ```bash
 git add src/db/schema.ts
@@ -199,7 +199,7 @@ Mensaje: `Agrega las tablas de creadores y fichas del modo Tinder`
 Ningún archivo de `fuentes/` importa `server-only` salvo el orquestador de la tarea 4. Este
 par no toca la base.
 
-- [ ] **Paso 1: El contrato**
+- [x] **Paso 1: El contrato**
 
 `src/lib/social/fuentes/fuente.ts`:
 
@@ -240,7 +240,7 @@ export const AUTOR_ILEGIBLE = 'No se pudo leer esta cuenta.'
 export const TOPE_ALCANZADO = 'Se alcanzó el tope de lecturas de hoy.'
 ```
 
-- [ ] **Paso 2: El test que falla**
+- [x] **Paso 2: El test que falla**
 
 `src/lib/social/fuentes/x.test.ts`:
 
@@ -287,12 +287,12 @@ describe('normalizeXTweet', () => {
 })
 ```
 
-- [ ] **Paso 3: Correrlo y verlo fallar**
+- [x] **Paso 3: Correrlo y verlo fallar**
 
 Corre: `npx vitest run src/lib/social/fuentes/x.test.ts`
 Esperado: falla porque el módulo no existe.
 
-- [ ] **Paso 4: La fuente**
+- [x] **Paso 4: La fuente**
 
 `src/lib/social/fuentes/x.ts`. El normalizador es puro y recibe `ahora` en vez de llamar a
 `new Date()`, para que el test no dependa del reloj:
@@ -381,7 +381,7 @@ export const xFuente: Fuente = {
 }
 ```
 
-- [ ] **Paso 5: El registro**
+- [x] **Paso 5: El registro**
 
 `src/lib/social/fuentes/index.ts`:
 
@@ -399,12 +399,12 @@ export function fuenteFor(network: string): Fuente | undefined {
 export * from './fuente'
 ```
 
-- [ ] **Paso 6: Correrlo y verlo pasar**
+- [x] **Paso 6: Correrlo y verlo pasar**
 
 Corre: `npx vitest run src/lib/social/fuentes/x.test.ts`
 Esperado: pasa. Después `npm run typecheck` y `npm run lint`.
 
-- [ ] **Paso 7: Commit**
+- [x] **Paso 7: Commit**
 
 ```bash
 git add src/lib/social/fuentes/fuente.ts src/lib/social/fuentes/x.ts src/lib/social/fuentes/index.ts src/lib/social/fuentes/x.test.ts
@@ -428,7 +428,7 @@ Mensaje: `Lee los tuits nuevos de una cuenta con la API de X`
   `TOPE_POR_DEFECTO`, `diaDe(now)`, `normalizarTope(bruto)`,
   `leidasHoy(valor, hoy)`, `serializarContador(hoy, leidas)`, `idMayor(a, b)`.
 
-- [ ] **Paso 1: El escritor de ajustes**
+- [x] **Paso 1: El escritor de ajustes**
 
 `src/lib/ajustes.ts` tiene hoy solo el lector: la entrega 2 de comentarios dejó fuera el
 escritor a propósito, por no tener llamador. Ahora lo tiene. Agrégalo junto a `leerAjuste`:
@@ -442,7 +442,7 @@ export async function guardarAjuste(clave: string, valor: string): Promise<void>
 }
 ```
 
-- [ ] **Paso 2: El test que falla**
+- [x] **Paso 2: El test que falla**
 
 `src/lib/social/fuentes/tope.test.ts`:
 
@@ -514,12 +514,12 @@ describe('idMayor', () => {
 })
 ```
 
-- [ ] **Paso 3: Correrlo y verlo fallar**
+- [x] **Paso 3: Correrlo y verlo fallar**
 
 Corre: `npx vitest run src/lib/social/fuentes/tope.test.ts`
 Esperado: falla porque el módulo no existe.
 
-- [ ] **Paso 4: El módulo**
+- [x] **Paso 4: El módulo**
 
 `src/lib/social/fuentes/tope.ts`. Puro: no toca la base ni la red.
 
@@ -567,12 +567,12 @@ export function idMayor(a: string | null, b: string | null): string | null {
 }
 ```
 
-- [ ] **Paso 5: Correrlo y verlo pasar**
+- [x] **Paso 5: Correrlo y verlo pasar**
 
 Corre: `npx vitest run src/lib/social/fuentes/tope.test.ts`
 Esperado: pasa. Después `npm run typecheck` y `npm run lint`.
 
-- [ ] **Paso 6: Commit**
+- [x] **Paso 6: Commit**
 
 ```bash
 git add src/lib/ajustes.ts src/lib/social/fuentes/tope.ts src/lib/social/fuentes/tope.test.ts
@@ -593,7 +593,7 @@ Mensaje: `Lleva la cuenta de lo leído en el día y su techo`
 - Consume: todo lo de las tareas 1, 2 y 3.
 - Produce: `TraidaReport`, `traerIdeas(now?: Date): Promise<TraidaReport>`.
 
-- [ ] **Paso 1: El orquestador**
+- [x] **Paso 1: El orquestador**
 
 `src/lib/social/fuentes/run.ts`:
 
@@ -730,7 +730,7 @@ export async function traerIdeas(now: Date = new Date()): Promise<TraidaReport> 
 Fíjate en el contador: se guarda **siempre** al final, incluso si la corrida se cortó. Lo
 que ya se leyó ya se pagó, y olvidarlo sería pagarlo dos veces mañana.
 
-- [ ] **Paso 2: El cron**
+- [x] **Paso 2: El cron**
 
 `src/app/api/cron/traer-ideas/route.ts`, con la misma disciplina que
 `src/app/api/cron/publish-social/route.ts`:
@@ -762,7 +762,7 @@ export async function GET(request: Request) {
 }
 ```
 
-- [ ] **Paso 3: Verificar**
+- [x] **Paso 3: Verificar**
 
 Corre `npm test`, `npm run typecheck`, `npm run lint` y `npx next build`. Hay un warning
 conocido y ajeno de Vite sobre `vitest.config.ts`: no lo toques.
@@ -771,7 +771,7 @@ No hay test nuevo en esta tarea: `run.ts` toca la base y la red, y la casa no pr
 orquestadores. Su vecino directo, `src/lib/social/comentarios/run.ts`, tampoco tiene test.
 Lo puro que esta tarea usa ya está probado en las tareas 2 y 3.
 
-- [ ] **Paso 4: Commit**
+- [x] **Paso 4: Commit**
 
 ```bash
 git add src/lib/social/fuentes/run.ts src/app/api/cron/traer-ideas/route.ts
@@ -789,7 +789,7 @@ Mensaje: `Trae las ideas nuevas de cada creador de la lista`
 - Modificar: `README.md`
 - Modificar: este plan (marcar las casillas)
 
-- [ ] **Paso 1: La variable**
+- [x] **Paso 1: La variable**
 
 En `.env.example`, al final, con el formato de las demás:
 
@@ -799,7 +799,7 @@ En `.env.example`, al final, con el formato de las demás:
 X_BEARER_TOKEN=
 ```
 
-- [ ] **Paso 2: El README**
+- [x] **Paso 2: El README**
 
 Después de la sección «Responder comentarios» y antes de la siguiente, agrega:
 
@@ -832,11 +832,11 @@ creadores y de fichas son nuevas.
 
 Mantén el tono del resto: segunda persona, español, frases cortas.
 
-- [ ] **Paso 3: Las casillas**
+- [x] **Paso 3: Las casillas**
 
 Marca `[x]` los pasos de este plan que quedaron hechos.
 
-- [ ] **Paso 4: Verificar y commit**
+- [x] **Paso 4: Verificar y commit**
 
 Corre `npm run lint`.
 
