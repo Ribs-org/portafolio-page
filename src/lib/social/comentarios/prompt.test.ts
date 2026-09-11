@@ -43,6 +43,12 @@ describe('limpiarBorrador', () => {
     expect(limpiarBorrador('Le dije "ya voy" y fui.', 100)).toBe('Le dije "ya voy" y fui.')
   })
 
+  it('no despoja dos frases entrecomilladas, que no son un solo par que envuelve todo', () => {
+    expect(limpiarBorrador('"hola" y "chao"', 100)).toBe('"hola" y "chao"')
+    expect(limpiarBorrador("'está' o 'no está'", 100)).toBe("'está' o 'no está'")
+    expect(limpiarBorrador('«hola» y «chao»', 100)).toBe('«hola» y «chao»')
+  })
+
   it('quita el prefijo con el que el modelo a veces se presenta', () => {
     expect(limpiarBorrador('Respuesta: ¡Gracias!', 100)).toBe('¡Gracias!')
     expect(limpiarBorrador('respuesta:¡Gracias!', 100)).toBe('¡Gracias!')

@@ -35,11 +35,20 @@ const ENVOLTORIOS: Array<[string, string]> = [
 /** El modelo a veces se presenta antes de responder; esto es lo que se le ha visto hacer. */
 const PREFIJO = /^(respuesta|reply)\s*:\s*/i
 
+/**
+ * Las comillas se quitan solo cuando envuelven toda la respuesta. Que empiece con una
+ * apertura y termine con su cierre no basta: `"hola" y "chao"` también cumple eso y es
+ * dos frases, no un envoltorio — despojarlo dejaría una comilla colgando. Por eso además
+ * se exige que el interior no repita el cierre; si lo repite, se corta el bucle igual,
+ * sin tocar el texto, para no probar el par siguiente sobre una cadena que ya no
+ * empieza como el bucle cree.
+ */
 export function limpiarBorrador(bruto: string, limite: number): string {
   let texto = bruto.trim().replace(PREFIJO, '').trim()
   for (const [abre, cierra] of ENVOLTORIOS) {
     if (texto.length >= 2 && texto.startsWith(abre) && texto.endsWith(cierra)) {
-      texto = texto.slice(abre.length, texto.length - cierra.length).trim()
+      const interior = texto.slice(abre.length, texto.length - cierra.length)
+      if (!interior.includes(cierra)) texto = interior.trim()
       break
     }
   }
