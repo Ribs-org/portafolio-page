@@ -368,8 +368,11 @@ export const postComments = pgTable(
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [
-    // Orden físico, como en social_posts: ver el comentario de esa unique.
-    unique('post_comments_account_external_key').on(t.externalId, t.accountId),
+    // Al revés que en social_posts, por la misma regla: la unique va en el orden físico de
+    // la tabla, y como esta tabla todavía no existe, `db:push` la crea tal como está
+    // declarada y su orden de declaración es su orden físico. Con `account_id` primero
+    // sirve además la consulta del sondeo, que filtra por cuenta y luego por publicación.
+    unique('post_comments_account_external_key').on(t.accountId, t.externalId),
     index('post_comments_state_idx').on(t.state),
     index('post_comments_published_idx').on(t.publishedAt),
   ],

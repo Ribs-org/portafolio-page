@@ -176,7 +176,7 @@ export const postComments = pgTable(
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [
-    unique('post_comments_account_external_key').on(t.externalId, t.accountId),
+    unique('post_comments_account_external_key').on(t.accountId, t.externalId),
     index('post_comments_state_idx').on(t.state),
     index('post_comments_published_idx').on(t.publishedAt),
   ],
@@ -186,9 +186,11 @@ export const postComments = pgTable(
 y junto a los otros tipos exportados al final: `export type PostComment = typeof postComments.$inferSelect`.
 
 **El orden de las columnas de la unique importa**: drizzle-kit introspecta las claves
-únicas por la posición física de la columna en la tabla, y `external_id` se declara antes
-que `account_id`. Declararla al revés hace que cada `db:push` quiera recrearla (ver el
-comentario de `social_posts_account_external_key`).
+únicas por la posición física de la columna en la tabla. A diferencia de `social_posts`,
+donde `account_id` llegó por un ALTER y quedó segunda, esta tabla todavía no existe:
+`db:push` la va a crear tal como está declarada, así que su orden de declaración es su
+orden físico y la unique va `(account_id, external_id)`. Declararla al revés hace que
+cada `db:push` quiera recrearla (ver el comentario de `social_posts_account_external_key`).
 
 - [ ] **Step 4: Los tipos y las frases**
 
