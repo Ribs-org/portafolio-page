@@ -3,7 +3,7 @@ import { eq } from 'drizzle-orm'
 import { getDb, sourceAuthors, sourcePosts } from '@/db'
 import { guardarAjuste, leerAjuste } from '@/lib/ajustes'
 import { fuenteFor } from './index'
-import { AUTOR_ILEGIBLE } from './fuente'
+import { AUTOR_ILEGIBLE, MIN_LECTURAS } from './fuente'
 import {
   CLAVE_CONTADOR,
   CLAVE_TOPE,
@@ -52,16 +52,29 @@ export async function traerIdeas(now: Date = new Date()): Promise<TraidaReport> 
     return reporte
   }
 
+  // Se guarda creador por creador y no solo al final: una corrida que muera por `maxDuration`
+  // olvidaría todo lo que ya pagó, y el tope dejaría de morder el resto del día.
+  const guardarContador = async (): Promise<void> => {
+    try {
+      await guardarAjuste(CLAVE_CONTADOR, serializarContador(hoy, leidas))
+    } catch (fallo) {
+      console.error('[ideas] no se pudo guardar el contador:', String(fallo).slice(0, 300))
+    }
+  }
+
   const autores = await db.select().from(sourceAuthors).where(eq(sourceAuthors.active, true))
 
   let seguidos = 0
   for (const [indice, autor] of autores.entries()) {
+    let abandonar = false
     const fuente = fuenteFor(autor.network)
     // Una red sin fuente se ignora en silencio: no es un fallo, es que todavía no existe.
     if (!fuente) continue
 
+    // Con menos que el mínimo que la red entrega, la página vendría recortada y la marca
+    // avanzaría sobre lo más viejo que nadie alcanzó a ver: eso no se recupera nunca.
     const restante = tope - leidas
-    if (restante <= 0) {
+    if (restante < MIN_LECTURAS) {
       reporte.topeAlcanzado = true
       reporte.sinMirar = autores.length - indice
       break
@@ -131,7 +144,7 @@ export async function traerIdeas(now: Date = new Date()): Promise<TraidaReport> 
       try {
         await marcar(autor.id, AUTOR_ILEGIBLE)
       } catch (fallo) {
-        // Si esta escritura se saliera, se perdería el contador del día entero.
+        // Si esta escritura se saliera, una sola cuenta rota se llevaría la corrida entera.
         console.error(`[ideas] no se pudo marcar ${autor.username}:`, String(fallo).slice(0, 300))
       }
       reporte.autores.push({ username: autor.username, nuevas: 0, error: AUTOR_ILEGIBLE })
@@ -139,12 +152,15 @@ export async function traerIdeas(now: Date = new Date()): Promise<TraidaReport> 
       if (seguidos >= MAX_FALLOS_SEGUIDOS) {
         console.error(`[ideas] se abandona la corrida tras ${seguidos} cuentas seguidas fallando.`)
         reporte.sinMirar = autores.length - indice - 1
-        break
+        abandonar = true
       }
     }
+
+    await guardarContador()
+    if (abandonar) break
   }
 
   reporte.leidas = leidas
-  await guardarAjuste(CLAVE_CONTADOR, serializarContador(hoy, leidas))
+  await guardarContador()
   return reporte
 }
