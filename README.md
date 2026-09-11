@@ -272,11 +272,17 @@ perder nada.
 
 El cron nuevo lo dispara el mismo pinger externo que el de publicación, así que hay que
 darlo de alta en cron-job.org apuntando a `/api/cron/traer-ideas` con el mismo
-`CRON_SECRET`, a las 9, 13, 17 y 21 UTC. Sin esa entrada el endpoint existe y no lo llama
-nadie, y el síntoma sería una baraja vacía sin ningún error a la vista.
+`CRON_SECRET`, a las 9, 13, 17 y 21 UTC. Ese pinger es la única forma en que la traída
+corre: sin esa entrada el endpoint existe y no lo llama nadie, y el síntoma sería una baraja
+vacía sin ningún error a la vista.
 
 Después de fusionar hay que correr `npm run db:push` otra vez, porque las tablas de
 creadores y de fichas son nuevas.
+
+Los creadores todavía no tienen pantalla: son filas que insertas a mano en la tabla
+`source_authors`. Con los valores por defecto te basta la red y el nombre de usuario:
+`INSERT INTO source_authors (network, username) VALUES ('x', 'algun_creador');`. El nombre
+va sin arroba.
 
 ### Conectar y sincronizar
 
