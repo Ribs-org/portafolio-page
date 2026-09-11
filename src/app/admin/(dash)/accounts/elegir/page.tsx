@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { cookies } from 'next/headers'
-import { eq } from 'drizzle-orm'
+import { and, eq, isNotNull } from 'drizzle-orm'
 import { conectarElegidas } from '@/app/admin/actions'
 import { getDb, socialAccounts } from '@/db'
 import { networkLabel } from '@/lib/networks'
@@ -38,12 +38,12 @@ export default async function Elegir({
   const existentes = new Set(
     (
       await getDb()
-        .select({ externalId: socialAccounts.externalId, accessToken: socialAccounts.accessToken })
+        .select({ externalId: socialAccounts.externalId })
         .from(socialAccounts)
-        .where(eq(socialAccounts.network, pendiente.network))
-    )
-      .filter((r) => r.accessToken !== null)
-      .map((r) => r.externalId),
+        .where(
+          and(eq(socialAccounts.network, pendiente.network), isNotNull(socialAccounts.accessToken)),
+        )
+    ).map((r) => r.externalId),
   )
 
   return (

@@ -15,7 +15,7 @@ export default async function AccountsPage({
   return (
     <>
       <header className="mb-6">
-        <h1 className="font-display text-lg font-semibold">Cuentas</h1>
+        <h1 className="font-display text-2xl font-semibold tracking-[-0.02em]">Cuentas</h1>
       </header>
       {mensaje ? (
         <p role="status" className="mb-4 rounded-xl bg-white/[0.04] px-4 py-2 text-sm text-fg-muted">
