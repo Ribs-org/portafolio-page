@@ -52,6 +52,14 @@ describe('normalizeXTweet', () => {
     ).toEqual(AHORA)
   })
 
+  it('un nombre guardado con arroba da el mismo enlace que sin ella', () => {
+    const con = normalizeXTweet({ id: '42', text: 'una idea' }, '@alguien', AHORA)
+    const sin = normalizeXTweet({ id: '42', text: 'una idea' }, 'alguien', AHORA)
+    expect(con?.url).toBe('https://x.com/alguien/status/42')
+    expect(con?.url).toBe(sin?.url)
+    expect(con?.authorHandle).toBe(sin?.authorHandle)
+  })
+
   it('recorta los bordes del texto', () => {
     expect(normalizeXTweet({ id: '1', text: '  una idea \n' }, 'x', AHORA)?.text).toBe('una idea')
   })

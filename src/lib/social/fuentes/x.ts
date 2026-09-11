@@ -16,6 +16,14 @@ export type XTweetPayload = {
   created_at?: string
 }
 
+/**
+ * El nombre pelado. La fila la escribe el dueño a mano, y un `@alguien` no resuelve contra
+ * X ni arma un enlace que exista: `x.com/@alguien/status/1` es un 404.
+ */
+export function sinArroba(username: string): string {
+  return username.replace(/^@/, '')
+}
+
 /** Null cuando no hay id o no hay texto: sin identidad no hay fila, y sin texto no hay idea. */
 export function normalizeXTweet(
   raw: XTweetPayload,
@@ -26,10 +34,11 @@ export function normalizeXTweet(
   const text = (raw.text ?? '').trim()
   if (text.length === 0) return null
   const fecha = raw.created_at ? new Date(raw.created_at) : null
+  const handle = sinArroba(username)
   return {
     externalId: raw.id,
-    url: `https://x.com/${username}/status/${raw.id}`,
-    authorHandle: username,
+    url: `https://x.com/${handle}/status/${raw.id}`,
+    authorHandle: handle,
     text,
     // Sin fecha de la red, la del descubrimiento: 1970 hundiría la ficha al fondo de una
     // baraja ordenada por fecha, y un Date inválido reventaría el insert.
@@ -54,9 +63,7 @@ export const xFuente: Fuente = {
   network: 'x',
 
   async resolverAutor(username) {
-    // X quiere el nombre pelado: un `@alguien` tecleado a mano en la fila no resuelve nunca.
-    const limpio = username.replace(/^@/, '')
-    const body = (await pedir(`/users/by/username/${encodeURIComponent(limpio)}`)) as {
+    const body = (await pedir(`/users/by/username/${encodeURIComponent(sinArroba(username))}`)) as {
       data?: { id?: string }
     }
     const id = body.data?.id
