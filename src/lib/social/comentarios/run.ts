@@ -4,6 +4,7 @@ import { getDb, postComments, socialAccounts, socialPosts } from '@/db'
 import type { SocialAccount } from '@/db'
 import { connectorFor } from '../index'
 import { comentaristaFor } from './index'
+import { redactarPendientes, type RedaccionReport } from './redaccion'
 import { DIAS_VENTANA, estadoInicial, postsAsondear, seAcaboElTiempo, tocaSondear } from './ventana'
 
 /**
@@ -31,6 +32,8 @@ export type SondeoReport = {
   }>
   /** Cuentas que el tope de tiempo dejó para la pasada siguiente; no es un fallo. */
   sinSondear: number
+  /** Lo que la fase de redacción alcanzó a hacer en esta misma corrida. */
+  redaccion: RedaccionReport
 }
 
 type Cuenta = { posts: number; nuevos: number; salteados: number }
@@ -149,7 +152,11 @@ export async function sondearComentarios(now: Date = new Date()): Promise<Sondeo
   const aSondear = cuentas.filter(
     (cuenta) => comentaristaFor(cuenta.network) && tocaSondear(cuenta.network, now),
   )
-  const reporte: SondeoReport = { cuentas: [], sinSondear: 0 }
+  const reporte: SondeoReport = {
+    cuentas: [],
+    sinSondear: 0,
+    redaccion: { redactados: 0, fallidos: 0, sinPasarela: false },
+  }
   // En serie, como la sincronización: la casa nunca pega concurrente contra Meta.
   for (const [i, cuenta] of aSondear.entries()) {
     // El tope por cuenta no acota la corrida: con varias cuentas son veinte llamadas por
@@ -176,6 +183,13 @@ export async function sondearComentarios(now: Date = new Date()): Promise<Sondeo
         error: SONDEO_FALLIDO,
       })
     }
+  }
+  try {
+    reporte.redaccion = await redactarPendientes(inicio)
+  } catch (error) {
+    // Publicar y descubrir mandan sobre redactar: si la fase entera revienta, la corrida
+    // conserva lo que ya descubrió y los borradores esperan la pasada siguiente.
+    console.error('[comentarios] redacción:', String(error).slice(0, 300))
   }
   return reporte
 }

@@ -28,6 +28,7 @@ export async function GET(request: Request) {
     let comentarios: Awaited<ReturnType<typeof sondearComentarios>> = {
       cuentas: [],
       sinSondear: 0,
+      redaccion: { redactados: 0, fallidos: 0, sinPasarela: false },
     }
     try {
       comentarios = await sondearComentarios()
