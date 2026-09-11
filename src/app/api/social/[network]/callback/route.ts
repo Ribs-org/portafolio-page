@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { isAuthenticated } from '@/lib/auth'
 import { env } from '@/lib/env'
+import { networkLabel } from '@/lib/networks'
 import { guardarCuenta } from '@/lib/social/conectar'
 import {
   NO_FACEBOOK_PAGE,
@@ -335,11 +336,26 @@ async function tiktokCredential(code: string, redirectUri: string): Promise<Cred
   // identidad y un reconectar crearía otra en vez de renovar el token de la que ya está.
   if (!data.open_id) throw new OAuthError('TikTok no devolvió el id de la cuenta. Vuelve a conectar.')
 
+  // El nombre es lo que hace legible la tarjeta — sin él queda un open_id largo — y es
+  // justo para lo que está el scope `user.info.basic`. Si esta llamada falla, la conexión
+  // sigue: se pierde el nombre, no la cuenta.
+  let handle: string | null = null
+  try {
+    const perfil = await fetch('https://open.tiktokapis.com/v2/user/info/?fields=open_id,display_name', {
+      headers: { Authorization: `Bearer ${data.access_token}` },
+    })
+    if (!perfil.ok) throw new Error(`${perfil.status} ${(await perfil.text()).slice(0, 200)}`)
+    const info = (await perfil.json()) as { data?: { user?: { display_name?: string } } }
+    handle = info.data?.user?.display_name ?? null
+  } catch (error) {
+    console.error('No se pudo leer el perfil de TikTok:', String(error).slice(0, 300))
+  }
+
   return {
     accessToken: data.access_token,
     refreshToken: data.refresh_token ?? null,
     expiresAt: new Date(Date.now() + (data.expires_in ?? 86400) * 1000),
-    candidatas: [{ externalId: data.open_id, handle: null }],
+    candidatas: [{ externalId: data.open_id, handle }],
   }
 }
 
@@ -369,8 +385,13 @@ export async function GET(
   const code = url.searchParams.get('code')
   const state = url.searchParams.get('state')
 
-  const back = (message: string) =>
-    NextResponse.redirect(`${url.origin}/admin/accounts?mensaje=${encodeURIComponent(message)}`)
+  const back = (message: string) => {
+    const fallo = NextResponse.redirect(`${url.origin}/admin/accounts?mensaje=${encodeURIComponent(message)}`)
+    // Un login que falló tampoco puede dejar una elección anterior viva: esa cookie
+    // mantendría alcanzable un selector abandonado durante sus diez minutos.
+    fallo.cookies.delete({ name: COOKIE_PENDIENTE, path: '/admin/accounts' })
+    return fallo
+  }
 
   if (!code || !state) return back('La red no devolvió el código de autorización.')
 
@@ -406,7 +427,7 @@ export async function GET(
       // Una conexión que terminó no puede dejar otra a medias detrás: la cookie de una
       // elección anterior abandonada seguiría viva diez minutos y confundiría al panel.
       const hecho = NextResponse.redirect(
-        `${url.origin}/admin/accounts?mensaje=${encodeURIComponent(`${network} conectado.`)}`,
+        `${url.origin}/admin/accounts?mensaje=${encodeURIComponent(`${networkLabel(network)} conectado.`)}`,
       )
       hecho.cookies.delete({ name: COOKIE_PENDIENTE, path: '/admin/accounts' })
       return hecho
@@ -414,7 +435,7 @@ export async function GET(
 
     // Varias candidatas: el dueño elige en el panel. El token de usuario y la lista
     // viajan cifrados en una cookie corta; los tokens de página no (no cabrían).
-    const response = NextResponse.redirect(`${url.origin}/admin/accounts/elegir?red=${network}`)
+    const response = NextResponse.redirect(`${url.origin}/admin/accounts/elegir`)
     response.cookies.set(
       COOKIE_PENDIENTE,
       serializarPendiente({

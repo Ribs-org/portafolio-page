@@ -14,8 +14,13 @@ export default async function AccountsPage({
   const cuentas = await getCuentas()
   return (
     <>
+      <header className="mb-6">
+        <h1 className="font-display text-lg font-semibold">Cuentas</h1>
+      </header>
       {mensaje ? (
-        <p className="mb-4 rounded-xl bg-white/[0.04] px-4 py-2 text-sm text-fg-muted">{mensaje}</p>
+        <p role="status" className="mb-4 rounded-xl bg-white/[0.04] px-4 py-2 text-sm text-fg-muted">
+          {mensaje}
+        </p>
       ) : null}
       <Cuentas rows={cuentas} />
     </>

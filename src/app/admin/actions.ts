@@ -349,7 +349,7 @@ export async function syncSocialNow(): Promise<{ ok?: boolean; error?: string }>
   const failed = report.filter((r) => !r.ok)
   // Una instalación sin cuentas conectadas no tiene nada que fallar.
   if (report.length > 0 && failed.length === report.length) {
-    return { error: 'Ninguna red respondió. Revisa las tarjetas de conexión.' }
+    return { error: 'Ninguna red respondió. Revisa las tarjetas en Cuentas.' }
   }
   return { ok: true }
 }
@@ -377,7 +377,7 @@ export async function conectarElegidas(formData: FormData): Promise<void> {
 
   const marcadas = elegidas(pendiente.candidatas, formData.getAll('ids').map(String))
   if (marcadas.length === 0) {
-    redirect(`/admin/accounts/elegir?red=${pendiente.network}&mensaje=${encodeURIComponent('Elige al menos una cuenta.')}`)
+    redirect(`/admin/accounts/elegir?mensaje=${encodeURIComponent('Elige al menos una cuenta.')}`)
   }
 
   // Facebook: el token de cada página no viajó en la cookie; se pide ahora con el de usuario.
@@ -391,19 +391,31 @@ export async function conectarElegidas(formData: FormData): Promise<void> {
     }
   }
 
-  for (const cuenta of marcadas) {
-    const token = pendiente.network === 'facebook' ? tokens.get(cuenta.externalId) : pendiente.accessToken
-    if (!token) {
-      redirect(`/admin/accounts?mensaje=${encodeURIComponent(SIN_TOKEN_DE_PAGINA)}`)
-    }
-    await guardarCuenta(pendiente.network, {
-      externalId: cuenta.externalId,
-      handle: cuenta.handle,
-      accessToken: token,
-      refreshToken: pendiente.refreshToken,
-      expiresAt: pendiente.expiresAt ? new Date(pendiente.expiresAt) : null,
-    })
+  // No se guarda nada hasta que toda cuenta elegida tenga token, así una falla nunca deja
+  // la conexión a medias.
+  if (pendiente.network === 'facebook' && marcadas.some((c) => !tokens.get(c.externalId))) {
+    redirect(`/admin/accounts?mensaje=${encodeURIComponent(SIN_TOKEN_DE_PAGINA)}`)
   }
+
+  let fallo: string | null = null
+  try {
+    for (const cuenta of marcadas) {
+      await guardarCuenta(pendiente.network, {
+        externalId: cuenta.externalId,
+        handle: cuenta.handle,
+        accessToken:
+          pendiente.network === 'facebook' ? tokens.get(cuenta.externalId)! : pendiente.accessToken,
+        refreshToken: pendiente.refreshToken,
+        expiresAt: pendiente.expiresAt ? new Date(pendiente.expiresAt) : null,
+      })
+    }
+  } catch (error) {
+    console.error('conectarElegidas:', String(error).slice(0, 300))
+    fallo = 'No se pudo guardar la cuenta. Inténtalo de nuevo.'
+  }
+  // Fuera del try a propósito: redirect() lanza su propio error de navegación, y dentro
+  // el catch lo tragaría como si fuera una falla de la base.
+  if (fallo) redirect(`/admin/accounts?mensaje=${encodeURIComponent(fallo)}`)
 
   // Con el mismo path con que la puso el callback: borrarla sin path escribe sobre otra
   // cookie y deja esta viva sus diez minutos.

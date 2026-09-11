@@ -48,7 +48,8 @@ export function PostTable({ rows }: { rows: PostRow[] }) {
       <div className="py-8 text-center">
         <p className="text-sm text-fg-faint">Todavía no hay posts sincronizados.</p>
         <p className="mx-auto mt-2 max-w-sm text-[0.8rem] leading-relaxed text-fg-faint">
-          Conecta una red arriba y aprieta <span className="text-fg-muted">Sincronizar ahora</span>.
+          Conecta una red en <span className="text-fg-muted">Cuentas</span> y aprieta{' '}
+          <span className="text-fg-muted">Sincronizar ahora</span> ahí mismo.
         </p>
       </div>
     )

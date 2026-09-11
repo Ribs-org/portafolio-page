@@ -64,8 +64,13 @@ export function Cuentas({ rows }: { rows: CuentaRow[] }) {
                       <p className="mt-0.5 truncate font-mono text-[0.68rem] text-fg-faint">{row.externalId}</p>
                     ) : null}
                     <p className="mt-0.5 font-mono text-[0.68rem] text-fg-faint">
-                      {row.connected ? `Sincronizado ${syncedAgo(row.lastSyncedAt)}` : 'Desconectada'}
+                      {row.lastSyncedAt ? `Sincronizado ${syncedAgo(row.lastSyncedAt)}` : 'Sin sincronizar'}
                     </p>
+                    {/* Una fila puede sincronizar sin credencial OAuth (YouTube lee con su
+                        API key): la tarjeta no debe decir lo contrario. */}
+                    {!row.connected ? (
+                      <p className="mt-0.5 font-mono text-[0.68rem] text-fg-faint">Sin credencial</p>
+                    ) : null}
                     {row.lastSyncError ? (
                       <p className="mt-2 line-clamp-2 text-[0.72rem]" style={{ color: NEGATIVE }}>
                         {row.lastSyncError}

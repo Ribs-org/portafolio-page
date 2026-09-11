@@ -194,9 +194,10 @@ export async function syncAccount(account: SocialAccount, primaria: boolean): Pr
 }
 
 /**
- * Every account runs on its own. One that throws leaves its error on its own row and
- * the others still finish and store their snapshot — which is the whole reason it was
- * defensible to take on several integrations at once.
+ * The networks run in parallel and the accounts of one network in series, so the house
+ * never hits the same API concurrently. Every account runs on its own: one that throws
+ * leaves its error on its own row and the others still finish and store their snapshot —
+ * which is the whole reason it was defensible to take on several integrations at once.
  */
 export async function syncAll(): Promise<SyncReport> {
   // Antes del resto y por su cuenta: una base inalcanzable acá no debe costarle el

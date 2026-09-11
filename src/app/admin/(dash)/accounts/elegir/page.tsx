@@ -32,14 +32,18 @@ export default async function Elegir({
     )
   }
 
-  // «Ya conectada» se decide acá y no en la cookie: la lista de Meta no sabe qué filas tenemos.
+  // «Ya conectada» se decide acá y no en la cookie: la lista de Meta no sabe qué filas
+  // tenemos. Y conectada quiere decir «con credencial», el mismo criterio que la pestaña
+  // Cuentas: una fila sin token está para reconectar, no para marcarla como ya lista.
   const existentes = new Set(
     (
       await getDb()
-        .select({ externalId: socialAccounts.externalId })
+        .select({ externalId: socialAccounts.externalId, accessToken: socialAccounts.accessToken })
         .from(socialAccounts)
         .where(eq(socialAccounts.network, pendiente.network))
-    ).map((r) => r.externalId),
+    )
+      .filter((r) => r.accessToken !== null)
+      .map((r) => r.externalId),
   )
 
   return (

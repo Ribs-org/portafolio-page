@@ -145,10 +145,10 @@ YOUTUBE_API_KEY=AIza...
 YOUTUBE_CHANNEL_ID=UC...
 ```
 
-Cambiar el id ahora no reemplaza la cuenta: crea una segunda fila de YouTube, y la vieja
-queda en la pestaña **Cuentas**, donde se desconecta como cualquier otra. Eso le quita la
-credencial, no la API key: YouTube lee con la key, así que la fila vieja sigue trayendo
-posts hasta que la borres a mano.
+Cambiar el id ahora no reemplaza la cuenta: crea una segunda fila de YouTube. La vieja
+queda en la pestaña **Cuentas** y sigue sincronizando con la API key —ahí se ve su fecha,
+marcada **Sin credencial**, porque nunca pasó por un login—, así que no tiene botón
+*Desconectar*: para que deje de traer posts hay que borrar la fila a mano.
 
 ### Instagram — cuenta profesional y página de Facebook
 
@@ -178,6 +178,10 @@ INSTAGRAM_APP_SECRET=
 Si administras **más de una cuenta de Instagram**, al conectar el panel te muestra la
 lista y marcas cuáles quieres ver. Cada una queda como una cuenta aparte, con sus
 posts y sus métricas. Volver a conectar una que ya está solo renueva su acceso.
+
+La analítica todavía agrupa por red: mientras una red tenga más de una cuenta conectada,
+su tarjeta de seguidores y sus «ganados» muestran los números de una sola cuenta como si
+fueran los de la red entera —eso se arregla en la próxima entrega—.
 
 #### Renovar la conexión, cada ~60 días
 

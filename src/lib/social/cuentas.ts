@@ -2,7 +2,7 @@
 // en redes. Sin `server-only`: `crear.ts` lo importa y `actions.ts` ya es server.
 import { and, asc, inArray, isNotNull } from 'drizzle-orm'
 import { getDb, socialAccounts } from '@/db'
-import { SIN_CUENTA, primariaDe } from './cuenta'
+import { SIN_CUENTA, agruparPorRed, primariaDe } from './cuenta'
 
 export class SinCuenta extends Error {
   constructor(public readonly network: string) {
@@ -23,8 +23,7 @@ export async function cuentasPrimarias(networks: string[]): Promise<Map<string, 
     .from(socialAccounts)
     .where(and(inArray(socialAccounts.network, networks), isNotNull(socialAccounts.accessToken)))
     .orderBy(asc(socialAccounts.createdAt))
-  const porRed = new Map<string, Array<{ id: string; createdAt: Date }>>()
-  for (const fila of filas) porRed.set(fila.network, [...(porRed.get(fila.network) ?? []), fila])
+  const porRed = agruparPorRed(filas)
   const resultado = new Map<string, string>()
   for (const [network, cuentas] of porRed) {
     const id = primariaDe(cuentas)
