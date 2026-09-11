@@ -15,6 +15,7 @@ const pendiente = {
     { externalId: '61550000000001', handle: 'Ribs' },
     { externalId: '61550000000002', handle: null },
   ],
+  emitidoEn: Date.now(),
 }
 
 describe('serializarPendiente / leerPendiente', () => {
@@ -35,6 +36,11 @@ describe('serializarPendiente / leerPendiente', () => {
   it('un payload cifrado con otra forma también da null', () => {
     expect(leerPendiente(encryptToken(JSON.stringify({ network: 'x' })))).toBeNull()
     expect(leerPendiente(encryptToken(JSON.stringify({ ...pendiente, candidatas: [{ handle: 'sin id' }] })))).toBeNull()
+  })
+
+  it('una cookie de hace más de diez minutos ya venció', () => {
+    const viejo = serializarPendiente({ ...pendiente, emitidoEn: Date.now() - 11 * 60_000 })
+    expect(leerPendiente(viejo)).toBeNull()
   })
 
   it('la cookie tiene nombre y vida fijos', () => {

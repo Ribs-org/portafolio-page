@@ -2,7 +2,12 @@ import { NextResponse } from 'next/server'
 import { isAuthenticated } from '@/lib/auth'
 import { env } from '@/lib/env'
 import { guardarCuenta } from '@/lib/social/conectar'
-import { NO_FACEBOOK_PAGE, listFacebookPages, type FacebookPagesList } from '@/lib/social/facebook'
+import {
+  NO_FACEBOOK_PAGE,
+  SIN_TOKEN_DE_PAGINA,
+  listFacebookPages,
+  type FacebookPagesList,
+} from '@/lib/social/facebook'
 import {
   NO_INSTAGRAM_ACCOUNT,
   instagramTokenExpiry,
@@ -17,14 +22,15 @@ export const dynamic = 'force-dynamic'
 /** Instagram runs on Facebook Login, so every leg of its OAuth is on the Facebook host. */
 const GRAPH = 'https://graph.facebook.com/v23.0'
 
-type Candidata = { externalId: string; handle: string | null; accessToken?: string }
+/** Como la `Candidata` de la cookie, más el token de página que esa nunca lleva. */
+type CandidataConToken = { externalId: string; handle: string | null; accessToken?: string }
 
 type Credential = {
   accessToken: string
   refreshToken: string | null
   expiresAt: Date | null
   /** Lo que el login dejó elegir: una para la mayoría de redes, varias en Meta y Google. */
-  candidatas: Candidata[]
+  candidatas: CandidataConToken[]
 }
 
 /**
@@ -112,6 +118,9 @@ async function facebookCredential(code: string, redirectUri: string): Promise<Cr
 
   const paginas = listFacebookPages((await pages.json()) as FacebookPagesList)
   if (paginas.length === 0) throw new OAuthError(NO_FACEBOOK_PAGE)
+  // Con una sola página el callback la guarda directo, y Facebook lee y publica con el
+  // token de la página, nunca con el de usuario: sin ese token no hay nada que guardar.
+  if (paginas.length === 1 && !paginas[0].accessToken) throw new OAuthError(SIN_TOKEN_DE_PAGINA)
   return {
     // El token de usuario queda como base; el de cada página viaja en su candidata (una
     // sola) o se vuelve a pedir en la selección (varias). Derivados de un token largo,
@@ -386,14 +395,21 @@ export async function GET(
     if (credential.candidatas.length === 1) {
       const [unica] = credential.candidatas
       await guardarCuenta(network, {
-        externalId: unica!.externalId,
-        handle: unica!.handle,
-        // Facebook publica y lee con el token de la página, no con el del usuario.
-        accessToken: unica!.accessToken ?? credential.accessToken,
+        externalId: unica.externalId,
+        handle: unica.handle,
+        // Facebook publica y lee con el token de la página, no con el del usuario; las
+        // demás redes no traen token propio y caen en el del credential.
+        accessToken: unica.accessToken ?? credential.accessToken,
         refreshToken: credential.refreshToken,
         expiresAt: credential.expiresAt,
       })
-      return back(`${network} conectado.`)
+      // Una conexión que terminó no puede dejar otra a medias detrás: la cookie de una
+      // elección anterior abandonada seguiría viva diez minutos y confundiría al panel.
+      const hecho = NextResponse.redirect(
+        `${url.origin}/admin/accounts?mensaje=${encodeURIComponent(`${network} conectado.`)}`,
+      )
+      hecho.cookies.delete({ name: COOKIE_PENDIENTE, path: '/admin/accounts' })
+      return hecho
     }
 
     // Varias candidatas: el dueño elige en el panel. El token de usuario y la lista
@@ -407,6 +423,7 @@ export async function GET(
         refreshToken: credential.refreshToken,
         expiresAt: credential.expiresAt?.toISOString() ?? null,
         candidatas: credential.candidatas.map(({ externalId, handle }) => ({ externalId, handle })),
+        emitidoEn: Date.now(),
       }),
       { httpOnly: true, secure: true, sameSite: 'lax', maxAge: PENDIENTE_MAX_AGE, path: '/admin/accounts' },
     )

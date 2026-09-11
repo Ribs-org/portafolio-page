@@ -51,6 +51,7 @@ async function getJson(url: string): Promise<Record<string, unknown>> {
 }
 
 export const NO_FACEBOOK_PAGE = 'Esta cuenta no administra ninguna página de Facebook.'
+export const SIN_TOKEN_DE_PAGINA = 'Facebook no entregó el token de la página. Inténtalo de nuevo.'
 
 /** Todas las páginas administrables, con el token de cada una cuando Meta lo entrega. */
 export function listFacebookPages(pages: FacebookPagesList): FacebookPage[] {
