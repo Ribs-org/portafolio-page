@@ -1,5 +1,6 @@
 import { env } from '@/lib/env'
 import type { Fuente, PostAjeno } from './fuente'
+import { idMayor } from './tope'
 
 const API = 'https://api.x.com/2'
 
@@ -67,15 +68,23 @@ export const xFuente: Fuente = {
     if (sinceId) params.set('since_id', sinceId)
     const body = (await pedir(`/users/${externalId}/tweets?${params}`)) as {
       data?: XTweetPayload[]
+      meta?: { newest_id?: string }
     }
+    const crudos = body.data ?? []
     // Una sola hora de descubrimiento para toda la página: dos tuits traídos juntos no
     // tienen por qué diferir en milisegundos cuando ninguno trajo fecha.
     const ahora = new Date()
-    const leidos: PostAjeno[] = []
-    for (const raw of body.data ?? []) {
+    const posts: PostAjeno[] = []
+    for (const raw of crudos) {
       const c = normalizeXTweet(raw, username, ahora)
-      if (c) leidos.push(c)
+      if (c) posts.push(c)
     }
-    return leidos
+    // La marca sale de lo que X entregó y no de lo que sobrevivió: una página entera de
+    // descartes dejaría la marca quieta y se volvería a pedir, y a pagar, en cada corrida.
+    let masNuevo = body.meta?.newest_id ?? null
+    if (!masNuevo) {
+      for (const raw of crudos) masNuevo = idMayor(masNuevo, raw.id ?? null)
+    }
+    return { posts, leidas: crudos.length, masNuevo }
   },
 }

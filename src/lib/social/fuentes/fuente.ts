@@ -24,7 +24,16 @@ export type Fuente = {
     username: string,
     sinceId: string | null,
     tope: number,
-  ): Promise<PostAjeno[]>
+  ): Promise<Traida>
+}
+
+/** Lo que una fuente entrega en una pasada. `leidas` es lo que la red cobró, que no es lo
+ * mismo que lo que sobrevivió al normalizador; `masNuevo` permite avanzar la marca aunque
+ * no sobreviviera ninguna. */
+export type Traida = {
+  posts: PostAjeno[]
+  leidas: number
+  masNuevo: string | null
 }
 
 /** Lo único que el dueño llega a leer cuando una cuenta de su lista dejó de ser legible. */

@@ -73,41 +73,49 @@ export async function traerIdeas(now: Date = new Date()): Promise<TraidaReport> 
           .where(eq(sourceAuthors.id, autor.id))
       }
 
-      const ajenos = await fuente.traer(externalId, autor.username, autor.sinceId, restante)
-      leidas += ajenos.length
+      const traida = await fuente.traer(externalId, autor.username, autor.sinceId, restante)
+      // Se suma lo que la red entregó y no lo que sobrevivió al normalizador: X cobra por
+      // publicación leída, la descarte quien la descarte.
+      leidas += traida.leidas
       seguidos = 0
 
-      if (ajenos.length > 0) {
-        await db
-          .insert(sourcePosts)
-          .values(
-            ajenos.map((p) => ({
-              authorId: autor.id,
-              network: autor.network,
-              externalId: p.externalId,
-              url: p.url,
-              authorHandle: p.authorHandle,
-              originalText: p.text,
-              publishedAt: p.publishedAt,
-            })),
-          )
-          // Dos corridas que se solapen verían los mismos tuits; la unique decide y la
-          // segunda no pisa nada.
-          .onConflictDoNothing({
-            target: [sourcePosts.authorId, sourcePosts.externalId],
-          })
+      if (traida.posts.length > 0 || traida.masNuevo) {
+        if (traida.posts.length > 0) {
+          await db
+            .insert(sourcePosts)
+            .values(
+              traida.posts.map((p) => ({
+                authorId: autor.id,
+                network: autor.network,
+                externalId: p.externalId,
+                url: p.url,
+                authorHandle: p.authorHandle,
+                originalText: p.text,
+                publishedAt: p.publishedAt,
+              })),
+            )
+            // Dos corridas que se solapen verían los mismos tuits; la unique decide y la
+            // segunda no pisa nada.
+            .onConflictDoNothing({
+              target: [sourcePosts.authorId, sourcePosts.externalId],
+            })
+        }
 
-        let masNuevo = autor.sinceId
-        for (const p of ajenos) masNuevo = idMayor(masNuevo, p.externalId)
+        // La marca avanza aunque no sobreviva ninguna publicación: si no, esa misma página
+        // se vuelve a pedir, y a pagar, en cada corrida.
         await db
           .update(sourceAuthors)
-          .set({ sinceId: masNuevo, lastError: null, updatedAt: new Date() })
+          .set({
+            sinceId: idMayor(autor.sinceId, traida.masNuevo),
+            lastError: null,
+            updatedAt: new Date(),
+          })
           .where(eq(sourceAuthors.id, autor.id))
       } else if (autor.lastError) {
         await marcar(autor.id, null)
       }
 
-      reporte.autores.push({ username: autor.username, nuevas: ajenos.length })
+      reporte.autores.push({ username: autor.username, nuevas: traida.posts.length })
     } catch (error) {
       // El detalle de X se queda en el log: el reporte lleva una frase fija.
       console.error(`[ideas] ${autor.username}:`, String(error).slice(0, 300))
