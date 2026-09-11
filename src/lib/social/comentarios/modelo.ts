@@ -1,4 +1,5 @@
 import { generateText } from 'ai'
+import { env } from '@/lib/env'
 import { armarPrompt, type EntradaPrompt } from './prompt'
 
 /** Lo único que el dueño llega a leer cuando el modelo no responde. */
@@ -23,13 +24,13 @@ const TIMEOUT_MS = 20_000
  * a la clave, y por eso también vale `VERCEL_OIDC_TOKEN`.
  */
 export function hayPasarela(): boolean {
-  return Boolean(process.env.AI_GATEWAY_API_KEY || process.env.VERCEL_OIDC_TOKEN)
+  return Boolean(env('AI_GATEWAY_API_KEY') || env('VERCEL_OIDC_TOKEN'))
 }
 
 export async function pedirBorrador(entrada: EntradaPrompt): Promise<string> {
   const { system, prompt } = armarPrompt(entrada)
   const { text } = await generateText({
-    model: process.env.COMENTARIOS_MODELO || MODELO_POR_DEFECTO,
+    model: env('COMENTARIOS_MODELO') ?? MODELO_POR_DEFECTO,
     instructions: system,
     prompt,
     maxOutputTokens: MAX_TOKENS,
