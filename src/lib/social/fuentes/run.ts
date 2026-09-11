@@ -24,6 +24,8 @@ export type TraidaReport = {
   autores: Array<{ username: string; nuevas: number; error?: string }>
   leidas: number
   topeAlcanzado: boolean
+  // Sin esto, un corte del cortacircuitos se lee igual que una lista de tres creadores.
+  sinMirar: number
 }
 
 async function marcar(id: string, error: string | null): Promise<void> {
@@ -39,20 +41,21 @@ async function marcar(id: string, error: string | null): Promise<void> {
  */
 export async function traerIdeas(now: Date = new Date()): Promise<TraidaReport> {
   const db = getDb()
-  const reporte: TraidaReport = { autores: [], leidas: 0, topeAlcanzado: false }
+  const reporte: TraidaReport = { autores: [], leidas: 0, topeAlcanzado: false, sinMirar: 0 }
 
   const hoy = diaDe(now)
   const tope = normalizarTope(await leerAjuste(CLAVE_TOPE))
   let leidas = leidasHoy(await leerAjuste(CLAVE_CONTADOR), hoy)
   if (leidas >= tope) {
     reporte.topeAlcanzado = true
+    reporte.leidas = leidas
     return reporte
   }
 
   const autores = await db.select().from(sourceAuthors).where(eq(sourceAuthors.active, true))
 
   let seguidos = 0
-  for (const autor of autores) {
+  for (const [indice, autor] of autores.entries()) {
     const fuente = fuenteFor(autor.network)
     // Una red sin fuente se ignora en silencio: no es un fallo, es que todavía no existe.
     if (!fuente) continue
@@ -60,6 +63,7 @@ export async function traerIdeas(now: Date = new Date()): Promise<TraidaReport> 
     const restante = tope - leidas
     if (restante <= 0) {
       reporte.topeAlcanzado = true
+      reporte.sinMirar = autores.length - indice
       break
     }
 
@@ -67,6 +71,9 @@ export async function traerIdeas(now: Date = new Date()): Promise<TraidaReport> 
       let externalId = autor.externalId
       if (!externalId) {
         externalId = await fuente.resolverAutor(autor.username)
+        // Resolver un creador nuevo también es una llamada que X cobra, una sola vez en
+        // toda su vida, pero ninguna llamada queda fuera de la cuenta del día.
+        leidas += 1
         await db
           .update(sourceAuthors)
           .set({ externalId, updatedAt: new Date() })
@@ -77,7 +84,6 @@ export async function traerIdeas(now: Date = new Date()): Promise<TraidaReport> 
       // Se suma lo que la red entregó y no lo que sobrevivió al normalizador: X cobra por
       // publicación leída, la descarte quien la descarte.
       leidas += traida.leidas
-      seguidos = 0
 
       if (traida.posts.length > 0 || traida.masNuevo) {
         if (traida.posts.length > 0) {
@@ -115,15 +121,24 @@ export async function traerIdeas(now: Date = new Date()): Promise<TraidaReport> 
         await marcar(autor.id, null)
       }
 
+      // El reinicio va acá y no apenas responde X: si fuera antes de las escrituras, una
+      // lectura buena con escritura mala nunca dejaría que el cortacircuitos saltara.
+      seguidos = 0
       reporte.autores.push({ username: autor.username, nuevas: traida.posts.length })
     } catch (error) {
       // El detalle de X se queda en el log: el reporte lleva una frase fija.
       console.error(`[ideas] ${autor.username}:`, String(error).slice(0, 300))
-      await marcar(autor.id, AUTOR_ILEGIBLE)
+      try {
+        await marcar(autor.id, AUTOR_ILEGIBLE)
+      } catch (fallo) {
+        // Si esta escritura se saliera, se perdería el contador del día entero.
+        console.error(`[ideas] no se pudo marcar ${autor.username}:`, String(fallo).slice(0, 300))
+      }
       reporte.autores.push({ username: autor.username, nuevas: 0, error: AUTOR_ILEGIBLE })
       seguidos += 1
       if (seguidos >= MAX_FALLOS_SEGUIDOS) {
         console.error(`[ideas] se abandona la corrida tras ${seguidos} cuentas seguidas fallando.`)
+        reporte.sinMirar = autores.length - indice - 1
         break
       }
     }
