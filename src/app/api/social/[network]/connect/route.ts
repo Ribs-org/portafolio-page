@@ -17,7 +17,9 @@ const SCOPES: Record<string, string> = {
     // `business_management` is what lets `me/accounts` enumerate Pages owned by a business
     // portfolio rather than by the person. Without it the call returns an empty list and the
     // Instagram account is undiscoverable, even when Page and account are correctly linked.
-    'instagram_basic,instagram_manage_insights,pages_show_list,pages_read_engagement,instagram_content_publish,business_management',
+    // `instagram_manage_comments` is the one that opens listing and replying to comments on
+    // the account's own posts; with the Meta app in development mode it needs no review.
+    'instagram_basic,instagram_manage_insights,pages_show_list,pages_read_engagement,instagram_content_publish,business_management,instagram_manage_comments',
   // Facebook rides the same Meta app as Instagram; the pages scopes repeat because each
   // network's authorization is its own consent screen. The dialog only accepts scopes
   // the app's Meta use cases activate: pages_read_user_content and pages_manage_posts
@@ -25,14 +27,17 @@ const SCOPES: Record<string, string> = {
   // request as "Invalid Scopes"). read_insights stays out — Meta deprecated it as a
   // login scope — and publish_video waits until the dialog is confirmed to accept it:
   // one rejected scope voids the entire request, breaking the connect flow for the
-  // other four.
+  // other four. `pages_manage_engagement` is the one that opens listing and replying to
+  // comments on the Page's own posts; with the app in development mode it needs no review.
   facebook:
-    'pages_show_list,pages_read_engagement,pages_read_user_content,pages_manage_posts,business_management',
+    'pages_show_list,pages_read_engagement,pages_read_user_content,pages_manage_posts,business_management,pages_manage_engagement',
   // upload alone is write-only: it cannot read channels.list (the callback's channel
-  // discovery) nor videos.list (the publisher's processing poll) — both 403 without
-  // readonly. Space-separated: that is Google's delimiter, unlike Meta's commas.
+  // discovery) nor videos.list (the publisher's processing poll) — both 403 without a
+  // reading scope. force-ssl covers everything readonly did and also allows commenting,
+  // which is what it is here for. Space-separated: that is Google's delimiter, unlike
+  // Meta's commas.
   youtube:
-    'https://www.googleapis.com/auth/youtube.upload https://www.googleapis.com/auth/youtube.readonly',
+    'https://www.googleapis.com/auth/youtube.upload https://www.googleapis.com/auth/youtube.force-ssl',
   threads: 'threads_basic,threads_content_publish',
   x: 'tweet.read tweet.write users.read offline.access',
   tiktok: 'user.info.basic,video.list',

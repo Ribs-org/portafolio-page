@@ -332,6 +332,63 @@ export const scheduledPostMedia = pgTable(
   (t) => [index('scheduled_post_media_post_idx').on(t.postId)],
 )
 
+export const COMMENT_STATES = ['pendiente', 'enviado', 'descartado', 'propio', 'fallido'] as const
+export type CommentState = (typeof COMMENT_STATES)[number]
+
+/**
+ * Un comentario que alguien dejó en una publicación del dueño, y qué se hizo con él.
+ *
+ * La identidad es `(account_id, external_id)`: es lo que impide que el sondeo lo
+ * procese dos veces, y por eso la fila sobrevive al envío en vez de borrarse. `propio`
+ * marca los comentarios del dueño mismo — sus propias respuestas — que nunca reciben
+ * borrador.
+ *
+ * `draft` y `draft_error` los llena la entrega 2; `reply_external_id` y `error`, la 3.
+ */
+export const postComments = pgTable(
+  'post_comments',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    accountId: uuid('account_id')
+      .notNull()
+      .references(() => socialAccounts.id, { onDelete: 'cascade' }),
+    network: text('network').notNull(),
+    postExternalId: text('post_external_id').notNull(),
+    externalId: text('external_id').notNull(),
+    author: text('author'),
+    authorExternalId: text('author_external_id'),
+    text: text('text').notNull(),
+    publishedAt: timestamp('published_at', { withTimezone: true }).notNull(),
+    draft: text('draft'),
+    draftError: text('draft_error'),
+    state: text('state').$type<CommentState>().notNull().default('pendiente'),
+    replyExternalId: text('reply_external_id'),
+    error: text('error'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    // Al revés que en social_posts, por la misma regla: la unique va en el orden físico de
+    // la tabla, y como esta tabla todavía no existe, `db:push` la crea tal como está
+    // declarada y su orden de declaración es su orden físico. Con `account_id` primero
+    // sirve además la consulta del sondeo, que filtra por cuenta y luego por publicación.
+    unique('post_comments_account_external_key').on(t.accountId, t.externalId),
+    index('post_comments_state_idx').on(t.state),
+    index('post_comments_published_idx').on(t.publishedAt),
+  ],
+)
+
+/**
+ * Preferencias del panel, una fila por clave. Tabla de clave y valor y no columnas en otra
+ * tabla porque esta es la primera de varias: lo que se guarda acá no tiene dueño natural
+ * en ninguna entidad del dominio.
+ */
+export const ajustes = pgTable('ajustes', {
+  clave: text('clave').primaryKey(),
+  valor: text('valor').notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+})
+
 export type Profile = typeof profiles.$inferSelect
 export type Link = typeof links.$inferSelect
 export type Visit = typeof visits.$inferSelect
@@ -342,3 +399,5 @@ export type PostMetric = typeof postMetrics.$inferSelect
 export type ScheduledPost = typeof scheduledPosts.$inferSelect
 export type ScheduledPostTarget = typeof scheduledPostTargets.$inferSelect
 export type ScheduledPostMedia = typeof scheduledPostMedia.$inferSelect
+export type PostComment = typeof postComments.$inferSelect
+export type Ajuste = typeof ajustes.$inferSelect

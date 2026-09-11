@@ -113,7 +113,7 @@ const REFRESH_WINDOW_MS = 5 * 60 * 1000
  * so the stored one survives — and re-encrypts what it saves, like every credential
  * in this repo.
  */
-async function ensureYoutubeCredential(account: SocialAccount): Promise<string | null> {
+export async function ensureYoutubeCredential(account: SocialAccount): Promise<string | null> {
   if (!account.accessToken || !account.refreshToken) return null
   const token = decryptToken(account.accessToken)
 
