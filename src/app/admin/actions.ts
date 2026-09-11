@@ -3,7 +3,7 @@
 import { randomUUID } from 'node:crypto'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
-import { headers } from 'next/headers'
+import { cookies, headers } from 'next/headers'
 import { guardar, SIN_ALMACEN } from '@/lib/storage'
 import { and, asc, eq, inArray, max, ne, sql } from 'drizzle-orm'
 import { getDb, links, profiles, socialAccounts, socialPosts, scheduledPosts, scheduledPostTargets, scheduledPostMedia } from '@/db'
@@ -27,6 +27,10 @@ import { validateAtributos, ATRIBUTOS_ERROR, type Atributos } from '@/lib/social
 import { diffMedia, diffTargets } from '@/lib/social/publish/edit'
 import { crearPostProgramado } from '@/lib/social/publish/crear'
 import { SinCuenta, exigirCuentas } from '@/lib/social/cuentas'
+import { guardarCuenta, tokensDePaginas } from '@/lib/social/conectar'
+import { SIN_TOKEN_DE_PAGINA } from '@/lib/social/facebook'
+import { COOKIE_PENDIENTE, LOGIN_VENCIDO, elegidas, leerPendiente } from '@/lib/social/pendiente'
+import { networkLabel } from '@/lib/networks'
 import { fromZonedInput, normalizeUrl, slugify } from '@/lib/utils'
 
 export type FormState = { error?: string; ok?: boolean }
@@ -373,6 +377,56 @@ export async function disconnectNetwork(network: string): Promise<void> {
     .where(eq(socialAccounts.network, network))
 
   revalidatePath('/admin/content')
+}
+
+/**
+ * El final de un login con varias candidatas: crea una fila por cuenta marcada. Lee la
+ * cookie de nuevo en vez de confiar en el formulario, así lo único que el navegador
+ * decide es qué casillas marcó.
+ */
+export async function conectarElegidas(formData: FormData): Promise<void> {
+  await requireAuth()
+  const jar = await cookies()
+  const pendiente = leerPendiente(jar.get(COOKIE_PENDIENTE)?.value)
+  if (!pendiente) redirect(`/admin/accounts?mensaje=${encodeURIComponent(LOGIN_VENCIDO)}`)
+
+  const marcadas = elegidas(pendiente.candidatas, formData.getAll('ids').map(String))
+  if (marcadas.length === 0) {
+    redirect(`/admin/accounts/elegir?red=${pendiente.network}&mensaje=${encodeURIComponent('Elige al menos una cuenta.')}`)
+  }
+
+  // Facebook: el token de cada página no viajó en la cookie; se pide ahora con el de usuario.
+  let tokens = new Map<string, string>()
+  if (pendiente.network === 'facebook') {
+    try {
+      tokens = await tokensDePaginas(pendiente.accessToken)
+    } catch (error) {
+      console.error('tokensDePaginas:', String(error).slice(0, 300))
+      redirect(`/admin/accounts?mensaje=${encodeURIComponent(SIN_TOKEN_DE_PAGINA)}`)
+    }
+  }
+
+  for (const cuenta of marcadas) {
+    const token = pendiente.network === 'facebook' ? tokens.get(cuenta.externalId) : pendiente.accessToken
+    if (!token) {
+      redirect(`/admin/accounts?mensaje=${encodeURIComponent(SIN_TOKEN_DE_PAGINA)}`)
+    }
+    await guardarCuenta(pendiente.network, {
+      externalId: cuenta.externalId,
+      handle: cuenta.handle,
+      accessToken: token,
+      refreshToken: pendiente.refreshToken,
+      expiresAt: pendiente.expiresAt ? new Date(pendiente.expiresAt) : null,
+    })
+  }
+
+  // Con el mismo path con que la puso el callback: borrarla sin path escribe sobre otra
+  // cookie y deja esta viva sus diez minutos.
+  jar.delete({ name: COOKIE_PENDIENTE, path: '/admin/accounts' })
+  revalidatePath('/admin/accounts')
+  const mensaje =
+    marcadas.length === 1 ? `${networkLabel(pendiente.network)} conectado.` : `${marcadas.length} cuentas conectadas.`
+  redirect(`/admin/accounts?mensaje=${encodeURIComponent(mensaje)}`)
 }
 
 export async function updatePostCampaign(
