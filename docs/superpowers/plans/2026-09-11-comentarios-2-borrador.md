@@ -76,7 +76,7 @@ fila «2 · El borrador» de la tabla de entregas).
 **No escribas `guardarAjuste` todavía.** En esta entrega nadie guarda instrucciones: el
 campo del panel es la entrega 3, y una función sin llamador es una función sin probar.
 
-- [ ] **Paso 1: La tabla**
+- [x] **Paso 1: La tabla**
 
 En `src/db/schema.ts`, junto a las demás, con su comentario de por qué es clave y valor:
 
@@ -96,7 +96,7 @@ export const ajustes = pgTable('ajustes', {
 No lleva unique compuesta, así que no hay ningún orden de columnas que cuidar: la primaria
 es una sola columna.
 
-- [ ] **Paso 2: El acceso**
+- [x] **Paso 2: El acceso**
 
 `src/lib/ajustes.ts`:
 
@@ -111,7 +111,7 @@ export async function leerAjuste(clave: string): Promise<string | null> {
 }
 ```
 
-- [ ] **Paso 3: El test que falla**
+- [x] **Paso 3: El test que falla**
 
 `src/lib/social/comentarios/instrucciones.test.ts`:
 
@@ -145,12 +145,12 @@ describe('normalizarInstrucciones', () => {
 })
 ```
 
-- [ ] **Paso 4: Correrlo y verlo fallar**
+- [x] **Paso 4: Correrlo y verlo fallar**
 
 Corre: `npx vitest run src/lib/social/comentarios/instrucciones.test.ts`
 Esperado: falla porque el módulo todavía no existe.
 
-- [ ] **Paso 5: El módulo**
+- [x] **Paso 5: El módulo**
 
 `src/lib/social/comentarios/instrucciones.ts`. Reusa `recortar` de `./ventana`, que ya corta
 por puntos de código:
@@ -175,12 +175,12 @@ export function normalizarInstrucciones(bruto: string | null): string {
 }
 ```
 
-- [ ] **Paso 6: Correrlo y verlo pasar**
+- [x] **Paso 6: Correrlo y verlo pasar**
 
 Corre: `npx vitest run src/lib/social/comentarios/instrucciones.test.ts`
 Esperado: pasa. Después `npm run typecheck` y `npm run lint`.
 
-- [ ] **Paso 7: Commit**
+- [x] **Paso 7: Commit**
 
 ```bash
 git add src/db/schema.ts src/lib/ajustes.ts src/lib/social/comentarios/instrucciones.ts src/lib/social/comentarios/instrucciones.test.ts
@@ -206,7 +206,7 @@ Mensaje: `Guarda las instrucciones de los comentarios en una tabla de ajustes`
 
 Este archivo es puro: no importa nada del paquete `ai`, ni la base, ni `server-only`.
 
-- [ ] **Paso 1: El test que falla**
+- [x] **Paso 1: El test que falla**
 
 `src/lib/social/comentarios/prompt.test.ts`:
 
@@ -271,16 +271,18 @@ describe('limpiarBorrador', () => {
 })
 ```
 
-- [ ] **Paso 2: Correrlo y verlo fallar**
+- [x] **Paso 2: Correrlo y verlo fallar**
 
 Corre: `npx vitest run src/lib/social/comentarios/prompt.test.ts`
 Esperado: falla porque el módulo no existe.
 
-- [ ] **Paso 3: El módulo**
+- [x] **Paso 3: El módulo**
 
 `src/lib/social/comentarios/prompt.ts`. El mensaje de sistema fija el papel y le pega las
 instrucciones del dueño; el prompt lleva el contexto y nada más. Las comillas se quitan solo
-cuando envuelven **toda** la respuesta, para no destrozar una cita interna:
+cuando envuelven **toda** la respuesta: empezar con una apertura y terminar con su cierre no
+basta, porque `"hola" y "chao"` también lo cumple y son dos frases, no un envoltorio; por eso
+además se exige que el interior no repita el cierre:
 
 ```ts
 import { recortar } from './ventana'
@@ -320,11 +322,20 @@ const ENVOLTORIOS: Array<[string, string]> = [
 /** El modelo a veces se presenta antes de responder; esto es lo que se le ha visto hacer. */
 const PREFIJO = /^(respuesta|reply)\s*:\s*/i
 
+/**
+ * Las comillas se quitan solo cuando envuelven toda la respuesta. Que empiece con una
+ * apertura y termine con su cierre no basta: `"hola" y "chao"` también cumple eso y es
+ * dos frases, no un envoltorio — despojarlo dejaría una comilla colgando. Por eso además
+ * se exige que el interior no repita el cierre; si lo repite, se corta el bucle igual,
+ * sin tocar el texto, para no probar el par siguiente sobre una cadena que ya no
+ * empieza como el bucle cree.
+ */
 export function limpiarBorrador(bruto: string, limite: number): string {
   let texto = bruto.trim().replace(PREFIJO, '').trim()
   for (const [abre, cierra] of ENVOLTORIOS) {
     if (texto.length >= 2 && texto.startsWith(abre) && texto.endsWith(cierra)) {
-      texto = texto.slice(abre.length, texto.length - cierra.length).trim()
+      const interior = texto.slice(abre.length, texto.length - cierra.length)
+      if (!interior.includes(cierra)) texto = interior.trim()
       break
     }
   }
@@ -332,12 +343,12 @@ export function limpiarBorrador(bruto: string, limite: number): string {
 }
 ```
 
-- [ ] **Paso 4: Correrlo y verlo pasar**
+- [x] **Paso 4: Correrlo y verlo pasar**
 
 Corre: `npx vitest run src/lib/social/comentarios/prompt.test.ts`
 Esperado: pasa. Después `npm run typecheck` y `npm run lint`.
 
-- [ ] **Paso 5: Commit**
+- [x] **Paso 5: Commit**
 
 ```bash
 git add src/lib/social/comentarios/prompt.ts src/lib/social/comentarios/prompt.test.ts
@@ -361,7 +372,7 @@ Mensaje: `Arma el prompt del borrador y limpia lo que el modelo devuelve`
   `pedirBorrador(entrada: EntradaPrompt): Promise<string>` — devuelve el texto crudo del
   modelo, sin limpiar; limpiar es de quien llama.
 
-- [ ] **Paso 1: La dependencia**
+- [x] **Paso 1: La dependencia**
 
 Corre: `npm install ai`
 
@@ -369,7 +380,7 @@ No instales ningún paquete de proveedor (`@ai-sdk/openai` y compañía): a la p
 Vercel se le pasa el modelo como string `proveedor/modelo`, que es justamente la razón por la
 que se eligió.
 
-- [ ] **Paso 2: El módulo**
+- [x] **Paso 2: El módulo**
 
 `src/lib/social/comentarios/modelo.ts`:
 
@@ -406,7 +417,7 @@ export async function pedirBorrador(entrada: EntradaPrompt): Promise<string> {
   const { system, prompt } = armarPrompt(entrada)
   const { text } = await generateText({
     model: process.env.COMENTARIOS_MODELO || MODELO_POR_DEFECTO,
-    system,
+    instructions: system,
     prompt,
     maxOutputTokens: MAX_TOKENS,
     abortSignal: AbortSignal.timeout(TIMEOUT_MS),
@@ -415,12 +426,16 @@ export async function pedirBorrador(entrada: EntradaPrompt): Promise<string> {
 }
 ```
 
-Si la versión instalada del paquete `ai` nombra distinto alguna de esas opciones, lee su
+En la versión instalada (`ai@7.0.97`), `system` está `@deprecated` a favor de `instructions`;
+de ahí el nombre del campo arriba, aunque la variable siga llamándose `system` por venir de
+`armarPrompt`.
+
+Si la versión instalada del paquete `ai` nombra distinto alguna otra de esas opciones, lee su
 documentación en `node_modules/ai` y usa el nombre que corresponda, sin cambiar el sentido:
 un tope de salida, un aborto por tiempo, un mensaje de sistema y un prompt. Repórtalo en tus
 dudas si tuviste que cambiar algo.
 
-- [ ] **Paso 3: Las variables de entorno**
+- [x] **Paso 3: Las variables de entorno**
 
 En `.env.example`, al final, con el mismo formato que las demás:
 
@@ -432,12 +447,12 @@ AI_GATEWAY_API_KEY=
 COMENTARIOS_MODELO=
 ```
 
-- [ ] **Paso 4: Verificar**
+- [x] **Paso 4: Verificar**
 
 Corre `npm run typecheck` y `npm run lint`. No hay test: es una llamada de red, y la casa no
 prueba esas.
 
-- [ ] **Paso 5: Commit**
+- [x] **Paso 5: Commit**
 
 ```bash
 git add package.json package-lock.json src/lib/social/comentarios/modelo.ts .env.example
@@ -471,7 +486,7 @@ primera corrida después de desplegar encuentra siete días de comentarios de go
 puede gastar una llamada al modelo por cada uno, y un comentario que quedó sin borrador por
 la razón que sea se recupera solo en la pasada siguiente, sin código de rescate.
 
-- [ ] **Paso 1: El tope**
+- [x] **Paso 1: El tope**
 
 En `ventana.ts`, junto a sus hermanas:
 
@@ -487,7 +502,7 @@ export const MAX_BORRADORES_POR_CORRIDA = 10
 Es una constante y no lleva test propio. `seAcaboElTiempo`, que la fase nueva reusa, ya está
 probado.
 
-- [ ] **Paso 2: La fase**
+- [x] **Paso 2: La fase**
 
 `src/lib/social/comentarios/redaccion.ts`:
 
@@ -599,7 +614,7 @@ Fíjate en `limiteTexto`: hasta ahora lo declaraban los tres comentaristas y no 
 Esta es su primera lectura, y por eso el borrador se recorta al límite de la red **antes** de
 guardarse y no al enviarse.
 
-- [ ] **Paso 3: Engancharla**
+- [x] **Paso 3: Engancharla**
 
 En `run.ts`, `sondearComentarios` ya mide `inicio`. Agrega el import:
 
@@ -638,17 +653,17 @@ Y reemplaza el `return reporte` del final por:
   return reporte
 ```
 
-- [ ] **Paso 4: El route**
+- [x] **Paso 4: El route**
 
 `src/app/api/cron/publish-social/route.ts` ya devuelve `comentarios`. Como `SondeoReport`
 solo gana un campo, lo único que puede faltar es el valor por defecto que el catch siembra
 cuando el sondeo entero falla: verifícalo y agrégale `redaccion` con sus ceros si hace falta.
 
-- [ ] **Paso 5: Verificar**
+- [x] **Paso 5: Verificar**
 
 Corre `npm test`, `npm run typecheck`, `npm run lint` y `npx next build`.
 
-- [ ] **Paso 6: Commit**
+- [x] **Paso 6: Commit**
 
 ```bash
 git add src/lib/social/comentarios/redaccion.ts src/lib/social/comentarios/ventana.ts src/lib/social/comentarios/run.ts src/app/api/cron/publish-social/route.ts
@@ -665,7 +680,7 @@ Mensaje: `Redacta el borrador de los comentarios pendientes en la misma corrida`
 - Modificar: `README.md`
 - Modificar: este plan (marcar las casillas)
 
-- [ ] **Paso 1: El README**
+- [x] **Paso 1: El README**
 
 En la sección «Responder comentarios» que ya existe, después de lo que hay y antes de la
 sección siguiente, agrega:
@@ -686,11 +701,11 @@ nueva.
 
 Mantén el tono del resto: segunda persona, español, frases cortas.
 
-- [ ] **Paso 2: Las casillas**
+- [x] **Paso 2: Las casillas**
 
 Marca `[x]` los pasos de este plan que quedaron hechos.
 
-- [ ] **Paso 3: Verificar y commit**
+- [x] **Paso 3: Verificar y commit**
 
 Corre `npm run lint`.
 

@@ -238,6 +238,18 @@ Si al reconectar te sale **«Invalid Scopes»**, es que el caso de uso que da es
 está activado en tu app de Meta. Actívalo en el panel de desarrolladores y vuelve a
 intentar.
 
+El borrador lo escribe un modelo por la pasarela de IA de Vercel. Necesita
+`AI_GATEWAY_API_KEY` en el entorno; en Vercel puedes omitirla si el proyecto usa OIDC. Sin
+ella no se rompe nada: los comentarios entran a la cola sin borrador y los respondes a mano.
+Con `COMENTARIOS_MODELO` cambias el modelo sin desplegar, con la forma `proveedor/modelo`.
+
+Las instrucciones que sigue el modelo se guardan en la base y las vas a editar desde el
+panel en la entrega siguiente. Hasta entonces rigen las de la casa: responder en español, en
+primera persona, breve y cálido, sin inventar datos ni dar precios.
+
+Después de fusionar hay que correr `npm run db:push` otra vez, porque la tabla de ajustes es
+nueva.
+
 ### Conectar y sincronizar
 
 Antes que nada, `npm run db:push`: la analítica de posts agrega tablas nuevas, y este
