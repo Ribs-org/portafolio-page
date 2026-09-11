@@ -59,7 +59,7 @@ Rama: `multicuentas-2`, nacida de `main`.
 - Produces (Task 2): `listInstagramAccounts(pages: FacebookPages): InstagramAccount[]`; `listFacebookPages(pages: FacebookPagesList): FacebookPage[]`; `NO_INSTAGRAM_ACCOUNT`, `NO_FACEBOOK_PAGE` siguen. Desaparecen `pickInstagramAccount`, `pickFacebookPage`, `InstagramAccountError`, `FacebookPageError`, `AMBIGUOUS_*`, `PINNED_*`, `pinnedAccountMissingMessage`, `pinnedPageMissingMessage`, `mayConnectAccount`.
 - Produces (Tasks 2-3), de `pendiente.ts`: `type Candidata = { externalId: string; handle: string | null }`; `type ConexionPendiente = { network: string; accessToken: string; refreshToken: string | null; expiresAt: string | null; candidatas: Candidata[] }`; `COOKIE_PENDIENTE = 'conexion-pendiente'`; `PENDIENTE_MAX_AGE = 600`; `LOGIN_VENCIDO`; `serializarPendiente(p): string`; `leerPendiente(raw: string | undefined): ConexionPendiente | null`; `elegidas(candidatas, ids: string[]): Candidata[]`.
 
-- [ ] **Step 1: Tests que fallan**
+- [x] **Step 1: Tests que fallan**
 
 En `src/lib/social/instagram.test.ts` reemplaza el `describe('pickInstagramAccount', …)` entero por:
 
@@ -179,12 +179,12 @@ describe('elegidas', () => {
 })
 ```
 
-- [ ] **Step 2: Verificar que fallan**
+- [x] **Step 2: Verificar que fallan**
 
 Run: `npx vitest run src/lib/social/instagram.test.ts src/lib/social/facebook.test.ts src/lib/social/pendiente.test.ts`
 Expected: FAIL — las funciones nuevas no existen.
 
-- [ ] **Step 3: Implementar**
+- [x] **Step 3: Implementar**
 
 `src/lib/social/instagram.ts`: quita `InstagramAccountError`, `AMBIGUOUS_INSTAGRAM_ACCOUNT`, `PINNED_INSTAGRAM_ACCOUNT_MISSING`, `pinnedAccountMissingMessage` y `pickInstagramAccount`; conserva `FacebookPages`, `InstagramAccount`, `NO_INSTAGRAM_ACCOUNT`; agrega:
 
@@ -279,7 +279,7 @@ export function elegidas(candidatas: Candidata[], ids: string[]): Candidata[] {
 }
 ```
 
-- [ ] **Step 4: Verde y commit**
+- [x] **Step 4: Verde y commit**
 
 Run: `npx vitest run src/lib/social && npm run typecheck`
 Expected: los tests de social pasan; **el typecheck falla** en `callback/route.ts` porque todavía importa lo retirado. Es lo esperado: Task 2 lo arregla. Commitea igual esta tarea (el repo queda verde al cerrar Task 2).
@@ -302,7 +302,7 @@ git commit -m "Lista todas las candidatas de Meta y define la conexión pendient
 - Consumes: Task 1.
 - Produces (Task 3): de `conectar.ts`, `type CuentaAConectar = { externalId: string; handle: string | null; accessToken: string; refreshToken: string | null; expiresAt: Date | null }`; `guardarCuenta(network: string, cuenta: CuentaAConectar): Promise<void>`; `tokensDePaginas(userToken: string): Promise<Map<string, string>>`.
 
-- [ ] **Step 1: `conectar.ts`**
+- [x] **Step 1: `conectar.ts`**
 
 ```ts
 // src/lib/social/conectar.ts
@@ -353,7 +353,7 @@ export async function tokensDePaginas(userToken: string): Promise<Map<string, st
 }
 ```
 
-- [ ] **Step 2: El callback**
+- [x] **Step 2: El callback**
 
 En `src/app/api/social/[network]/callback/route.ts`:
 
@@ -445,7 +445,7 @@ type Credential = {
 ```
    El guard de id externo nulo desaparece: cada rama ya garantiza `externalId` string.
 
-- [ ] **Step 3: Verificar y commitear**
+- [x] **Step 3: Verificar y commitear**
 
 Run: `npm run typecheck && npm run lint && npx vitest run src/lib/social`
 Expected: verde (el typecheck vuelve a pasar).
@@ -467,7 +467,7 @@ git commit -m "El callback guarda la única candidata o deja elegir entre varias
 - Consumes: Task 1 (`leerPendiente`, `elegidas`, `COOKIE_PENDIENTE`, `LOGIN_VENCIDO`), Task 2 (`guardarCuenta`, `tokensDePaginas`).
 - Produces: `conectarElegidas(formData: FormData): Promise<void>` (server action que redirige).
 
-- [ ] **Step 1: La acción**
+- [x] **Step 1: La acción**
 
 En `src/app/admin/actions.ts`, imports: `cookies` de `next/headers` (ya importa `headers`), `guardarCuenta`, `tokensDePaginas` de `@/lib/social/conectar`, `COOKIE_PENDIENTE`, `LOGIN_VENCIDO`, `elegidas`, `leerPendiente` de `@/lib/social/pendiente`, `networkLabel` de `@/lib/networks`. Agrega bajo `disconnectNetwork` (que Task 4 reemplaza):
 
@@ -523,7 +523,7 @@ export async function conectarElegidas(formData: FormData): Promise<void> {
 
 `redirect` lanza, así que los `if` sin `return` son correctos; si el typecheck reclama por `pendiente` posiblemente nulo después del `redirect`, agrega `return` tras cada `redirect` (Next lo trata igual).
 
-- [ ] **Step 2: La página**
+- [x] **Step 2: La página**
 
 ```tsx
 // src/app/admin/(dash)/accounts/elegir/page.tsx
@@ -605,7 +605,7 @@ export default async function Elegir({
 }
 ```
 
-- [ ] **Step 3: Verificar y commitear**
+- [x] **Step 3: Verificar y commitear**
 
 Run: `npm run typecheck && npm run lint`
 Expected: verde (la ruta `/admin/accounts` de Task 4 aún no existe, pero un `Link` a ella compila).
@@ -627,7 +627,7 @@ git commit -m "Agrega la pantalla para elegir qué cuentas conectar"
 **Interfaces:**
 - Produces: `type CuentaRow = { id: string; network: string; handle: string | null; externalId: string | null; connected: boolean; lastSyncedAt: string | null; lastSyncError: string | null }`; `getCuentas(): Promise<CuentaRow[]>`; `disconnectAccount(accountId: string): Promise<void>`.
 
-- [ ] **Step 1: Tipo y consulta**
+- [x] **Step 1: Tipo y consulta**
 
 En `src/lib/posts-kpis.ts`, reemplaza `ConnectionRow` por:
 
@@ -670,7 +670,7 @@ export async function getCuentas(): Promise<CuentaRow[]> {
 
 (Ajusta imports: `asc` de drizzle si falta; `CuentaRow` en vez de `ConnectionRow`.)
 
-- [ ] **Step 2: Acciones**
+- [x] **Step 2: Acciones**
 
 En `src/app/admin/actions.ts`: reemplaza `disconnectNetwork` por
 
@@ -688,7 +688,7 @@ export async function disconnectAccount(accountId: string): Promise<void> {
 
 y en `syncSocialNow` cambia `revalidatePath('/admin/content')` por `revalidatePath('/admin/accounts')`.
 
-- [ ] **Step 3: La pestaña**
+- [x] **Step 3: La pestaña**
 
 ```tsx
 // src/app/admin/(dash)/accounts/page.tsx
@@ -834,13 +834,13 @@ export function Cuentas({ rows }: { rows: CuentaRow[] }) {
 }
 ```
 
-- [ ] **Step 4: Nav y Contenido**
+- [x] **Step 4: Nav y Contenido**
 
 `nav.tsx`: agrega `{ href: '/admin/accounts', label: 'Cuentas' }` entre Contenido y Calendario.
 
 `content/page.tsx`: quita el import de `Connections` y de `getConnections`, la llamada a `getConnections()` en el `Promise.all` (y su variable), el bloque `{mensaje ? … }` y la línea `<Connections rows={connections} />`, y la lectura de `mensaje` de `params`. Deja el comentario y la exclusión de `mensaje` en `contentHref` (no hacen daño y un link viejo puede traerlo). Borra `content/connections.tsx`.
 
-- [ ] **Step 5: Verificar y commitear**
+- [x] **Step 5: Verificar y commitear**
 
 Run: `npm run typecheck && npm run lint && npm test`
 Expected: verde.
@@ -859,7 +859,7 @@ git commit -m "Agrega la pestaña Cuentas: por red, con agregar, reconectar y de
 - Modify: `src/lib/social/cuenta.ts`, `src/lib/social/sync.ts`, `src/lib/social/cuentas.ts`, `src/lib/social/publish/run.ts`
 - Test: `src/lib/social/cuenta.test.ts`
 
-- [ ] **Step 1: Test que falla**
+- [x] **Step 1: Test que falla**
 
 Agrega a `src/lib/social/cuenta.test.ts`:
 
@@ -881,7 +881,7 @@ describe('agruparPorRed', () => {
 
 (Fusiona el import con el existente.)
 
-- [ ] **Step 2: Implementar**
+- [x] **Step 2: Implementar**
 
 `cuenta.ts`:
 
@@ -923,7 +923,7 @@ export function agruparPorRed<T extends { network: string }>(cuentas: T[]): Map<
 
 `run.ts`, `attempt`: quita la rama por red y su comentario; `target.accountId` pasa a `string`; la lectura queda `db.select().from(socialAccounts).where(eq(socialAccounts.id, target.accountId))` con un comentario de una línea: «Por la cuenta del destino: con dos páginas de Facebook, la red no dice cuál.»
 
-- [ ] **Step 3: Verificar y commitear**
+- [x] **Step 3: Verificar y commitear**
 
 Run: `npx vitest run src/lib/social && npm run typecheck && npm run lint`
 
@@ -939,11 +939,11 @@ git commit -m "Sincroniza las cuentas de una red en serie y exige credencial par
 **Files:**
 - Modify: `README.md`, `.env.example`, este plan
 
-- [ ] **Step 1: `.env.example`**
+- [x] **Step 1: `.env.example`**
 
 Quita la línea `INSTAGRAM_IG_USER_ID=` (y `FACEBOOK_PAGE_ID=` si estuviera).
 
-- [ ] **Step 2: README**
+- [x] **Step 2: README**
 
 1. Sección Instagram: reemplaza el párrafo «Si administras **más de una cuenta de Instagram**…» y su bloque `INSTAGRAM_IG_USER_ID=` por:
 
@@ -965,7 +965,7 @@ cuenta** en el bloque de la red.
 4. En «Conectar y sincronizar», `/admin/content` pasa a `/admin/accounts` (la pestaña **Cuentas**), y «aprieta *Conectar* en cada tarjeta» a «aprieta *Conectar* en cada red; con varias páginas o cuentas, elige cuáles».
 5. La nota junto a `YOUTUBE_CHANNEL_ID` de la entrega 1 («…hasta que la entrega 2 traiga el desconectar por cuenta») pasa a decir que la fila vieja se desconecta desde Cuentas.
 
-- [ ] **Step 3: Verificación final y commit**
+- [x] **Step 3: Verificación final y commit**
 
 Run: `npm test && npm run typecheck && npm run lint && npx next build`
 Expected: verde. Marca `[x]` cada step de este plan.

@@ -145,9 +145,10 @@ YOUTUBE_API_KEY=AIza...
 YOUTUBE_CHANNEL_ID=UC...
 ```
 
-Cambiar el id ahora no reemplaza la cuenta: crea una segunda fila de YouTube y la
-vieja sigue sincronizando por API key hasta que alguien la borre a mano (la entrega 2
-trae desconectar por cuenta).
+Cambiar el id ahora no reemplaza la cuenta: crea una segunda fila de YouTube, y la vieja
+queda en la pestaña **Cuentas**, donde se desconecta como cualquier otra. Eso le quita la
+credencial, no la API key: YouTube lee con la key, así que la fila vieja sigue trayendo
+posts hasta que la borres a mano.
 
 ### Instagram — cuenta profesional y página de Facebook
 
@@ -174,29 +175,24 @@ INSTAGRAM_APP_ID=
 INSTAGRAM_APP_SECRET=
 ```
 
-Si administras **más de una cuenta de Instagram**, hay que decir cuál es la que se
-conecta. Sin la variable, el callback se niega a elegir y te lo dice: el orden en que Meta
-lista tus páginas no es estable, y conectar sin querer otra cuenta archivaría el
-catálogo de la anterior. El id aparece en los logs del servidor al intentar conectar.
-
-```
-INSTAGRAM_IG_USER_ID=
-```
+Si administras **más de una cuenta de Instagram**, al conectar el panel te muestra la
+lista y marcas cuáles quieres ver. Cada una queda como una cuenta aparte, con sus
+posts y sus métricas. Volver a conectar una que ya está solo renueva su acceso.
 
 #### Renovar la conexión, cada ~60 días
 
 El token de Facebook dura unos 60 días. El cron intenta extenderlo una semana antes de que
 venza, pero **no está garantizado que eso funcione** sobre un token que ya es de larga
 duración: la vía documentada por Meta para uno que se está muriendo es volver a pasar por
-el login. Si el intento no sirve, la credencial caduca y la tarjeta de Instagram en
-**Contenido → Conexiones** se pone roja con el error de la API.
+el login. Si el intento no sirve, la credencial caduca y la tarjeta de esa cuenta en
+**Cuentas** se pone roja con el error de la API.
 
-Cuando pase, entra al panel, pulsa **Desconectar** y luego **Conectar** otra vez. El
+Cuando pase, entra al panel y pulsa **Reconectar** en la tarjeta de esa cuenta. El
 historial de métricas ya recogido no se toca. Cuenta con hacerlo cada dos meses más o menos.
 
-Desconectar borra las credenciales, pero **no olvida qué cuenta era**. Al volver a conectar
-tiene que salir la misma: si autorizas otra, el panel lo rechaza en vez de archivarte el
-catálogo de la anterior.
+Desconectar borra las credenciales de esa cuenta y conserva su historial. Para volver,
+**Reconectar** en su tarjeta; para sumar otra cuenta de la misma red, **Agregar
+cuenta** en el bloque de la red.
 
 ### TikTok
 
@@ -218,10 +214,10 @@ Antes que nada, `npm run db:push`: la analítica de posts agrega tablas nuevas, 
 proyecto no lleva archivos de migración. Si el deploy sale antes que el esquema,
 `/admin/analytics` responde 500 y el cron también.
 
-Con eso hecho, las variables puestas y un redeploy encima, entra a `/admin/content` y
-aprieta *Conectar* en cada tarjeta. El `vercel.json` del repo declara una corrida diaria a las
-9:00 UTC; Vercel inyecta `CRON_SECRET` solo. También puedes apretar *Sincronizar ahora*
-cuando quieras.
+Con eso hecho, las variables puestas y un redeploy encima, entra a `/admin/accounts` (la
+pestaña **Cuentas**) y aprieta *Conectar* en cada red; con varias páginas o cuentas, elige
+cuáles. El `vercel.json` del repo declara una corrida diaria a las 9:00 UTC; Vercel inyecta
+`CRON_SECRET` solo. También puedes apretar *Sincronizar ahora* cuando quieras.
 
 Después de sincronizar, cada post trae su etiqueta `?s=` lista. Copia el link de la fila,
 pégalo en el post, y de ahí en adelante el cruce es automático.
@@ -345,8 +341,6 @@ Vercel y bajan con `vercel env pull .env.local`.
 | `GOOGLE_CLIENT_SECRET` | El secreto de ese OAuth Client | Junto con el anterior; el sync de solo lectura sigue usando `YOUTUBE_API_KEY` |
 | `INSTAGRAM_APP_ID` | Conectar Instagram | No — sin ella esa red aparece como no conectada |
 | `INSTAGRAM_APP_SECRET` | Conectar Instagram | No — sin ella esa red aparece como no conectada |
-| `INSTAGRAM_IG_USER_ID` | Elegir cuál de tus cuentas de Instagram se conecta | Solo si administras más de una: sin ella, conectar falla en vez de adivinar |
-| `FACEBOOK_PAGE_ID` | Elegir cuál de tus páginas de Facebook se conecta | Solo si administras más de una: sin ella, conectar falla con `AMBIGUOUS_FACEBOOK_PAGE` en vez de adivinar |
 | `TIKTOK_CLIENT_KEY` | Conectar TikTok | No — sin ella esa red aparece como no conectada |
 | `TIKTOK_CLIENT_SECRET` | Conectar TikTok | No — sin ella esa red aparece como no conectada |
 | `THREADS_APP_ID` | Conectar Threads para publicar | El Threads App ID del caso de uso «API de Threads» de la app de Meta |
