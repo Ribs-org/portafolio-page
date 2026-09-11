@@ -1,21 +1,17 @@
 // Kept free of `server-only` on purpose: these are the pieces of the posts module that
-// a unit test — and the two client components under `admin/content` — can import
-// directly, without dragging in the DB layer that the rest of `posts.ts` depends on.
+// a unit test — and the client components of the panel (`content`, `accounts`) — can
+// import directly, without dragging in the DB layer that the rest of `posts.ts` depends on.
 
-export type ConnectionRow = {
+export type CuentaRow = {
+  id: string
   network: string
   handle: string | null
-  /**
-   * The account the sync actually fetches for. Shown on the card because a handle looks
-   * right even when the id underneath belongs to a different account, and that mismatch
-   * is what archives a catalogue.
-   */
+  /** El id con el que la sincronización pide los posts; a la vista, porque el handle puede engañar. */
   externalId: string | null
+  /** Con credencial guardada. La fila sobrevive a un desconectar a propósito. */
   connected: boolean
   lastSyncedAt: string | null
   lastSyncError: string | null
-  /** YouTube is configured by environment and has no button. */
-  usesOAuth: boolean
 }
 
 export type PostRow = {
