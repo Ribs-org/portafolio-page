@@ -14,6 +14,12 @@ export const DIAS_VENTANA = 7
 export const MAX_POSTS_POR_PASADA = 20
 /** El cron publica antes de sondear y `maxDuration` son 240 s: al sondeo le toca la mitad, porque publicar a tiempo manda. */
 export const MAX_MS_POR_CORRIDA = 120_000
+/**
+ * Cuántos borradores como mucho por corrida. La primera pasada después de desplegar
+ * encuentra siete días de comentarios de una vez; sin tope serían cientos de llamadas al
+ * modelo dentro de la corrida que además publica. Lo que sobra espera cinco minutos.
+ */
+export const MAX_BORRADORES_POR_CORRIDA = 10
 /** La cadencia del cron que llama a esto: de ahí sale el desplazamiento de la rotación. */
 const PASADA_MS = 5 * 60_000
 /**

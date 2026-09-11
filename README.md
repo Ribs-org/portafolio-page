@@ -221,8 +221,8 @@ mira tus publicaciones de los últimos siete días. A YouTube lo mira cada media
 cada cinco minutos: su cuota diaria es la misma que usa la sincronización de métricas, y
 gastarla acá te dejaría sin las dos cosas.
 
-Después de fusionar, corre `npm run db:push` una vez: la tabla de comentarios es nueva y
-sin ella el sondeo no tiene dónde guardar nada.
+Después de fusionar, corre `npm run db:push` una vez: las tablas de comentarios y de
+ajustes son nuevas, y sin ellas el sondeo no tiene dónde guardar nada.
 
 Para que funcione hay que **reconectar una vez cada red**, porque el permiso se concede
 en el consentimiento: entra a **Cuentas** y pulsa *Reconectar* en cada tarjeta de
@@ -237,6 +237,21 @@ tus propias cuentas.
 Si al reconectar te sale **«Invalid Scopes»**, es que el caso de uso que da ese permiso no
 está activado en tu app de Meta. Actívalo en el panel de desarrolladores y vuelve a
 intentar.
+
+El borrador lo escribe un modelo por la pasarela de IA de Vercel. Necesita
+`AI_GATEWAY_API_KEY` en el entorno; en Vercel puedes omitirla si el proyecto usa OIDC. Sin
+ella no se rompe nada: los comentarios entran a la cola sin borrador y los respondes a mano.
+Con `COMENTARIOS_MODELO` cambias el modelo sin desplegar, con la forma `proveedor/modelo`.
+El borrador tiene un tope de salida corto, así que un modelo de razonamiento puede
+gastárselo pensando y devolverte vacío: acá conviene uno rápido.
+
+De tu infraestructura salen tres cosas hacia el proveedor del modelo: el texto del
+comentario, el nombre de quien lo dejó y el texto de la publicación. Nada más: ni tus
+métricas, ni tus otros comentarios, ni datos de la persona.
+
+Las instrucciones que sigue el modelo se guardan en la base y las vas a editar desde el
+panel en la entrega siguiente. Hasta entonces rigen las de la casa: responder en español, en
+primera persona, breve y cálido, sin inventar datos ni dar precios.
 
 ### Conectar y sincronizar
 

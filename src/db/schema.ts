@@ -378,6 +378,17 @@ export const postComments = pgTable(
   ],
 )
 
+/**
+ * Preferencias del panel, una fila por clave. Tabla de clave y valor y no columnas en otra
+ * tabla porque esta es la primera de varias: lo que se guarda acá no tiene dueño natural
+ * en ninguna entidad del dominio.
+ */
+export const ajustes = pgTable('ajustes', {
+  clave: text('clave').primaryKey(),
+  valor: text('valor').notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+})
+
 export type Profile = typeof profiles.$inferSelect
 export type Link = typeof links.$inferSelect
 export type Visit = typeof visits.$inferSelect
@@ -389,3 +400,4 @@ export type ScheduledPost = typeof scheduledPosts.$inferSelect
 export type ScheduledPostTarget = typeof scheduledPostTargets.$inferSelect
 export type ScheduledPostMedia = typeof scheduledPostMedia.$inferSelect
 export type PostComment = typeof postComments.$inferSelect
+export type Ajuste = typeof ajustes.$inferSelect
