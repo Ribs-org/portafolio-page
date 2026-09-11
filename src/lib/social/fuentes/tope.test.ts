@@ -62,4 +62,10 @@ describe('idMayor', () => {
     expect(idMayor('10', null)).toBe('10')
     expect(idMayor(null, null)).toBeNull()
   })
+
+  it('degrada en vez de reventar cuando un id no es un entero', () => {
+    expect(idMayor('abc', '10')).toBe('10')
+    expect(idMayor('10', 'abc')).toBe('10')
+    expect(idMayor('abc', 'def')).toBeNull()
+  })
 })

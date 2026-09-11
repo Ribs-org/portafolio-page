@@ -30,12 +30,17 @@ export function normalizarTope(bruto: string | null): number {
   return Number.isInteger(n) && n > 0 ? n : TOPE_POR_DEFECTO
 }
 
+/** Un id que no es un entero decimal reventaría `BigInt`; acá vale lo mismo que no tenerlo. */
+function esId(valor: string | null): valor is string {
+  return valor !== null && /^\d+$/.test(valor)
+}
+
 /**
  * Los ids de X son enteros que crecen y cambian de largo, así que compararlos como texto
  * daría que '9' es mayor que '10'. BigInt porque no caben en un number.
  */
 export function idMayor(a: string | null, b: string | null): string | null {
-  if (!a) return b
-  if (!b) return a
+  if (!esId(a)) return esId(b) ? b : null
+  if (!esId(b)) return a
   return BigInt(a) >= BigInt(b) ? a : b
 }
