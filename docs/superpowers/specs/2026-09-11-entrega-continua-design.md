@@ -65,9 +65,9 @@ antes de que la base exista», y `env()` devuelve `undefined` sin lanzar. Si alg
 paso necesitara un valor, se le pasa uno falso, nunca un secreto real.
 
 **`app`** corre siempre, en cada pull request contra `main`, sin filtro por ruta. Instala en
-`mobile/` y comprueba tipos, que hoy no lo mira nadie. Una comprobación obligatoria que no
-llega a correr por un filtro de rutas deja el pull request esperándola para siempre, y el
-repositorio es público, así que los minutos son gratis.
+`mobile/` y corre los tests, el typecheck y el lint, que hoy no los mira nadie. Una
+comprobación obligatoria que no llega a correr por un filtro de rutas deja el pull request
+esperándola para siempre, y el repositorio es público, así que los minutos son gratis.
 
 Node se fija en un `.nvmrc` en la raíz, y el flujo de trabajo lo lee de ahí en vez de
 repetir el número. La versión es la 24, que es la que usan hoy la máquina local y Vercel.

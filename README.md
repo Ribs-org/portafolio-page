@@ -25,7 +25,7 @@ quedar verdes antes de poder fusionar.
 - **sitio** corre los tests, el typecheck, el lint y el build de producción. Corre sin
   ninguna credencial, a propósito: si el build empieza a necesitar un secreto para compilar,
   queremos enterarnos acá y no en Vercel.
-- **app** comprueba los tipos y el lint del proyecto de `mobile/`.
+- **app** corre los tests, el typecheck y el lint del proyecto de `mobile/`.
 
 `main` está protegida. No se puede empujar directo: todo entra por pull request, los dos
 trabajos son obligatorios, y la rama tiene que estar al día con `main` antes de fusionar,
@@ -42,7 +42,8 @@ la rama esté al día.
 
 ## Desplegar el tuyo
 
-Toma unos 10 minutos. Necesitas una cuenta de GitHub, una de Vercel y Node 20 o superior.
+Toma unos 10 minutos. Necesitas una cuenta de GitHub, una de Vercel y Node 24 o superior,
+la versión fijada en `.nvmrc`.
 
 ### 1. Genera tus dos secretos
 
