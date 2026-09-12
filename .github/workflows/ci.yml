@@ -4,6 +4,9 @@ on:
   pull_request:
     branches: [main]
 
+permissions:
+  contents: read
+
 # Un empujón nuevo al mismo pull request cancela la corrida anterior: la respuesta que
 # importa es la del último commit.
 concurrency:
@@ -37,6 +40,8 @@ jobs:
           cache: npm
           cache-dependency-path: mobile/package-lock.json
       - run: npm ci
+        working-directory: mobile
+      - run: npm test
         working-directory: mobile
       - run: npm run typecheck
         working-directory: mobile
