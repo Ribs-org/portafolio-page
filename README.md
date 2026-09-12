@@ -17,6 +17,29 @@ Corre en planes gratis: Next.js 16 en Vercel, Postgres en Neon y la media en Clo
 
 ---
 
+## Cómo entra un cambio
+
+Cada pull request contra `main` dispara la reja: dos trabajos en paralelo que tienen que
+quedar verdes antes de poder fusionar.
+
+- **sitio** corre los tests, el typecheck, el lint y el build de producción. Corre sin
+  ninguna credencial, a propósito: si el build empieza a necesitar un secreto para compilar,
+  queremos enterarnos acá y no en Vercel.
+- **app** comprueba los tipos y el lint del proyecto de `mobile/`.
+
+`main` está protegida. No se puede empujar directo: todo entra por pull request, los dos
+trabajos son obligatorios, y la rama tiene que estar al día con `main` antes de fusionar,
+para que la reja haya corrido sobre el código que de verdad va a quedar.
+
+Por eso Vercel no espera a nadie. Lo que llega a `main` ya pasó por la reja.
+
+Si alguna vez hay que reconfigurar esto, la protección vive en **Settings → Branches →
+Branch protection rules** del repositorio, sobre `main`, con estas casillas: exigir pull
+request antes de fusionar, exigir que las comprobaciones `sitio` y `app` pasen, y exigir que
+la rama esté al día.
+
+---
+
 ## Desplegar el tuyo
 
 Toma unos 10 minutos. Necesitas una cuenta de GitHub, una de Vercel y Node 20 o superior.

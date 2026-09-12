@@ -73,7 +73,7 @@ elimina la trampa entera.
   README y el controlador los usa como comprobaciones obligatorias, así que **no los
   renombres**.
 
-- [ ] **Paso 1: La versión de Node**
+- [x] **Paso 1: La versión de Node**
 
 Crea `.nvmrc` en la raíz con una sola línea:
 
@@ -84,7 +84,7 @@ Crea `.nvmrc` en la raíz con una sola línea:
 Es la versión que usan hoy la máquina local (`v24.15.0`) y Vercel. Un solo dígito: `.nvmrc`
 acepta la versión mayor y así no hay que tocarlo en cada parche.
 
-- [ ] **Paso 2: El script de typecheck de la app**
+- [x] **Paso 2: El script de typecheck de la app**
 
 `mobile/package.json` tiene hoy `start`, `reset-project`, `android`, `ios`, `web` y `lint`.
 No tiene `typecheck`, y el del sitio se llama así. Agrégalo con el mismo cuerpo que usa la
@@ -94,7 +94,7 @@ raíz:
     "typecheck": "tsc --noEmit"
 ```
 
-- [ ] **Paso 3: Correrlo y ver qué sale**
+- [x] **Paso 3: Correrlo y ver qué sale**
 
 Corre: `npm --prefix mobile run typecheck`
 
@@ -108,7 +108,7 @@ cambió entre medio.
   en una tarea aparte, o si la reja entra primero solo con el lint de la app. Arreglar tipos
   ajenos sin que nadie los haya mirado es exactamente donde un cambio «obvio» rompe algo.
 
-- [ ] **Paso 4: El flujo de trabajo**
+- [x] **Paso 4: El flujo de trabajo**
 
 Crea `.github/workflows/ci.yml`:
 
@@ -161,7 +161,7 @@ jobs:
 
 Los dos trabajos no declaran `needs`, así que corren en paralelo.
 
-- [ ] **Paso 5: Verificar la sintaxis**
+- [x] **Paso 5: Verificar la sintaxis**
 
 El YAML no se ejecuta en tu máquina, pero sí se puede comprobar que es válido:
 
@@ -174,7 +174,7 @@ Corre también los cuatro comandos del trabajo `sitio` localmente, para confirma
 flujo de trabajo no pide nada que no exista: `npm test`, `npm run typecheck`, `npm run lint`
 y `npx next build`.
 
-- [ ] **Paso 6: Commit**
+- [x] **Paso 6: Commit**
 
 ```bash
 git add .nvmrc mobile/package.json .github/workflows/ci.yml
@@ -192,7 +192,7 @@ Mensaje: `Corre los tests y el build en cada pull request`
 - Modificar: `docs/superpowers/specs/2026-09-11-entrega-continua-design.md`
 - Modificar: este plan (marcar las casillas)
 
-- [ ] **Paso 1: El README**
+- [x] **Paso 1: El README**
 
 Busca dónde el README habla de cómo se trabaja en el repositorio. Si no hay una sección
 natural, crea `## Cómo entra un cambio` antes de la primera sección de despliegue. Agrega:
@@ -218,7 +218,7 @@ request antes de fusionar, exigir que las comprobaciones `sitio` y `app` pasen, 
 la rama esté al día.
 ```
 
-- [ ] **Paso 2: Corregir el spec**
+- [x] **Paso 2: Corregir el spec**
 
 En `docs/superpowers/specs/2026-09-11-entrega-continua-design.md`, la sección 1 dice que el
 trabajo de la app «corre solo cuando el pull request toca `mobile/`». Eso ya no es lo que se
@@ -227,11 +227,11 @@ razón: una comprobación obligatoria que no llega a correr por un filtro de rut
 request esperándola para siempre, y el repositorio es público, así que los minutos son
 gratis.
 
-- [ ] **Paso 3: Las casillas**
+- [x] **Paso 3: Las casillas**
 
 Marca `[x]` los pasos de este plan que quedaron hechos.
 
-- [ ] **Paso 4: Verificar y commit**
+- [x] **Paso 4: Verificar y commit**
 
 Corre `npm run lint`. Lee la sección nueva del README de corrido junto a sus vecinas.
 
