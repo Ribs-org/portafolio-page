@@ -16,6 +16,8 @@ export const COLORES = {
 
 // El destello de Android al tocar: el mismo blanco del texto, casi transparente.
 const RIPPLE = { color: COLORES.texto + '22' }
+// Sobre `destacado` (verde claro) el blanco casi no se nota: mismo nivel de opacidad, pero negro.
+const RIPPLE_DESTACADO = { color: '#00000022' }
 
 export function Pantalla({
   children,
@@ -229,7 +231,7 @@ export function Boton({
     <Pressable
       onPress={onPress}
       disabled={deshabilitado}
-      android_ripple={deshabilitado ? undefined : RIPPLE}
+      android_ripple={deshabilitado ? undefined : destacado ? RIPPLE_DESTACADO : RIPPLE}
       style={({ pressed }) => ({
         flex: 1,
         backgroundColor: destacado ? COLORES.verde : COLORES.tarjeta,

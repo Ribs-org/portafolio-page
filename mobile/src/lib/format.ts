@@ -22,3 +22,8 @@ export function shortDate(iso: string): string {
   return `${Number(iso.slice(8, 10))} ${mes}, ${iso.slice(11, 16)}`
 }
 
+/** Las claves de atributos ya vienen en español (`hook`, `tema`); solo falta mayúscula inicial. */
+export function capitalizar(texto: string): string {
+  return texto ? texto[0].toUpperCase() + texto.slice(1) : texto
+}
+

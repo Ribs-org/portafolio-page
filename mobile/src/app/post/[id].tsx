@@ -3,8 +3,8 @@ import { Linking, Pressable, ScrollView, Text, View } from 'react-native'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { Boton, COLORES, Cargando, Tarjeta } from '../../components/ui'
 import { readCache } from '../../lib/cache'
-import { num, pct, shortDate } from '../../lib/format'
-import { NOMBRE_RED, type PostMetrica, type Posts } from '../../lib/tipos'
+import { capitalizar, num, pct, shortDate } from '../../lib/format'
+import { NOMBRE_RED, RANGOS, type PostMetrica, type Posts } from '../../lib/tipos'
 
 export default function DetallePost() {
   const { id, red } = useLocalSearchParams<{ id: string; red: string }>()
@@ -18,7 +18,7 @@ export default function DetallePost() {
     // efecto, así que la regla `react-hooks/set-state-in-effect` no aplica: es un
     // arranque asíncrono legítimo (leer la caché no tiene versión síncrona).
     async function buscar() {
-      for (const rango of ['hoy', '7d', '30d']) {
+      for (const rango of RANGOS) {
         const guardado = await readCache<Posts>(`posts:rango=${rango}`)
         const encontrado = guardado?.data.posts.find(
           (p) => p.externalId === id && p.red === red,
@@ -98,7 +98,7 @@ export default function DetallePost() {
           </Text>
           {Object.entries(post.atributos).map(([clave, valor]) => (
             <View key={clave} style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-              <Text style={{ color: COLORES.suave, fontSize: 13 }}>{clave}</Text>
+              <Text style={{ color: COLORES.suave, fontSize: 13 }}>{capitalizar(clave)}</Text>
               <Text style={{ color: COLORES.texto, fontSize: 13 }}>{String(valor)}</Text>
             </View>
           ))}

@@ -3,6 +3,7 @@ import { Alert, KeyboardAvoidingView, ScrollView, Text, TextInput, View } from '
 import { DateTimePickerAndroid } from '@react-native-community/datetimepicker'
 import * as ImagePicker from 'expo-image-picker'
 import { useRouter } from 'expo-router'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import { Boton, COLORES, Chip, Miniatura } from '../../components/ui'
 import { SesionCaducada } from '../../lib/api'
@@ -27,6 +28,10 @@ import { useToken } from '../../lib/useToken'
 
 const MAX_TEXTO = 2200
 
+// El contenedor mide desde su padre y el teclado desde la pantalla; en medio está la
+// cabecera. Es el estándar de Android (expo-router no reexporta `useHeaderHeight`): confirmar en el teléfono la primera vez.
+const ALTO_CABECERA = 56
+
 function fechaLegible(fecha: Date): string {
   const dd = String(fecha.getDate()).padStart(2, '0')
   const mm = String(fecha.getMonth() + 1).padStart(2, '0')
@@ -38,6 +43,7 @@ function fechaLegible(fecha: Date): string {
 export default function Publicar() {
   const token = useToken()
   const router = useRouter()
+  const insets = useSafeAreaInsets()
   const [texto, setTexto] = useState('')
   const [archivos, setArchivos] = useState<Elegido[]>([])
   const [redes, setRedes] = useState<string[]>(['instagram'])
@@ -193,7 +199,10 @@ export default function Publicar() {
     return () => clearTimeout(salto)
   }, [envio.paso, router])
 
-  const ocupado = envio.paso === 'chequeando' || envio.paso === 'subiendo' || envio.paso === 'creando'
+  // 'hecho' también cuenta: durante el segundo que se ve «Listo» la pantalla ya no
+  // acepta nada, para que un toque de más no despache el mismo post dos veces.
+  const ocupado =
+    envio.paso === 'chequeando' || envio.paso === 'subiendo' || envio.paso === 'creando' || envio.paso === 'hecho'
   const etiqueta = etiquetaEnvio(envio)
   const error = envio.paso === 'listo' ? envio.error : envio.paso === 'error' ? envio.mensaje : null
 
@@ -201,7 +210,11 @@ export default function Publicar() {
     // `height` es el `behavior` de Android: la app dibuja de borde a borde, así que la
     // ventana ya no se encoge sola al abrir el teclado y el texto largo dejaba
     // «Programar» y «Publicar ahora» debajo de las teclas.
-    <KeyboardAvoidingView behavior="height" style={{ flex: 1, backgroundColor: COLORES.fondo }}>
+    <KeyboardAvoidingView
+      behavior="height"
+      keyboardVerticalOffset={insets.top + ALTO_CABECERA}
+      style={{ flex: 1, backgroundColor: COLORES.fondo }}
+    >
       <ScrollView
         style={{ flex: 1, backgroundColor: COLORES.fondo }}
         contentContainerStyle={{ padding: 16, paddingBottom: 48, gap: 14 }}
