@@ -34,6 +34,9 @@ export async function pedirBorrador(entrada: EntradaPrompt): Promise<string> {
     instructions: system,
     prompt,
     maxOutputTokens: MAX_TOKENS,
+    // Un modelo de razonamiento mete el pensamiento en la respuesta y se gasta el tope antes de
+    // escribir la frase; apagado contesta limpio, comprobado contra la API de la pasarela.
+    providerOptions: { gateway: { reasoning: { enabled: false } } },
     abortSignal: AbortSignal.timeout(TIMEOUT_MS),
   })
   return text
