@@ -1,3 +1,4 @@
+import { Suspense } from 'react'
 import { asc } from 'drizzle-orm'
 import Link from 'next/link'
 import { AccountCards, AccountSeriesChart } from './accounts'
@@ -7,7 +8,7 @@ import { CampaignTable } from '@/components/charts/campaign-table'
 import { Donut } from '@/components/charts/donut'
 import { Funnel } from '@/components/charts/funnel'
 import { Heatmap } from '@/components/charts/heatmap'
-import { Empty, Panel } from '@/components/charts/panel'
+import { Empty, Panel, PanelSkeleton } from '@/components/charts/panel'
 import { StatTile, delta } from '@/components/charts/stat-tile'
 import { seriesColor } from '@/components/charts/theme'
 import { TrafficChart } from '@/components/charts/traffic-chart'
@@ -15,6 +16,8 @@ import { FilterBar } from '@/components/filter-bar'
 import { buildAccountCards, buildAccountSeries } from '@/lib/account-stats'
 import {
   SITE_TIMEZONE,
+  type Filters,
+  type Kpis,
   getBrowsers,
   getCampaigns,
   getCities,
@@ -67,61 +70,17 @@ export default async function AnalyticsPage({
 }) {
   const params = await searchParams
   const filters = parseFilters(params)
-  const profiles = await getAllProfiles()
 
-  const [
-    kpis,
-    previous,
-    series,
-    campaigns,
-    networks,
-    countries,
-    cities,
-    devices,
-    systems,
-    browsers,
-    languages,
-    heatmap,
-    recent,
-  ] = await Promise.all([
+  // Solo lo que hace falta para pintar algo: la barra de filtros, las cuatro cifras y el
+  // gráfico de tráfico. Los otros once paneles esperan abajo, cada grupo en su propio
+  // `Suspense`, para que la consulta más lenta de la página no retenga a las tres más
+  // rápidas.
+  const [profiles, kpis, previous, series] = await Promise.all([
+    getAllProfiles(),
     getKpis(filters),
     getKpis(previousPeriod(filters)),
     getTimeSeries(filters),
-    getCampaigns(filters),
-    getNetworks(filters),
-    getCountries(filters),
-    getCities(filters),
-    getDevices(filters),
-    getOperatingSystems(filters),
-    getBrowsers(filters),
-    getLanguages(filters),
-    getHeatmap(filters),
-    getRecentVisits(filters),
   ])
-
-  const campaignPosts = await getCampaignPosts(campaigns.map((c) => c.campaign))
-
-  const [topLinks, funnel, accountRows] = await Promise.all([
-    getTopLinks(filters, kpis.visits),
-    getFunnel(filters, kpis),
-    // Sin filtro de fecha a propósito: la variación necesita la lectura anterior a la
-    // ventana, y la tabla crece una fila por red y día — nada que paginar.
-    getDb()
-      .select({
-        network: accountMetrics.network,
-        day: accountMetrics.day,
-        followers: accountMetrics.followers,
-        profileViews: accountMetrics.profileViews,
-        reach: accountMetrics.reach,
-      })
-      .from(accountMetrics)
-      .orderBy(asc(accountMetrics.day), asc(accountMetrics.network)),
-  ])
-
-  const accountFrom = localDay(filters.from)
-  const accountTo = localDay(filters.to)
-  const cards = buildAccountCards(accountRows, accountFrom, accountTo)
-  const accountSeries = buildAccountSeries(accountRows, accountFrom, accountTo)
 
   return (
     <>
@@ -142,164 +101,247 @@ export default async function AnalyticsPage({
       </div>
 
       <div className="mt-4 grid gap-4">
-        <Panel
-          title="Tus cuentas"
-          hint="Seguidores por red, con lo ganado en el período. Visitas al perfil y alcance son del último día leído — Instagram es la única que los entrega hoy."
-        >
-          <AccountCards cards={cards} />
-          <div className="mt-4">
-            <AccountSeriesChart series={accountSeries} />
-          </div>
-        </Panel>
-
         <Panel title="Tráfico en el tiempo" hint="Visitas y clicks, comparables en la misma escala">
           <TrafficChart data={series} />
         </Panel>
 
-        <Panel
-          title="Qué contenido te trae gente"
-          hint="Cada etiqueta ?s= es una pieza de contenido. Ordena por CTR para ver cuál convierte."
-          action={
-            <Link
-              href="/admin/content"
-              className="text-[0.75rem] text-fg-faint transition-colors hover:text-fg"
-            >
-              Ver por post →
-            </Link>
+        <Suspense
+          fallback={
+            // La grilla anidada repite el `gap-4` del contenedor: los huecos tienen que
+            // caer donde caerán los paneles.
+            <div role="status" aria-label="Cargando" className="grid gap-4">
+              <PanelSkeleton />
+              <PanelSkeleton />
+              <div className="grid gap-4 lg:grid-cols-2">
+                <PanelSkeleton />
+                <PanelSkeleton />
+              </div>
+            </div>
           }
         >
-          <CampaignTable rows={campaigns} posts={Object.fromEntries(campaignPosts)} />
-        </Panel>
+          <PanelesDeOrigen filters={filters} visits={kpis.visits} />
+        </Suspense>
 
-        <div className="grid gap-4 lg:grid-cols-2">
-          <Panel title="Links más clickeados" hint="CTR calculado sobre las visitas del período">
-            <BarList
-              items={topLinks.map((link) => ({
-                key: link.linkId ?? link.label,
-                label: link.label,
-                value: link.clicks,
-                note: formatPercent(link.ctr),
-                href: link.url || undefined,
-              }))}
-              color={seriesColor(1)}
-              emptyLabel="Nadie ha hecho click todavía."
-            />
-          </Panel>
-
-          <Panel title="De dónde vienen" hint="Red de origen inferida del referrer y de utm_source">
-            <Donut
-              slices={networks.map((n) => ({
-                key: n.key,
-                label: networkLabel(n.key),
-                value: n.visits,
-              }))}
-            />
-          </Panel>
-        </div>
-
-        <div className="grid gap-4 lg:grid-cols-2">
-          <Panel title="Países">
-            <BarList
-              items={countries.map((c) => ({
-                key: c.key,
-                label: `${flagEmoji(c.key)}  ${countryName(c.key)}`,
-                value: c.visits,
-              }))}
-            />
-          </Panel>
-
-          <Panel title="Ciudades">
-            <BarList
-              items={cities.map((c) => ({ key: c.key, label: c.key, value: c.visits }))}
-            />
-          </Panel>
-        </div>
-
-        <div className="grid gap-4 lg:grid-cols-3">
-          <Panel title="Dispositivo">
-            <BarList
-              items={devices.map((d) => ({
-                key: d.key,
-                label: DEVICE_LABELS[d.key] ?? d.key,
-                value: d.visits,
-              }))}
-            />
-          </Panel>
-          <Panel title="Sistema">
-            <BarList
-              items={systems.map((s) => ({ key: s.key, label: s.key, value: s.visits }))}
-            />
-          </Panel>
-          <Panel title="Navegador">
-            <BarList
-              items={browsers.map((b) => ({ key: b.key, label: b.key, value: b.visits }))}
-            />
-          </Panel>
-        </div>
-
-        <Panel
-          title="Cuándo te visitan"
-          hint={`Hora local de ${SITE_TIMEZONE}`}
+        <Suspense
+          fallback={
+            <div role="status" aria-label="Cargando" className="grid gap-4">
+              <div className="grid gap-4 lg:grid-cols-2">
+                <PanelSkeleton />
+                <PanelSkeleton />
+              </div>
+              <div className="grid gap-4 lg:grid-cols-3">
+                <PanelSkeleton />
+                <PanelSkeleton />
+                <PanelSkeleton />
+              </div>
+              <PanelSkeleton />
+              <div className="grid gap-4 lg:grid-cols-2">
+                <PanelSkeleton />
+                <PanelSkeleton />
+              </div>
+              <PanelSkeleton />
+            </div>
+          }
         >
-          <Heatmap cells={heatmap} />
+          <PanelesDeAudiencia filters={filters} kpis={kpis} />
+        </Suspense>
+      </div>
+    </>
+  )
+}
+
+/** Quién trae el tráfico: las cuentas, las etiquetas `?s=`, los links y la red de origen. */
+async function PanelesDeOrigen({ filters, visits }: { filters: Filters; visits: number }) {
+  const [campaigns, networks, topLinks, accountRows] = await Promise.all([
+    getCampaigns(filters),
+    getNetworks(filters),
+    getTopLinks(filters, visits),
+    // Sin filtro de fecha a propósito: la variación necesita la lectura anterior a la
+    // ventana, y la tabla crece una fila por red y día — nada que paginar.
+    getDb()
+      .select({
+        network: accountMetrics.network,
+        day: accountMetrics.day,
+        followers: accountMetrics.followers,
+        profileViews: accountMetrics.profileViews,
+        reach: accountMetrics.reach,
+      })
+      .from(accountMetrics)
+      .orderBy(asc(accountMetrics.day), asc(accountMetrics.network)),
+  ])
+
+  // Este sí depende del anterior: los posts se piden por las campañas que volvieron.
+  const campaignPosts = await getCampaignPosts(campaigns.map((c) => c.campaign))
+
+  const accountFrom = localDay(filters.from)
+  const accountTo = localDay(filters.to)
+  const cards = buildAccountCards(accountRows, accountFrom, accountTo)
+  const accountSeries = buildAccountSeries(accountRows, accountFrom, accountTo)
+
+  return (
+    <>
+      <Panel
+        title="Tus cuentas"
+        hint="Seguidores por red, con lo ganado en el período. Visitas al perfil y alcance son del último día leído — Instagram es la única que los entrega hoy."
+      >
+        <AccountCards cards={cards} />
+        <div className="mt-4">
+          <AccountSeriesChart series={accountSeries} />
+        </div>
+      </Panel>
+
+      <Panel
+        title="Qué contenido te trae gente"
+        hint="Cada etiqueta ?s= es una pieza de contenido. Ordena por CTR para ver cuál convierte."
+        action={
+          <Link
+            href="/admin/content"
+            className="text-[0.75rem] text-fg-faint transition-colors hover:text-fg"
+          >
+            Ver por post →
+          </Link>
+        }
+      >
+        <CampaignTable rows={campaigns} posts={Object.fromEntries(campaignPosts)} />
+      </Panel>
+
+      <div className="grid gap-4 lg:grid-cols-2">
+        <Panel title="Links más clickeados" hint="CTR calculado sobre las visitas del período">
+          <BarList
+            items={topLinks.map((link) => ({
+              key: link.linkId ?? link.label,
+              label: link.label,
+              value: link.clicks,
+              note: formatPercent(link.ctr),
+              href: link.url || undefined,
+            }))}
+            color={seriesColor(1)}
+            emptyLabel="Nadie ha hecho click todavía."
+          />
         </Panel>
 
-        <div className="grid gap-4 lg:grid-cols-2">
-          <Panel title="Embudo" hint="De llegar a la página a hacer click">
-            <Funnel data={funnel} />
-          </Panel>
-
-          <Panel title="Idioma del navegador">
-            <BarList
-              items={languages.map((l) => ({ key: l.key, label: l.key, value: l.visits }))}
-            />
-          </Panel>
-        </div>
-
-        <Panel title="Últimas visitas" hint="Las 40 más recientes del período">
-          {recent.length === 0 ? (
-            <Empty>Nada todavía.</Empty>
-          ) : (
-            <ul className="divide-y divide-white/[0.06]">
-              {recent.map((visit) => (
-                <li key={visit.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 py-2 text-[0.82rem]">
-                  <span aria-hidden>{flagEmoji(visit.country)}</span>
-                  <span className="text-fg">
-                    {visit.city ?? countryName(visit.country)}
-                    {visit.city && visit.country ? (
-                      <span className="text-fg-faint">, {countryName(visit.country)}</span>
-                    ) : null}
-                  </span>
-                  <span className="text-fg-muted">
-                    {DEVICE_LABELS[visit.deviceType ?? ''] ?? visit.deviceType ?? '—'}
-                    {visit.os ? ` · ${visit.os}` : ''}
-                    {visit.browser ? ` · ${visit.browser}` : ''}
-                  </span>
-                  <span className="rounded-md bg-white/[0.06] px-1.5 py-0.5 font-mono text-[0.68rem] text-fg-muted">
-                    {networkLabel(visit.referrerNetwork)}
-                  </span>
-                  {visit.campaign ? (
-                    <span
-                      className="rounded-md px-1.5 py-0.5 font-mono text-[0.68rem]"
-                      style={{ background: `${seriesColor(0)}25`, color: seriesColor(0) }}
-                    >
-                      ?s={visit.campaign}
-                    </span>
-                  ) : null}
-                  {visit.isBot ? (
-                    <span className="rounded-md bg-white/[0.06] px-1.5 py-0.5 font-mono text-[0.68rem] text-fg-faint">
-                      bot
-                    </span>
-                  ) : null}
-                  <span className="ml-auto font-mono text-[0.7rem] text-fg-faint">
-                    {timeAgo(visit.createdAt)}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          )}
+        <Panel title="De dónde vienen" hint="Red de origen inferida del referrer y de utm_source">
+          <Donut
+            slices={networks.map((n) => ({
+              key: n.key,
+              label: networkLabel(n.key),
+              value: n.visits,
+            }))}
+          />
         </Panel>
       </div>
+    </>
+  )
+}
+
+/** Quién es y cuándo llega: geografía, equipo, hora, embudo e idioma. */
+async function PanelesDeAudiencia({ filters, kpis }: { filters: Filters; kpis: Kpis }) {
+  const [countries, cities, devices, systems, browsers, languages, heatmap, funnel, recent] =
+    await Promise.all([
+      getCountries(filters),
+      getCities(filters),
+      getDevices(filters),
+      getOperatingSystems(filters),
+      getBrowsers(filters),
+      getLanguages(filters),
+      getHeatmap(filters),
+      getFunnel(filters, kpis),
+      getRecentVisits(filters),
+    ])
+
+  return (
+    <>
+      <div className="grid gap-4 lg:grid-cols-2">
+        <Panel title="Países">
+          <BarList
+            items={countries.map((c) => ({
+              key: c.key,
+              label: `${flagEmoji(c.key)}  ${countryName(c.key)}`,
+              value: c.visits,
+            }))}
+          />
+        </Panel>
+
+        <Panel title="Ciudades">
+          <BarList items={cities.map((c) => ({ key: c.key, label: c.key, value: c.visits }))} />
+        </Panel>
+      </div>
+
+      <div className="grid gap-4 lg:grid-cols-3">
+        <Panel title="Dispositivo">
+          <BarList
+            items={devices.map((d) => ({
+              key: d.key,
+              label: DEVICE_LABELS[d.key] ?? d.key,
+              value: d.visits,
+            }))}
+          />
+        </Panel>
+        <Panel title="Sistema">
+          <BarList items={systems.map((s) => ({ key: s.key, label: s.key, value: s.visits }))} />
+        </Panel>
+        <Panel title="Navegador">
+          <BarList items={browsers.map((b) => ({ key: b.key, label: b.key, value: b.visits }))} />
+        </Panel>
+      </div>
+
+      <Panel title="Cuándo te visitan" hint={`Hora local de ${SITE_TIMEZONE}`}>
+        <Heatmap cells={heatmap} />
+      </Panel>
+
+      <div className="grid gap-4 lg:grid-cols-2">
+        <Panel title="Embudo" hint="De llegar a la página a hacer click">
+          <Funnel data={funnel} />
+        </Panel>
+
+        <Panel title="Idioma del navegador">
+          <BarList items={languages.map((l) => ({ key: l.key, label: l.key, value: l.visits }))} />
+        </Panel>
+      </div>
+
+      <Panel title="Últimas visitas" hint="Las 40 más recientes del período">
+        {recent.length === 0 ? (
+          <Empty>Nada todavía.</Empty>
+        ) : (
+          <ul className="divide-y divide-white/[0.06]">
+            {recent.map((visit) => (
+              <li key={visit.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 py-2 text-[0.82rem]">
+                <span aria-hidden>{flagEmoji(visit.country)}</span>
+                <span className="text-fg">
+                  {visit.city ?? countryName(visit.country)}
+                  {visit.city && visit.country ? (
+                    <span className="text-fg-faint">, {countryName(visit.country)}</span>
+                  ) : null}
+                </span>
+                <span className="text-fg-muted">
+                  {DEVICE_LABELS[visit.deviceType ?? ''] ?? visit.deviceType ?? '—'}
+                  {visit.os ? ` · ${visit.os}` : ''}
+                  {visit.browser ? ` · ${visit.browser}` : ''}
+                </span>
+                <span className="rounded-md bg-white/[0.06] px-1.5 py-0.5 font-mono text-[0.68rem] text-fg-muted">
+                  {networkLabel(visit.referrerNetwork)}
+                </span>
+                {visit.campaign ? (
+                  <span
+                    className="rounded-md px-1.5 py-0.5 font-mono text-[0.68rem]"
+                    style={{ background: `${seriesColor(0)}25`, color: seriesColor(0) }}
+                  >
+                    ?s={visit.campaign}
+                  </span>
+                ) : null}
+                {visit.isBot ? (
+                  <span className="rounded-md bg-white/[0.06] px-1.5 py-0.5 font-mono text-[0.68rem] text-fg-faint">
+                    bot
+                  </span>
+                ) : null}
+                <span className="ml-auto font-mono text-[0.7rem] text-fg-faint">
+                  {timeAgo(visit.createdAt)}
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </Panel>
     </>
   )
 }

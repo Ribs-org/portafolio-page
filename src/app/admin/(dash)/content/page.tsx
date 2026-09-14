@@ -185,22 +185,24 @@ export default async function ContentPage({
           title="Tus posts"
           hint="Lo publicado dentro del rango elegido; «Incluir anteriores» suma lo más viejo que siga teniendo actividad. Ordena por cualquier columna. La columna Views muestra el acumulado, con lo ganado al lado — y un «—» cuando el post existía antes de la primera medición y su crecimiento no se puede saber. Arrastre es visitas sobre views ganadas."
           action={
+            // Los tres son controles y estaban pintados como notas al pie: `fg-faint`
+            // sobre la superficie da 3,5:1, por debajo de lo legible a este tamaño.
             <div className="flex items-center gap-3">
               <Link
                 href={toggleHref(params, 'anteriores', incluirAnteriores)}
-                className="text-[0.75rem] text-fg-faint transition-colors hover:text-fg"
+                className="text-[0.75rem] text-fg-muted transition-colors hover:text-fg"
               >
                 {incluirAnteriores ? 'Solo del período' : 'Incluir anteriores'}
               </Link>
               <Link
                 href={toggleHref(params, 'metricas', onlyWithMetrics)}
-                className="text-[0.75rem] text-fg-faint transition-colors hover:text-fg"
+                className="text-[0.75rem] text-fg-muted transition-colors hover:text-fg"
               >
                 {onlyWithMetrics ? 'Mostrar todas' : 'Solo con métricas'}
               </Link>
               <Link
                 href={toggleHref(params, 'archivados', includeArchived)}
-                className="text-[0.75rem] text-fg-faint transition-colors hover:text-fg"
+                className="text-[0.75rem] text-fg-muted transition-colors hover:text-fg"
               >
                 {includeArchived ? 'Ocultar borrados' : 'Ver borrados'}
               </Link>

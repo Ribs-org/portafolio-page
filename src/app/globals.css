@@ -18,6 +18,8 @@
 
   --color-positive: #4ade80;
   --color-negative: #fb7185;
+  /* Ni bien ni mal: algo está en curso o pide atención sin haber fallado. */
+  --color-caution: #fbbf24;
 }
 
 @layer base {

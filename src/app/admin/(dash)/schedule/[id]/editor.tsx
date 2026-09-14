@@ -4,7 +4,9 @@ import Image from 'next/image'
 import Link from 'next/link'
 import { useActionState, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
+import { ArrowDown, ArrowLeft, ArrowUp, Check, Copy, ExternalLink } from 'lucide-react'
 import { deleteScheduledPost, updateScheduledPost, type FormState } from '@/app/admin/actions'
+import { Button, Field, GroupLabel, Input, Textarea } from '@/components/ui'
 import { networkLabel } from '@/lib/networks'
 import { cn } from '@/lib/utils'
 
@@ -58,18 +60,22 @@ export function Editor({
     <div className="max-w-2xl">
       <div className="mb-4 flex items-center justify-between">
         <h1 className="font-display text-xl font-semibold tracking-[-0.02em]">Editar post</h1>
-        <Link href={volver} className="text-sm text-fg-faint transition-colors hover:text-fg">
-          ← Volver
+        <Link
+          href={volver}
+          className="inline-flex items-center gap-1 text-sm text-fg-faint transition-colors hover:text-fg"
+        >
+          <ArrowLeft className="h-4 w-4" aria-hidden />
+          Volver
         </Link>
       </div>
 
       {publishing ? (
-        <p className="mb-4 rounded-xl bg-amber-500/10 px-4 py-3 text-sm text-amber-300">
+        <p className="mb-4 rounded-xl bg-caution/10 px-4 py-3 text-sm text-caution">
           Hay una publicación en curso. Vuelve en un minuto.
         </p>
       ) : null}
       {published.size > 0 ? (
-        <p className="mb-4 rounded-xl bg-emerald-500/10 px-4 py-3 text-sm text-emerald-300">
+        <p className="mb-4 rounded-xl bg-positive/10 px-4 py-3 text-sm text-positive">
           Ya publicado en {[...published].map(networkLabel).join(', ')}. Los cambios no tocan lo
           publicado.
         </p>
@@ -78,34 +84,21 @@ export function Editor({
       <form action={formAction}>
         <fieldset disabled={publishing || pending} className="space-y-4">
           <input type="hidden" name="volver" value={volver} />
-          <label className="block">
-            <span className="mb-1 block font-mono text-[0.65rem] uppercase tracking-[0.14em] text-fg-faint">
-              Texto
-            </span>
-            <textarea
-              name="caption"
-              defaultValue={caption}
-              rows={4}
-              className="w-full rounded-xl bg-white/[0.05] px-3 py-2 text-sm text-fg outline-none"
-            />
-          </label>
+          <Field label="Texto">
+            <Textarea name="caption" defaultValue={caption} rows={4} />
+          </Field>
 
-          <label className="block">
-            <span className="mb-1 block font-mono text-[0.65rem] uppercase tracking-[0.14em] text-fg-faint">
-              Fecha y hora
-            </span>
-            <input
+          <Field label="Fecha y hora">
+            <Input
               type="datetime-local"
               name="scheduledAt"
               defaultValue={scheduledAtLocal}
-              className="rounded-xl bg-white/[0.05] px-3 py-2 text-sm text-fg outline-none"
+              className="max-w-[16rem]"
             />
-          </label>
+          </Field>
 
           <div>
-            <span className="mb-1 block font-mono text-[0.65rem] uppercase tracking-[0.14em] text-fg-faint">
-              Redes
-            </span>
+            <GroupLabel>Redes</GroupLabel>
             <div className="flex flex-wrap gap-3">
               {NETWORKS.map((network) => {
                 const locked = published.has(network)
@@ -131,9 +124,7 @@ export function Editor({
           </div>
 
           <div>
-            <span className="mb-1 block font-mono text-[0.65rem] uppercase tracking-[0.14em] text-fg-faint">
-              Media
-            </span>
+            <GroupLabel>Media</GroupLabel>
             {kept.length > 0 ? (
               <ul className="mb-2 space-y-2">
                 {kept.map((m, index) => (
@@ -155,8 +146,22 @@ export function Editor({
                     )}
                     <span className="min-w-0 flex-1 truncate text-xs text-fg-faint">{m.blobUrl}</span>
                     <MediaActions url={m.blobUrl} />
-                    <button type="button" onClick={() => move(index, -1)} className="text-fg-faint hover:text-fg">↑</button>
-                    <button type="button" onClick={() => move(index, 1)} className="text-fg-faint hover:text-fg">↓</button>
+                    <button
+                      type="button"
+                      onClick={() => move(index, -1)}
+                      aria-label="Subir"
+                      className="text-fg-faint transition-colors hover:text-fg"
+                    >
+                      <ArrowUp className="h-4 w-4" aria-hidden />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => move(index, 1)}
+                      aria-label="Bajar"
+                      className="text-fg-faint transition-colors hover:text-fg"
+                    >
+                      <ArrowDown className="h-4 w-4" aria-hidden />
+                    </button>
                     <button
                       type="button"
                       onClick={() => setKept(kept.filter((k) => k.id !== m.id))}
@@ -168,25 +173,18 @@ export function Editor({
                 ))}
               </ul>
             ) : null}
-            <label className="block text-sm">
-              Agregar archivos
-              <input type="file" name="media" multiple accept="image/*,video/*" className="mt-1 block text-xs" />
-            </label>
-            <label className="mt-2 block text-sm">
-              Agregar por URL (una por línea)
-              <textarea
-                name="mediaUrls"
-                rows={2}
-                placeholder="https://…"
-                className="mt-1 w-full rounded-xl bg-white/[0.05] px-3 py-2 text-xs text-fg outline-none"
-              />
-            </label>
+            <Field label="Agregar archivos">
+              <Input type="file" name="media" multiple accept="image/*,video/*" />
+            </Field>
+            <div className="mt-2">
+              <Field label="Agregar por URL" hint="Una por línea">
+                <Textarea name="mediaUrls" rows={2} placeholder="https://…" />
+              </Field>
+            </div>
           </div>
 
           <div>
-            <span className="mb-1 block font-mono text-[0.65rem] uppercase tracking-[0.14em] text-fg-faint">
-              Portada (solo para video)
-            </span>
+            <GroupLabel>Portada (solo para video)</GroupLabel>
             {keptCover ? (
               <div className="mb-2 flex items-center gap-3 rounded-xl bg-white/[0.04] p-2">
                 <input type="hidden" name="keepPortada" value={keptCover} />
@@ -198,42 +196,31 @@ export function Editor({
                 </button>
               </div>
             ) : null}
-            <label className="block text-sm">
-              {keptCover ? 'Cambiar por URL' : 'Agregar por URL'}
-              <input
-                type="text"
-                name="portadaUrl"
-                placeholder="https://…/portada.jpg"
-                className="mt-1 w-full rounded-xl bg-white/[0.05] px-3 py-2 text-xs text-fg outline-none"
-              />
-            </label>
+            <Field label={keptCover ? 'Cambiar por URL' : 'Agregar por URL'}>
+              <Input type="text" name="portadaUrl" placeholder="https://…/portada.jpg" />
+            </Field>
           </div>
 
-          <label className="block">
-            <span className="mb-1 block font-mono text-[0.65rem] uppercase tracking-[0.14em] text-fg-faint">
-              Atributos (JSON del editor de contenido)
-            </span>
-            <textarea
+          <Field label="Atributos (JSON del editor de contenido)">
+            <Textarea
               name="atributos"
               defaultValue={atributos}
               rows={3}
               placeholder='{"hook": "pregunta-polemica", "tema": "negocios"}'
-              className="w-full rounded-xl bg-white/[0.05] px-3 py-2 font-mono text-xs text-fg outline-none"
+              className="font-mono text-xs"
             />
-          </label>
+          </Field>
 
-          {state.error ? <p className="text-sm text-red-400">{state.error}</p> : null}
-          {deleteError ? <p className="text-sm text-red-400">{deleteError}</p> : null}
+          {state.error ? <p className="text-sm text-negative">{state.error}</p> : null}
+          {deleteError ? <p className="text-sm text-negative">{deleteError}</p> : null}
 
           <div className="flex items-center gap-3">
-            <button
-              type="submit"
-              className="rounded-xl bg-white/[0.12] px-4 py-2 text-sm text-fg transition-colors hover:bg-white/[0.18]"
-            >
+            <Button type="submit" variant="primary" disabled={pending}>
               {pending ? 'Guardando…' : 'Guardar'}
-            </button>
-            <button
+            </Button>
+            <Button
               type="button"
+              variant="danger"
               disabled={deleting}
               onClick={() =>
                 startDelete(async () => {
@@ -243,10 +230,9 @@ export function Editor({
                   else router.push(volver)
                 })
               }
-              className="text-sm text-fg-faint transition-colors hover:text-red-300"
             >
-              Eliminar
-            </button>
+              {deleting ? 'Eliminando…' : 'Eliminar'}
+            </Button>
           </div>
         </fieldset>
       </form>
@@ -281,11 +267,29 @@ function MediaActions({ url }: { url: string }) {
 
   return (
     <span className="flex shrink-0 items-center gap-2">
-      <a href={url} target="_blank" rel="noreferrer" className="text-xs text-fg-faint transition-colors hover:text-fg">
-        Abrir ↗
+      <a
+        href={url}
+        target="_blank"
+        rel="noreferrer"
+        aria-label="Abrir en una pestaña nueva"
+        title="Abrir en una pestaña nueva"
+        className="text-fg-faint transition-colors hover:text-fg"
+      >
+        <ExternalLink className="h-4 w-4" aria-hidden />
       </a>
-      <button type="button" onClick={copy} className="text-xs text-fg-faint transition-colors hover:text-fg">
-        {copied ? '✓ copiada' : failed ? 'no se pudo copiar' : 'Copiar URL'}
+      {/* Ícono y no texto: los tres estados medían distinto y la fila saltaba de ancho
+          cada vez que se copiaba una URL. El `title` dice lo que el ícono calla. */}
+      <button
+        type="button"
+        onClick={copy}
+        aria-label={failed ? 'No se pudo copiar la URL' : 'Copiar la URL'}
+        title={copied ? 'Copiada' : failed ? 'No se pudo copiar' : 'Copiar la URL'}
+        className={cn(
+          'transition-colors hover:text-fg',
+          failed ? 'text-negative' : 'text-fg-faint',
+        )}
+      >
+        {copied ? <Check className="h-4 w-4" aria-hidden /> : <Copy className="h-4 w-4" aria-hidden />}
       </button>
     </span>
   )

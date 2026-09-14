@@ -1,22 +1,8 @@
 'use client'
 
 import { useActionState } from 'react'
-import { useFormStatus } from 'react-dom'
+import { Submit } from '@/components/ui'
 import { login, type FormState } from '../actions'
-
-function Submit() {
-  const { pending } = useFormStatus()
-  return (
-    <button
-      type="submit"
-      disabled={pending}
-      className="surface surface-hover mt-4 w-full rounded-xl px-4 py-2.5 text-sm font-medium disabled:opacity-50"
-      style={{ background: 'rgb(var(--accent) / 0.18)', borderColor: 'rgb(var(--accent) / 0.4)' }}
-    >
-      {pending ? 'Entrando…' : 'Entrar'}
-    </button>
-  )
-}
 
 export function LoginForm() {
   const [state, formAction] = useActionState<FormState, FormData>(login, {})
@@ -40,7 +26,15 @@ export function LoginForm() {
           {state.error}
         </p>
       ) : null}
-      <Submit />
+      {/* El acento del login no es un `variant` del panel: lo pinta el mismo `--accent`
+          del perfil, y por eso viaja en `style` y no en clases. */}
+      <Submit
+        pendingLabel="Entrando…"
+        className="surface surface-hover mt-4 w-full px-4 py-2.5"
+        style={{ background: 'rgb(var(--accent) / 0.18)', borderColor: 'rgb(var(--accent) / 0.4)' }}
+      >
+        Entrar
+      </Submit>
     </form>
   )
 }

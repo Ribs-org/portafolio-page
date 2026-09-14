@@ -70,7 +70,7 @@ export function ProfileEditor({ profile, initialLinks, origin }: Props) {
     setLinks(initialLinks)
   }
 
-  const [profileState, saveProfile] = useActionState<FormState, FormData>(
+  const [profileState, saveProfile, savingProfile] = useActionState<FormState, FormData>(
     updateProfile.bind(null, profile.id),
     {},
   )
@@ -253,10 +253,10 @@ export function ProfileEditor({ profile, initialLinks, origin }: Props) {
             ) : null}
 
             <div className="flex items-center gap-3">
-              <Button type="submit" variant="primary">
-                Guardar perfil
+              <Button type="submit" variant="primary" disabled={savingProfile}>
+                {savingProfile ? 'Guardando…' : 'Guardar perfil'}
               </Button>
-              {profileState.ok ? (
+              {profileState.ok && !savingProfile ? (
                 <span className="flex items-center gap-1 text-sm text-positive">
                   <Check className="h-4 w-4" aria-hidden /> Guardado
                 </span>
