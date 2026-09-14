@@ -2,7 +2,7 @@
 
 > **Para quien ejecute esto:** SUB-SKILL OBLIGATORIA: usa superpowers:subagent-driven-development
 > (recomendada) o superpowers:executing-plans para implementar tarea por tarea. Los pasos
-> usan casillas (`- [x]`) para marcar avance.
+> usan casillas (`- [ ]`) para marcar avance.
 
 **Meta:** que el dueño vea en el panel cada comentario nuevo con su borrador, lo corrija si
 quiere, y lo mande o lo descarte de un toque. Y que escriba y cambie las instrucciones que

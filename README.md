@@ -239,8 +239,7 @@ TIKTOK_CLIENT_SECRET=
 ### Responder comentarios
 
 El panel puede traer los comentarios nuevos de tus publicaciones de Instagram, Facebook y
-YouTube, y —en las entregas siguientes— proponerte una respuesta que apruebas de un
-toque. El descubrimiento viaja en la misma corrida que publica, cada cinco minutos, y
+YouTube, y en la cola te propone una respuesta que apruebas de un toque. El descubrimiento viaja en la misma corrida que publica, cada cinco minutos, y
 mira tus publicaciones de los últimos siete días. A YouTube lo mira cada media hora, no
 cada cinco minutos: su cuota diaria es la misma que usa la sincronización de métricas, y
 gastarla acá te dejaría sin las dos cosas.
