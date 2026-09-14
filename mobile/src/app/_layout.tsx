@@ -1,9 +1,16 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Stack, useRouter } from 'expo-router'
+import { DarkTheme, Stack, ThemeProvider, useRouter, type Theme } from 'expo-router'
 import * as LocalAuthentication from 'expo-local-authentication'
-import { View } from 'react-native'
+import { StatusBar } from 'expo-status-bar'
 import { COLORES, Cargando } from '../components/ui'
 import { readToken } from '../lib/session'
+
+// Sin esto el navegador pinta su tema claro debajo de todo: el fondo de escena y
+// las cabeceras nativas salían blancos aunque cada pantalla se dibuje oscura.
+const TEMA: Theme = {
+  ...DarkTheme,
+  colors: { ...DarkTheme.colors, background: COLORES.fondo, card: COLORES.tarjeta },
+}
 
 export default function RootLayout() {
   const [listo, setListo] = useState(false)
@@ -47,13 +54,16 @@ export default function RootLayout() {
     void arrancar()
   }, [arrancar])
 
-  if (!listo) {
-    return (
-      <View style={{ flex: 1, backgroundColor: COLORES.fondo, justifyContent: 'center' }}>
+  return (
+    <ThemeProvider value={TEMA}>
+      <StatusBar style="light" />
+      {listo ? (
+        <Stack
+          screenOptions={{ headerShown: false, contentStyle: { backgroundColor: COLORES.fondo } }}
+        />
+      ) : (
         <Cargando />
-      </View>
-    )
-  }
-
-  return <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: COLORES.fondo } }} />
+      )}
+    </ThemeProvider>
+  )
 }

@@ -64,7 +64,18 @@ export function Sello({ texto }: { texto: string | null }) {
 }
 
 export function Cargando() {
-  return <ActivityIndicator color={COLORES.suave} style={{ marginTop: 32 }} />
+  return (
+    <View
+      style={{
+        flex: 1,
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: COLORES.fondo,
+      }}
+    >
+      <ActivityIndicator color={COLORES.suave} />
+    </View>
+  )
 }
 
 export function ErrorConReintento({ mensaje, onReintentar }: { mensaje: string; onReintentar: () => void }) {
