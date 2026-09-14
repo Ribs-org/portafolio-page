@@ -1,7 +1,7 @@
 import { useState } from 'react'
-import { Pressable, Text, TextInput, View } from 'react-native'
+import { Text, TextInput, View } from 'react-native'
 import { useRouter } from 'expo-router'
-import { COLORES } from '../components/ui'
+import { Boton, COLORES } from '../components/ui'
 import { login } from '../lib/session'
 
 export default function Login() {
@@ -42,13 +42,15 @@ export default function Login() {
         }}
       />
       {error ? <Text style={{ color: COLORES.rojo }}>{error}</Text> : null}
-      <Pressable
-        onPress={entrar}
-        disabled={entrando}
-        style={{ backgroundColor: COLORES.tarjeta, borderRadius: 12, padding: 14, alignItems: 'center' }}
-      >
-        <Text style={{ color: COLORES.texto }}>{entrando ? 'Entrando…' : 'Entrar'}</Text>
-      </Pressable>
+      {/* En fila porque `Boton` crece a lo ancho con `flex: 1`, y esta pantalla apila. */}
+      <View style={{ flexDirection: 'row' }}>
+        <Boton
+          texto={entrando ? 'Entrando…' : 'Entrar'}
+          onPress={entrar}
+          deshabilitado={entrando}
+          destacado
+        />
+      </View>
     </View>
   )
 }

@@ -234,7 +234,7 @@ export default function Publicar() {
           />
         ))}
         {archivos.length < MAX_ARCHIVOS && !ocupado ? (
-          <Chip texto="＋ Fotos o video" activo={false} onPress={() => void elegir()} />
+          <Chip texto="+ Fotos o video" activo={false} onPress={() => void elegir()} />
         ) : null}
       </View>
 
@@ -244,12 +244,18 @@ export default function Publicar() {
             key={red}
             texto={NOMBRE_RED[red] ?? red}
             activo={redes.includes(red)}
-            onPress={() => (ocupado ? undefined : alternarRed(red))}
+            onPress={() => alternarRed(red)}
+            deshabilitado={ocupado}
           />
         ))}
       </View>
 
-      <Chip texto={`Cuándo: ${fechaLegible(fecha)}`} activo onPress={() => (ocupado ? undefined : elegirFecha())} />
+      <Chip
+        texto={`Cuándo: ${fechaLegible(fecha)}`}
+        activo
+        onPress={elegirFecha}
+        deshabilitado={ocupado}
+      />
 
       {aviso ? <Text style={{ color: COLORES.rojo }}>{aviso}</Text> : null}
       {error ? <Text style={{ color: COLORES.rojo }}>{error}</Text> : null}

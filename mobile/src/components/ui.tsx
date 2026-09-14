@@ -1,7 +1,6 @@
 import { ActivityIndicator, Pressable, RefreshControl, ScrollView, Text, View } from 'react-native'
 import type { ReactNode } from 'react'
 import { Image } from 'expo-image'
-import { num } from '../lib/format'
 
 export const COLORES = {
   fondo: '#0b0b0f',
@@ -14,6 +13,9 @@ export const COLORES = {
   rojo: '#f87171',
   ambar: '#fbbf24',
 }
+
+// El destello de Android al tocar: el mismo blanco del texto, casi transparente.
+const RIPPLE = { color: COLORES.texto + '22' }
 
 export function Pantalla({
   children,
@@ -82,9 +84,9 @@ export function ErrorConReintento({ mensaje, onReintentar }: { mensaje: string; 
   return (
     <Tarjeta>
       <Text style={{ color: COLORES.texto }}>{mensaje}</Text>
-      <Pressable onPress={onReintentar}>
-        <Text style={{ color: COLORES.verde, marginTop: 6 }}>Reintentar</Text>
-      </Pressable>
+      <View style={{ flexDirection: 'row', marginTop: 4 }}>
+        <Boton texto="Reintentar" onPress={onReintentar} destacado />
+      </View>
     </Tarjeta>
   )
 }
@@ -118,20 +120,37 @@ export function PuntoEstado({ estado }: { estado: string }) {
   )
 }
 
-export function Numero({ children }: { children: number | null }) {
-  return <Text style={{ color: COLORES.suave, fontSize: 13 }}>{num(children)}</Text>
-}
-
-export function Chip({ texto, activo, onPress }: { texto: string; activo: boolean; onPress: () => void }) {
+/**
+ * El control más usado de la app: filtros, rangos, el selector de archivos y el de
+ * fecha. De ahí los 44 dp más el `hitSlop`: en reposo se ve casi igual que antes,
+ * pero el dedo ya no falla.
+ */
+export function Chip({
+  texto,
+  activo,
+  onPress,
+  deshabilitado,
+}: {
+  texto: string
+  activo: boolean
+  onPress: () => void
+  deshabilitado?: boolean
+}) {
   return (
     <Pressable
       onPress={onPress}
-      style={{
+      disabled={deshabilitado}
+      hitSlop={4}
+      android_ripple={deshabilitado ? undefined : RIPPLE}
+      style={({ pressed }) => ({
         paddingHorizontal: 12,
-        paddingVertical: 6,
+        paddingVertical: 10,
+        minHeight: 44,
+        justifyContent: 'center',
         borderRadius: 999,
         backgroundColor: activo ? COLORES.tarjeta : 'transparent',
-      }}
+        opacity: deshabilitado ? 0.5 : pressed ? 0.7 : 1,
+      })}
     >
       <Text style={{ color: activo ? COLORES.texto : COLORES.tenue, fontSize: 12 }}>{texto}</Text>
     </Pressable>
@@ -165,7 +184,7 @@ export function Miniatura({
             justifyContent: 'center',
           }}
         >
-          <Text style={{ color: COLORES.suave, fontSize: 11 }}>video</Text>
+          <Text style={{ color: COLORES.suave, fontSize: 11 }}>Video</Text>
         </View>
       ) : (
         <Image source={{ uri }} style={{ width: 72, height: 72, borderRadius: 10 }} />
@@ -173,7 +192,7 @@ export function Miniatura({
       {onQuitar ? (
         <Pressable
           onPress={onQuitar}
-          hitSlop={8}
+          hitSlop={14}
           style={{
             position: 'absolute',
             top: -6,
@@ -208,14 +227,17 @@ export function Boton({
     <Pressable
       onPress={onPress}
       disabled={deshabilitado}
-      style={{
+      android_ripple={deshabilitado ? undefined : RIPPLE}
+      style={({ pressed }) => ({
         flex: 1,
         backgroundColor: destacado ? COLORES.verde : COLORES.tarjeta,
         borderRadius: 12,
         padding: 14,
+        minHeight: 48,
         alignItems: 'center',
-        opacity: deshabilitado ? 0.5 : 1,
-      }}
+        justifyContent: 'center',
+        opacity: deshabilitado ? 0.5 : pressed ? 0.7 : 1,
+      })}
     >
       <Text style={{ color: destacado ? COLORES.fondo : COLORES.texto, fontWeight: '600' }}>{texto}</Text>
     </Pressable>

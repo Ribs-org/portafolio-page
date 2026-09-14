@@ -63,6 +63,17 @@ export type Cuentas = {
 
 export type Calendario = { posts: PostProgramado[] }
 
+export const RANGOS = ['hoy', '7d', '30d'] as const
+
+export type Rango = (typeof RANGOS)[number]
+
+/** Resumen y Contenido ofrecen los mismos rangos; que también los llamen igual. */
+export const ETIQUETA_RANGO: Record<Rango, string> = {
+  hoy: 'Hoy',
+  '7d': '7 días',
+  '30d': '30 días',
+}
+
 export const NOMBRE_RED: Record<string, string> = {
   instagram: 'Instagram',
   facebook: 'Facebook',

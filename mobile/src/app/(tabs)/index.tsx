@@ -1,9 +1,10 @@
 import { useCallback, useState } from 'react'
-import { Pressable, Text, View } from 'react-native'
+import { Text, View } from 'react-native'
 import { useFocusEffect, useRouter } from 'expo-router'
 import {
   COLORES,
   Cargando,
+  Chip,
   Cifra,
   ErrorConReintento,
   Pantalla,
@@ -15,17 +16,17 @@ import {
 import { num, pct, shortDate } from '../../lib/format'
 import { clearToken } from '../../lib/session'
 import { useScreenData } from '../../lib/useScreenData'
-import type { Overview, PostProgramado } from '../../lib/tipos'
+import {
+  ETIQUETA_RANGO,
+  RANGOS,
+  type Overview,
+  type PostProgramado,
+  type Rango,
+} from '../../lib/tipos'
 import { useToken } from '../../lib/useToken'
 
-const RANGOS = [
-  { key: 'hoy', label: 'Hoy' },
-  { key: '7d', label: '7 días' },
-  { key: '30d', label: '30 días' },
-]
-
 export default function Resumen() {
-  const [rango, setRango] = useState('7d')
+  const [rango, setRango] = useState<Rango>('7d')
   const token = useToken()
   const router = useRouter()
   const salir = useCallback(async () => {
@@ -57,20 +58,7 @@ export default function Resumen() {
     <Pantalla refrescando={cargando} onRefrescar={refrescar}>
       <View style={{ flexDirection: 'row', gap: 8 }}>
         {RANGOS.map((r) => (
-          <Pressable
-            key={r.key}
-            onPress={() => setRango(r.key)}
-            style={{
-              paddingHorizontal: 12,
-              paddingVertical: 6,
-              borderRadius: 999,
-              backgroundColor: rango === r.key ? COLORES.tarjeta : 'transparent',
-            }}
-          >
-            <Text style={{ color: rango === r.key ? COLORES.texto : COLORES.tenue, fontSize: 12 }}>
-              {r.label}
-            </Text>
-          </Pressable>
+          <Chip key={r} texto={ETIQUETA_RANGO[r]} activo={rango === r} onPress={() => setRango(r)} />
         ))}
       </View>
       <Sello texto={sello} />
