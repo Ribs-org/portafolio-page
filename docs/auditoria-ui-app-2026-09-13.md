@@ -84,7 +84,8 @@ y «Publicar ahora» salen apagados al abrir la pestaña sin decir qué falta.
 
 Sin cabecera ni botón de volver. Sin safe-area, así que la primera línea queda debajo de la
 hora y la batería. Estado «no encontrado» como frase suelta sin acción. La tabla de atributos
-imprime claves crudas de la API en inglés. Las filas de métricas desbordan con valores largos.
+muestra la clave tal cual (`hook`, `tema`, ya en español) sin mayúscula inicial. Las filas de
+métricas desbordan con valores largos.
 
 ### El mismo concepto con dos caras
 
@@ -98,7 +99,7 @@ imprime claves crudas de la API en inglés. Las filas de métricas desbordan con
 
 - Cinco pestañas sin íconos con etiquetas de hasta diez caracteres; «Calendario» se corta en
   360 dp.
-- Cuentas imprime una fecha ISO cruda.
+- Cuentas recibe `cuenta.dia` ya formateado («3 sep»), no una fecha ISO cruda.
 - El error de red en Calendario no tiene `numberOfLines` ni `flex: 1` y desborda la tarjeta.
 - Publicar no tiene `KeyboardAvoidingView`: con el teclado abierto los botones quedan tapados.
 - Login abre el teclado al instante y en pantallas chicas empuja el botón fuera de vista.
@@ -142,16 +143,17 @@ instaladas y sin usar.
 1. **Los primeros diez segundos.** Fondo oscuro en `Cargando`, tema oscuro declarado en el
    navegador y en `app.json`, barra de estado clara, ícono y splash propios a partir de la
    bandera que ya usa el sitio, y fuera los assets de la plantilla.
-2. **El tacto.** Estado presionado, ripple y 48 dp de alto en `Chip` y `Boton`. Resumen y el
-   login pasan a usar los componentes en vez de copiarlos. Los rangos se rotulan igual en todas
-   partes. Los chips deshabilitados se atenúan como los botones.
+2. **El tacto.** Estado presionado y ripple en `Chip` y `Boton`; `Boton` queda en 48 dp de alto
+   y `Chip` en 44 dp más `hitSlop`, un área de toque de unos 52. Resumen y el login pasan a usar
+   los componentes en vez de copiarlos. Los rangos se rotulan igual en todas partes. Los chips
+   deshabilitados se atenúan como los botones.
 3. **Los bordes de pantalla.** Cabecera con botón de volver en el detalle de post, safe-area,
    `KeyboardAvoidingView` en Publicar y en el login, estado de error del detalle igual al del
-   resto, `numberOfLines` y `flex` donde el texto largo desborda, y los atributos crudos con
-   etiqueta en español o escondidos.
+   resto, `numberOfLines` y `flex` donde el texto largo desborda, y la clave de cada atributo con
+   mayúscula inicial.
 
-Más los menores que caen de paso: el signo más, `Numero`, la fecha ISO en Cuentas, y que la
-confirmación «Listo» se vea un momento antes de saltar al calendario.
+Más los menores que caen de paso: el signo más, `Numero`, y que la confirmación «Listo» se vea
+un momento antes de saltar al calendario.
 
 ## 6. Lo que queda para una decisión aparte
 
