@@ -91,7 +91,11 @@ export function Cuentas({ rows }: { rows: CuentaRow[] }) {
           <RefreshCw className={cn('h-3.5 w-3.5', pending && 'animate-spin')} aria-hidden />
           Sincronizar ahora
         </button>
-        {aviso ? <span className="text-[0.78rem] text-fg-faint">{aviso.texto}</span> : null}
+        {/* La región vive siempre, y el aviso entra y sale de ella: montarla con el texto
+            adentro es un cambio que el lector de pantalla no siempre alcanza a ver. */}
+        <span role="status" className="text-[0.78rem] text-fg-faint">
+          {aviso ? aviso.texto : null}
+        </span>
       </div>
     </section>
   )
@@ -153,11 +157,9 @@ function Tarjeta({ row, network }: { row: CuentaRow; network: string }) {
           {FALLO_DE_SYNC}
         </p>
       ) : null}
-      {desconectada ? (
-        <p className="mt-2 text-[0.72rem] text-fg-muted" role="status">
-          Desconectada.
-        </p>
-      ) : null}
+      <div role="status">
+        {desconectada ? <p className="mt-2 text-[0.72rem] text-fg-muted">Desconectada.</p> : null}
+      </div>
       <div className="mt-3 flex items-center gap-3">
         <a
           href={`/api/social/${network}/connect`}

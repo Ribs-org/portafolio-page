@@ -70,12 +70,13 @@ export default async function AnalyticsPage({
 }) {
   const params = await searchParams
   const filters = parseFilters(params)
-  const profiles = await getAllProfiles()
 
-  // Solo lo que hace falta para pintar algo: las cuatro cifras y el gráfico de tráfico.
-  // Los otros once paneles esperan abajo, cada grupo en su propio `Suspense`, para que
-  // la consulta más lenta de la página no retenga a las tres más rápidas.
-  const [kpis, previous, series] = await Promise.all([
+  // Solo lo que hace falta para pintar algo: la barra de filtros, las cuatro cifras y el
+  // gráfico de tráfico. Los otros once paneles esperan abajo, cada grupo en su propio
+  // `Suspense`, para que la consulta más lenta de la página no retenga a las tres más
+  // rápidas.
+  const [profiles, kpis, previous, series] = await Promise.all([
+    getAllProfiles(),
     getKpis(filters),
     getKpis(previousPeriod(filters)),
     getTimeSeries(filters),
@@ -106,14 +107,16 @@ export default async function AnalyticsPage({
 
         <Suspense
           fallback={
-            <>
+            // La grilla anidada repite el `gap-4` del contenedor: los huecos tienen que
+            // caer donde caerán los paneles.
+            <div role="status" aria-label="Cargando" className="grid gap-4">
               <PanelSkeleton />
               <PanelSkeleton />
               <div className="grid gap-4 lg:grid-cols-2">
                 <PanelSkeleton />
                 <PanelSkeleton />
               </div>
-            </>
+            </div>
           }
         >
           <PanelesDeOrigen filters={filters} visits={kpis.visits} />
@@ -121,7 +124,7 @@ export default async function AnalyticsPage({
 
         <Suspense
           fallback={
-            <>
+            <div role="status" aria-label="Cargando" className="grid gap-4">
               <div className="grid gap-4 lg:grid-cols-2">
                 <PanelSkeleton />
                 <PanelSkeleton />
@@ -137,7 +140,7 @@ export default async function AnalyticsPage({
                 <PanelSkeleton />
               </div>
               <PanelSkeleton />
-            </>
+            </div>
           }
         >
           <PanelesDeAudiencia filters={filters} kpis={kpis} />

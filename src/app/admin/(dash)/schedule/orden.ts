@@ -30,3 +30,12 @@ export function ordenarCola<T extends ItemCola>(items: T[]): T[] {
   cerrados.sort((a, b) => b.post.scheduledAt.getTime() - a.post.scheduledAt.getTime())
   return [...abiertos, ...cerrados]
 }
+
+/**
+ * El corte de la lista larga: lo que se muestra de entrada y cuántos quedan debajo.
+ * Recibe la lista ya ordenada, porque qué cae del otro lado del corte depende del
+ * orden y no del corte.
+ */
+export function cortarCola<T>(items: T[], tope: number): { visibles: T[]; ocultos: number } {
+  return { visibles: items.slice(0, tope), ocultos: Math.max(items.length - tope, 0) }
+}

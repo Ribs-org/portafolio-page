@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { estaCerrado, ordenarCola } from './orden'
+import { cortarCola, estaCerrado, ordenarCola } from './orden'
 
 function item(id: string, fecha: string, ...estados: string[]) {
   return {
@@ -57,5 +57,21 @@ describe('ordenarCola', () => {
     ]
     ordenarCola(items)
     expect(items.map((i) => i.id)).toEqual(['b', 'a'])
+  })
+})
+
+describe('cortarCola', () => {
+  const veinte = Array.from({ length: 20 }, (_, i) => i)
+
+  it('justo en el tope no esconde nada', () => {
+    const { visibles, ocultos } = cortarCola(veinte, 20)
+    expect(visibles).toHaveLength(20)
+    expect(ocultos).toBe(0)
+  })
+
+  it('uno más que el tope esconde uno', () => {
+    const { visibles, ocultos } = cortarCola([...veinte, 20], 20)
+    expect(visibles).toHaveLength(20)
+    expect(ocultos).toBe(1)
   })
 })

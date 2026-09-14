@@ -2,6 +2,7 @@
 
 import { useEffect } from 'react'
 import Link from 'next/link'
+import { usePathname } from 'next/navigation'
 import { Button } from '@/components/ui'
 
 /**
@@ -18,6 +19,9 @@ export default function PanelError({
   error: Error & { digest?: string }
   retry: () => void
 }) {
+  // La salida de emergencia no sirve cuando la que se rompió es la pantalla de llegada.
+  const enElResumen = usePathname() === '/admin'
+
   // El mensaje puede venir de una fila de la base o de la respuesta de una red: a la
   // consola, donde lo lee quien depura, y nunca a la pantalla.
   useEffect(() => {
@@ -35,9 +39,11 @@ export default function PanelError({
         <Button type="button" variant="primary" onClick={() => retry()}>
           Reintentar
         </Button>
-        <Link href="/admin" className="text-sm text-fg-muted transition-colors hover:text-fg">
-          Ir al Resumen
-        </Link>
+        {enElResumen ? null : (
+          <Link href="/admin" className="text-sm text-fg-muted transition-colors hover:text-fg">
+            Ir al Resumen
+          </Link>
+        )}
       </div>
     </section>
   )

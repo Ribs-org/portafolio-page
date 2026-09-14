@@ -7,6 +7,7 @@ import { Button, Input } from '@/components/ui'
 import type { ScheduledPost, ScheduledPostTarget } from '@/db/schema'
 import { networkLabel } from '@/lib/networks'
 import { cn } from '@/lib/utils'
+import { cortarCola } from './orden'
 
 const STATUS_LABEL: Record<string, string> = {
   scheduled: 'Programado',
@@ -15,8 +16,8 @@ const STATUS_LABEL: Record<string, string> = {
   failed: 'Falló',
 }
 
-// El corte de la tabla de contenido, por la misma razón: lo pendiente cabe entero
-// arriba y lo ya publicado no tiene por qué alargar la página para siempre.
+// El mismo corte que la tabla de contenido: de entrada solo las primeras veinte, que
+// casi siempre alcanzan para todo lo pendiente. El resto espera detrás del botón.
 const VISTA_PREVIA = 20
 
 export function Queue({
@@ -32,19 +33,28 @@ export function Queue({
   // la vez: abrir otro cierra el anterior sin dejar dos fechas a medio llenar.
   const [rescheduling, setRescheduling] = useState<string | null>(null)
   const [when, setWhen] = useState('')
+  // Aparte del error de arriba: el de reprogramar se pinta en la fila que lo produjo,
+  // que con la lista larga puede estar lejísimos del encabezado.
+  const [errorReprogramar, setErrorReprogramar] = useState<string | null>(null)
   const [expanded, setExpanded] = useState(false)
 
   function openReschedule(targetId: string) {
     setRescheduling(targetId)
     setWhen('')
+    setErrorReprogramar(null)
+  }
+
+  function closeReschedule() {
+    setRescheduling(null)
+    setErrorReprogramar(null)
   }
 
   function saveReschedule(targetId: string) {
     start(async () => {
-      setError(null)
+      setErrorReprogramar(null)
       const result = await rescheduleTarget(targetId, when)
-      if (result.error) setError(result.error)
-      else setRescheduling(null)
+      if (result.error) setErrorReprogramar(result.error)
+      else closeReschedule()
     })
   }
 
@@ -52,14 +62,14 @@ export function Queue({
     return <p className="py-8 text-center text-sm text-fg-faint">Nada programado todavía.</p>
   }
 
-  const visible = expanded ? items : items.slice(0, VISTA_PREVIA)
-  const ocultos = items.length - visible.length
+  const { visibles, ocultos } = cortarCola(items, VISTA_PREVIA)
+  const mostrados = expanded ? items : visibles
 
   return (
     <>
       {error && <p className="mb-3 text-sm text-negative">{error}</p>}
       <ul className="space-y-3">
-      {visible.map(({ post, targets }) => {
+      {mostrados.map(({ post, targets }) => {
         // El formulario de hora nueva vive bajo el post dueño del destino, no dentro
         // de la píldora: un `datetime-local` ahí adentro no cabe.
         const reprogramando = targets.find((target) => target.id === rescheduling)?.id
@@ -133,14 +143,19 @@ export function Queue({
               >
                 Guardar
               </Button>
-              <Button type="button" onClick={() => setRescheduling(null)}>Cancelar</Button>
+              <Button type="button" disabled={pending} onClick={closeReschedule}>
+                Cancelar
+              </Button>
+              {errorReprogramar ? (
+                <p className="w-full text-sm text-negative">{errorReprogramar}</p>
+              ) : null}
             </div>
           ) : null}
         </li>
         )
       })}
       </ul>
-      {ocultos > 0 || expanded ? (
+      {ocultos > 0 ? (
         <div className="mt-3 border-t border-white/[0.06] pt-2 text-center">
           <button
             type="button"
@@ -150,8 +165,8 @@ export function Queue({
             {expanded
               ? 'Mostrar menos'
               : ocultos === 1
-                ? 'Ver el anterior'
-                : `Ver los ${ocultos} anteriores`}
+                ? 'Ver el restante'
+                : `Ver los ${ocultos} restantes`}
           </button>
         </div>
       ) : null}
