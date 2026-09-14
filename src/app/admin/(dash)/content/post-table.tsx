@@ -314,7 +314,7 @@ function CampaignCell({ postId, campaign }: { postId: string; campaign: string }
         {copied ? <Check className="h-3 w-3" aria-hidden /> : <Copy className="h-3 w-3" aria-hidden />}
       </button>
 
-      {error ? <span className="text-[0.65rem] text-[#d03b3b]">{error}</span> : null}
+      {error ? <span className="text-[0.65rem] text-negative">{error}</span> : null}
     </div>
   )
 }

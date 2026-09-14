@@ -83,40 +83,49 @@ export default async function SchedulePage({
   const volver = scheduleHref(params, {})
 
   return (
-    <div className="space-y-6">
-      <Composer />
-      <BatchUpload />
-      <div>
-        <div className="mb-3 flex items-center gap-1.5">
-          {[
-            { label: 'Lista', href: scheduleHref(params, { vista: null, semana: null }), active: !calendarView },
-            { label: 'Calendario', href: scheduleHref(params, { vista: 'calendario' }), active: calendarView },
-          ].map((tab) => (
-            <Link
-              key={tab.label}
-              href={tab.href}
-              className={cn(
-                'rounded-full px-2.5 py-1 font-mono text-[0.68rem] transition-colors',
-                tab.active ? 'bg-white/[0.14] text-fg' : 'bg-white/[0.05] text-fg-faint hover:text-fg',
-              )}
-            >
-              {tab.label}
-            </Link>
-          ))}
+    <>
+      <header className="mb-6">
+        <h1 className="font-display text-2xl font-semibold tracking-[-0.02em]">Calendario</h1>
+        <p className="mt-1 text-sm text-fg-muted">
+          Programa lo que viene y revisa cómo salió lo que ya se fue.
+        </p>
+      </header>
+
+      <div className="space-y-6">
+        <Composer />
+        <BatchUpload />
+        <div>
+          <div className="mb-3 flex items-center gap-1.5">
+            {[
+              { label: 'Lista', href: scheduleHref(params, { vista: null, semana: null }), active: !calendarView },
+              { label: 'Calendario', href: scheduleHref(params, { vista: 'calendario' }), active: calendarView },
+            ].map((tab) => (
+              <Link
+                key={tab.label}
+                href={tab.href}
+                className={cn(
+                  'rounded-full px-2.5 py-1 font-mono text-[0.68rem] transition-colors',
+                  tab.active ? 'bg-white/[0.14] text-fg' : 'bg-white/[0.05] text-fg-faint hover:text-fg',
+                )}
+              >
+                {tab.label}
+              </Link>
+            ))}
+          </div>
+          {calendarView ? (
+            <WeekCalendar
+              monday={monday}
+              items={items}
+              zone={SITE_TIMEZONE}
+              volver={volver}
+              prevHref={scheduleHref(params, { vista: 'calendario', semana: addDays(monday, -7) })}
+              nextHref={scheduleHref(params, { vista: 'calendario', semana: addDays(monday, 7) })}
+            />
+          ) : (
+            <Queue items={items} volver={volver} />
+          )}
         </div>
-        {calendarView ? (
-          <WeekCalendar
-            monday={monday}
-            items={items}
-            zone={SITE_TIMEZONE}
-            volver={volver}
-            prevHref={scheduleHref(params, { vista: 'calendario', semana: addDays(monday, -7) })}
-            nextHref={scheduleHref(params, { vista: 'calendario', semana: addDays(monday, 7) })}
-          />
-        ) : (
-          <Queue items={items} volver={volver} />
-        )}
       </div>
-    </div>
+    </>
   )
 }

@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import { useState, useTransition } from 'react'
 import { deleteScheduledPost, rescheduleTarget } from '@/app/admin/actions'
+import { Button, Input } from '@/components/ui'
 import type { ScheduledPost, ScheduledPostTarget } from '@/db/schema'
 import { networkLabel } from '@/lib/networks'
 import { cn } from '@/lib/utils'
@@ -23,6 +24,24 @@ export function Queue({
 }) {
   const [pending, start] = useTransition()
   const [error, setError] = useState<string | null>(null)
+  // El destino que está pidiendo hora nueva, y la hora que lleva escrita. Uno solo a
+  // la vez: abrir otro cierra el anterior sin dejar dos fechas a medio llenar.
+  const [rescheduling, setRescheduling] = useState<string | null>(null)
+  const [when, setWhen] = useState('')
+
+  function openReschedule(targetId: string) {
+    setRescheduling(targetId)
+    setWhen('')
+  }
+
+  function saveReschedule(targetId: string) {
+    start(async () => {
+      setError(null)
+      const result = await rescheduleTarget(targetId, when)
+      if (result.error) setError(result.error)
+      else setRescheduling(null)
+    })
+  }
 
   if (items.length === 0) {
     return <p className="py-8 text-center text-sm text-fg-faint">Nada programado todavía.</p>
@@ -30,9 +49,13 @@ export function Queue({
 
   return (
     <>
-      {error && <p className="mb-3 text-sm text-red-400">{error}</p>}
+      {error && <p className="mb-3 text-sm text-negative">{error}</p>}
       <ul className="space-y-3">
-      {items.map(({ post, targets }) => (
+      {items.map(({ post, targets }) => {
+        // El formulario de hora nueva vive bajo el post dueño del destino, no dentro
+        // de la píldora: un `datetime-local` ahí adentro no cabe.
+        const reprogramando = targets.find((target) => target.id === rescheduling)?.id
+        return (
         <li key={post.id} className="rounded-xl bg-white/[0.03] p-4">
           <div className="flex items-start justify-between gap-3">
             <div>
@@ -64,8 +87,8 @@ export function Queue({
                 key={target.id}
                 className={cn(
                   'rounded-full px-2.5 py-1 text-xs',
-                  target.status === 'published' && 'bg-emerald-500/15 text-emerald-300',
-                  target.status === 'failed' && 'bg-red-500/15 text-red-300',
+                  target.status === 'published' && 'bg-positive/15 text-positive',
+                  target.status === 'failed' && 'bg-negative/15 text-negative',
                   (target.status === 'scheduled' || target.status === 'publishing') &&
                     'bg-white/[0.08] text-fg-muted',
                 )}
@@ -77,10 +100,7 @@ export function Queue({
                     type="button"
                     disabled={pending}
                     className="ml-2 underline"
-                    onClick={() => {
-                      const when = prompt('Nueva fecha y hora (YYYY-MM-DDTHH:MM):')
-                      if (when) start(async () => { setError(null); const result = await rescheduleTarget(target.id, when); if (result.error) setError(result.error) })
-                    }}
+                    onClick={() => openReschedule(target.id)}
                   >
                     Reprogramar
                   </button>
@@ -88,8 +108,29 @@ export function Queue({
               </span>
             ))}
           </div>
+          {reprogramando ? (
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              <Input
+                type="datetime-local"
+                aria-label="Nueva fecha y hora"
+                value={when}
+                onChange={(event) => setWhen(event.target.value)}
+                className="max-w-[16rem]"
+              />
+              <Button
+                type="button"
+                variant="primary"
+                disabled={pending || when === ''}
+                onClick={() => saveReschedule(reprogramando)}
+              >
+                Guardar
+              </Button>
+              <Button type="button" onClick={() => setRescheduling(null)}>Cancelar</Button>
+            </div>
+          ) : null}
         </li>
-      ))}
+        )
+      })}
       </ul>
     </>
   )

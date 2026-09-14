@@ -1,5 +1,6 @@
 import Image from 'next/image'
 import Link from 'next/link'
+import { ChevronLeft, ChevronRight } from 'lucide-react'
 import type { ScheduledPost, ScheduledPostTarget } from '@/db/schema'
 import { dayLabel, dayKey, groupByDay, hourLabel, weekDays, weekLabel } from '@/lib/schedule-week'
 import { cn } from '@/lib/utils'
@@ -12,9 +13,9 @@ type Item = {
 
 const DOT: Record<string, string> = {
   scheduled: 'bg-white/40',
-  publishing: 'bg-amber-400',
-  published: 'bg-emerald-400',
-  failed: 'bg-red-400',
+  publishing: 'bg-caution',
+  published: 'bg-positive',
+  failed: 'bg-negative',
 }
 
 export function WeekCalendar({
@@ -45,12 +46,20 @@ export function WeekCalendar({
   return (
     <div>
       <div className="mb-3 flex items-center justify-between text-sm">
-        <Link href={prevHref} className="text-fg-faint transition-colors hover:text-fg">
-          ← Semana anterior
+        <Link
+          href={prevHref}
+          className="inline-flex items-center gap-1 text-fg-faint transition-colors hover:text-fg"
+        >
+          <ChevronLeft className="h-4 w-4" aria-hidden />
+          Semana anterior
         </Link>
         <span className="font-mono text-[0.8rem] text-fg-muted">{weekLabel(monday)}</span>
-        <Link href={nextHref} className="text-fg-faint transition-colors hover:text-fg">
-          Semana siguiente →
+        <Link
+          href={nextHref}
+          className="inline-flex items-center gap-1 text-fg-faint transition-colors hover:text-fg"
+        >
+          Semana siguiente
+          <ChevronRight className="h-4 w-4" aria-hidden />
         </Link>
       </div>
       <div className="-mx-1 overflow-x-auto px-1">
@@ -83,9 +92,9 @@ export function WeekCalendar({
                     className={cn(
                       'block rounded-lg p-2 transition-colors',
                       failed
-                        ? 'bg-red-500/15 hover:bg-red-500/25'
+                        ? 'bg-negative/15 hover:bg-negative/25'
                         : allPublished
-                          ? 'bg-emerald-500/15 hover:bg-emerald-500/25'
+                          ? 'bg-positive/15 hover:bg-positive/25'
                           : 'bg-white/[0.05] hover:bg-white/[0.1]',
                     )}
                   >

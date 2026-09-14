@@ -55,7 +55,7 @@ export default async function Elegir({
       <p className="mt-1 text-sm text-fg-muted">
         Marca las que quieres ver en el panel. Las ya conectadas solo renuevan su acceso.
       </p>
-      {mensaje ? <p className="mt-3 text-sm text-red-400">{mensaje}</p> : null}
+      {mensaje ? <p className="mt-3 text-sm text-negative">{mensaje}</p> : null}
 
       <form action={conectarElegidas} className="mt-4 space-y-2">
         {pendiente.candidatas.map((c) => (

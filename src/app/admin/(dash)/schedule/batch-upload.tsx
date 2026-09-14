@@ -26,7 +26,7 @@ export function BatchUpload() {
 
         <input type="file" name="archivo" accept=".csv,text/csv" className="block text-sm text-fg-muted" />
 
-        {state.error && <p className="text-sm text-red-400">{state.error}</p>}
+        {state.error && <p className="text-sm text-negative">{state.error}</p>}
 
         <button
           type="submit"
@@ -42,7 +42,7 @@ export function BatchUpload() {
           {state.filas.map((fila) => (
             <li
               key={fila.fila}
-              className={cn('text-sm', fila.ok ? 'text-emerald-300' : 'text-red-300')}
+              className={cn('text-sm', fila.ok ? 'text-positive' : 'text-negative')}
             >
               Fila {fila.fila}: {fila.detalle}
             </li>
