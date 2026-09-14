@@ -6,6 +6,7 @@ import { addDays, normalizeWeekParam } from '@/lib/schedule-week'
 import { cn } from '@/lib/utils'
 import { Composer } from './composer'
 import { BatchUpload } from './batch-upload'
+import { ordenarCola } from './orden'
 import { Queue } from './queue'
 import { WeekCalendar } from './calendar'
 
@@ -78,6 +79,8 @@ export default async function SchedulePage({
     for (const m of media) posts.get(m.postId)?.media.push(m)
   }
 
+  // Ordenados por fecha ascendente, que es lo que el calendario necesita dentro de
+  // cada día. La lista los reordena aparte: ahí lo próximo va arriba.
   const items = [...posts.values()]
   // `volver` carries the exact view to return to after editing — list or a given week.
   const volver = scheduleHref(params, {})
@@ -122,7 +125,7 @@ export default async function SchedulePage({
               nextHref={scheduleHref(params, { vista: 'calendario', semana: addDays(monday, 7) })}
             />
           ) : (
-            <Queue items={items} volver={volver} />
+            <Queue items={ordenarCola(items)} volver={volver} />
           )}
         </div>
       </div>

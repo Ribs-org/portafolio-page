@@ -4,7 +4,7 @@ import Image from 'next/image'
 import Link from 'next/link'
 import { useActionState, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import { ArrowDown, ArrowLeft, ArrowUp, ExternalLink } from 'lucide-react'
+import { ArrowDown, ArrowLeft, ArrowUp, Check, Copy, ExternalLink } from 'lucide-react'
 import { deleteScheduledPost, updateScheduledPost, type FormState } from '@/app/admin/actions'
 import { Button, Field, Input, Textarea } from '@/components/ui'
 import { networkLabel } from '@/lib/networks'
@@ -282,8 +282,19 @@ function MediaActions({ url }: { url: string }) {
       >
         <ExternalLink className="h-4 w-4" aria-hidden />
       </a>
-      <button type="button" onClick={copy} className="text-xs text-fg-faint transition-colors hover:text-fg">
-        {copied ? '✓ copiada' : failed ? 'no se pudo copiar' : 'Copiar URL'}
+      {/* Ícono y no texto: los tres estados medían distinto y la fila saltaba de ancho
+          cada vez que se copiaba una URL. El `title` dice lo que el ícono calla. */}
+      <button
+        type="button"
+        onClick={copy}
+        aria-label={failed ? 'No se pudo copiar la URL' : 'Copiar la URL'}
+        title={copied ? 'Copiada' : failed ? 'No se pudo copiar' : 'Copiar la URL'}
+        className={cn(
+          'transition-colors hover:text-fg',
+          failed ? 'text-negative' : 'text-fg-faint',
+        )}
+      >
+        {copied ? <Check className="h-4 w-4" aria-hidden /> : <Copy className="h-4 w-4" aria-hidden />}
       </button>
     </span>
   )

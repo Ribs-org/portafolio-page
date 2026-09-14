@@ -15,6 +15,10 @@ const STATUS_LABEL: Record<string, string> = {
   failed: 'Falló',
 }
 
+// El corte de la tabla de contenido, por la misma razón: lo pendiente cabe entero
+// arriba y lo ya publicado no tiene por qué alargar la página para siempre.
+const VISTA_PREVIA = 20
+
 export function Queue({
   items,
   volver,
@@ -28,6 +32,7 @@ export function Queue({
   // la vez: abrir otro cierra el anterior sin dejar dos fechas a medio llenar.
   const [rescheduling, setRescheduling] = useState<string | null>(null)
   const [when, setWhen] = useState('')
+  const [expanded, setExpanded] = useState(false)
 
   function openReschedule(targetId: string) {
     setRescheduling(targetId)
@@ -47,19 +52,22 @@ export function Queue({
     return <p className="py-8 text-center text-sm text-fg-faint">Nada programado todavía.</p>
   }
 
+  const visible = expanded ? items : items.slice(0, VISTA_PREVIA)
+  const ocultos = items.length - visible.length
+
   return (
     <>
       {error && <p className="mb-3 text-sm text-negative">{error}</p>}
       <ul className="space-y-3">
-      {items.map(({ post, targets }) => {
+      {visible.map(({ post, targets }) => {
         // El formulario de hora nueva vive bajo el post dueño del destino, no dentro
         // de la píldora: un `datetime-local` ahí adentro no cabe.
         const reprogramando = targets.find((target) => target.id === rescheduling)?.id
         return (
         <li key={post.id} className="rounded-xl bg-white/[0.03] p-4">
           <div className="flex items-start justify-between gap-3">
-            <div>
-              <p className="text-sm">{post.caption || '(sin texto)'}</p>
+            <div className="min-w-0">
+              <p className="line-clamp-2 text-sm">{post.caption || '(sin texto)'}</p>
               <p className="mt-1 text-xs text-fg-faint">
                 {post.scheduledAt.toLocaleString('es-CL', { dateStyle: 'medium', timeStyle: 'short' })}
               </p>
@@ -132,6 +140,21 @@ export function Queue({
         )
       })}
       </ul>
+      {ocultos > 0 || expanded ? (
+        <div className="mt-3 border-t border-white/[0.06] pt-2 text-center">
+          <button
+            type="button"
+            onClick={() => setExpanded(!expanded)}
+            className="rounded px-2 py-1 font-mono text-[0.7rem] uppercase tracking-[0.14em] text-fg-faint transition-colors hover:text-fg"
+          >
+            {expanded
+              ? 'Mostrar menos'
+              : ocultos === 1
+                ? 'Ver el anterior'
+                : `Ver los ${ocultos} anteriores`}
+          </button>
+        </div>
+      ) : null}
     </>
   )
 }
