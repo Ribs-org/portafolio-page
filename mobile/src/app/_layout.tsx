@@ -60,7 +60,23 @@ export default function RootLayout() {
       {listo ? (
         <Stack
           screenOptions={{ headerShown: false, contentStyle: { backgroundColor: COLORES.fondo } }}
-        />
+        >
+          {/* La única pantalla con cabecera: el detalle se empuja sobre esta pila y sin
+              ella no hay cómo volver ni queda libre la franja de la hora. Declararla
+              acá y no en el propio archivo la deja puesta también mientras el detalle
+              busca en la caché y cuando no encuentra el post — ese archivo vuelve
+              antes con `Cargando`. Las demás rutas siguen saliendo del sistema de
+              archivos: nombrar una no esconde el resto. */}
+          <Stack.Screen
+            name="post/[id]"
+            options={{
+              headerShown: true,
+              title: 'Detalle',
+              headerStyle: { backgroundColor: COLORES.tarjeta },
+              contentStyle: { backgroundColor: COLORES.fondo },
+            }}
+          />
+        </Stack>
       ) : (
         <Cargando />
       )}

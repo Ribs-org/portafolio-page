@@ -1,13 +1,14 @@
 import { useEffect, useState } from 'react'
 import { Linking, Pressable, ScrollView, Text, View } from 'react-native'
-import { useLocalSearchParams } from 'expo-router'
-import { COLORES, Cargando, Tarjeta } from '../../components/ui'
+import { useLocalSearchParams, useRouter } from 'expo-router'
+import { Boton, COLORES, Cargando, Tarjeta } from '../../components/ui'
 import { readCache } from '../../lib/cache'
 import { num, pct, shortDate } from '../../lib/format'
 import { NOMBRE_RED, type PostMetrica, type Posts } from '../../lib/tipos'
 
 export default function DetallePost() {
   const { id, red } = useLocalSearchParams<{ id: string; red: string }>()
+  const router = useRouter()
   const [post, setPost] = useState<PostMetrica | null>(null)
   const [buscado, setBuscado] = useState(false)
 
@@ -36,9 +37,16 @@ export default function DetallePost() {
   if (!post) {
     return (
       <View style={{ flex: 1, backgroundColor: COLORES.fondo, padding: 16 }}>
-        <Text style={{ color: COLORES.suave }}>
-          Vuelve a la lista y ábrelo de nuevo: este post no está en lo descargado.
-        </Text>
+        <Tarjeta>
+          <Text style={{ color: COLORES.suave }}>
+            Vuelve a la lista y ábrelo de nuevo: este post no está en lo descargado.
+          </Text>
+          {/* «Volver» y no «Reintentar»: la caché no va a cambiar por mirarla de nuevo.
+              En fila porque `Boton` crece a lo ancho con `flex: 1`. */}
+          <View style={{ flexDirection: 'row', marginTop: 4 }}>
+            <Boton texto="Volver" onPress={() => router.back()} />
+          </View>
+        </Tarjeta>
       </View>
     )
   }
@@ -70,9 +78,15 @@ export default function DetallePost() {
 
       <Tarjeta>
         {filas.map(([etiqueta, valor]) => (
-          <View key={etiqueta} style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-            <Text style={{ color: COLORES.suave, fontSize: 13 }}>{etiqueta}</Text>
-            <Text style={{ color: COLORES.texto, fontSize: 13 }}>{valor}</Text>
+          <View
+            key={etiqueta}
+            style={{ flexDirection: 'row', justifyContent: 'space-between', gap: 12 }}
+          >
+            {/* La cifra manda: la etiqueta cede el ancho y se corta antes que el valor. */}
+            <Text style={{ color: COLORES.suave, fontSize: 13, flex: 1 }} numberOfLines={1}>
+              {etiqueta}
+            </Text>
+            <Text style={{ color: COLORES.texto, fontSize: 13, flexShrink: 0 }}>{valor}</Text>
           </View>
         ))}
       </Tarjeta>

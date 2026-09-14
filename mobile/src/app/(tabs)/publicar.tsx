@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useReducer, useRef, useState } from 'react'
-import { Alert, ScrollView, Text, TextInput, View } from 'react-native'
+import { Alert, KeyboardAvoidingView, ScrollView, Text, TextInput, View } from 'react-native'
 import { DateTimePickerAndroid } from '@react-native-community/datetimepicker'
 import * as ImagePicker from 'expo-image-picker'
 import { useRouter } from 'expo-router'
@@ -195,89 +195,94 @@ export default function Publicar() {
   const error = envio.paso === 'listo' ? envio.error : envio.paso === 'error' ? envio.mensaje : null
 
   return (
-    <ScrollView
-      style={{ flex: 1, backgroundColor: COLORES.fondo }}
-      contentContainerStyle={{ padding: 16, paddingBottom: 48, gap: 14 }}
-      keyboardShouldPersistTaps="handled"
-    >
-      <TextInput
-        value={texto}
-        onChangeText={setTexto}
-        multiline
-        maxLength={MAX_TEXTO}
-        editable={!ocupado}
-        placeholder="Texto del post…"
-        placeholderTextColor={COLORES.tenue}
-        style={{
-          backgroundColor: COLORES.tarjeta,
-          color: COLORES.texto,
-          borderRadius: 12,
-          padding: 14,
-          minHeight: 120,
-          textAlignVertical: 'top',
-        }}
-      />
-      <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-        <Text style={{ color: COLORES.tenue, fontSize: 11 }}>En YouTube el primer renglón es el título</Text>
-        <Text style={{ color: COLORES.tenue, fontSize: 11 }}>
-          {texto.length} / {MAX_TEXTO}
-        </Text>
-      </View>
-
-      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12, alignItems: 'center' }}>
-        {archivos.map((a, i) => (
-          <Miniatura
-            key={`${a.uri}:${i}`}
-            uri={a.uri}
-            esVideo={a.mediaType === 'video'}
-            onQuitar={ocupado ? undefined : () => quitar(i)}
-          />
-        ))}
-        {archivos.length < MAX_ARCHIVOS && !ocupado ? (
-          <Chip texto="+ Fotos o video" activo={false} onPress={() => void elegir()} />
-        ) : null}
-      </View>
-
-      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
-        {REDES_PUBLICABLES.map((red) => (
-          <Chip
-            key={red}
-            texto={NOMBRE_RED[red] ?? red}
-            activo={redes.includes(red)}
-            onPress={() => alternarRed(red)}
-            deshabilitado={ocupado}
-          />
-        ))}
-      </View>
-
-      <Chip
-        texto={`Cuándo: ${fechaLegible(fecha)}`}
-        activo
-        onPress={elegirFecha}
-        deshabilitado={ocupado}
-      />
-
-      {aviso ? <Text style={{ color: COLORES.rojo }}>{aviso}</Text> : null}
-      {error ? <Text style={{ color: COLORES.rojo }}>{error}</Text> : null}
-      {etiqueta ? <Text style={{ color: COLORES.suave }}>{etiqueta}</Text> : null}
-      {envio.paso === 'subiendo' ? (
-        <View style={{ height: 4, backgroundColor: '#ffffff10', borderRadius: 2 }}>
-          <View style={{ height: 4, width: `${Math.round(envio.progreso * 100)}%`, backgroundColor: COLORES.verde, borderRadius: 2 }} />
+    // `height` es el `behavior` de Android: la app dibuja de borde a borde, así que la
+    // ventana ya no se encoge sola al abrir el teclado y el texto largo dejaba
+    // «Programar» y «Publicar ahora» debajo de las teclas.
+    <KeyboardAvoidingView behavior="height" style={{ flex: 1, backgroundColor: COLORES.fondo }}>
+      <ScrollView
+        style={{ flex: 1, backgroundColor: COLORES.fondo }}
+        contentContainerStyle={{ padding: 16, paddingBottom: 48, gap: 14 }}
+        keyboardShouldPersistTaps="handled"
+      >
+        <TextInput
+          value={texto}
+          onChangeText={setTexto}
+          multiline
+          maxLength={MAX_TEXTO}
+          editable={!ocupado}
+          placeholder="Texto del post…"
+          placeholderTextColor={COLORES.tenue}
+          style={{
+            backgroundColor: COLORES.tarjeta,
+            color: COLORES.texto,
+            borderRadius: 12,
+            padding: 14,
+            minHeight: 120,
+            textAlignVertical: 'top',
+          }}
+        />
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+          <Text style={{ color: COLORES.tenue, fontSize: 11 }}>En YouTube el primer renglón es el título</Text>
+          <Text style={{ color: COLORES.tenue, fontSize: 11 }}>
+            {texto.length} / {MAX_TEXTO}
+          </Text>
         </View>
-      ) : null}
 
-      <View style={{ flexDirection: 'row', gap: 10 }}>
-        {envio.paso === 'error' ? (
-          <Boton texto="Reintentar" onPress={reintentar} destacado />
-        ) : ocupado ? (
-          <Boton texto="Cancelar" onPress={cancelar} deshabilitado={envio.paso !== 'subiendo'} />
-        ) : (
-          <>
-            <Boton texto="Programar" onPress={programar} deshabilitado={!puedeEnviar(texto, archivos.length)} />
-            <Boton texto="Publicar ahora" onPress={publicarAhora} deshabilitado={!puedeEnviar(texto, archivos.length)} destacado />
-          </>
-        )}
-      </View>
-    </ScrollView>
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12, alignItems: 'center' }}>
+          {archivos.map((a, i) => (
+            <Miniatura
+              key={`${a.uri}:${i}`}
+              uri={a.uri}
+              esVideo={a.mediaType === 'video'}
+              onQuitar={ocupado ? undefined : () => quitar(i)}
+            />
+          ))}
+          {archivos.length < MAX_ARCHIVOS && !ocupado ? (
+            <Chip texto="+ Fotos o video" activo={false} onPress={() => void elegir()} />
+          ) : null}
+        </View>
+
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
+          {REDES_PUBLICABLES.map((red) => (
+            <Chip
+              key={red}
+              texto={NOMBRE_RED[red] ?? red}
+              activo={redes.includes(red)}
+              onPress={() => alternarRed(red)}
+              deshabilitado={ocupado}
+            />
+          ))}
+        </View>
+
+        <Chip
+          texto={`Cuándo: ${fechaLegible(fecha)}`}
+          activo
+          onPress={elegirFecha}
+          deshabilitado={ocupado}
+        />
+
+        {aviso ? <Text style={{ color: COLORES.rojo }}>{aviso}</Text> : null}
+        {error ? <Text style={{ color: COLORES.rojo }}>{error}</Text> : null}
+        {etiqueta ? <Text style={{ color: COLORES.suave }}>{etiqueta}</Text> : null}
+        {envio.paso === 'subiendo' ? (
+          <View style={{ height: 4, backgroundColor: '#ffffff10', borderRadius: 2 }}>
+            <View style={{ height: 4, width: `${Math.round(envio.progreso * 100)}%`, backgroundColor: COLORES.verde, borderRadius: 2 }} />
+          </View>
+        ) : null}
+
+        <View style={{ flexDirection: 'row', gap: 10 }}>
+          {envio.paso === 'error' ? (
+            <Boton texto="Reintentar" onPress={reintentar} destacado />
+          ) : ocupado ? (
+            <Boton texto="Cancelar" onPress={cancelar} deshabilitado={envio.paso !== 'subiendo'} />
+          ) : (
+            <>
+              <Boton texto="Programar" onPress={programar} deshabilitado={!puedeEnviar(texto, archivos.length)} />
+              <Boton texto="Publicar ahora" onPress={publicarAhora} deshabilitado={!puedeEnviar(texto, archivos.length)} destacado />
+            </>
+          )}
+        </View>
+      </ScrollView>
+    </KeyboardAvoidingView>
   )
 }
