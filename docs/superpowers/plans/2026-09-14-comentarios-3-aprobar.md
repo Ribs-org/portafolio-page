@@ -2,7 +2,7 @@
 
 > **Para quien ejecute esto:** SUB-SKILL OBLIGATORIA: usa superpowers:subagent-driven-development
 > (recomendada) o superpowers:executing-plans para implementar tarea por tarea. Los pasos
-> usan casillas (`- [ ]`) para marcar avance.
+> usan casillas (`- [x]`) para marcar avance.
 
 **Meta:** que el dueño vea en el panel cada comentario nuevo con su borrador, lo corrija si
 quiere, y lo mande o lo descarte de un toque. Y que escriba y cambie las instrucciones que
@@ -83,7 +83,7 @@ fila «3 · Aprobar» de la tabla de entregas.
 - Produce: `DM_STATES`, `DmState`, las columnas `dmState` y `dmError` en `postComments`;
   `ESCRIBE_RESPUESTA`, `validarRespuesta(texto: string, limite: number): { texto: string } | { error: string }`.
 
-- [ ] **Paso 1: Las columnas**
+- [x] **Paso 1: Las columnas**
 
 En `src/db/schema.ts`, junto a `COMMENT_STATES`:
 
@@ -104,7 +104,7 @@ Son columnas nuevas en una tabla existente: `db:push` las agrega con `ALTER TABL
 `default('no')` llena las filas que ya hay. No hay unique compuesta nueva, así que no hay
 orden de columnas que cuidar.
 
-- [ ] **Paso 2: El test que falla**
+- [x] **Paso 2: El test que falla**
 
 `src/lib/social/comentarios/validar.test.ts`:
 
@@ -134,12 +134,12 @@ describe('validarRespuesta', () => {
 })
 ```
 
-- [ ] **Paso 3: Correrlo y verlo fallar**
+- [x] **Paso 3: Correrlo y verlo fallar**
 
 Corre: `npx vitest run src/lib/social/comentarios/validar.test.ts`
 Esperado: falla porque el módulo no existe.
 
-- [ ] **Paso 4: El módulo**
+- [x] **Paso 4: El módulo**
 
 `src/lib/social/comentarios/validar.ts`, puro:
 
@@ -163,12 +163,12 @@ export function validarRespuesta(
 }
 ```
 
-- [ ] **Paso 5: Correrlo y verlo pasar**
+- [x] **Paso 5: Correrlo y verlo pasar**
 
 Corre: `npx vitest run src/lib/social/comentarios/validar.test.ts`
 Esperado: pasa. Después `npm run typecheck` y `npm run lint`.
 
-- [ ] **Paso 6: Commit**
+- [x] **Paso 6: Commit**
 
 ```bash
 git add src/db/schema.ts src/lib/social/comentarios/validar.ts src/lib/social/comentarios/validar.test.ts
@@ -192,7 +192,7 @@ Mensaje: `Prepara el privado en la tabla y valida lo que el dueño responde`
   now, activo): boolean`, `mandarPrivado(account, token, comentarioExternalId, texto):
   Promise<string>`, `CLAVE_TEXTO_PRIVADO`, `TEXTO_PRIVADO_POR_DEFECTO`.
 
-- [ ] **Paso 1: El test que falla**
+- [x] **Paso 1: El test que falla**
 
 `src/lib/social/comentarios/privado.test.ts`:
 
@@ -221,12 +221,12 @@ describe('tocaPrivado', () => {
 })
 ```
 
-- [ ] **Paso 2: Correrlo y verlo fallar**
+- [x] **Paso 2: Correrlo y verlo fallar**
 
 Corre: `npx vitest run src/lib/social/comentarios/privado.test.ts`
 Esperado: falla porque el módulo no existe.
 
-- [ ] **Paso 3: El texto del privado**
+- [x] **Paso 3: El texto del privado**
 
 En `src/lib/social/comentarios/instrucciones.ts`, junto a las instrucciones:
 
@@ -238,7 +238,7 @@ export const TEXTO_PRIVADO_POR_DEFECTO =
   'Gracias por comentar. Si quieres conversar, escríbeme por acá.'
 ```
 
-- [ ] **Paso 4: El módulo**
+- [x] **Paso 4: El módulo**
 
 `src/lib/social/comentarios/privado.ts`. Lee `./graph.ts` primero: `pedirGraph` es un GET.
 Acá hace falta un POST, así que se hace con `fetch` directo, con el mismo molde de error que
@@ -303,12 +303,12 @@ export async function mandarPrivado(
 }
 ```
 
-- [ ] **Paso 5: Correrlo y verlo pasar**
+- [x] **Paso 5: Correrlo y verlo pasar**
 
 Corre: `npx vitest run src/lib/social/comentarios/privado.test.ts`
 Esperado: pasa. Después `npm run typecheck` y `npm run lint`.
 
-- [ ] **Paso 6: Commit**
+- [x] **Paso 6: Commit**
 
 ```bash
 git add src/lib/social/comentarios/privado.ts src/lib/social/comentarios/privado.test.ts src/lib/social/comentarios/instrucciones.ts
@@ -335,7 +335,7 @@ Mensaje: `Deja escrito y apagado el mensaje privado a quien comenta`
   `descartarComentario(id: string): Promise<void>`,
   `redactarUno(id: string): Promise<{ ok: true } | { error: string }>`.
 
-- [ ] **Paso 1: El envío**
+- [x] **Paso 1: El envío**
 
 `src/lib/social/comentarios/responder.ts`:
 
@@ -457,7 +457,7 @@ async function privadoSiToca(
 }
 ```
 
-- [ ] **Paso 2: El reintento del borrador**
+- [x] **Paso 2: El reintento del borrador**
 
 En `src/lib/social/comentarios/redaccion.ts`, la parte del modelo (pedir, limpiar,
 rechazar vacío) vive hoy dentro del `try` interno del bucle de `redactarPendientes`.
@@ -538,13 +538,13 @@ export async function redactarUno(id: string): Promise<{ ok: true } | { error: s
 Ajusta los imports que hagan falta (`postComments`, `SIN_BORRADOR`, `hayPasarela` ya se
 importan en ese archivo o en `./modelo`).
 
-- [ ] **Paso 3: Verificar**
+- [x] **Paso 3: Verificar**
 
 `npm test` (el suite completo: la fase de redacción no tiene test propio, pero los tests
 de `ventana`, `prompt` e `instrucciones` tienen que seguir verdes), `npm run typecheck`,
 `npm run lint`.
 
-- [ ] **Paso 4: Commit**
+- [x] **Paso 4: Commit**
 
 ```bash
 git add src/lib/social/comentarios/responder.ts src/lib/social/comentarios/redaccion.ts
@@ -567,7 +567,7 @@ Mensaje: `Manda la respuesta de un comentario y reintenta su borrador a pedido`
   red: string | null }): Promise<ComentarioFila[]>`, `contarPendientes(): Promise<number>`;
   `agruparPorPublicacion(filas: ComentarioFila[]): Grupo[]`.
 
-- [ ] **Paso 1: El test que falla**
+- [x] **Paso 1: El test que falla**
 
 `src/lib/social/comentarios/agrupar.test.ts`:
 
@@ -599,12 +599,12 @@ describe('agruparPorPublicacion', () => {
 })
 ```
 
-- [ ] **Paso 2: Correrlo y verlo fallar**
+- [x] **Paso 2: Correrlo y verlo fallar**
 
 Corre: `npx vitest run src/lib/social/comentarios/agrupar.test.ts`
 Esperado: falla porque el módulo no existe.
 
-- [ ] **Paso 3: El agrupado**
+- [x] **Paso 3: El agrupado**
 
 `src/lib/social/comentarios/agrupar.ts`, puro y genérico sobre lo mínimo que necesita:
 
@@ -634,12 +634,12 @@ export function agruparPorPublicacion<T extends Agrupable>(filas: T[]): Grupo<T>
 }
 ```
 
-- [ ] **Paso 4: Correrlo y verlo pasar**
+- [x] **Paso 4: Correrlo y verlo pasar**
 
 Corre: `npx vitest run src/lib/social/comentarios/agrupar.test.ts`
 Esperado: pasa.
 
-- [ ] **Paso 5: La consulta**
+- [x] **Paso 5: La consulta**
 
 `src/lib/comentarios-cola.ts`. Mira `src/lib/posts.ts` para copiar la forma en que el panel
 consulta (`getCuentas` es el vecino directo).
@@ -731,7 +731,7 @@ export async function contarPendientes(): Promise<number> {
 Si `count()` de drizzle te queda más natural que traer los ids, úsalo; lo que importa es
 el número.
 
-- [ ] **Paso 6: Verificar y commit**
+- [x] **Paso 6: Verificar y commit**
 
 `npm test`, `npm run typecheck`, `npm run lint`.
 
@@ -760,7 +760,7 @@ Mensaje: `Lee la cola de comentarios para el panel, agrupada por publicación`
   `normalizarInstrucciones`, `TOPE_INSTRUCCIONES`, `INSTRUCCIONES_POR_DEFECTO` de
   `@/lib/social/comentarios/instrucciones`; `leerAjuste`, `guardarAjuste` de `@/lib/ajustes`.
 
-- [ ] **Paso 1: Las acciones**
+- [x] **Paso 1: Las acciones**
 
 En `src/app/admin/actions.ts`, al final, con el mismo molde que `syncSocialNow` (auth,
 import diferido para no cargar el peso de las redes en cada acción, frase fija, revalidate):
@@ -806,7 +806,7 @@ export async function guardarInstruccionesComentarios(
 }
 ```
 
-- [ ] **Paso 2: La pestaña**
+- [x] **Paso 2: La pestaña**
 
 En `src/app/admin/(dash)/nav.tsx`, en `TABS`, después de Contenido:
 
@@ -814,7 +814,7 @@ En `src/app/admin/(dash)/nav.tsx`, en `TABS`, después de Contenido:
   { href: '/admin/comments', label: 'Comentarios' },
 ```
 
-- [ ] **Paso 3: El campo de instrucciones**
+- [x] **Paso 3: El campo de instrucciones**
 
 `src/app/admin/(dash)/comments/instrucciones.tsx`, cliente. Molde: cómo `login-form.tsx`
 usa `useActionState` + `Submit`.
@@ -852,7 +852,7 @@ export function Instrucciones({ valor, tope }: { valor: string; tope: number }) 
 
 `Field` envuelve a su hijo en un `<label>`: no lleva `htmlFor` ni el textarea lleva `id`.
 
-- [ ] **Paso 4: La cola**
+- [x] **Paso 4: La cola**
 
 `src/app/admin/(dash)/comments/cola.tsx`, cliente. Una tarjeta por comentario, agrupadas por
 publicación con la miniatura y el texto de la publicación como cabecera del grupo. Cada
@@ -1011,7 +1011,7 @@ function Tarjeta({ fila, mostrarPrivado }: { fila: ComentarioFila; mostrarPrivad
 y `unoptimized`, igual que en `schedule/calendar.tsx`: los CDN de Meta y YouTube ya están
 en `remotePatterns` de `next.config`.
 
-- [ ] **Paso 5: La página**
+- [x] **Paso 5: La página**
 
 `src/app/admin/(dash)/comments/page.tsx`, servidor. Molde: `accounts/page.tsx` y los
 `href` helpers de `content/page.tsx` para los filtros en la URL.
@@ -1119,12 +1119,12 @@ export default async function CommentsPage({
 así que puede leer la bandera. En «todos» conviven filas enviadas y pendientes: cada
 `Tarjeta` decide sola por su `state`, la página no lo decide por ella.
 
-- [ ] **Paso 6: Verificar**
+- [x] **Paso 6: Verificar**
 
 `npm test`, `npm run typecheck`, `npm run lint` y `npx next build`. El build tiene que
 listar `ƒ /admin/comments`.
 
-- [ ] **Paso 7: Commit**
+- [x] **Paso 7: Commit**
 
 ```bash
 git add src/app/admin/actions.ts "src/app/admin/(dash)/comments/page.tsx" "src/app/admin/(dash)/comments/cola.tsx" "src/app/admin/(dash)/comments/instrucciones.tsx" "src/app/admin/(dash)/nav.tsx"
@@ -1142,7 +1142,7 @@ Mensaje: `Muestra la cola de comentarios en el panel con sus tres acciones`
 - Modificar: `.env.example`
 - Modificar: este plan (marcar las casillas)
 
-- [ ] **Paso 1: La bandera**
+- [x] **Paso 1: La bandera**
 
 En `.env.example`, junto a las otras de comentarios:
 
@@ -1153,7 +1153,7 @@ En `.env.example`, junto a las otras de comentarios:
 COMENTARIOS_DM=
 ```
 
-- [ ] **Paso 2: El README**
+- [x] **Paso 2: El README**
 
 En la sección «Responder comentarios», después de lo que hay, agrega:
 
@@ -1176,11 +1176,11 @@ Después de fusionar hay que correr `npm run db:push` otra vez: la tabla de come
 dos columnas para el estado del privado.
 ```
 
-- [ ] **Paso 3: Las casillas**
+- [x] **Paso 3: Las casillas**
 
 Marca `[x]` los pasos hechos.
 
-- [ ] **Paso 4: Verificar y commit**
+- [x] **Paso 4: Verificar y commit**
 
 `npm run lint`.
 

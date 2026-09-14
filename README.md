@@ -279,6 +279,23 @@ Las instrucciones que sigue el modelo se guardan en la base y las vas a editar d
 panel en la entrega siguiente. Hasta entonces rigen las de la casa: responder en español, en
 primera persona, breve y cálido, sin inventar datos ni dar precios.
 
+La cola vive en **Comentarios**, en el panel. Cada comentario nuevo llega con el borrador que
+escribió el modelo; lo corriges si quieres y lo mandas con **Enviar**, o lo descartas. Si el
+modelo no pudo redactar, la tarjeta lo dice y tiene **Reintentar borrador**. Arriba está el
+campo con las instrucciones que sigue el modelo: las editas ahí y rigen desde el siguiente
+borrador.
+
+Nada sale sin tu toque. Dos toques, o el panel y el teléfono a la vez, mandan una sola vez:
+antes de enviar se relee el comentario y si ya salió no pasa nada.
+
+El mensaje privado a quien comentó está escrito y **apagado**. Meta exige para eso
+`pages_messaging` con acceso avanzado, que pasa por revisión de la app. El día que la
+consigas, `COMENTARIOS_DM=1` en Vercel lo enciende para Instagram y Facebook, dentro de los
+siete días que Meta permite. Hasta entonces la cola no muestra nada del privado.
+
+Después de fusionar hay que correr `npm run db:push` otra vez: la tabla de comentarios gana
+dos columnas para el estado del privado.
+
 ### Modo Tinder
 
 El panel puede leer los tuits nuevos de una lista de creadores que tú curas y —en las
