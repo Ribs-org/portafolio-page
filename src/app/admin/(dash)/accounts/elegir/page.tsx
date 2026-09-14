@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { cookies } from 'next/headers'
 import { and, eq, isNotNull } from 'drizzle-orm'
 import { conectarElegidas } from '@/app/admin/actions'
+import { Submit } from '@/components/ui'
 import { getDb, socialAccounts } from '@/db'
 import { networkLabel } from '@/lib/networks'
 import { COOKIE_PENDIENTE, LOGIN_VENCIDO, leerPendiente } from '@/lib/social/pendiente'
@@ -67,9 +68,9 @@ export default async function Elegir({
           </label>
         ))}
         <div className="flex items-center gap-3 pt-2">
-          <button type="submit" className="rounded-lg bg-white/[0.1] px-4 py-2 text-sm hover:bg-white/[0.15]">
-            Conectar
-          </button>
+          {/* El intercambio de tokens con Meta o Google tarda segundos: sin esto el botón
+              se ve idéntico durante toda la espera. */}
+          <Submit pendingLabel="Conectando…">Conectar</Submit>
           <Link href="/admin/accounts" className="text-sm text-fg-faint hover:text-fg">
             Cancelar
           </Link>

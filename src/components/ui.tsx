@@ -1,6 +1,7 @@
 'use client'
 
 import { useId } from 'react'
+import { useFormStatus } from 'react-dom'
 import { cn } from '@/lib/utils'
 
 const CONTROL =
@@ -56,6 +57,51 @@ export function Button({
         className,
       )}
     />
+  )
+}
+
+/**
+ * El botón que envía un formulario y lo dice: mientras el server action viaja se apaga
+ * y se renombra con `pendingLabel`.
+ *
+ * Tiene que ser un componente aparte del `<form>` porque `useFormStatus` solo lee el
+ * formulario que está por encima de quien lo llama — dentro del mismo componente que
+ * renderiza el `<form>` devolvería siempre `pending: false`.
+ *
+ * `confirm` pregunta antes de enviar. El diálogo va en el click y no en el `onSubmit`
+ * del formulario para que un «cancelar» no llegue nunca a encolar la acción.
+ */
+export function Submit({
+  children,
+  pendingLabel,
+  confirm: question,
+  variant = 'primary',
+  onClick,
+  disabled,
+  ...props
+}: Omit<React.ButtonHTMLAttributes<HTMLButtonElement>, 'type'> & {
+  variant?: 'primary' | 'ghost' | 'danger'
+  pendingLabel: string
+  confirm?: string
+}) {
+  const { pending } = useFormStatus()
+
+  return (
+    <Button
+      {...props}
+      type="submit"
+      variant={variant}
+      disabled={pending || disabled}
+      onClick={(event) => {
+        if (question && !window.confirm(question)) {
+          event.preventDefault()
+          return
+        }
+        onClick?.(event)
+      }}
+    >
+      {pending ? pendingLabel : children}
+    </Button>
   )
 }
 

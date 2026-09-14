@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import { ExternalLink, Plus, Star } from 'lucide-react'
+import { Submit } from '@/components/ui'
 import { getAllLinks, getAllProfiles } from '@/lib/profiles'
 import { createProfile, makeDefault } from '../../actions'
 
@@ -22,13 +23,10 @@ export default async function ProfilesPage() {
           </p>
         </div>
         <form action={createProfile} className="ml-auto">
-          <button
-            type="submit"
-            className="inline-flex items-center gap-1.5 rounded-xl bg-white/[0.12] px-3.5 py-2 text-sm font-medium transition-colors hover:bg-white/[0.18]"
-          >
+          <Submit pendingLabel="Creando…">
             <Plus className="h-4 w-4" aria-hidden />
             Nuevo perfil
-          </button>
+          </Submit>
         </form>
       </header>
 
@@ -84,14 +82,18 @@ export default async function ProfilesPage() {
               </a>
               {!profile.isDefault ? (
                 <form action={makeDefault.bind(null, profile.id)} className="ml-auto">
-                  <button
-                    type="submit"
+                  {/* Cambia qué perfil ve cualquiera que entre a la raíz del sitio: es la
+                      única acción de esta página que se nota fuera del panel. */}
+                  <Submit
+                    variant="ghost"
                     title="Servir este perfil en /"
-                    className="inline-flex items-center gap-1 rounded-xl px-2.5 py-1.5 text-xs text-fg-faint transition-colors hover:text-fg"
+                    className="border-transparent px-2.5 py-1.5 text-xs text-fg-faint"
+                    pendingLabel="Cambiando…"
+                    confirm={`«${profile.displayName}» se servirá en / y el perfil principal de ahora pasará a su propia URL. Si era borrador, queda publicado. ¿Seguir?`}
                   >
                     <Star className="h-3.5 w-3.5" aria-hidden />
                     Hacer principal
-                  </button>
+                  </Submit>
                 </form>
               ) : null}
             </div>
