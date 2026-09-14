@@ -239,11 +239,11 @@ TIKTOK_CLIENT_SECRET=
 ### Responder comentarios
 
 El panel puede traer los comentarios nuevos de tus publicaciones de Instagram, Facebook y
-YouTube, y —en las entregas siguientes— proponerte una respuesta que apruebas de un
-toque. El descubrimiento viaja en la misma corrida que publica, cada cinco minutos, y
-mira tus publicaciones de los últimos siete días. A YouTube lo mira cada media hora, no
-cada cinco minutos: su cuota diaria es la misma que usa la sincronización de métricas, y
-gastarla acá te dejaría sin las dos cosas.
+YouTube, y en la cola te propone una respuesta que apruebas de un toque. El descubrimiento
+viaja en la misma corrida que publica, cada cinco minutos, y mira tus publicaciones de los
+últimos siete días. A YouTube lo mira cada media hora, no cada cinco minutos: su cuota
+diaria es la misma que usa la sincronización de métricas, y gastarla acá te dejaría sin
+las dos cosas.
 
 Después de fusionar, corre `npm run db:push` una vez: las tablas de comentarios y de
 ajustes son nuevas, y sin ellas el sondeo no tiene dónde guardar nada.
@@ -275,9 +275,25 @@ De tu infraestructura salen tres cosas hacia el proveedor del modelo: el texto d
 comentario, el nombre de quien lo dejó y el texto de la publicación. Nada más: ni tus
 métricas, ni tus otros comentarios, ni datos de la persona.
 
-Las instrucciones que sigue el modelo se guardan en la base y las vas a editar desde el
-panel en la entrega siguiente. Hasta entonces rigen las de la casa: responder en español, en
+Si el campo de instrucciones queda vacío rigen las de la casa: responder en español, en
 primera persona, breve y cálido, sin inventar datos ni dar precios.
+
+La cola vive en **Comentarios**, en el panel. Cada comentario nuevo llega con el borrador que
+escribió el modelo; lo corriges si quieres y lo mandas con **Enviar**, o lo descartas. Si el
+modelo no pudo redactar, la tarjeta lo dice y tiene **Reintentar borrador**. Arriba está el
+campo con las instrucciones que sigue el modelo: las editas ahí y rigen desde el siguiente
+borrador.
+
+Nada sale sin tu toque. Dos toques, o el panel y el teléfono a la vez, mandan una sola vez:
+antes de enviar se relee el comentario y si ya salió no pasa nada.
+
+El mensaje privado a quien comentó está escrito y **apagado**. Meta exige para eso
+`pages_messaging` con acceso avanzado, que pasa por revisión de la app. El día que la
+consigas, `COMENTARIOS_DM=1` en Vercel lo enciende para Instagram y Facebook, dentro de los
+siete días que Meta permite. Hasta entonces la cola no muestra nada del privado.
+
+Después de fusionar hay que correr `npm run db:push` otra vez: la tabla de comentarios gana
+dos columnas para el estado del privado.
 
 ### Modo Tinder
 

@@ -335,6 +335,10 @@ export const scheduledPostMedia = pgTable(
 export const COMMENT_STATES = ['pendiente', 'enviado', 'descartado', 'propio', 'fallido'] as const
 export type CommentState = (typeof COMMENT_STATES)[number]
 
+/** El privado de la sección 7 del diseño: `no` hasta que la bandera lo encienda. */
+export const DM_STATES = ['no', 'pendiente', 'enviado', 'fallido'] as const
+export type DmState = (typeof DM_STATES)[number]
+
 /**
  * Un comentario que alguien dejó en una publicación del dueño, y qué se hizo con él.
  *
@@ -364,6 +368,8 @@ export const postComments = pgTable(
     state: text('state').$type<CommentState>().notNull().default('pendiente'),
     replyExternalId: text('reply_external_id'),
     error: text('error'),
+    dmState: text('dm_state').$type<DmState>().notNull().default('no'),
+    dmError: text('dm_error'),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },

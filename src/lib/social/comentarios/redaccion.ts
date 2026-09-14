@@ -18,6 +18,34 @@ export type RedaccionReport = {
   sinPasarela: boolean
 }
 
+/** El caption de la publicación comentada, o null si la sincronización todavía no la trajo. */
+async function captionDe(accountId: string, postExternalId: string): Promise<string | null> {
+  const [post] = await getDb()
+    .select({ caption: socialPosts.caption })
+    .from(socialPosts)
+    .where(and(eq(socialPosts.accountId, accountId), eq(socialPosts.externalId, postExternalId)))
+    .limit(1)
+  return post?.caption ?? null
+}
+
+/**
+ * Solo la parte del modelo. Lanza si falla o devuelve vacío; quien llama decide qué
+ * marcar, porque la fase y el botón marcan distinto.
+ */
+async function redactarFila(
+  fila: { text: string; author: string | null },
+  caption: string | null,
+  instrucciones: string,
+  limite: number,
+): Promise<string> {
+  const crudo = await pedirBorrador({ instrucciones, caption, comentario: fila.text, autor: fila.author })
+  const borrador = limpiarBorrador(crudo, limite)
+  // Un borrador vacío no sirve de nada en la cola: cuenta como fallo, y el dueño
+  // reintenta o escribe a mano.
+  if (borrador.length === 0) throw new Error('el modelo devolvió una respuesta vacía')
+  return borrador
+}
+
 /**
  * Le pide un borrador a cada comentario pendiente que todavía no tiene ninguno, del más
  * nuevo al más viejo. Una fila que ya falló conserva su `draft_error` y no se reintenta
@@ -71,29 +99,11 @@ export async function redactarPendientes(inicio: number): Promise<RedaccionRepor
     // Todo el cuerpo va adentro: un tropiezo de la base no es un borrador fallido, así que
     // la fila queda pendiente y sin marca, y la pasada siguiente la vuelve a tomar.
     try {
-      const [post] = await db
-        .select({ caption: socialPosts.caption })
-        .from(socialPosts)
-        .where(
-          and(
-            eq(socialPosts.accountId, fila.accountId),
-            eq(socialPosts.externalId, fila.postExternalId),
-          ),
-        )
-        .limit(1)
+      const caption = await captionDe(fila.accountId, fila.postExternalId)
 
       let borrador: string
       try {
-        const crudo = await pedirBorrador({
-          instrucciones,
-          caption: post?.caption ?? null,
-          comentario: fila.text,
-          autor: fila.author,
-        })
-        borrador = limpiarBorrador(crudo, comentarista.limiteTexto)
-        // Un borrador vacío no sirve de nada en la cola: cuenta como fallo, y el dueño
-        // reintenta o escribe a mano.
-        if (borrador.length === 0) throw new Error('el modelo devolvió una respuesta vacía')
+        borrador = await redactarFila(fila, caption, instrucciones, comentarista.limiteTexto)
       } catch (error) {
         // Solo el modelo llega acá: es el único fallo que puede marcar la fila y sacarla de
         // las pasadas siguientes hasta que el dueño reintente.
@@ -139,4 +149,34 @@ export async function redactarPendientes(inicio: number): Promise<RedaccionRepor
   }
 
   return reporte
+}
+
+/**
+ * El botón «Reintentar borrador» de la cola. A diferencia de la fase, acá el dueño está
+ * mirando: se marca de inmediato, en cualquier dirección.
+ */
+export async function redactarUno(id: string): Promise<{ ok: true } | { error: string }> {
+  const db = getDb()
+  const [fila] = await db.select().from(postComments).where(eq(postComments.id, id)).limit(1)
+  if (!fila || (fila.state !== 'pendiente' && fila.state !== 'fallido')) return { ok: true }
+  const comentarista = comentaristaFor(fila.network)
+  if (!comentarista) return { error: SIN_BORRADOR }
+  if (!hayPasarela()) return { error: SIN_BORRADOR }
+  const instrucciones = normalizarInstrucciones(await leerAjuste(CLAVE_INSTRUCCIONES))
+  const caption = await captionDe(fila.accountId, fila.postExternalId)
+  try {
+    const borrador = await redactarFila(fila, caption, instrucciones, comentarista.limiteTexto)
+    await db
+      .update(postComments)
+      .set({ draft: borrador, draftError: null, updatedAt: new Date() })
+      .where(eq(postComments.id, id))
+    return { ok: true }
+  } catch (error) {
+    console.error(`[comentarios] reintento ${fila.network}:`, String(error).slice(0, 300))
+    await db
+      .update(postComments)
+      .set({ draftError: SIN_BORRADOR, updatedAt: new Date() })
+      .where(eq(postComments.id, id))
+    return { error: SIN_BORRADOR }
+  }
 }

@@ -7,6 +7,12 @@ export const TOPE_INSTRUCCIONES = 2000
 
 export const INSTRUCCIONES_POR_DEFECTO = `Responde en español, en primera persona, breve y cálido: una o dos frases. Agradece cuando el comentario es un elogio, responde la pregunta cuando la hay, y si preguntan por precios o por trabajar juntos, invita a escribir por mensaje directo sin dar cifras. No inventes datos que no estén en la publicación. No uses hashtags. Un emoji como máximo, y solo si el comentario tiene uno.`
 
+export const CLAVE_TEXTO_PRIVADO = 'comentarios_privado_texto'
+
+/** Lo que se le manda por privado a quien comentó. Editable en el panel el día que la bandera se encienda. */
+export const TEXTO_PRIVADO_POR_DEFECTO =
+  'Gracias por comentar. Si quieres conversar, escríbeme por acá.'
+
 /**
  * Lo guardado manda salvo que esté vacío: unas instrucciones en blanco dejarían al modelo
  * sin ninguna, que es peor que las de la casa.

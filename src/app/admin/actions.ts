@@ -803,3 +803,46 @@ export async function uploadBatch(_prev: BatchState, formData: FormData): Promis
     })),
   }
 }
+
+/* -------------------------------------------------------- comentarios -- */
+
+export async function responderComentario(id: string, texto: string): Promise<FormState> {
+  await requireAuth()
+  // Diferido: el módulo carga los conectores de cada red solo cuando alguien de verdad
+  // aprieta «Enviar».
+  const { responderComentario: responder } = await import('@/lib/social/comentarios/responder')
+  const resultado = await responder(id, texto)
+  revalidatePath('/admin/comments')
+  return 'error' in resultado ? { error: resultado.error } : { ok: true }
+}
+
+export async function descartarComentario(id: string): Promise<FormState> {
+  await requireAuth()
+  const { descartarComentario: descartar } = await import('@/lib/social/comentarios/responder')
+  await descartar(id)
+  revalidatePath('/admin/comments')
+  return { ok: true }
+}
+
+export async function reintentarBorrador(id: string): Promise<FormState> {
+  await requireAuth()
+  const { redactarUno } = await import('@/lib/social/comentarios/redaccion')
+  const resultado = await redactarUno(id)
+  revalidatePath('/admin/comments')
+  return 'error' in resultado ? { error: resultado.error } : { ok: true }
+}
+
+export async function guardarInstruccionesComentarios(
+  _prev: FormState,
+  formData: FormData,
+): Promise<FormState> {
+  await requireAuth()
+  const { CLAVE_INSTRUCCIONES, normalizarInstrucciones } = await import(
+    '@/lib/social/comentarios/instrucciones'
+  )
+  const { guardarAjuste } = await import('@/lib/ajustes')
+  const bruto = String(formData.get('instrucciones') ?? '')
+  await guardarAjuste(CLAVE_INSTRUCCIONES, normalizarInstrucciones(bruto))
+  revalidatePath('/admin/comments')
+  return { ok: true }
+}
