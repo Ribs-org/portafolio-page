@@ -6,17 +6,12 @@ import { useActionState, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { ArrowDown, ArrowLeft, ArrowUp, Check, Copy, ExternalLink } from 'lucide-react'
 import { deleteScheduledPost, updateScheduledPost, type FormState } from '@/app/admin/actions'
-import { Button, Field, Input, Textarea } from '@/components/ui'
+import { Button, Field, GroupLabel, Input, Textarea } from '@/components/ui'
 import { networkLabel } from '@/lib/networks'
 import { cn } from '@/lib/utils'
 
 // Twin of ENABLED in the composer (schedule/composer.tsx) — update both together.
 const NETWORKS = ['instagram', 'facebook', 'youtube', 'threads', 'x']
-
-// Encabezado de un grupo de controles. `Field` rotula uno solo: su `<label>` alrededor
-// de varios dejaría el nombre apuntando al primero.
-const GROUP_LABEL =
-  'mb-1.5 block font-mono text-[0.62rem] uppercase tracking-[0.16em] text-fg-faint'
 
 type MediaRow = { id: string; blobUrl: string; mediaType: string }
 
@@ -103,7 +98,7 @@ export function Editor({
           </Field>
 
           <div>
-            <span className={GROUP_LABEL}>Redes</span>
+            <GroupLabel>Redes</GroupLabel>
             <div className="flex flex-wrap gap-3">
               {NETWORKS.map((network) => {
                 const locked = published.has(network)
@@ -129,7 +124,7 @@ export function Editor({
           </div>
 
           <div>
-            <span className={GROUP_LABEL}>Media</span>
+            <GroupLabel>Media</GroupLabel>
             {kept.length > 0 ? (
               <ul className="mb-2 space-y-2">
                 {kept.map((m, index) => (
@@ -189,7 +184,7 @@ export function Editor({
           </div>
 
           <div>
-            <span className={GROUP_LABEL}>Portada (solo para video)</span>
+            <GroupLabel>Portada (solo para video)</GroupLabel>
             {keptCover ? (
               <div className="mb-2 flex items-center gap-3 rounded-xl bg-white/[0.04] p-2">
                 <input type="hidden" name="keepPortada" value={keptCover} />

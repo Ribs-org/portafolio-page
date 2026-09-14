@@ -23,8 +23,7 @@ export default async function ProfilesPage() {
           </p>
         </div>
         <form action={createProfile} className="ml-auto">
-          <Submit pendingLabel="Creando…">
-            <Plus className="h-4 w-4" aria-hidden />
+          <Submit pendingLabel="Creando…" icono={<Plus className="h-4 w-4" aria-hidden />}>
             Nuevo perfil
           </Submit>
         </form>
@@ -89,9 +88,9 @@ export default async function ProfilesPage() {
                     title="Servir este perfil en /"
                     className="border-transparent px-2.5 py-1.5 text-xs text-fg-faint"
                     pendingLabel="Cambiando…"
+                    icono={<Star className="h-3.5 w-3.5" aria-hidden />}
                     confirm={`«${profile.displayName}» se servirá en / y el perfil principal de ahora pasará a su propia URL. Si era borrador, queda publicado. ¿Seguir?`}
                   >
-                    <Star className="h-3.5 w-3.5" aria-hidden />
                     Hacer principal
                   </Submit>
                 </form>

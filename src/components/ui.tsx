@@ -7,6 +7,18 @@ import { cn } from '@/lib/utils'
 const CONTROL =
   'w-full rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2 text-sm outline-none transition-colors placeholder:text-fg-faint focus:border-white/25'
 
+/**
+ * Encabezado de un grupo de controles. `Field` rotula uno solo: su `<label>` alrededor
+ * de varios dejaría el nombre apuntando al primero.
+ */
+export function GroupLabel({ children }: { children: React.ReactNode }) {
+  return (
+    <span className="mb-1.5 block font-mono text-[0.62rem] uppercase tracking-[0.16em] text-fg-faint">
+      {children}
+    </span>
+  )
+}
+
 export function Field({
   label,
   hint,
@@ -18,9 +30,7 @@ export function Field({
 }) {
   return (
     <label className="block">
-      <span className="mb-1.5 block font-mono text-[0.62rem] uppercase tracking-[0.16em] text-fg-faint">
-        {label}
-      </span>
+      <GroupLabel>{label}</GroupLabel>
       {children}
       {hint ? <span className="mt-1 block text-[0.72rem] text-fg-faint">{hint}</span> : null}
     </label>
@@ -70,9 +80,14 @@ export function Button({
  *
  * `confirm` pregunta antes de enviar. El diálogo va en el click y no en el `onSubmit`
  * del formulario para que un «cancelar» no llegue nunca a encolar la acción.
+ *
+ * `icono` va aparte de los hijos porque es lo único que sobrevive al cambio de texto:
+ * adentro de `children` desaparecería al llegar `pendingLabel`, y el botón encogería
+ * justo cuando hay que mirarlo.
  */
 export function Submit({
   children,
+  icono,
   pendingLabel,
   confirm: question,
   variant = 'primary',
@@ -81,6 +96,7 @@ export function Submit({
   ...props
 }: Omit<React.ButtonHTMLAttributes<HTMLButtonElement>, 'type'> & {
   variant?: 'primary' | 'ghost' | 'danger'
+  icono?: React.ReactNode
   pendingLabel: string
   confirm?: string
 }) {
@@ -100,6 +116,7 @@ export function Submit({
         onClick?.(event)
       }}
     >
+      {icono}
       {pending ? pendingLabel : children}
     </Button>
   )

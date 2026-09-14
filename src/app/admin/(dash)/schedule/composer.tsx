@@ -2,7 +2,7 @@
 
 import { useActionState, useId } from 'react'
 import { createScheduledPost } from '@/app/admin/actions'
-import { Field, Input, Submit, Textarea } from '@/components/ui'
+import { Field, GroupLabel, Input, Submit, Textarea } from '@/components/ui'
 import { SOCIAL_NETWORKS } from '@/db/schema'
 import { networkLabel } from '@/lib/networks'
 import { cn } from '@/lib/utils'
@@ -36,9 +36,7 @@ export function Composer() {
         </Field>
 
         <div>
-          <span className="mb-1.5 block font-mono text-[0.62rem] uppercase tracking-[0.16em] text-fg-faint">
-            Redes
-          </span>
+          <GroupLabel>Redes</GroupLabel>
           <div className="flex flex-wrap gap-3">
             {SOCIAL_NETWORKS.map((network) => {
               const enabled = ENABLED.has(network)
