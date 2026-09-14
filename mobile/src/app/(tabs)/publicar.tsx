@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useReducer, useRef, useState } from 'react'
-import { Alert, ScrollView, Text, TextInput, View } from 'react-native'
+import { Alert, KeyboardAvoidingView, ScrollView, Text, TextInput, View } from 'react-native'
 import { DateTimePickerAndroid } from '@react-native-community/datetimepicker'
 import * as ImagePicker from 'expo-image-picker'
 import { useRouter } from 'expo-router'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import { Boton, COLORES, Chip, Miniatura } from '../../components/ui'
 import { SesionCaducada } from '../../lib/api'
@@ -27,6 +28,10 @@ import { useToken } from '../../lib/useToken'
 
 const MAX_TEXTO = 2200
 
+// El contenedor mide desde su padre y el teclado desde la pantalla; en medio está la
+// cabecera. Es el estándar de Android (expo-router no reexporta `useHeaderHeight`): confirmar en el teléfono la primera vez.
+const ALTO_CABECERA = 56
+
 function fechaLegible(fecha: Date): string {
   const dd = String(fecha.getDate()).padStart(2, '0')
   const mm = String(fecha.getMonth() + 1).padStart(2, '0')
@@ -38,6 +43,7 @@ function fechaLegible(fecha: Date): string {
 export default function Publicar() {
   const token = useToken()
   const router = useRouter()
+  const insets = useSafeAreaInsets()
   const [texto, setTexto] = useState('')
   const [archivos, setArchivos] = useState<Elegido[]>([])
   const [redes, setRedes] = useState<string[]>(['instagram'])
@@ -173,105 +179,126 @@ export default function Publicar() {
 
   // Tras «hecho»: se vacía el formulario y se salta al Calendario, que refresca al
   // recibir foco porque anotamos el cambio. Un efecto y no un `if` en el render:
-  // navegar es un efecto secundario, y los `setState` de acá son la reacción a un
-  // paso del envío, exactamente el caso que la regla no puede ver por sí sola.
+  // navegar es un efecto secundario.
   useEffect(() => {
     if (envio.paso !== 'hecho') return
     anotarCambio()
-    despachar({ tipo: 'cancelar' })
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setTexto('')
-    setArchivos([])
-    setRedes(['instagram'])
-    setFecha(proximaHoraEnPunto(new Date()))
-    setAviso(null)
-    subidas.current = []
-    ultimoBorrador.current = null
-    router.navigate('/(tabs)/calendario')
+    // La espera es la confirmación: limpiar y navegar en el mismo tick borraba
+    // «Listo» antes de que alcanzara a dibujarse, y el envío terminaba sin acuse.
+    const salto = setTimeout(() => {
+      despachar({ tipo: 'cancelar' })
+      setTexto('')
+      setArchivos([])
+      setRedes(['instagram'])
+      setFecha(proximaHoraEnPunto(new Date()))
+      setAviso(null)
+      subidas.current = []
+      ultimoBorrador.current = null
+      router.navigate('/(tabs)/calendario')
+    }, 1000)
+    return () => clearTimeout(salto)
   }, [envio.paso, router])
 
-  const ocupado = envio.paso === 'chequeando' || envio.paso === 'subiendo' || envio.paso === 'creando'
+  // 'hecho' también cuenta: durante el segundo que se ve «Listo» la pantalla ya no
+  // acepta nada, para que un toque de más no despache el mismo post dos veces.
+  const ocupado =
+    envio.paso === 'chequeando' || envio.paso === 'subiendo' || envio.paso === 'creando' || envio.paso === 'hecho'
   const etiqueta = etiquetaEnvio(envio)
   const error = envio.paso === 'listo' ? envio.error : envio.paso === 'error' ? envio.mensaje : null
 
   return (
-    <ScrollView
+    // `height` es el `behavior` de Android: la app dibuja de borde a borde, así que la
+    // ventana ya no se encoge sola al abrir el teclado y el texto largo dejaba
+    // «Programar» y «Publicar ahora» debajo de las teclas.
+    <KeyboardAvoidingView
+      behavior="height"
+      keyboardVerticalOffset={insets.top + ALTO_CABECERA}
       style={{ flex: 1, backgroundColor: COLORES.fondo }}
-      contentContainerStyle={{ padding: 16, paddingBottom: 48, gap: 14 }}
-      keyboardShouldPersistTaps="handled"
     >
-      <TextInput
-        value={texto}
-        onChangeText={setTexto}
-        multiline
-        maxLength={MAX_TEXTO}
-        editable={!ocupado}
-        placeholder="Texto del post…"
-        placeholderTextColor={COLORES.tenue}
-        style={{
-          backgroundColor: COLORES.tarjeta,
-          color: COLORES.texto,
-          borderRadius: 12,
-          padding: 14,
-          minHeight: 120,
-          textAlignVertical: 'top',
-        }}
-      />
-      <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-        <Text style={{ color: COLORES.tenue, fontSize: 11 }}>En YouTube el primer renglón es el título</Text>
-        <Text style={{ color: COLORES.tenue, fontSize: 11 }}>
-          {texto.length} / {MAX_TEXTO}
-        </Text>
-      </View>
-
-      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12, alignItems: 'center' }}>
-        {archivos.map((a, i) => (
-          <Miniatura
-            key={`${a.uri}:${i}`}
-            uri={a.uri}
-            esVideo={a.mediaType === 'video'}
-            onQuitar={ocupado ? undefined : () => quitar(i)}
-          />
-        ))}
-        {archivos.length < MAX_ARCHIVOS && !ocupado ? (
-          <Chip texto="＋ Fotos o video" activo={false} onPress={() => void elegir()} />
-        ) : null}
-      </View>
-
-      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
-        {REDES_PUBLICABLES.map((red) => (
-          <Chip
-            key={red}
-            texto={NOMBRE_RED[red] ?? red}
-            activo={redes.includes(red)}
-            onPress={() => (ocupado ? undefined : alternarRed(red))}
-          />
-        ))}
-      </View>
-
-      <Chip texto={`Cuándo: ${fechaLegible(fecha)}`} activo onPress={() => (ocupado ? undefined : elegirFecha())} />
-
-      {aviso ? <Text style={{ color: COLORES.rojo }}>{aviso}</Text> : null}
-      {error ? <Text style={{ color: COLORES.rojo }}>{error}</Text> : null}
-      {etiqueta ? <Text style={{ color: COLORES.suave }}>{etiqueta}</Text> : null}
-      {envio.paso === 'subiendo' ? (
-        <View style={{ height: 4, backgroundColor: '#ffffff10', borderRadius: 2 }}>
-          <View style={{ height: 4, width: `${Math.round(envio.progreso * 100)}%`, backgroundColor: COLORES.verde, borderRadius: 2 }} />
+      <ScrollView
+        style={{ flex: 1, backgroundColor: COLORES.fondo }}
+        contentContainerStyle={{ padding: 16, paddingBottom: 48, gap: 14 }}
+        keyboardShouldPersistTaps="handled"
+      >
+        <TextInput
+          value={texto}
+          onChangeText={setTexto}
+          multiline
+          maxLength={MAX_TEXTO}
+          editable={!ocupado}
+          placeholder="Texto del post…"
+          placeholderTextColor={COLORES.tenue}
+          style={{
+            backgroundColor: COLORES.tarjeta,
+            color: COLORES.texto,
+            borderRadius: 12,
+            padding: 14,
+            minHeight: 120,
+            textAlignVertical: 'top',
+          }}
+        />
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+          <Text style={{ color: COLORES.tenue, fontSize: 11 }}>En YouTube el primer renglón es el título</Text>
+          <Text style={{ color: COLORES.tenue, fontSize: 11 }}>
+            {texto.length} / {MAX_TEXTO}
+          </Text>
         </View>
-      ) : null}
 
-      <View style={{ flexDirection: 'row', gap: 10 }}>
-        {envio.paso === 'error' ? (
-          <Boton texto="Reintentar" onPress={reintentar} destacado />
-        ) : ocupado ? (
-          <Boton texto="Cancelar" onPress={cancelar} deshabilitado={envio.paso !== 'subiendo'} />
-        ) : (
-          <>
-            <Boton texto="Programar" onPress={programar} deshabilitado={!puedeEnviar(texto, archivos.length)} />
-            <Boton texto="Publicar ahora" onPress={publicarAhora} deshabilitado={!puedeEnviar(texto, archivos.length)} destacado />
-          </>
-        )}
-      </View>
-    </ScrollView>
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12, alignItems: 'center' }}>
+          {archivos.map((a, i) => (
+            <Miniatura
+              key={`${a.uri}:${i}`}
+              uri={a.uri}
+              esVideo={a.mediaType === 'video'}
+              onQuitar={ocupado ? undefined : () => quitar(i)}
+            />
+          ))}
+          {archivos.length < MAX_ARCHIVOS && !ocupado ? (
+            <Chip texto="+ Fotos o video" activo={false} onPress={() => void elegir()} />
+          ) : null}
+        </View>
+
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
+          {REDES_PUBLICABLES.map((red) => (
+            <Chip
+              key={red}
+              texto={NOMBRE_RED[red] ?? red}
+              activo={redes.includes(red)}
+              onPress={() => alternarRed(red)}
+              deshabilitado={ocupado}
+            />
+          ))}
+        </View>
+
+        <Chip
+          texto={`Cuándo: ${fechaLegible(fecha)}`}
+          activo
+          onPress={elegirFecha}
+          deshabilitado={ocupado}
+        />
+
+        {aviso ? <Text style={{ color: COLORES.rojo }}>{aviso}</Text> : null}
+        {error ? <Text style={{ color: COLORES.rojo }}>{error}</Text> : null}
+        {etiqueta ? <Text style={{ color: COLORES.suave }}>{etiqueta}</Text> : null}
+        {envio.paso === 'subiendo' ? (
+          <View style={{ height: 4, backgroundColor: '#ffffff10', borderRadius: 2 }}>
+            <View style={{ height: 4, width: `${Math.round(envio.progreso * 100)}%`, backgroundColor: COLORES.verde, borderRadius: 2 }} />
+          </View>
+        ) : null}
+
+        <View style={{ flexDirection: 'row', gap: 10 }}>
+          {envio.paso === 'error' ? (
+            <Boton texto="Reintentar" onPress={reintentar} destacado />
+          ) : ocupado ? (
+            <Boton texto="Cancelar" onPress={cancelar} deshabilitado={envio.paso !== 'subiendo'} />
+          ) : (
+            <>
+              <Boton texto="Programar" onPress={programar} deshabilitado={!puedeEnviar(texto, archivos.length)} />
+              <Boton texto="Publicar ahora" onPress={publicarAhora} deshabilitado={!puedeEnviar(texto, archivos.length)} destacado />
+            </>
+          )}
+        </View>
+      </ScrollView>
+    </KeyboardAvoidingView>
   )
 }

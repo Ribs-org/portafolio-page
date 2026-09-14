@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { num, pct, shortDate } from './format'
+import { capitalizar, num, pct, shortDate } from './format'
 
 describe('num', () => {
   it('un null es un guion, nunca un cero', () => {
@@ -26,5 +26,15 @@ describe('pct', () => {
 describe('shortDate', () => {
   it('lee la fecha ISO con offset sin moverla de zona', () => {
     expect(shortDate('2026-09-03T11:06:00-04:00')).toBe('3 sep, 11:06')
+  })
+})
+
+describe('capitalizar', () => {
+  it('pone en mayúscula solo la primera letra', () => {
+    expect(capitalizar('hook')).toBe('Hook')
+  })
+
+  it('una cadena vacía sigue vacía', () => {
+    expect(capitalizar('')).toBe('')
   })
 })

@@ -16,13 +16,12 @@ import { num, pct, shortDate } from '../../lib/format'
 import { clearToken } from '../../lib/session'
 import { useScreenData } from '../../lib/useScreenData'
 import { useToken } from '../../lib/useToken'
-import { NOMBRE_RED, type Posts } from '../../lib/tipos'
+import { ETIQUETA_RANGO, NOMBRE_RED, RANGOS, type Posts, type Rango } from '../../lib/tipos'
 
 const REDES = ['instagram', 'facebook', 'youtube', 'threads', 'x']
-const RANGOS = ['hoy', '7d', '30d']
 
 export default function Contenido() {
-  const [rango, setRango] = useState('7d')
+  const [rango, setRango] = useState<Rango>('7d')
   const [redes, setRedes] = useState<string[]>([])
   const token = useToken()
   const router = useRouter()
@@ -65,7 +64,7 @@ export default function Contenido() {
     <Pantalla refrescando={cargando} onRefrescar={refrescar}>
       <View style={{ flexDirection: 'row', gap: 8 }}>
         {RANGOS.map((r) => (
-          <Chip key={r} texto={r === 'hoy' ? 'Hoy' : r} activo={rango === r} onPress={() => setRango(r)} />
+          <Chip key={r} texto={ETIQUETA_RANGO[r]} activo={rango === r} onPress={() => setRango(r)} />
         ))}
       </View>
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>

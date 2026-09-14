@@ -71,7 +71,9 @@ export default function Calendario() {
                   {post.redes.map((r) => (
                     <View key={r.red} style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                       <PuntoEstado estado={r.estado} />
-                      <Text style={{ color: COLORES.suave, fontSize: 12 }}>
+                      {/* El error viene de la red y puede ser largo: sin esto se salía
+                          de la tarjeta en vez de cortarse. */}
+                      <Text style={{ color: COLORES.suave, fontSize: 12, flex: 1 }} numberOfLines={2}>
                         {NOMBRE_RED[r.red] ?? r.red}
                         {r.error ? ` — ${r.error}` : ''}
                       </Text>

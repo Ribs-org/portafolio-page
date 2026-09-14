@@ -1,7 +1,8 @@
 import { useState } from 'react'
-import { Pressable, Text, TextInput, View } from 'react-native'
+import { KeyboardAvoidingView, Text, TextInput, View } from 'react-native'
 import { useRouter } from 'expo-router'
-import { COLORES } from '../components/ui'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
+import { Boton, COLORES } from '../components/ui'
 import { login } from '../lib/session'
 
 export default function Login() {
@@ -9,6 +10,8 @@ export default function Login() {
   const [error, setError] = useState<string | null>(null)
   const [entrando, setEntrando] = useState(false)
   const router = useRouter()
+  // El proveedor ya lo monta expo-router en su raíz; acá solo se leen los márgenes.
+  const insets = useSafeAreaInsets()
 
   async function entrar() {
     setEntrando(true)
@@ -22,33 +25,48 @@ export default function Login() {
   }
 
   return (
-    <View style={{ flex: 1, backgroundColor: COLORES.fondo, justifyContent: 'center', padding: 24, gap: 12 }}>
-      <Text style={{ color: COLORES.texto, fontSize: 22, fontWeight: '600' }}>Tus números</Text>
-      <Text style={{ color: COLORES.suave }}>Escribe tu contraseña una vez.</Text>
-      <TextInput
-        value={password}
-        onChangeText={setPassword}
-        secureTextEntry
-        autoFocus
-        onSubmitEditing={entrar}
-        placeholder="Contraseña"
-        placeholderTextColor={COLORES.tenue}
-        style={{
-          backgroundColor: COLORES.tarjeta,
-          color: COLORES.texto,
-          borderRadius: 12,
-          padding: 14,
-          marginTop: 8,
-        }}
-      />
-      {error ? <Text style={{ color: COLORES.rojo }}>{error}</Text> : null}
-      <Pressable
-        onPress={entrar}
-        disabled={entrando}
-        style={{ backgroundColor: COLORES.tarjeta, borderRadius: 12, padding: 14, alignItems: 'center' }}
-      >
-        <Text style={{ color: COLORES.texto }}>{entrando ? 'Entrando…' : 'Entrar'}</Text>
-      </Pressable>
-    </View>
+    // `height` es el `behavior` de Android: la app dibuja de borde a borde, así que la
+    // ventana ya no se encoge sola al abrir el teclado. Y acá el teclado sale de
+    // entrada por el `autoFocus`, con lo que «Entrar» nacía tapado.
+    <KeyboardAvoidingView
+      behavior="height"
+      style={{
+        flex: 1,
+        backgroundColor: COLORES.fondo,
+        paddingTop: insets.top,
+        paddingBottom: insets.bottom,
+      }}
+    >
+      <View style={{ flex: 1, justifyContent: 'center', padding: 24, gap: 12 }}>
+        <Text style={{ color: COLORES.texto, fontSize: 22, fontWeight: '600' }}>Tus números</Text>
+        <Text style={{ color: COLORES.suave }}>Escribe tu contraseña una vez.</Text>
+        <TextInput
+          value={password}
+          onChangeText={setPassword}
+          secureTextEntry
+          autoFocus
+          onSubmitEditing={entrar}
+          placeholder="Contraseña"
+          placeholderTextColor={COLORES.tenue}
+          style={{
+            backgroundColor: COLORES.tarjeta,
+            color: COLORES.texto,
+            borderRadius: 12,
+            padding: 14,
+            marginTop: 8,
+          }}
+        />
+        {error ? <Text style={{ color: COLORES.rojo }}>{error}</Text> : null}
+        {/* En fila porque `Boton` crece a lo ancho con `flex: 1`, y esta pantalla apila. */}
+        <View style={{ flexDirection: 'row' }}>
+          <Boton
+            texto={entrando ? 'Entrando…' : 'Entrar'}
+            onPress={entrar}
+            deshabilitado={entrando}
+            destacado
+          />
+        </View>
+      </View>
+    </KeyboardAvoidingView>
   )
 }
