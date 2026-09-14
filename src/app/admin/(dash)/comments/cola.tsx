@@ -5,9 +5,17 @@ import { useState, useTransition } from 'react'
 import { descartarComentario, reintentarBorrador, responderComentario } from '@/app/admin/actions'
 import { Empty } from '@/components/charts/panel'
 import { Button, Textarea } from '@/components/ui'
-import type { ComentarioFila } from '@/lib/comentarios-cola'
+import type { DmState } from '@/db/schema'
+import type { ComentarioFila, EstadoCola } from '@/lib/comentarios-cola'
 import { agruparPorPublicacion } from '@/lib/social/comentarios/agrupar'
 import { networkLabel } from '@/lib/networks'
+
+const ETIQUETA_DM: Record<DmState, string> = {
+  no: '',
+  pendiente: 'pendiente',
+  enviado: 'enviado',
+  fallido: 'no salió',
+}
 
 const RELATIVE = new Intl.RelativeTimeFormat('es', { numeric: 'auto' })
 
@@ -18,9 +26,22 @@ function hace(fecha: Date): string {
   return RELATIVE.format(-Math.round(horas / 24), 'day')
 }
 
-export function Cola({ filas, mostrarPrivado }: { filas: ComentarioFila[]; mostrarPrivado: boolean }) {
+export function Cola({
+  filas,
+  mostrarPrivado,
+  estado,
+}: {
+  filas: ComentarioFila[]
+  mostrarPrivado: boolean
+  estado: EstadoCola
+}) {
   if (filas.length === 0) {
-    return <Empty>No hay comentarios aquí. Los nuevos llegan cada cinco minutos.</Empty>
+    const cronico = estado === 'pendientes' || estado === 'todos'
+    return (
+      <Empty>
+        No hay comentarios aquí.{cronico ? ' Los nuevos llegan cada cinco minutos.' : ''}
+      </Empty>
+    )
   }
   const grupos = agruparPorPublicacion(filas)
   return (
@@ -45,7 +66,13 @@ export function Cola({ filas, mostrarPrivado }: { filas: ComentarioFila[]; mostr
                   {networkLabel(primero.network)}
                   {primero.accountHandle ? ` · ${primero.accountHandle}` : ''}
                 </p>
-                <p className="line-clamp-2 text-sm text-fg-muted">{primero.postCaption ?? '(sin texto)'}</p>
+                {primero.postPermalink ? (
+                  <a href={primero.postPermalink} target="_blank" rel="noreferrer" className="hover:text-fg">
+                    <p className="line-clamp-2 text-sm text-fg-muted">{primero.postCaption ?? '(sin texto)'}</p>
+                  </a>
+                ) : (
+                  <p className="line-clamp-2 text-sm text-fg-muted">{primero.postCaption ?? '(sin texto)'}</p>
+                )}
               </div>
             </header>
             {g.comentarios.map((c) => (
@@ -61,6 +88,13 @@ export function Cola({ filas, mostrarPrivado }: { filas: ComentarioFila[]; mostr
 function Tarjeta({ fila, mostrarPrivado }: { fila: ComentarioFila; mostrarPrivado: boolean }) {
   const editable = fila.state === 'pendiente' || fila.state === 'fallido'
   const [texto, setTexto] = useState(fila.draft ?? '')
+  // «Reintentar borrador» escribe el borrador en el servidor y `revalidatePath` vuelve a
+  // renderizar con la misma key: sin esto la caja se queda vacía aunque el borrador llegó.
+  const [previo, setPrevio] = useState(fila.draft)
+  if (fila.draft !== previo) {
+    setPrevio(fila.draft)
+    setTexto(fila.draft ?? '')
+  }
   const [error, setError] = useState<string | null>(null)
   const [pending, startTransition] = useTransition()
 
@@ -129,7 +163,7 @@ function Tarjeta({ fila, mostrarPrivado }: { fila: ComentarioFila; mostrarPrivad
           )}
           {mostrarPrivado && fila.dmState !== 'no' ? (
             <p className="text-fg-faint">
-              Privado: {fila.dmState}{fila.dmError ? ` · ${fila.dmError}` : ''}
+              Privado: {ETIQUETA_DM[fila.dmState]}{fila.dmError ? ` · ${fila.dmError}` : ''}
             </p>
           ) : null}
         </div>

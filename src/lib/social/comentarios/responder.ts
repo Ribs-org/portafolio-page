@@ -2,8 +2,7 @@ import 'server-only'
 import { eq } from 'drizzle-orm'
 import { getDb, postComments, socialAccounts } from '@/db'
 import { leerAjuste } from '@/lib/ajustes'
-import { connectorFor } from '../index'
-import { COMENTARIO_AUSENTE, RED_RECHAZO, SIN_CREDENCIAL } from './comentarista'
+import { COMENTARIO_AUSENTE, PRIVADO_RECHAZADO, RED_RECHAZO, SIN_CREDENCIAL } from './comentarista'
 import { comentaristaFor } from './index'
 import { CLAVE_TEXTO_PRIVADO, TEXTO_PRIVADO_POR_DEFECTO } from './instrucciones'
 import { mandarPrivado, privadoActivo, tocaPrivado } from './privado'
@@ -34,7 +33,9 @@ export async function responderComentario(id: string, texto: string): Promise<Re
     .from(socialAccounts)
     .where(eq(socialAccounts.id, fila.accountId))
     .limit(1)
-  const ensure = comentarista.ensureCredential ?? connectorFor(fila.network)?.ensureCredential
+  // Solo la credencial del propio comentarista: la del conector genérico puede ser de
+  // solo lectura (YouTube lee con API key y comenta con OAuth) y escribiría con la que no sirve.
+  const ensure = comentarista.ensureCredential
   const token = account && ensure ? await ensure(account) : null
   if (!account || !token) {
     await marcar(id, 'fallido', SIN_CREDENCIAL)
@@ -104,7 +105,7 @@ async function privadoSiToca(
     console.error(`[comentarios] privado ${fila.network}:`, 'la cuenta no tiene external_id')
     await db
       .update(postComments)
-      .set({ dmState: 'fallido', dmError: RED_RECHAZO, updatedAt: new Date() })
+      .set({ dmState: 'fallido', dmError: PRIVADO_RECHAZADO, updatedAt: new Date() })
       .where(eq(postComments.id, fila.id))
     return
   }
@@ -119,7 +120,7 @@ async function privadoSiToca(
     console.error(`[comentarios] privado ${fila.network}:`, String(error).slice(0, 300))
     await db
       .update(postComments)
-      .set({ dmState: 'fallido', dmError: RED_RECHAZO, updatedAt: new Date() })
+      .set({ dmState: 'fallido', dmError: PRIVADO_RECHAZADO, updatedAt: new Date() })
       .where(eq(postComments.id, fila.id))
   }
 }

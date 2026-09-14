@@ -44,7 +44,7 @@ export default async function CommentsPage({
 
   const [filas, pendientes, instrucciones] = await Promise.all([
     getCola({ estado, red }),
-    contarPendientes(),
+    contarPendientes(red),
     leerAjuste(CLAVE_INSTRUCCIONES),
   ])
 
@@ -90,7 +90,7 @@ export default async function CommentsPage({
         ))}
       </div>
 
-      <Cola filas={filas} mostrarPrivado={privadoActivo()} />
+      <Cola filas={filas} mostrarPrivado={privadoActivo()} estado={estado} />
     </>
   )
 }

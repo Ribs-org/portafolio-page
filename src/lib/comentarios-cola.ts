@@ -1,7 +1,9 @@
 import 'server-only'
-import { and, desc, eq, inArray } from 'drizzle-orm'
+import { and, desc, eq, inArray, sql, type SQL } from 'drizzle-orm'
 import { getDb, postComments, socialAccounts, socialPosts } from '@/db'
 import type { CommentState, DmState } from '@/db/schema'
+
+const int = (fragment: SQL) => sql<number>`${fragment}`.mapWith(Number)
 
 export const ESTADOS_COLA = ['pendientes', 'enviados', 'descartados', 'todos'] as const
 export type EstadoCola = (typeof ESTADOS_COLA)[number]
@@ -72,10 +74,12 @@ export async function getCola(filtro: { estado: EstadoCola; red: string | null }
   return filas
 }
 
-export async function contarPendientes(): Promise<number> {
-  const filas = await getDb()
-    .select({ id: postComments.id })
+export async function contarPendientes(red: string | null): Promise<number> {
+  const condiciones = [inArray(postComments.state, POR_ESTADO.pendientes)]
+  if (red) condiciones.push(eq(postComments.network, red))
+  const [fila] = await getDb()
+    .select({ total: int(sql`count(*)`) })
     .from(postComments)
-    .where(inArray(postComments.state, POR_ESTADO.pendientes))
-  return filas.length
+    .where(and(...condiciones))
+  return fila?.total ?? 0
 }

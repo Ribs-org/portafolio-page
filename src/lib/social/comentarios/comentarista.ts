@@ -37,3 +37,4 @@ export type Comentarista = {
 export const SIN_CREDENCIAL = 'Esa cuenta ya no está conectada.'
 export const RED_RECHAZO = 'La red no aceptó la respuesta. Inténtalo de nuevo.'
 export const COMENTARIO_AUSENTE = 'El comentario ya no está en la red.'
+export const PRIVADO_RECHAZADO = 'No se pudo mandar el privado.'
