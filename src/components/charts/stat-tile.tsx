@@ -39,6 +39,17 @@ export function StatTile({ label, value, delta, hint }: Props) {
   )
 }
 
+/** El hueco de un `StatTile`: las tres líneas de la cifra, sin la cifra. */
+export function StatTileSkeleton() {
+  return (
+    <div className="surface animate-pulse rounded-2xl p-4" aria-hidden>
+      <div className="h-4 w-20 rounded bg-white/[0.06]" />
+      <div className="mt-2 h-7 w-24 rounded bg-white/[0.07]" />
+      <div className="mt-2 h-4 w-28 rounded bg-white/[0.035]" />
+    </div>
+  )
+}
+
 /** Percentage change, guarding the divide-by-zero that a first period always hits. */
 export function delta(current: number, previous: number): number | null {
   if (previous === 0) return current === 0 ? 0 : null
