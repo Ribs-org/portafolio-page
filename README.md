@@ -266,8 +266,10 @@ El borrador lo escribe un modelo por la pasarela de IA de Vercel. Necesita
 `AI_GATEWAY_API_KEY` en el entorno; en Vercel puedes omitirla si el proyecto usa OIDC. Sin
 ella no se rompe nada: los comentarios entran a la cola sin borrador y los respondes a mano.
 Con `COMENTARIOS_MODELO` cambias el modelo sin desplegar, con la forma `proveedor/modelo`.
-El borrador tiene un tope de salida corto, así que un modelo de razonamiento puede
-gastárselo pensando y devolverte vacío: acá conviene uno rápido.
+El borrador tiene un tope de salida corto, así que la petición sale siempre con el
+razonamiento apagado: un modelo de razonamiento se gastaría el tope pensando y te
+devolvería el pensamiento a medias en vez de la frase. Con eso puedes usar uno de
+razonamiento sin miedo, y funciona hasta el gratuito `inclusionai/ling-3.0-flash-fin-free`.
 
 De tu infraestructura salen tres cosas hacia el proveedor del modelo: el texto del
 comentario, el nombre de quien lo dejó y el texto de la publicación. Nada más: ni tus
