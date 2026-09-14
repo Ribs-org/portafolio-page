@@ -18,6 +18,7 @@ import { clearToken } from '../../lib/session'
 import { useScreenData } from '../../lib/useScreenData'
 import {
   ETIQUETA_RANGO,
+  NOMBRE_RED,
   RANGOS,
   type Overview,
   type PostProgramado,
@@ -101,9 +102,22 @@ export function FilaProgramada({ post }: { post: PostProgramado }) {
       <Text style={{ color: COLORES.texto, fontSize: 14 }} numberOfLines={2}>
         {post.texto || '(sin texto)'}
       </Text>
-      <View style={{ flexDirection: 'row', gap: 6, marginTop: 4, alignItems: 'center' }}>
+      {/* El punto solo tiene color, y el color no dice de qué red es. Con el nombre al
+          lado se lee igual que el calendario; envuelve porque tres redes no caben. */}
+      <View
+        style={{
+          flexDirection: 'row',
+          flexWrap: 'wrap',
+          gap: 10,
+          marginTop: 4,
+          alignItems: 'center',
+        }}
+      >
         {post.redes.map((r) => (
-          <PuntoEstado key={r.red} estado={r.estado} />
+          <View key={r.red} style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+            <PuntoEstado estado={r.estado} />
+            <Text style={{ color: COLORES.tenue, fontSize: 11 }}>{NOMBRE_RED[r.red] ?? r.red}</Text>
+          </View>
         ))}
       </View>
     </Tarjeta>

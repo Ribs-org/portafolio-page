@@ -148,6 +148,8 @@ export function Chip({
         minHeight: 44,
         justifyContent: 'center',
         borderRadius: 999,
+        // Sin esto el ripple se dibuja rectangular, por fuera de las esquinas redondas.
+        overflow: 'hidden',
         backgroundColor: activo ? COLORES.tarjeta : 'transparent',
         opacity: deshabilitado ? 0.5 : pressed ? 0.7 : 1,
       })}
@@ -232,6 +234,8 @@ export function Boton({
         flex: 1,
         backgroundColor: destacado ? COLORES.verde : COLORES.tarjeta,
         borderRadius: 12,
+        // Sin esto el ripple se dibuja rectangular, por fuera de las esquinas redondas.
+        overflow: 'hidden',
         padding: 14,
         minHeight: 48,
         alignItems: 'center',

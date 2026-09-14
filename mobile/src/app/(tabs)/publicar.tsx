@@ -173,21 +173,24 @@ export default function Publicar() {
 
   // Tras «hecho»: se vacía el formulario y se salta al Calendario, que refresca al
   // recibir foco porque anotamos el cambio. Un efecto y no un `if` en el render:
-  // navegar es un efecto secundario, y los `setState` de acá son la reacción a un
-  // paso del envío, exactamente el caso que la regla no puede ver por sí sola.
+  // navegar es un efecto secundario.
   useEffect(() => {
     if (envio.paso !== 'hecho') return
     anotarCambio()
-    despachar({ tipo: 'cancelar' })
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setTexto('')
-    setArchivos([])
-    setRedes(['instagram'])
-    setFecha(proximaHoraEnPunto(new Date()))
-    setAviso(null)
-    subidas.current = []
-    ultimoBorrador.current = null
-    router.navigate('/(tabs)/calendario')
+    // La espera es la confirmación: limpiar y navegar en el mismo tick borraba
+    // «Listo» antes de que alcanzara a dibujarse, y el envío terminaba sin acuse.
+    const salto = setTimeout(() => {
+      despachar({ tipo: 'cancelar' })
+      setTexto('')
+      setArchivos([])
+      setRedes(['instagram'])
+      setFecha(proximaHoraEnPunto(new Date()))
+      setAviso(null)
+      subidas.current = []
+      ultimoBorrador.current = null
+      router.navigate('/(tabs)/calendario')
+    }, 1000)
+    return () => clearTimeout(salto)
   }, [envio.paso, router])
 
   const ocupado = envio.paso === 'chequeando' || envio.paso === 'subiendo' || envio.paso === 'creando'
