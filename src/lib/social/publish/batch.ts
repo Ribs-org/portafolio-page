@@ -1,7 +1,8 @@
 import { env } from '@/lib/env'
 import { fromZonedInput } from '@/lib/utils'
-import { validateScheduleDraft } from './validate'
+import { extensionDe, validateScheduleDraft } from './validate'
 import { validateAtributos } from './atributos'
+import { validarOpcionesPorRed, OPCIONES_ERROR, type OpcionesDestino } from './opciones'
 import { guardar } from '@/lib/storage'
 import { getDb, scheduledPosts, scheduledPostMedia, scheduledPostTargets } from '@/db'
 import { randomUUID } from 'node:crypto'
@@ -32,6 +33,8 @@ export type BatchItem = {
   portada?: string
   /** JSON plano libre del editor-LLM; se valida con validateAtributos. */
   atributos?: unknown
+  /** Lo que cada red exige por destino, por red: `{ "tiktok": { … } }`. Se valida con validarOpcionesPorRed. */
+  opciones?: unknown
 }
 
 export type BatchResult =
@@ -44,9 +47,9 @@ export const PORTADA_NEEDS_VIDEO = 'La portada requiere un video en media.'
 export const PORTADA_NOT_IMAGE = 'La portada debe ser una imagen.'
 export const PORTADA_FORMAT = 'La portada debe ser JPG o PNG.'
 
-// The five networks with a publisher; tiktok reads but cannot post yet. Twin of
-// ENABLED in the composer (schedule/composer.tsx) — update both together.
-export const PUBLISHABLE = new Set(['instagram', 'facebook', 'youtube', 'threads', 'x'])
+// The six networks with a publisher (TikTok's lands in the next delivery, same PR).
+// Twin of ENABLED in the composer (schedule/composer.tsx) — update both together.
+export const PUBLISHABLE = new Set(['instagram', 'facebook', 'youtube', 'threads', 'x', 'tiktok'])
 
 const IMAGE_EXTENSIONS = new Set(['jpg', 'jpeg', 'png', 'gif', 'webp'])
 const VIDEO_EXTENSIONS = new Set(['mp4', 'mov', 'webm'])
@@ -128,6 +131,15 @@ export function tipoArchivo(file: File): string {
   return ''
 }
 
+/** Las opciones de la fila ya limpias, o la frase. Un valor que no es objeto se rechaza entero. */
+function opcionesDeFila(item: BatchItem): { opciones: Record<string, OpcionesDestino> } | { error: string } {
+  const raw = item.opciones
+  if (raw !== undefined && raw !== null && (typeof raw !== 'object' || Array.isArray(raw))) {
+    return { error: OPCIONES_ERROR }
+  }
+  return validarOpcionesPorRed(item.redes, (raw ?? {}) as Record<string, unknown>)
+}
+
 /**
  * The batch item's whole rulebook: its own shape first, then the composer's exact
  * rules via validateScheduleDraft — one source of truth for limits and media shapes.
@@ -170,8 +182,18 @@ export function validateBatchItem(item: BatchItem, now: Date): string | null {
   const atributosCheck = validateAtributos(item.atributos)
   if ('error' in atributosCheck) return atributosCheck.error
 
+  const opcionesCheck = opcionesDeFila(item)
+  if ('error' in opcionesCheck) return opcionesCheck.error
+
   return validateScheduleDraft(
-    { caption: item.texto, imageCount, videoCount, networks: item.redes, scheduledAt },
+    {
+      caption: item.texto,
+      imageCount,
+      videoCount,
+      networks: item.redes,
+      scheduledAt,
+      formats: item.media.map(extensionDe),
+    },
     now,
   )
 }
@@ -261,6 +283,7 @@ export async function scheduleBatch(items: BatchItem[]): Promise<BatchResult[]> 
           videoCount: uploaded.filter((m) => m.mediaType === 'video').length,
           networks: item.redes,
           scheduledAt,
+          formats: uploaded.map((m) => extensionDe(m.url)),
         },
         now,
       )
@@ -311,9 +334,23 @@ export async function scheduleBatch(items: BatchItem[]): Promise<BatchResult[]> 
           })),
         )
       }
-      await db
-        .insert(scheduledPostTargets)
-        .values(item.redes.map((network) => ({ postId: post!.id, network, accountId: cuentas.get(network)! })))
+      const opcionesCheck = opcionesDeFila(item)
+      if ('error' in opcionesCheck) {
+        // Inalcanzable en la práctica (validateBatchItem ya corrió esta misma regla),
+        // pero nunca debe escribir opciones NULL para un destino de TikTok.
+        results.push({ index, ok: false, error: opcionesCheck.error })
+        continue
+      }
+      const opciones = opcionesCheck.opciones
+
+      await db.insert(scheduledPostTargets).values(
+        item.redes.map((network) => ({
+          postId: post!.id,
+          network,
+          accountId: cuentas.get(network)!,
+          opciones: opciones[network] ?? null,
+        })),
+      )
 
       results.push({ index, ok: true, postId: post!.id })
     } catch (error) {

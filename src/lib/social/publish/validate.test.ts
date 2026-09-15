@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { validateScheduleDraft, type ScheduleDraft } from './validate'
+import { validateScheduleDraft, type ScheduleDraft, TIKTOK_MEDIA, extensionDe } from './validate'
 
 const now = new Date('2026-08-31T12:00:00Z')
 const base: ScheduleDraft = {
@@ -116,5 +116,55 @@ describe('validación por destino (Threads y X)', () => {
     expect(
       validateScheduleDraft({ ...base, imageCount: 2, networks: ['threads'] }, now),
     ).toMatch(/un solo archivo/)
+  })
+})
+
+describe('extensionDe', () => {
+  it('lee la extensión de un nombre o una URL, sin querystring, en minúscula', () => {
+    expect(extensionDe('clip.MP4')).toBe('mp4')
+    expect(extensionDe('https://ej.com/a.JPG?x=1')).toBe('jpg')
+    expect(extensionDe('https://drive.google.com/uc?id=abc')).toBe('')
+    expect(extensionDe('sin-extension')).toBe('')
+  })
+})
+
+describe('validación por destino (TikTok)', () => {
+  const tt = { ...base, networks: ['tiktok'] }
+
+  it('acepta un video solo', () => {
+    expect(validateScheduleDraft({ ...tt, imageCount: 0, videoCount: 1, formats: ['mp4'] }, now)).toBeNull()
+    expect(validateScheduleDraft({ ...tt, imageCount: 0, videoCount: 1, formats: ['mov'] }, now)).toBeNull()
+  })
+
+  it('acepta de una a treinta y cinco fotos', () => {
+    expect(validateScheduleDraft({ ...tt, imageCount: 1, formats: ['jpg'] }, now)).toBeNull()
+    expect(validateScheduleDraft({ ...tt, imageCount: 35, formats: Array(35).fill('webp') }, now)).toBeNull()
+    expect(validateScheduleDraft({ ...tt, imageCount: 36 }, now)).toBe(TIKTOK_MEDIA)
+  })
+
+  it('el tope de diez sigue rigiendo si otra red acompaña', () => {
+    expect(validateScheduleDraft({ ...tt, networks: ['tiktok', 'instagram'], imageCount: 11 }, now)).toMatch(/diez/)
+  })
+
+  it('rechaza cero archivos, dos videos y la mezcla', () => {
+    expect(validateScheduleDraft({ ...tt, imageCount: 0, videoCount: 0 }, now)).toMatch(/archivo/)
+    expect(validateScheduleDraft({ ...tt, imageCount: 0, videoCount: 2 }, now)).toBe(TIKTOK_MEDIA)
+    expect(validateScheduleDraft({ ...tt, imageCount: 1, videoCount: 1 }, now)).toBe(TIKTOK_MEDIA)
+  })
+
+  it('rechaza los formatos que TikTok no toma, y difiere los desconocidos', () => {
+    expect(validateScheduleDraft({ ...tt, imageCount: 1, formats: ['png'] }, now)).toBe(TIKTOK_MEDIA)
+    expect(validateScheduleDraft({ ...tt, imageCount: 1, formats: ['gif'] }, now)).toBe(TIKTOK_MEDIA)
+    expect(validateScheduleDraft({ ...tt, imageCount: 0, videoCount: 1, formats: ['avi'] }, now)).toBe(TIKTOK_MEDIA)
+    expect(validateScheduleDraft({ ...tt, imageCount: 1, formats: [''] }, now)).toBeNull()
+  })
+
+  it('los formatos no molestan a las demás redes', () => {
+    expect(validateScheduleDraft({ ...base, imageCount: 1, formats: ['png'] }, now)).toBeNull()
+  })
+
+  it('el caption de TikTok llega hasta 2200', () => {
+    expect(validateScheduleDraft({ ...tt, imageCount: 1, caption: 'x'.repeat(2200) }, now)).toBeNull()
+    expect(validateScheduleDraft({ ...tt, imageCount: 1, caption: 'x'.repeat(2201) }, now)).toMatch(/largo/)
   })
 })

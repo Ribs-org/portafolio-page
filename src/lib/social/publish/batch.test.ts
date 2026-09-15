@@ -10,6 +10,8 @@ import {
   type BatchItem,
 } from './batch'
 import { ATRIBUTOS_ERROR } from './atributos'
+import { TIKTOK_SIN_PRIVACIDAD, OPCIONES_ERROR } from './opciones'
+import { TIKTOK_MEDIA } from './validate'
 
 const now = new Date('2026-09-02T12:00:00Z')
 const base: BatchItem = {
@@ -43,7 +45,7 @@ describe('validateBatchItem', () => {
   })
 
   it('rechaza redes desconocidas o sin publisher', () => {
-    expect(validateBatchItem({ ...base, redes: ['tiktok'] }, now)).toMatch(/tiktok/)
+    expect(validateBatchItem({ ...base, redes: ['linkedin'] }, now)).toMatch(/linkedin/)
     expect(validateBatchItem({ ...base, redes: ['myspace'] }, now)).toMatch(/myspace/)
   })
 
@@ -202,5 +204,35 @@ describe('atributos en validateBatchItem', () => {
 
   it('sin atributos no exige nada', () => {
     expect(validateBatchItem(base, now)).toBeNull()
+  })
+})
+
+describe('opciones por red en el lote', () => {
+  const directo = { modo: 'directo', privacidad: 'SELF_ONLY' }
+
+  it('tiktok es publicable, pero exige sus opciones', () => {
+    const fila: BatchItem = { ...base, redes: ['tiktok'], media: ['https://ej.com/a.mp4'] }
+    expect(validateBatchItem(fila, now)).toBe(TIKTOK_SIN_PRIVACIDAD)
+    expect(validateBatchItem({ ...fila, opciones: { tiktok: directo } }, now)).toBeNull()
+    expect(validateBatchItem({ ...fila, opciones: { tiktok: { modo: 'borrador' } } }, now)).toBeNull()
+  })
+
+  it('las opciones malformadas caen con la frase de forma', () => {
+    const fila: BatchItem = { ...base, redes: ['tiktok'], media: ['https://ej.com/a.mp4'] }
+    expect(validateBatchItem({ ...fila, opciones: 'directo' }, now)).toBe(OPCIONES_ERROR)
+    expect(validateBatchItem({ ...fila, opciones: { tiktok: { modo: 'ya' } } }, now)).toBe(OPCIONES_ERROR)
+  })
+
+  it('una red que no pide opciones no las acepta', () => {
+    expect(validateBatchItem({ ...base, opciones: { threads: { modo: 'directo' } } }, now)).toBe(OPCIONES_ERROR)
+  })
+
+  it('la media de tiktok se valida por extensión antes de descargar', () => {
+    const fila: BatchItem = { ...base, redes: ['tiktok'], opciones: { tiktok: directo }, media: [] }
+    expect(validateBatchItem({ ...fila, media: ['https://ej.com/a.png'] }, now)).toBe(TIKTOK_MEDIA)
+    expect(validateBatchItem({ ...fila, media: ['https://ej.com/a.mp4', 'https://ej.com/b.jpg'] }, now)).toBe(
+      TIKTOK_MEDIA,
+    )
+    expect(validateBatchItem({ ...fila, media: ['https://drive.google.com/uc?id=x'] }, now)).toBeNull()
   })
 })

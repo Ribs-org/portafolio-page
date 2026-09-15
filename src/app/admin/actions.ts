@@ -22,13 +22,16 @@ import {
   tipoArchivo,
   PORTADA_NEEDS_VIDEO,
 } from '@/lib/social/publish/batch'
-import { validateScheduleDraft } from '@/lib/social/publish/validate'
+import { opcionesDesdeFormulario, validarOpciones, validarOpcionesPorRed } from '@/lib/social/publish/opciones'
+import { extensionDe, validateScheduleDraft } from '@/lib/social/publish/validate'
 import { validateAtributos, ATRIBUTOS_ERROR, type Atributos } from '@/lib/social/publish/atributos'
 import { diffMedia, diffTargets } from '@/lib/social/publish/edit'
 import { crearPostProgramado } from '@/lib/social/publish/crear'
-import { SinCuenta, exigirCuentas } from '@/lib/social/cuentas'
+import { SinCuenta, exigirCuentas, cuentasPrimarias } from '@/lib/social/cuentas'
 import { guardarCuenta, tokensDePaginas } from '@/lib/social/conectar'
 import { SIN_TOKEN_DE_PAGINA } from '@/lib/social/facebook'
+import { tiktokConnector } from '@/lib/social/tiktok'
+import { TIKTOK_SIN_CUENTA, consultarCreador, type CreadorTikTok } from '@/lib/social/publish/tiktok-creador'
 import { COOKIE_PENDIENTE, LOGIN_VENCIDO, elegidas, leerPendiente } from '@/lib/social/pendiente'
 import { networkLabel } from '@/lib/networks'
 import { fromZonedInput, normalizeUrl, slugify } from '@/lib/utils'
@@ -459,6 +462,22 @@ export async function updatePostCampaign(
 
 /* ---------------------------------------------------------- scheduling -- */
 
+/**
+ * Lo que el bloque de TikTok del compositor necesita al abrirse: nombre, avatar y qué
+ * privacidades puede elegir el dueño hoy. Por la cuenta primaria de TikTok, la misma a
+ * la que `crearPostProgramado` va a apuntar el destino.
+ */
+export async function leerCreadorTikTok(): Promise<{ creador: CreadorTikTok } | { error: string }> {
+  await requireAuth()
+  const cuentas = await cuentasPrimarias(['tiktok'])
+  const id = cuentas.get('tiktok')
+  if (!id) return { error: TIKTOK_SIN_CUENTA }
+  const [account] = await getDb().select().from(socialAccounts).where(eq(socialAccounts.id, id))
+  const token = account ? await tiktokConnector.ensureCredential(account) : null
+  if (!token) return { error: TIKTOK_SIN_CUENTA }
+  return consultarCreador(token)
+}
+
 export async function createScheduledPost(_prev: FormState, formData: FormData): Promise<FormState> {
   await requireAuth()
 
@@ -467,22 +486,44 @@ export async function createScheduledPost(_prev: FormState, formData: FormData):
   const scheduledAt = fromZonedInput(String(formData.get('scheduledAt') ?? ''), SITE_TIMEZONE)
   const files = formData.getAll('media').filter((f): f is File => f instanceof File && f.size > 0)
 
-  const videoCount = files.filter((f) => f.type.startsWith('video/')).length
+  // f.type viene vacío para algunos .mov del navegador: tipoArchivo cae a la extensión
+  // en ese caso, así un MOV válido no se cuenta como foto (y TikTok lo rechazaría por
+  // mezcla) ni se guarda con mediaType 'image'.
+  const esVideo = (f: File) => tipoArchivo(f).startsWith('video/')
+  const videoCount = files.filter(esVideo).length
   const error = validateScheduleDraft(
-    { caption, imageCount: files.length - videoCount, videoCount, networks, scheduledAt },
+    {
+      caption,
+      imageCount: files.length - videoCount,
+      videoCount,
+      networks,
+      scheduledAt,
+      formats: files.map((f) => extensionDe(f.name)),
+    },
     new Date(),
   )
   if (error) return { error }
+
+  // Lo que la red exige por destino, antes de subir nada: una privacidad sin elegir no
+  // debe costar la subida de un video.
+  const opcionesCheck = validarOpcionesPorRed(networks, opcionesDesdeFormulario(formData, networks))
+  if ('error' in opcionesCheck) return { error: opcionesCheck.error }
 
   const uploaded: Array<{ url: string; mediaType: 'image' | 'video' }> = []
   for (const file of files) {
     // Público a propósito: la Graph API de Instagram descarga la media desde esta URL.
     const url = await guardar(`scheduled/${randomUUID()}-${file.name}`, file, tipoArchivo(file))
-    uploaded.push({ url, mediaType: file.type.startsWith('video/') ? 'video' : 'image' })
+    uploaded.push({ url, mediaType: esVideo(file) ? 'video' : 'image' })
   }
 
   try {
-    await crearPostProgramado({ caption, scheduledAt: scheduledAt!, media: uploaded, networks })
+    await crearPostProgramado({
+      caption,
+      scheduledAt: scheduledAt!,
+      media: uploaded,
+      networks,
+      opciones: opcionesCheck.opciones,
+    })
   } catch (error) {
     if (error instanceof SinCuenta) return { error: error.message }
     throw error
@@ -561,10 +602,18 @@ export async function updateScheduledPost(
   const targetsPlan = diffTargets(targets, networks)
   if ('error' in targetsPlan) return { error: targetsPlan.error }
 
+  // Una red que exige opciones no se puede agregar desde el editor, que no las pide:
+  // el compositor y el lote sí; aquí la creación se rechaza con la misma frase.
+  for (const network of targetsPlan.create) {
+    const check = validarOpciones(network, null)
+    if ('error' in check) return { error: check.error }
+  }
+
   // Pre-validation before touching storage: kept media with their stored types, files
   // with their real types, URLs counted as images — the batch's deferred-type rule
   // (image is the guess that never falsely rejects; the re-check below settles it).
   const typeById = new Map(existingMedia.map((m) => [m.id, m.mediaType]))
+  const urlById = new Map(existingMedia.map((m) => [m.id, m.blobUrl]))
   const keptTypes = keptIds
     .map((id) => typeById.get(id))
     .filter((t): t is 'image' | 'video' => t === 'image' || t === 'video')
@@ -572,6 +621,16 @@ export async function updateScheduledPost(
   const preImages =
     keptTypes.filter((t) => t === 'image').length + (files.length - fileVideo) + urls.length
   const preVideos = keptTypes.filter((t) => t === 'video').length + fileVideo
+  // Igual que arriba con los tipos: la extensión conocida de cada media pendiente,
+  // para que TikTok rechace un formato ajeno antes de tocar el almacén.
+  const preFormats = [
+    ...keptIds
+      .map((id) => urlById.get(id))
+      .filter((url): url is string => Boolean(url))
+      .map(extensionDe),
+    ...files.map((f) => extensionDe(f.name)),
+    ...urls.map(extensionDe),
+  ]
   if (pendingNetworks.length === 0) {
     // Sin pendientes hay dos casos: todo publicado (válido — solo se corrige texto o
     // media) o un form que desmarcó todas las redes de un post nunca publicado, lo
@@ -582,7 +641,14 @@ export async function updateScheduledPost(
     if (!scheduledAt) return { error: 'La fecha no se entendió.' }
   } else {
     const preError = validateScheduleDraft(
-      { caption, imageCount: preImages, videoCount: preVideos, networks: pendingNetworks, scheduledAt },
+      {
+        caption,
+        imageCount: preImages,
+        videoCount: preVideos,
+        networks: pendingNetworks,
+        scheduledAt,
+        formats: preFormats,
+      },
       new Date(),
       { allowPast: dateUnchanged },
     )
@@ -617,6 +683,9 @@ export async function updateScheduledPost(
   const finalTypes = mediaPlan.order.map((entry) =>
     entry.kind === 'kept' ? typeById.get(entry.id)! : entry.mediaType,
   )
+  const finalFormats = mediaPlan.order.map((entry) =>
+    extensionDe(entry.kind === 'kept' ? urlById.get(entry.id)! : entry.url),
+  )
   if (pendingNetworks.length > 0) {
     const error = validateScheduleDraft(
       {
@@ -625,6 +694,7 @@ export async function updateScheduledPost(
         videoCount: finalTypes.filter((t) => t === 'video').length,
         networks: pendingNetworks,
         scheduledAt,
+        formats: finalFormats,
       },
       new Date(),
       { allowPast: dateUnchanged },

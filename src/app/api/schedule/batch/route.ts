@@ -35,6 +35,7 @@ export async function POST(request: Request) {
         portada: typeof p.portada === 'string' ? p.portada : '',
         // Crudo a propósito: la validación con frase fija vive en validateBatchItem.
         atributos: p.atributos,
+        opciones: p.opciones,
       }
     })
   } catch {

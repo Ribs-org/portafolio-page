@@ -1,5 +1,7 @@
+import type { BatchItem } from './batch'
+
 export const CSV_HEADER_ERROR =
-  'El encabezado del CSV debe ser exactamente: fecha,texto,redes,media — con portada opcional como quinta columna.'
+  'El encabezado del CSV debe ser exactamente: fecha,texto,redes,media — con portada opcional como quinta columna y opciones como sexta.'
 
 /** RFC 4180 in ~40 lines: quoted fields may hold commas, newlines and "" quotes. */
 export function parseCsv(text: string): string[][] {
@@ -50,25 +52,25 @@ function splitPipe(cell: string): string[] {
     .filter((part) => part.length > 0)
 }
 
-export function csvToBatchItems(
-  text: string,
-): { items: Array<{ fecha: string; texto: string; redes: string[]; media: string[]; portada: string }> } | { error: string } {
+const COLUMNAS = ['fecha', 'texto', 'redes', 'media', 'portada', 'opciones'] as const
+
+/** La celda de opciones: JSON parseado, o el texto crudo para que la validación lo rechace, o nada. */
+function opcionesDeCelda(cell: string): unknown {
+  const text = cell.trim()
+  if (!text) return undefined
+  try {
+    return JSON.parse(text)
+  } catch {
+    return text
+  }
+}
+
+export function csvToBatchItems(text: string): { items: BatchItem[] } | { error: string } {
   const rows = parseCsv(text)
   const header = rows[0]
-  if (
-    !header ||
-    header.length < 4 ||
-    header.length > 5 ||
-    header[0] !== 'fecha' ||
-    header[1] !== 'texto' ||
-    header[2] !== 'redes' ||
-    header[3] !== 'media'
-  ) {
-    return { error: CSV_HEADER_ERROR }
-  }
-
-  if (header.length === 5 && header[4] !== 'portada') {
-    return { error: CSV_HEADER_ERROR }
+  if (!header || header.length < 4 || header.length > COLUMNAS.length) return { error: CSV_HEADER_ERROR }
+  for (const [i, name] of header.entries()) {
+    if (name !== COLUMNAS[i]) return { error: CSV_HEADER_ERROR }
   }
 
   return {
@@ -77,7 +79,8 @@ export function csvToBatchItems(
       texto: (row[1] ?? '').trim(),
       redes: splitPipe(row[2] ?? ''),
       media: splitPipe(row[3] ?? ''),
-      portada: header.length === 5 ? (row[4] ?? '').trim() : '',
+      portada: header.length >= 5 ? (row[4] ?? '').trim() : '',
+      opciones: header.length === 6 ? opcionesDeCelda(row[5] ?? '') : undefined,
     })),
   }
 }

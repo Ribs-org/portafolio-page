@@ -12,9 +12,7 @@ guarda el resultado. Otro proceso sincroniza a diario las métricas de lo public
 Cierras el ciclo leyendo esas métricas junto a las etiquetas que tú mismo pusiste al
 programar.
 
-**Redes que publican hoy:** `instagram`, `facebook`, `youtube`, `threads`, `x`.
-`tiktok` existe en el sistema para leer métricas, pero **no publica** — programar
-hacia ella rechaza la fila.
+**Redes que publican hoy:** `instagram`, `facebook`, `youtube`, `threads`, `x`, `tiktok`.
 
 **Zona horaria:** todo lo que escribes y lees en horas está en `America/Santiago`.
 
@@ -49,7 +47,8 @@ Content-Type: application/json
       "redes": ["instagram", "facebook", "youtube"],
       "media": ["https://drive.usercontent.google.com/download?id=ABC&export=download"],
       "portada": "https://ejemplo.com/portada.jpg",
-      "atributos": { "hook": "pregunta-polemica", "tema": "negocios-chile", "formato": "listado" }
+      "atributos": { "hook": "pregunta-polemica", "tema": "negocios-chile", "formato": "listado" },
+      "opciones": { "tiktok": { "modo": "directo", "privacidad": "SELF_ONLY", "comentarios": true, "comercial": "no" } }
     }
   ]
 }
@@ -126,16 +125,49 @@ que puedes descubrir qué funciona: etiqueta de forma consistente lo que decides
 Recomendación práctica: mantén un vocabulario estable entre posts. `"hook": "pregunta"`
 en unos y `"gancho": "pregunta-directa"` en otros hace imposible comparar.
 
+### `opciones` (obligatorio si `redes` incluye `tiktok`)
+
+Lo que cada red exige elegir por destino. Hoy solo TikTok pide algo, así que el objeto
+lleva una clave `tiktok`:
+
+```json
+"opciones": {
+  "tiktok": {
+    "modo": "directo",
+    "privacidad": "SELF_ONLY",
+    "comentarios": true,
+    "duo": false,
+    "pegar": false,
+    "comercial": "no"
+  }
+}
+```
+
+- `modo`: `directo` publica en el perfil a la hora programada; `borrador` deja el video o las
+  fotos en la bandeja de TikTok del dueño para terminarlos desde el teléfono. En `borrador`
+  los demás campos se ignoran.
+- `privacidad` (obligatoria en `directo`): `PUBLIC_TO_EVERYONE`, `MUTUAL_FOLLOW_FRIENDS`,
+  `FOLLOWER_OF_CREATOR` o `SELF_ONLY`. Mientras TikTok no audite la app, solo `SELF_ONLY`
+  llega a publicarse.
+- `comentarios`, `duo`, `pegar`: booleanos, ausentes valen `false`. `duo` y `pegar` no
+  aplican a fotos.
+- `comercial`: `no`, `marca_propia` (etiqueta «Contenido promocional») o `patrocinado`
+  (etiqueta «Colaboración pagada»; no puede ir con `SELF_ONLY`).
+
+Media de TikTok: **un solo video** (mp4, mov, webm) **o de 1 a 35 fotos** (jpg, webp),
+nunca mezcla. En el CSV, `opciones` es la sexta columna, después de `portada`, con el mismo
+JSON entre comillas dobles escapadas.
+
 ## Reglas por red (las que rechazan una fila)
 
 | Regla | Cuándo se rompe | Frase exacta |
 |---|---|---|
-| Instagram y YouTube exigen archivo | los pones sin `media` | `Instagram y YouTube necesitan al menos un archivo.` |
+| Instagram, YouTube y TikTok exigen archivo | los pones sin `media` | `Instagram, YouTube y TikTok necesitan al menos un archivo.` |
 | Un post necesita algo | sin texto y sin media | `Escribe un texto o adjunta un archivo.` |
 | X no recibe video | `x` + un video | `X aún no recibe video desde el calendario.` |
 | X hasta 4 imágenes | `x` + 5 o más | `X recibe hasta cuatro imágenes.` |
 | Threads: un archivo | `threads` + 2 o más | `Threads recibe un solo archivo por post.` |
-| Tope general | 11 o más archivos | `Máximo diez archivos por publicación.` |
+| Tope general | 11 o más archivos, con alguna red además de `tiktok` (una fila solo con `tiktok` admite hasta 35 fotos) | `Máximo diez archivos por publicación.` |
 | Al menos una red | `redes: []` | `Elige al menos una plataforma.` |
 | Fecha futura | hora ya pasada | `La hora debe estar en el futuro.` |
 
@@ -149,7 +181,7 @@ Instagram acepta: 1 foto, 1 video, o 2–10 fotos (carrusel).
 | Frase exacta | Qué la causa |
 |---|---|
 | `La fecha no se entendió (usa YYYY-MM-DD HH:MM).` | formato de fecha inválido |
-| `Red desconocida o sin publicación: tiktok.` | red inexistente, o `tiktok` |
+| `Red desconocida o sin publicación: <red>.` | red inexistente |
 | `Hay redes repetidas en la fila.` | la misma red dos veces |
 | `No se pudo leer una media de la fila.` | descarga fallida, timeout, o tipo ajeno (HTML, PDF) |
 | `La portada requiere un video en media.` | portada sin video |
@@ -159,6 +191,10 @@ Instagram acepta: 1 foto, 1 video, o 2–10 fotos (carrusel).
 | `El texto excede los 280 caracteres de X.` | caption largo con `x` en las redes |
 | `El texto excede los 500 caracteres de Threads.` | caption largo con `threads` |
 | `El texto es demasiado largo para Instagram.` | caption sobre 2200 |
+| `TikTok necesita que elijas la privacidad.` | `tiktok` en redes sin `opciones.tiktok`, o `directo` sin `privacidad` válida |
+| `Un contenido patrocinado no puede ser privado.` | `comercial: patrocinado` con `SELF_ONLY` |
+| `Las opciones de la red no se entendieron.` | `opciones` no es objeto, `modo` desconocido, casilla no booleana, u opciones para una red que no pide |
+| `TikTok recibe un video, o hasta 35 fotos JPG o WebP.` | dos videos, mezcla, más de 35 fotos, png/gif, o video que no es mp4/mov/webm |
 | `No se pudo guardar la fila. Inténtalo de nuevo.` | fallo transitorio de base de datos |
 
 ## Respuesta

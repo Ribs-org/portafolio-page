@@ -516,6 +516,10 @@ taxonomía de quien crea el contenido: sirve para correlacionar decisiones creat
 con resultados. El CSV no lo lleva; el editor de un post programado lo muestra y
 permite corregirlo.
 
+Y `opciones`, obligatorio cuando la fila va a TikTok: el modo (directo o borrador), la
+privacidad y las casillas que TikTok exige elegir por publicación. El detalle está en
+`public/docs/api-editor.md`.
+
 ### Métricas por API
 
 `GET /api/metrics/posts` con el mismo `Authorization: Bearer <SCHEDULE_API_KEY>`.

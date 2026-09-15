@@ -3,6 +3,7 @@ import { asc, eq } from 'drizzle-orm'
 import { getDb, scheduledPosts, scheduledPostTargets, scheduledPostMedia } from '@/db'
 import { SITE_TIMEZONE } from '@/lib/analytics'
 import { toZonedInput } from '@/lib/utils'
+import { resumenOpciones } from '@/lib/social/publish/opciones'
 import { Editor } from './editor'
 
 export const dynamic = 'force-dynamic'
@@ -40,7 +41,11 @@ export default async function EditScheduledPostPage({
       volver={volver}
       caption={post.caption}
       scheduledAtLocal={toZonedInput(post.scheduledAt, SITE_TIMEZONE)}
-      targets={targets.map((t) => ({ network: t.network, status: t.status }))}
+      targets={targets.map((t) => ({
+        network: t.network,
+        status: t.status,
+        opciones: resumenOpciones(t.network, t.opciones),
+      }))}
       media={media.map((m) => ({ id: m.id, blobUrl: m.blobUrl, mediaType: m.mediaType }))}
       coverUrl={post.coverUrl}
       atributos={post.atributos ? JSON.stringify(post.atributos, null, 2) : ''}
