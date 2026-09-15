@@ -64,4 +64,17 @@ describe('consultarCreador', () => {
     vi.stubGlobal('fetch', vi.fn(async () => { throw new Error('dns') }))
     expect(await consultarCreador('tok')).toEqual({ error: TIKTOK_CREADOR_ILEGIBLE })
   })
+
+  it('un 200 con body que no es JSON no revienta: JSON.stringify(undefined) no tiene .slice', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => new Response('<html>', { status: 200, headers: { 'content-type': 'text/html' } })),
+    )
+    await expect(consultarCreador('tok')).resolves.toEqual({ error: TIKTOK_CREADOR_ILEGIBLE })
+  })
+
+  it('un 200 con error.code ok pero sin data tampoco revienta', async () => {
+    respond(200, { error: { code: 'ok' } })
+    await expect(consultarCreador('tok')).resolves.toEqual({ error: TIKTOK_CREADOR_ILEGIBLE })
+  })
 })

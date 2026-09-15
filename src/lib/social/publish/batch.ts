@@ -335,7 +335,13 @@ export async function scheduleBatch(items: BatchItem[]): Promise<BatchResult[]> 
         )
       }
       const opcionesCheck = opcionesDeFila(item)
-      const opciones = 'error' in opcionesCheck ? {} : opcionesCheck.opciones
+      if ('error' in opcionesCheck) {
+        // Inalcanzable en la práctica (validateBatchItem ya corrió esta misma regla),
+        // pero nunca debe escribir opciones NULL para un destino de TikTok.
+        results.push({ index, ok: false, error: opcionesCheck.error })
+        continue
+      }
+      const opciones = opcionesCheck.opciones
 
       await db.insert(scheduledPostTargets).values(
         item.redes.map((network) => ({

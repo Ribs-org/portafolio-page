@@ -71,7 +71,13 @@ export async function consultarCreador(token: string): Promise<{ creador: Creado
   }
   const creador = normalizarCreador(body.data)
   if (!creador) {
-    console.error('TikTok creator_info sin privacidades:', JSON.stringify(body.data).slice(0, 300))
+    // JSON.stringify(undefined) es `undefined` (no lanza, pero .slice revienta): pasa
+    // cuando el 200 no trae `data`, como un `error.code: 'ok'` sin cuerpo o un body que
+    // no era JSON.
+    console.error(
+      'TikTok creator_info sin privacidades:',
+      String(JSON.stringify(body.data) ?? 'sin data').slice(0, 300),
+    )
     return { error: TIKTOK_CREADOR_ILEGIBLE }
   }
   return { creador }
