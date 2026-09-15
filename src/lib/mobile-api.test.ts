@@ -127,6 +127,15 @@ describe('parseBorradorMovil', () => {
     })
   })
 
+  it('tiktok es publicable en el lote pero el teléfono aún no la ofrece', () => {
+    expect(parseBorradorMovil({ ...bueno, redes: ['tiktok'] })).toEqual({
+      error: 'Red desconocida o sin publicación: tiktok.',
+    })
+    expect(parseBorradorMovil({ ...bueno, redes: ['threads'] })).toMatchObject({
+      redes: ['threads'],
+    })
+  })
+
   it('rechaza cuerpos que no tienen la forma', () => {
     expect(parseBorradorMovil(null)).toEqual({ error: CUERPO_ILEGIBLE })
     expect(parseBorradorMovil('hola')).toEqual({ error: CUERPO_ILEGIBLE })

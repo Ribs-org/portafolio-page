@@ -1,6 +1,12 @@
 import { mobileTokenIsValid } from './mobile-token'
 import { PUBLISHABLE, typeFromContentType } from './social/publish/batch'
 
+// El teléfono todavía no tiene dónde pedir las opciones que TikTok exige por
+// destino (privacidad, interacciones, comercial), así que esa red se rechaza aquí
+// aunque el lote y el compositor ya la publiquen. Quitar esta exclusión cuando la
+// app móvil traiga el bloque de TikTok.
+const REDES_MOVIL = new Set([...PUBLISHABLE].filter((red) => red !== 'tiktok'))
+
 /** Los tres rangos que ofrece la app; el resto del panel no viaja al teléfono. */
 export const RANGOS = ['hoy', '7d', '30d'] as const
 export type Rango = (typeof RANGOS)[number]
@@ -94,7 +100,7 @@ export function parseBorradorMovil(body: unknown): BorradorMovil | { error: stri
   // después con un error de base que el teléfono no sabría explicar.
   const unicas = [...new Set(redes as string[])]
   for (const red of unicas) {
-    if (!PUBLISHABLE.has(red)) return { error: `Red desconocida o sin publicación: ${red}.` }
+    if (!REDES_MOVIL.has(red)) return { error: `Red desconocida o sin publicación: ${red}.` }
   }
   return { texto: texto.trim(), redes: unicas, cuando, ahora }
 }
