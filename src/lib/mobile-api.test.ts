@@ -122,8 +122,8 @@ describe('parseBorradorMovil', () => {
   })
 
   it('rechaza una red desconocida o sin publicación con la frase del lote', () => {
-    expect(parseBorradorMovil({ ...bueno, redes: ['tiktok'] })).toEqual({
-      error: 'Red desconocida o sin publicación: tiktok.',
+    expect(parseBorradorMovil({ ...bueno, redes: ['linkedin'] })).toEqual({
+      error: 'Red desconocida o sin publicación: linkedin.',
     })
   })
 

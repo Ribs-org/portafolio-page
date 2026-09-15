@@ -86,3 +86,30 @@ describe('portada en el CSV', () => {
     expect(result).toHaveProperty('error')
   })
 })
+
+describe('opciones en el CSV', () => {
+  it('la sexta columna trae un JSON por red; celda vacía es sin opciones', () => {
+    const text = [
+      'fecha,texto,redes,media,portada,opciones',
+      '2026-09-16 10:00,Directo,tiktok,https://ej.com/a.mp4,,"{""tiktok"":{""modo"":""directo"",""privacidad"":""SELF_ONLY""}}"',
+      '2026-09-16 11:00,Sin opciones,threads,,,',
+    ].join('\n')
+    const result = csvToBatchItems(text)
+    expect(result).toMatchObject({
+      items: [
+        { redes: ['tiktok'], opciones: { tiktok: { modo: 'directo', privacidad: 'SELF_ONLY' } } },
+        { redes: ['threads'], opciones: undefined },
+      ],
+    })
+  })
+
+  it('un JSON roto viaja como texto para que la validación lo rechace con su frase', () => {
+    const result = csvToBatchItems('fecha,texto,redes,media,portada,opciones\n2026-09-16 10:00,x,tiktok,,,{no es json')
+    expect(result).toMatchObject({ items: [{ opciones: '{no es json' }] })
+  })
+
+  it('la sexta columna solo puede llamarse opciones, y solo después de portada', () => {
+    expect(csvToBatchItems('fecha,texto,redes,media,portada,extra\n')).toEqual({ error: CSV_HEADER_ERROR })
+    expect(csvToBatchItems('fecha,texto,redes,media,opciones\n')).toEqual({ error: CSV_HEADER_ERROR })
+  })
+})
