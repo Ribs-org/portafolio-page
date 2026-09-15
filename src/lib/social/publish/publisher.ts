@@ -1,5 +1,6 @@
 import type { TargetStatus } from '@/db/schema'
 import type { SocialAccount } from '@/db'
+import type { OpcionesDestino } from './opciones'
 
 export type PublishMedia = { url: string; mediaType: 'image' | 'video'; position: number }
 
@@ -11,11 +12,18 @@ export type PublishInput = {
   accountExternalId: string
   /** Imagen de portada (URL del Blob) para los caminos de video; null si no hay. */
   coverUrl: string | null
+  /** Lo que la red exigió elegir por destino (TikTok); null en las redes que no piden nada. */
+  opciones: OpcionesDestino | null
 }
 
 export type PublishOutcome =
-  | { kind: 'published'; externalId: string }
+  // `externalId` nulo cuando la red no entrega un id que cruce con el connector: el
+  // borrador a la bandeja de TikTok publica "en la bandeja", no en el perfil.
+  | { kind: 'published'; externalId: string | null }
   | { kind: 'processing'; containerId: string }
+  // La red pidió esperar (cupo por minuto): se vuelve a intentar en la próxima corrida
+  // sin gastar intento ni dejar motivo, porque nada salió mal con el post.
+  | { kind: 'deferred' }
   | { kind: 'failed'; reason: string }
 
 /** Adding a network in later phases is a file plus a line, same as Connector. */
@@ -62,6 +70,15 @@ export function resolveOutcome(outcome: PublishOutcome, attemptCount: number): T
     return {
       status: 'publishing',
       containerId: outcome.containerId,
+      externalId: null,
+      attemptCount,
+      lastError: null,
+    }
+  }
+  if (outcome.kind === 'deferred') {
+    return {
+      status: 'scheduled',
+      containerId: null,
       externalId: null,
       attemptCount,
       lastError: null,

@@ -19,8 +19,9 @@ import {
   type PublishOutcome,
 } from './publisher'
 import { sendFailureAlert } from './alert'
+import type { OpcionesDestino } from './opciones'
 
-type Report = { published: number; processing: number; retried: number; failed: number }
+type Report = { published: number; processing: number; retried: number; deferred: number; failed: number }
 
 /**
  * One cron run: advance every due target one step. Sequential on purpose — the volume
@@ -29,7 +30,7 @@ type Report = { published: number; processing: number; retried: number; failed: 
  */
 export async function publishDue(now: Date = new Date()): Promise<Report> {
   const db = getDb()
-  const report: Report = { published: 0, processing: 0, retried: 0, failed: 0 }
+  const report: Report = { published: 0, processing: 0, retried: 0, deferred: 0, failed: 0 }
 
   const due = await db
     .select({ target: scheduledPostTargets, post: scheduledPosts })
@@ -71,6 +72,7 @@ export async function publishDue(now: Date = new Date()): Promise<Report> {
       outcome = await attempt(target, target.id, post.id, target.containerId, {
         caption: target.captionOverride ?? post.caption,
         coverUrl: post.coverUrl,
+        opciones: (target.opciones as OpcionesDestino | null) ?? null,
       })
     }
 
@@ -84,8 +86,10 @@ export async function publishDue(now: Date = new Date()): Promise<Report> {
       report.published++
       await limpiarMedia(post.id)
     } else if (patch.status === 'publishing') report.processing++
-    else if (patch.status === 'scheduled') report.retried++
-    else {
+    else if (patch.status === 'scheduled') {
+      if (patch.attemptCount === target.attemptCount) report.deferred++
+      else report.retried++
+    } else {
       report.failed++
       await sendFailureAlert(post.caption, target.network, patch.lastError ?? '')
     }
@@ -128,7 +132,7 @@ async function attempt(
   targetId: string,
   postId: string,
   containerId: string | null,
-  content: { caption: string; coverUrl: string | null },
+  content: { caption: string; coverUrl: string | null; opciones: OpcionesDestino | null },
 ): Promise<PublishOutcome> {
   const db = getDb()
   const network = target.network
@@ -159,6 +163,7 @@ async function attempt(
       token,
       accountExternalId: account.externalId,
       coverUrl: content.coverUrl,
+      opciones: content.opciones,
     })
   } catch (error) {
     // A publisher that throws (network hiccup, DNS, anything before Meta answered) is
