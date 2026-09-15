@@ -162,12 +162,12 @@ JSON entre comillas dobles escapadas.
 
 | Regla | Cuándo se rompe | Frase exacta |
 |---|---|---|
-| Instagram y YouTube exigen archivo | los pones sin `media` | `Instagram y YouTube necesitan al menos un archivo.` |
+| Instagram, YouTube y TikTok exigen archivo | los pones sin `media` | `Instagram, YouTube y TikTok necesitan al menos un archivo.` |
 | Un post necesita algo | sin texto y sin media | `Escribe un texto o adjunta un archivo.` |
 | X no recibe video | `x` + un video | `X aún no recibe video desde el calendario.` |
 | X hasta 4 imágenes | `x` + 5 o más | `X recibe hasta cuatro imágenes.` |
 | Threads: un archivo | `threads` + 2 o más | `Threads recibe un solo archivo por post.` |
-| Tope general | 11 o más archivos | `Máximo diez archivos por publicación.` |
+| Tope general | 11 o más archivos, con alguna red además de `tiktok` (una fila solo con `tiktok` admite hasta 35 fotos) | `Máximo diez archivos por publicación.` |
 | Al menos una red | `redes: []` | `Elige al menos una plataforma.` |
 | Fecha futura | hora ya pasada | `La hora debe estar en el futuro.` |
 
