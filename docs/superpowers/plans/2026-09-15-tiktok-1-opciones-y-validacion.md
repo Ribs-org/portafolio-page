@@ -424,7 +424,7 @@ export function resumenOpciones(network: string, opciones: unknown): string | nu
 - [ ] **Step 5: Corre el test y confirma que pasa**
 
 Run: `npx vitest run src/lib/social/publish/opciones.test.ts`
-Expected: PASS, 17 tests.
+Expected: PASS, 18 tests.
 
 - [ ] **Step 6: Typecheck y commit**
 
@@ -1758,7 +1758,7 @@ Claude-Session: https://claude.ai/code/session_01Bt6sz5ddKDJa97rz8CXNGw"
 - [ ] **Step 1: La suite completa**
 
 Run: `npm test && npm run typecheck && npm run lint && npx next build`
-Expected: todo verde. Un `next build` que falle por `DATABASE_URL` ausente no cuenta como fallo de esta entrega si `main` falla igual sin `.env.local`; compáralo con `git stash`-free: corre el build en `main` con un worktree aparte si hace falta, nunca con checkout.
+Expected: todo verde.
 
 - [ ] **Step 2: Anota en la spec que las entregas 1 y 2 van juntas**
 
