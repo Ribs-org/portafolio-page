@@ -26,9 +26,11 @@ import { validateScheduleDraft } from '@/lib/social/publish/validate'
 import { validateAtributos, ATRIBUTOS_ERROR, type Atributos } from '@/lib/social/publish/atributos'
 import { diffMedia, diffTargets } from '@/lib/social/publish/edit'
 import { crearPostProgramado } from '@/lib/social/publish/crear'
-import { SinCuenta, exigirCuentas } from '@/lib/social/cuentas'
+import { SinCuenta, exigirCuentas, cuentasPrimarias } from '@/lib/social/cuentas'
 import { guardarCuenta, tokensDePaginas } from '@/lib/social/conectar'
 import { SIN_TOKEN_DE_PAGINA } from '@/lib/social/facebook'
+import { tiktokConnector } from '@/lib/social/tiktok'
+import { TIKTOK_SIN_CUENTA, consultarCreador, type CreadorTikTok } from '@/lib/social/publish/tiktok-creador'
 import { COOKIE_PENDIENTE, LOGIN_VENCIDO, elegidas, leerPendiente } from '@/lib/social/pendiente'
 import { networkLabel } from '@/lib/networks'
 import { fromZonedInput, normalizeUrl, slugify } from '@/lib/utils'
@@ -458,6 +460,22 @@ export async function updatePostCampaign(
 }
 
 /* ---------------------------------------------------------- scheduling -- */
+
+/**
+ * Lo que el bloque de TikTok del compositor necesita al abrirse: nombre, avatar y qué
+ * privacidades puede elegir el dueño hoy. Por la cuenta primaria de TikTok, la misma a
+ * la que `crearPostProgramado` va a apuntar el destino.
+ */
+export async function leerCreadorTikTok(): Promise<{ creador: CreadorTikTok } | { error: string }> {
+  await requireAuth()
+  const cuentas = await cuentasPrimarias(['tiktok'])
+  const id = cuentas.get('tiktok')
+  if (!id) return { error: TIKTOK_SIN_CUENTA }
+  const [account] = await getDb().select().from(socialAccounts).where(eq(socialAccounts.id, id))
+  const token = account ? await tiktokConnector.ensureCredential(account) : null
+  if (!token) return { error: TIKTOK_SIN_CUENTA }
+  return consultarCreador(token)
+}
 
 export async function createScheduledPost(_prev: FormState, formData: FormData): Promise<FormState> {
   await requireAuth()
