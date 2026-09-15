@@ -153,7 +153,7 @@ export function fraseDeFallo(failReason: string | undefined): string {
  * connector. Se sacan del texto crudo, tal como vinieron.
  */
 export function idsDesdeTexto(texto: string): string[] {
-  const match = /"publicaly_available_post_id"\s*:\s*\[([^\]]*)\]/.exec(texto)
+  const match = /"public(?:a)?ly_available_post_id"\s*:\s*\[([^\]]*)\]/.exec(texto)
   if (!match) return []
   return (match[1]!.match(/\d+/g) ?? []).map(String)
 }
@@ -298,7 +298,8 @@ export const tiktokPublisher: Publisher = {
 
     // Primera corrida: validar todo antes de gastar una llamada.
     const check = validarOpciones('tiktok', input.opciones)
-    if ('error' in check || !check.opciones) return { kind: 'failed', reason: TIKTOK_SIN_PRIVACIDAD }
+    if ('error' in check) return { kind: 'failed', reason: check.error }
+    if (!check.opciones) return { kind: 'failed', reason: TIKTOK_SIN_PRIVACIDAD }
     const opciones = check.opciones as OpcionesTikTok
     const media = mediaTikTok(input.media)
     if (!media) return { kind: 'failed', reason: TIKTOK_MEDIA }

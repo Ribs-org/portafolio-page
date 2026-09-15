@@ -18,7 +18,7 @@ import {
   veredictoEstado,
 } from './tiktok'
 import { TIKTOK_RECONECTAR, type CreadorTikTok } from './tiktok-creador'
-import { TIKTOK_SIN_PRIVACIDAD } from './opciones'
+import { TIKTOK_PATROCINADO_PRIVADO, TIKTOK_SIN_PRIVACIDAD } from './opciones'
 import { TIKTOK_MEDIA } from './validate'
 import { PUBLISH_NETWORK_ERROR } from './publisher'
 import fixture from '../fixtures/tiktok-creator-info.json'
@@ -149,6 +149,9 @@ describe('idsDesdeTexto', () => {
     expect(idsDesdeTexto(texto)).toEqual(['7234567890123456789', '7234567890123456790'])
     // JSON.parse habría redondeado: esa es la razón de leer el texto.
     expect(String((JSON.parse(texto) as { data: { publicaly_available_post_id: number[] } }).data.publicaly_available_post_id[0])).not.toBe('7234567890123456789')
+    // Si TikTok corrige su propio typo a "publicly_available_post_id", se leen igual.
+    const corregido = texto.replace('publicaly_available_post_id', 'publicly_available_post_id')
+    expect(idsDesdeTexto(corregido)).toEqual(['7234567890123456789', '7234567890123456790'])
   })
 
   it('sin la clave, o con la lista vacía, no hay ids', () => {
@@ -288,6 +291,14 @@ describe('tiktokPublisher.publish', () => {
     stub({})
     expect(await tiktokPublisher.publish({ ...base, opciones: null, accountExternalId: cuenta() })).toEqual({ kind: 'failed', reason: TIKTOK_SIN_PRIVACIDAD })
     expect(await tiktokPublisher.publish({ ...base, media: [video, foto(1)], accountExternalId: cuenta() })).toEqual({ kind: 'failed', reason: TIKTOK_MEDIA })
+    expect(llamadas).toHaveLength(0)
+  })
+
+  it('patrocinado y privado falla con su propio motivo, no con el de privacidad faltante', async () => {
+    stub({})
+    expect(
+      await tiktokPublisher.publish({ ...base, opciones: { ...directo, comercial: 'patrocinado' }, accountExternalId: cuenta() }),
+    ).toEqual({ kind: 'failed', reason: TIKTOK_PATROCINADO_PRIVADO })
     expect(llamadas).toHaveLength(0)
   })
 

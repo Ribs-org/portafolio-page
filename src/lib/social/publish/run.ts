@@ -87,6 +87,7 @@ export async function publishDue(now: Date = new Date()): Promise<Report> {
       await limpiarMedia(post.id)
     } else if (patch.status === 'publishing') report.processing++
     else if (patch.status === 'scheduled') {
+      // Mismo attemptCount que antes = la red pidió esperar (deferred): no es un reintento.
       if (patch.attemptCount === target.attemptCount) report.deferred++
       else report.retried++
     } else {
