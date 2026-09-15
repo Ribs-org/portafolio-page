@@ -247,6 +247,10 @@ describe('tiktokPublisher.publish', () => {
     )
   }
 
+  let n = 0
+  /** Cuenta distinta por test: el cupo por minuto vive en el módulo y no debe cruzarse entre casos. */
+  const cuenta = () => `open-${++n}-${Date.now()}`
+
   const ok = { error: { code: 'ok', message: '', log_id: '1' } }
   const base = {
     caption: 'Hola',
@@ -263,7 +267,7 @@ describe('tiktokPublisher.publish', () => {
       '/post/publish/creator_info/query/': { body: fixture },
       '/post/publish/video/init/': { body: { data: { publish_id: 'v_pub.123' }, ...ok } },
     })
-    expect(await tiktokPublisher.publish(base)).toEqual({ kind: 'processing', containerId: 'v_pub.123' })
+    expect(await tiktokPublisher.publish({ ...base, accountExternalId: cuenta() })).toEqual({ kind: 'processing', containerId: 'v_pub.123' })
     expect(llamadas.map((l) => new URL(l.url).pathname)).toEqual([
       '/v2/post/publish/creator_info/query/',
       '/v2/post/publish/video/init/',
@@ -273,7 +277,7 @@ describe('tiktokPublisher.publish', () => {
 
   it('borrador: sin creator_info, init de bandeja', async () => {
     stub({ '/post/publish/inbox/video/init/': { body: { data: { publish_id: 'v_inbox.1' }, ...ok } } })
-    expect(await tiktokPublisher.publish({ ...base, opciones: { modo: 'borrador' } })).toEqual({
+    expect(await tiktokPublisher.publish({ ...base, opciones: { modo: 'borrador' }, accountExternalId: cuenta() })).toEqual({
       kind: 'processing',
       containerId: 'v_inbox.1',
     })
@@ -282,8 +286,8 @@ describe('tiktokPublisher.publish', () => {
 
   it('sin opciones o con media que TikTok no toma, falla antes de llamar a nadie', async () => {
     stub({})
-    expect(await tiktokPublisher.publish({ ...base, opciones: null })).toEqual({ kind: 'failed', reason: TIKTOK_SIN_PRIVACIDAD })
-    expect(await tiktokPublisher.publish({ ...base, media: [video, foto(1)] })).toEqual({ kind: 'failed', reason: TIKTOK_MEDIA })
+    expect(await tiktokPublisher.publish({ ...base, opciones: null, accountExternalId: cuenta() })).toEqual({ kind: 'failed', reason: TIKTOK_SIN_PRIVACIDAD })
+    expect(await tiktokPublisher.publish({ ...base, media: [video, foto(1)], accountExternalId: cuenta() })).toEqual({ kind: 'failed', reason: TIKTOK_MEDIA })
     expect(llamadas).toHaveLength(0)
   })
 
@@ -293,27 +297,31 @@ describe('tiktokPublisher.publish', () => {
         body: { ...fixture, data: { ...fixture.data, privacy_level_options: ['PUBLIC_TO_EVERYONE'] } },
       },
     })
-    expect(await tiktokPublisher.publish(base)).toEqual({ kind: 'failed', reason: TIKTOK_PRIVACIDAD_NO_DISPONIBLE })
+    expect(await tiktokPublisher.publish({ ...base, accountExternalId: cuenta() })).toEqual({ kind: 'failed', reason: TIKTOK_PRIVACIDAD_NO_DISPONIBLE })
   })
 
   it('creator_info sin scope pide reconectar; sin red, reintenta como error de red', async () => {
+    const cta = cuenta()
     stub({ '/post/publish/creator_info/query/': { status: 401, body: { error: { code: 'scope_not_authorized' } } } })
-    expect(await tiktokPublisher.publish(base)).toEqual({ kind: 'failed', reason: TIKTOK_RECONECTAR })
+    expect(await tiktokPublisher.publish({ ...base, accountExternalId: cta })).toEqual({ kind: 'failed', reason: TIKTOK_RECONECTAR })
     stub({ '/post/publish/creator_info/query/': { status: 500, body: { error: { code: 'internal_error' } } } })
-    expect(await tiktokPublisher.publish(base)).toEqual({ kind: 'failed', reason: PUBLISH_NETWORK_ERROR })
+    expect(await tiktokPublisher.publish({ ...base, accountExternalId: cta })).toEqual({ kind: 'failed', reason: PUBLISH_NETWORK_ERROR })
   })
 
   it('el init con error trae su frase, y el cupo de TikTok difiere', async () => {
+    const cta = cuenta()
     stub({
       '/post/publish/creator_info/query/': { body: fixture },
       '/post/publish/video/init/': { status: 400, body: { error: { code: 'url_ownership_unverified', message: 'x' } } },
     })
-    expect(await tiktokPublisher.publish(base)).toEqual({ kind: 'failed', reason: TIKTOK_DOMINIO })
+    expect(await tiktokPublisher.publish({ ...base, accountExternalId: cta })).toEqual({ kind: 'failed', reason: TIKTOK_DOMINIO })
     stub({
       '/post/publish/creator_info/query/': { body: fixture },
       '/post/publish/video/init/': { status: 429, body: { error: { code: 'rate_limit_exceeded' } } },
     })
-    expect(await tiktokPublisher.publish(base)).toEqual({ kind: 'deferred' })
+    expect(await tiktokPublisher.publish({ ...base, accountExternalId: cta })).toEqual({ kind: 'deferred' })
+    // Prueba que el mapeo viene de la respuesta de TikTok y no del cupo propio: el init sí se llamó.
+    expect(new URL(llamadas[llamadas.length - 1]!.url).pathname).toBe('/v2/post/publish/video/init/')
   })
 
   it('el séptimo init en el mismo minuto para la misma cuenta se difiere sin llamar', async () => {
