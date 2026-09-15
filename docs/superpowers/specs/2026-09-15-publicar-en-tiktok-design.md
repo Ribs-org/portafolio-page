@@ -441,4 +441,6 @@ We never read other users' data.
 3. **Comentarios**: tarea 0 de confirmación contra la API for Business, tabla y rutas
    de credencial, conector, ventana, panel. Video corto y revisión en Business.
 
-Cada entrega es un PR a `contenido-presentacion` y luego el de promoción a `main`.
+Las entregas 1 y 2 se apilan en la rama `publicar-en-tiktok` y salen en **un solo PR a
+`main`**: sin publisher, un destino de TikTok programado fallaría en el cron con
+`NO_PUBLISH_TOKEN` y dispararía la alerta. La entrega 3 es su propio PR.
