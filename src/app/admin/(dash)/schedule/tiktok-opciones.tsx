@@ -1,0 +1,176 @@
+'use client'
+
+import Image from 'next/image'
+import { useEffect, useState } from 'react'
+import { leerCreadorTikTok } from '@/app/admin/actions'
+import { Field, GroupLabel, Select, Toggle } from '@/components/ui'
+import type { CreadorTikTok } from '@/lib/social/publish/tiktok-creador'
+import { ETIQUETA_PRIVACIDAD, PRIVACIDADES_TIKTOK, type PrivacidadTikTok } from '@/lib/social/publish/opciones'
+
+const MUSIC_USAGE = 'https://www.tiktok.com/legal/page/global/music-usage-confirmation/en'
+const BRANDED_CONTENT = 'https://www.tiktok.com/legal/page/global/bc-policy/en'
+
+/**
+ * Lo que TikTok obliga a preguntar antes de publicar directo, en el orden y con los
+ * valores iniciales que su guía exige: privacidad sin elegir, interacciones apagadas,
+ * comercial apagado. Cada campo lleva el nombre que `opcionesDesdeFormulario` lee.
+ *
+ * `soloFotos` esconde dúo y pegar: TikTok no los ofrece en carruseles.
+ */
+export function TikTokOpciones({ soloFotos }: { soloFotos: boolean }) {
+  const [creador, setCreador] = useState<CreadorTikTok | null>(null)
+  const [aviso, setAviso] = useState<string | null>(null)
+  const [borrador, setBorrador] = useState(false)
+  const [privacidad, setPrivacidad] = useState<PrivacidadTikTok | ''>('')
+  const [comercial, setComercial] = useState(false)
+  const [tipoComercial, setTipoComercial] = useState<'marca_propia' | 'patrocinado'>('marca_propia')
+
+  useEffect(() => {
+    let vivo = true
+    leerCreadorTikTok().then((r) => {
+      if (!vivo) return
+      if ('error' in r) setAviso(r.error)
+      else setCreador(r.creador)
+    })
+    return () => {
+      vivo = false
+    }
+  }, [])
+
+  // Sin creator_info se ofrecen las cuatro: el cron vuelve a consultar antes de subir y
+  // falla con frase propia si la elegida ya no está permitida.
+  const privacidades = creador?.privacidades ?? PRIVACIDADES_TIKTOK
+  const patrocinado = comercial && tipoComercial === 'patrocinado'
+  const patrocinadoPrivado = patrocinado && privacidad === 'SELF_ONLY'
+
+  return (
+    <div className="space-y-4 rounded-xl bg-white/[0.04] p-4">
+      <div className="flex items-center gap-3">
+        {creador?.avatarUrl ? (
+          <Image src={creador.avatarUrl} alt="" width={32} height={32} unoptimized className="h-8 w-8 rounded-full" />
+        ) : null}
+        <div>
+          <GroupLabel>TikTok</GroupLabel>
+          <p className="text-sm">
+            {creador ? `Se publicará en la cuenta ${creador.nombre}` : aviso ?? 'Leyendo tu cuenta…'}
+          </p>
+        </div>
+      </div>
+
+      <input type="hidden" name="tiktokModo" value={borrador ? 'borrador' : 'directo'} />
+      <Toggle
+        label="Enviar como borrador a mi bandeja de TikTok"
+        hint={borrador ? 'Te llegará una notificación en TikTok para terminar la publicación desde el teléfono.' : undefined}
+        checked={borrador}
+        onChange={setBorrador}
+      />
+
+      {borrador ? null : (
+        <>
+          <Field label="Quién puede verlo">
+            <Select
+              name="tiktokPrivacidad"
+              required
+              value={privacidad}
+              onChange={(e) => setPrivacidad(e.target.value as PrivacidadTikTok | '')}
+              className="max-w-[16rem]"
+            >
+              <option value="" disabled>
+                Elige quién puede verlo
+              </option>
+              {privacidades.map((p) => (
+                <option key={p} value={p} disabled={patrocinado && p === 'SELF_ONLY'}>
+                  {ETIQUETA_PRIVACIDAD[p]}
+                </option>
+              ))}
+            </Select>
+          </Field>
+
+          <div>
+            <GroupLabel>Permitir</GroupLabel>
+            <div className="flex flex-wrap gap-4 text-sm">
+              <Casilla name="tiktokComentarios" label="Comentarios" bloqueada={creador?.comentariosDeshabilitados} />
+              {soloFotos ? null : (
+                <>
+                  <Casilla name="tiktokDuo" label="Dúos" bloqueada={creador?.duoDeshabilitado} />
+                  <Casilla name="tiktokPegar" label="Pegar (Stitch)" bloqueada={creador?.pegarDeshabilitado} />
+                </>
+              )}
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <Toggle
+              label="Este contenido promociona una marca"
+              checked={comercial}
+              onChange={setComercial}
+            />
+            <input type="hidden" name="tiktokComercial" value={comercial ? tipoComercial : 'no'} />
+            {comercial ? (
+              <div className="ml-12 space-y-1 text-sm">
+                <label className="flex items-center gap-2">
+                  <input
+                    type="radio"
+                    name="tiktokTipoComercial"
+                    checked={tipoComercial === 'marca_propia'}
+                    onChange={() => setTipoComercial('marca_propia')}
+                  />
+                  Mi marca
+                  <span className="text-xs text-fg-faint">Se etiquetará como Contenido promocional</span>
+                </label>
+                <label className="flex items-center gap-2">
+                  <input
+                    type="radio"
+                    name="tiktokTipoComercial"
+                    checked={tipoComercial === 'patrocinado'}
+                    onChange={() => setTipoComercial('patrocinado')}
+                  />
+                  Contenido patrocinado
+                  <span className="text-xs text-fg-faint">Se etiquetará como Colaboración pagada</span>
+                </label>
+                {patrocinadoPrivado ? (
+                  <p className="text-xs text-negative">Un contenido patrocinado no puede ser privado. Elige otra privacidad.</p>
+                ) : null}
+              </div>
+            ) : null}
+          </div>
+
+          <p className="text-[0.72rem] text-fg-faint">
+            {patrocinado ? (
+              <>
+                Al publicar aceptas la{' '}
+                <a href={BRANDED_CONTENT} target="_blank" rel="noreferrer" className="underline">
+                  Branded Content Policy
+                </a>{' '}
+                y la{' '}
+                <a href={MUSIC_USAGE} target="_blank" rel="noreferrer" className="underline">
+                  Music Usage Confirmation
+                </a>{' '}
+                de TikTok.
+              </>
+            ) : (
+              <>
+                Al publicar aceptas la{' '}
+                <a href={MUSIC_USAGE} target="_blank" rel="noreferrer" className="underline">
+                  Music Usage Confirmation
+                </a>{' '}
+                de TikTok.
+              </>
+            )}{' '}
+            Después de publicar, TikTok puede tardar unos minutos en mostrarlo en tu perfil.
+          </p>
+        </>
+      )}
+    </div>
+  )
+}
+
+/** Apagada al nacer; gris y sin enviar si creator_info dice que la cuenta la tiene bloqueada. */
+function Casilla({ name, label, bloqueada }: { name: string; label: string; bloqueada?: boolean }) {
+  return (
+    <label className={bloqueada ? 'flex items-center gap-2 opacity-40' : 'flex items-center gap-2'}>
+      <input type="checkbox" name={name} disabled={bloqueada} />
+      {label}
+    </label>
+  )
+}

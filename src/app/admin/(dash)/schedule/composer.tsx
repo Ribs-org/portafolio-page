@@ -1,18 +1,22 @@
 'use client'
 
-import { useActionState, useId } from 'react'
+import { useActionState, useId, useState } from 'react'
 import { createScheduledPost } from '@/app/admin/actions'
 import { Field, GroupLabel, Input, Submit, Textarea } from '@/components/ui'
 import { SOCIAL_NETWORKS } from '@/db/schema'
 import { networkLabel } from '@/lib/networks'
 import { cn } from '@/lib/utils'
+import { TikTokOpciones } from './tiktok-opciones'
 
-// Every network but TikTok publishes; its checkbox waits for a publisher.
-const ENABLED = new Set(['instagram', 'facebook', 'youtube', 'threads', 'x'])
+// Twin of PUBLISHABLE (publish/batch.ts) and NETWORKS (schedule/[id]/editor.tsx) —
+// update together.
+const ENABLED = new Set(['instagram', 'facebook', 'youtube', 'threads', 'x', 'tiktok'])
 
 export function Composer() {
   const [state, action] = useActionState(createScheduledPost, {})
   const captionId = useId()
+  const [tiktok, setTiktok] = useState(false)
+  const [soloFotos, setSoloFotos] = useState(false)
 
   return (
     <details
@@ -32,7 +36,16 @@ export function Composer() {
         </Field>
 
         <Field label="Archivos" hint="Imágenes o video, opcional">
-          <Input type="file" name="media" multiple accept="image/*,video/*" />
+          <Input
+            type="file"
+            name="media"
+            multiple
+            accept="image/*,video/*"
+            onChange={(e) => {
+              const files = Array.from(e.target.files ?? [])
+              setSoloFotos(files.length > 0 && files.every((f) => f.type.startsWith('image/')))
+            }}
+          />
         </Field>
 
         <div>
@@ -51,6 +64,7 @@ export function Composer() {
                     value={network}
                     disabled={!enabled}
                     defaultChecked={network === 'instagram'}
+                    onChange={network === 'tiktok' ? (e) => setTiktok(e.target.checked) : undefined}
                   />
                   {networkLabel(network)}
                   {!enabled && <span className="text-xs text-fg-faint">próximamente</span>}
@@ -59,6 +73,8 @@ export function Composer() {
             })}
           </div>
         </div>
+
+        {tiktok ? <TikTokOpciones soloFotos={soloFotos} /> : null}
 
         <Field label="Fecha y hora">
           <Input type="datetime-local" name="scheduledAt" required className="max-w-[16rem]" />
