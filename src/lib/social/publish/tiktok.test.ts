@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   CupoInit,
   TIKTOK_ARCHIVO,
@@ -13,10 +13,15 @@ import {
   idsDesdeTexto,
   interaccionesEfectivas,
   mediaTikTok,
+  tiktokPublisher,
   tituloFoto,
   veredictoEstado,
 } from './tiktok'
 import { TIKTOK_RECONECTAR, type CreadorTikTok } from './tiktok-creador'
+import { TIKTOK_SIN_PRIVACIDAD } from './opciones'
+import { TIKTOK_MEDIA } from './validate'
+import { PUBLISH_NETWORK_ERROR } from './publisher'
+import fixture from '../fixtures/tiktok-creator-info.json'
 
 const video = { url: 'https://media-bucket.vicente-pareja.cl/scheduled/a.mp4', mediaType: 'video' as const, position: 0 }
 const foto = (n: number) => ({ url: `https://media-bucket.vicente-pareja.cl/scheduled/${n}.jpg`, mediaType: 'image' as const, position: n })
@@ -213,5 +218,145 @@ describe('CupoInit', () => {
     expect(cupo.puede('a', t0)).toBe(false)
     expect(cupo.puede('b', t0)).toBe(true)
     expect(cupo.puede('a', new Date('2026-09-15T12:01:00Z'))).toBe(true)
+  })
+})
+
+describe('tiktokPublisher.publish', () => {
+  afterEach(() => vi.unstubAllGlobals())
+
+  type Llamada = { url: string; body: unknown }
+  const llamadas: Llamada[] = []
+
+  /**
+   * Un fetch que responde según el path; guarda cada llamada para inspeccionarla. Un
+   * `body` string se envía crudo, tal cual: así se prueba el id de 19 dígitos sin que
+   * `JSON.stringify` del test lo redondee antes.
+   */
+  function stub(respuestas: Record<string, { status?: number; body: unknown }>) {
+    llamadas.length = 0
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string, init?: RequestInit) => {
+        const path = new URL(url).pathname.replace('/v2', '')
+        llamadas.push({ url, body: init?.body ? JSON.parse(String(init.body)) : undefined })
+        const r = respuestas[path]
+        if (!r) throw new Error(`sin respuesta simulada para ${path}`)
+        const texto = typeof r.body === 'string' ? r.body : JSON.stringify(r.body)
+        return new Response(texto, { status: r.status ?? 200, headers: { 'content-type': 'application/json' } })
+      }),
+    )
+  }
+
+  const ok = { error: { code: 'ok', message: '', log_id: '1' } }
+  const base = {
+    caption: 'Hola',
+    media: [video],
+    containerId: null,
+    token: 'tok',
+    accountExternalId: 'open-1',
+    coverUrl: null,
+    opciones: directo,
+  }
+
+  it('primera corrida directa: creator_info, init y processing con el publish_id', async () => {
+    stub({
+      '/post/publish/creator_info/query/': { body: fixture },
+      '/post/publish/video/init/': { body: { data: { publish_id: 'v_pub.123' }, ...ok } },
+    })
+    expect(await tiktokPublisher.publish(base)).toEqual({ kind: 'processing', containerId: 'v_pub.123' })
+    expect(llamadas.map((l) => new URL(l.url).pathname)).toEqual([
+      '/v2/post/publish/creator_info/query/',
+      '/v2/post/publish/video/init/',
+    ])
+    expect((llamadas[1]!.body as { post_info: { privacy_level: string } }).post_info.privacy_level).toBe('SELF_ONLY')
+  })
+
+  it('borrador: sin creator_info, init de bandeja', async () => {
+    stub({ '/post/publish/inbox/video/init/': { body: { data: { publish_id: 'v_inbox.1' }, ...ok } } })
+    expect(await tiktokPublisher.publish({ ...base, opciones: { modo: 'borrador' } })).toEqual({
+      kind: 'processing',
+      containerId: 'v_inbox.1',
+    })
+    expect(llamadas).toHaveLength(1)
+  })
+
+  it('sin opciones o con media que TikTok no toma, falla antes de llamar a nadie', async () => {
+    stub({})
+    expect(await tiktokPublisher.publish({ ...base, opciones: null })).toEqual({ kind: 'failed', reason: TIKTOK_SIN_PRIVACIDAD })
+    expect(await tiktokPublisher.publish({ ...base, media: [video, foto(1)] })).toEqual({ kind: 'failed', reason: TIKTOK_MEDIA })
+    expect(llamadas).toHaveLength(0)
+  })
+
+  it('la privacidad elegida ya no está entre las de la cuenta', async () => {
+    stub({
+      '/post/publish/creator_info/query/': {
+        body: { ...fixture, data: { ...fixture.data, privacy_level_options: ['PUBLIC_TO_EVERYONE'] } },
+      },
+    })
+    expect(await tiktokPublisher.publish(base)).toEqual({ kind: 'failed', reason: TIKTOK_PRIVACIDAD_NO_DISPONIBLE })
+  })
+
+  it('creator_info sin scope pide reconectar; sin red, reintenta como error de red', async () => {
+    stub({ '/post/publish/creator_info/query/': { status: 401, body: { error: { code: 'scope_not_authorized' } } } })
+    expect(await tiktokPublisher.publish(base)).toEqual({ kind: 'failed', reason: TIKTOK_RECONECTAR })
+    stub({ '/post/publish/creator_info/query/': { status: 500, body: { error: { code: 'internal_error' } } } })
+    expect(await tiktokPublisher.publish(base)).toEqual({ kind: 'failed', reason: PUBLISH_NETWORK_ERROR })
+  })
+
+  it('el init con error trae su frase, y el cupo de TikTok difiere', async () => {
+    stub({
+      '/post/publish/creator_info/query/': { body: fixture },
+      '/post/publish/video/init/': { status: 400, body: { error: { code: 'url_ownership_unverified', message: 'x' } } },
+    })
+    expect(await tiktokPublisher.publish(base)).toEqual({ kind: 'failed', reason: TIKTOK_DOMINIO })
+    stub({
+      '/post/publish/creator_info/query/': { body: fixture },
+      '/post/publish/video/init/': { status: 429, body: { error: { code: 'rate_limit_exceeded' } } },
+    })
+    expect(await tiktokPublisher.publish(base)).toEqual({ kind: 'deferred' })
+  })
+
+  it('el séptimo init en el mismo minuto para la misma cuenta se difiere sin llamar', async () => {
+    stub({
+      '/post/publish/creator_info/query/': { body: fixture },
+      '/post/publish/video/init/': { body: { data: { publish_id: 'v' }, ...ok } },
+    })
+    const cuenta = { ...base, accountExternalId: `cupo-${Date.now()}` }
+    for (let i = 0; i < 6; i++) expect((await tiktokPublisher.publish(cuenta)).kind).toBe('processing')
+    const antes = llamadas.length
+    expect(await tiktokPublisher.publish(cuenta)).toEqual({ kind: 'deferred' })
+    expect(llamadas.length).toBe(antes)
+  })
+
+  it('corridas siguientes: el estado decide', async () => {
+    const resume = { ...base, containerId: 'v_pub.123' }
+    stub({ '/post/publish/status/fetch/': { body: { data: { status: 'PROCESSING_DOWNLOAD' }, ...ok } } })
+    expect(await tiktokPublisher.publish(resume)).toEqual({ kind: 'processing', containerId: 'v_pub.123' })
+    expect(llamadas[0]!.body).toEqual({ publish_id: 'v_pub.123' })
+
+    // Cuerpo crudo: el id es un int64 que JSON.parse redondearía; el publisher lo lee del texto.
+    stub({
+      '/post/publish/status/fetch/': {
+        body: '{"data":{"status":"PUBLISH_COMPLETE","publicaly_available_post_id":[7234567890123456789]},"error":{"code":"ok","message":"","log_id":"1"}}',
+      },
+    })
+    expect(await tiktokPublisher.publish(resume)).toEqual({ kind: 'published', externalId: '7234567890123456789' })
+
+    stub({ '/post/publish/status/fetch/': { body: { data: { status: 'PUBLISH_COMPLETE' }, ...ok } } })
+    expect(await tiktokPublisher.publish(resume)).toEqual({ kind: 'published', externalId: null })
+
+    stub({ '/post/publish/status/fetch/': { body: { data: { status: 'SEND_TO_USER_INBOX' }, ...ok } } })
+    expect(await tiktokPublisher.publish(resume)).toEqual({ kind: 'published', externalId: null })
+
+    stub({ '/post/publish/status/fetch/': { body: { data: { status: 'FAILED', fail_reason: 'auth_removed' }, ...ok } } })
+    expect(await tiktokPublisher.publish(resume)).toEqual({ kind: 'failed', reason: TIKTOK_RECONECTAR })
+  })
+
+  it('una consulta de estado que no responde no gasta intento', async () => {
+    const resume = { ...base, containerId: 'v_pub.123' }
+    stub({ '/post/publish/status/fetch/': { status: 500, body: { error: { code: 'internal_error' } } } })
+    expect(await tiktokPublisher.publish(resume)).toEqual({ kind: 'processing', containerId: 'v_pub.123' })
+    vi.stubGlobal('fetch', vi.fn(async () => { throw new Error('dns') }))
+    expect(await tiktokPublisher.publish(resume)).toEqual({ kind: 'processing', containerId: 'v_pub.123' })
   })
 })

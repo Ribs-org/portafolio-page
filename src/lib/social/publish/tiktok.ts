@@ -1,6 +1,7 @@
-import type { PublishMedia } from './publisher'
-import type { OpcionesTikTok } from './opciones'
-import { TIKTOK_RECONECTAR, type CreadorTikTok } from './tiktok-creador'
+import { PUBLISH_NETWORK_ERROR, type PublishInput, type PublishMedia, type PublishOutcome, type Publisher } from './publisher'
+import { TIKTOK_SIN_PRIVACIDAD, validarOpciones, type OpcionesTikTok } from './opciones'
+import { TIKTOK_MEDIA } from './validate'
+import { consultarCreador, TIKTOK_RECONECTAR, type CreadorTikTok } from './tiktok-creador'
 
 // Todo lo que el dueño puede leer. El detalle de TikTok solo va al log.
 export const TIKTOK_RECHAZO = 'TikTok rechazó la publicación.'
@@ -221,4 +222,117 @@ export class CupoInit {
     actual.usados++
     return true
   }
+}
+
+const API = 'https://open.tiktokapis.com/v2'
+const cupo = new CupoInit()
+
+type Respuesta = {
+  status: number
+  body: { data?: unknown; error?: { code?: string; message?: string } } | null
+  /** El JSON tal como vino: los ids de video son int64 y solo aquí conservan sus dígitos. */
+  texto: string
+}
+
+/** POST JSON con bearer; null solo si la red no respondió (el llamador decide qué significa). */
+async function postJson(path: string, token: string, body: unknown): Promise<Respuesta | null> {
+  let response: Response
+  try {
+    response = await fetch(`${API}${path}`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json; charset=UTF-8' },
+      body: JSON.stringify(body),
+    })
+  } catch (error) {
+    console.error('TikTok', path, String(error).slice(0, 300))
+    return null
+  }
+  const texto = await response.text()
+  let parsed: Respuesta['body'] = null
+  try {
+    parsed = JSON.parse(texto) as Respuesta['body']
+  } catch {
+    // Sin JSON: el status y el código ausente deciden abajo.
+  }
+  return { status: response.status, body: parsed, texto }
+}
+
+function codigo(r: Respuesta | null): string | undefined {
+  return r?.body?.error?.code
+}
+
+// Leídas por función y no por el `r` ya angostado: negar `esOk` angosta `r` a `null` (o,
+// cuando ya se descartó null antes, a `never`) y el acceso directo `r?.status` no
+// tipa contra ese `r` — pasarlo como argumento fresco sí.
+function estado(r: Respuesta | null): number | undefined {
+  return r?.status
+}
+
+function mensaje(r: Respuesta | null): string {
+  return r?.body?.error?.message ?? ''
+}
+
+function esOk(r: Respuesta | null): r is Respuesta {
+  return r !== null && r.status >= 200 && r.status < 300 && (codigo(r) === undefined || codigo(r) === 'ok')
+}
+
+export const tiktokPublisher: Publisher = {
+  network: 'tiktok',
+
+  async publish(input: PublishInput): Promise<PublishOutcome> {
+    // Corridas siguientes: el publish_id ya existe; solo se pregunta cómo va.
+    if (input.containerId) {
+      const r = await postJson('/post/publish/status/fetch/', input.token, { publish_id: input.containerId })
+      if (!esOk(r)) {
+        // Un poll que no respondió no dice nada del post: seguir esperando, nunca
+        // reintentar el init (subiría una segunda copia). El corte de 24 h sigue vigente.
+        console.error('TikTok status/fetch:', estado(r), codigo(r), mensaje(r).slice(0, 300))
+        return { kind: 'processing', containerId: input.containerId }
+      }
+      const veredicto = veredictoEstado(r.body?.data, idsDesdeTexto(r.texto))
+      if (veredicto.kind === 'complete') return { kind: 'published', externalId: veredicto.postId }
+      if (veredicto.kind === 'inbox') return { kind: 'published', externalId: null }
+      if (veredicto.kind === 'failed') return { kind: 'failed', reason: veredicto.reason }
+      return { kind: 'processing', containerId: input.containerId }
+    }
+
+    // Primera corrida: validar todo antes de gastar una llamada.
+    const check = validarOpciones('tiktok', input.opciones)
+    if ('error' in check || !check.opciones) return { kind: 'failed', reason: TIKTOK_SIN_PRIVACIDAD }
+    const opciones = check.opciones as OpcionesTikTok
+    const media = mediaTikTok(input.media)
+    if (!media) return { kind: 'failed', reason: TIKTOK_MEDIA }
+
+    // El cupo se revisa antes de gastar la llamada a creator_info: un intento que va a
+    // diferirse no debe consultar la red primero.
+    if (!cupo.puede(input.accountExternalId, new Date())) return { kind: 'deferred' }
+
+    let creador: CreadorTikTok | null = null
+    if (opciones.modo === 'directo') {
+      const consulta = await consultarCreador(input.token)
+      if ('error' in consulta) {
+        // Reconectar es un veredicto del dueño; cualquier otra cosa es la red y se reintenta.
+        return { kind: 'failed', reason: consulta.error === TIKTOK_RECONECTAR ? TIKTOK_RECONECTAR : PUBLISH_NETWORK_ERROR }
+      }
+      creador = consulta.creador
+      if (!creador.privacidades.includes(opciones.privacidad)) {
+        return { kind: 'failed', reason: TIKTOK_PRIVACIDAD_NO_DISPONIBLE }
+      }
+    }
+
+    const { path, body } = cuerpoInit(opciones, input.caption, media, creador)
+    const r = await postJson(path, input.token, body)
+    if (r === null) return { kind: 'failed', reason: PUBLISH_NETWORK_ERROR }
+    if (!esOk(r)) {
+      console.error('TikTok init:', path, estado(r), codigo(r), mensaje(r).slice(0, 300))
+      const frase = fraseDeInit(codigo(r))
+      return frase === 'deferred' ? { kind: 'deferred' } : { kind: 'failed', reason: frase }
+    }
+    const publishId = (r.body?.data as { publish_id?: unknown } | undefined)?.publish_id
+    if (typeof publishId !== 'string' || !publishId) {
+      console.error('TikTok init sin publish_id:', path, JSON.stringify(r.body).slice(0, 300))
+      return { kind: 'failed', reason: TIKTOK_RECHAZO }
+    }
+    return { kind: 'processing', containerId: publishId }
+  },
 }
