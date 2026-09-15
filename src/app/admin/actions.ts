@@ -22,7 +22,8 @@ import {
   tipoArchivo,
   PORTADA_NEEDS_VIDEO,
 } from '@/lib/social/publish/batch'
-import { validateScheduleDraft } from '@/lib/social/publish/validate'
+import { opcionesDesdeFormulario, validarOpcionesPorRed } from '@/lib/social/publish/opciones'
+import { extensionDe, validateScheduleDraft } from '@/lib/social/publish/validate'
 import { validateAtributos, ATRIBUTOS_ERROR, type Atributos } from '@/lib/social/publish/atributos'
 import { diffMedia, diffTargets } from '@/lib/social/publish/edit'
 import { crearPostProgramado } from '@/lib/social/publish/crear'
@@ -487,10 +488,22 @@ export async function createScheduledPost(_prev: FormState, formData: FormData):
 
   const videoCount = files.filter((f) => f.type.startsWith('video/')).length
   const error = validateScheduleDraft(
-    { caption, imageCount: files.length - videoCount, videoCount, networks, scheduledAt },
+    {
+      caption,
+      imageCount: files.length - videoCount,
+      videoCount,
+      networks,
+      scheduledAt,
+      formats: files.map((f) => extensionDe(f.name)),
+    },
     new Date(),
   )
   if (error) return { error }
+
+  // Lo que la red exige por destino, antes de subir nada: una privacidad sin elegir no
+  // debe costar la subida de un video.
+  const opcionesCheck = validarOpcionesPorRed(networks, opcionesDesdeFormulario(formData, networks))
+  if ('error' in opcionesCheck) return { error: opcionesCheck.error }
 
   const uploaded: Array<{ url: string; mediaType: 'image' | 'video' }> = []
   for (const file of files) {
@@ -500,7 +513,13 @@ export async function createScheduledPost(_prev: FormState, formData: FormData):
   }
 
   try {
-    await crearPostProgramado({ caption, scheduledAt: scheduledAt!, media: uploaded, networks })
+    await crearPostProgramado({
+      caption,
+      scheduledAt: scheduledAt!,
+      media: uploaded,
+      networks,
+      opciones: opcionesCheck.opciones,
+    })
   } catch (error) {
     if (error instanceof SinCuenta) return { error: error.message }
     throw error
