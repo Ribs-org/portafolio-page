@@ -8,8 +8,10 @@ import { networkLabel } from '@/lib/networks'
 import { cn } from '@/lib/utils'
 import { TikTokOpciones } from './tiktok-opciones'
 
-// Twin of PUBLISHABLE (publish/batch.ts) and NETWORKS (schedule/[id]/editor.tsx) —
-// update together.
+// Twin of PUBLISHABLE (publish/batch.ts) and NETWORKS (schedule/[id]/editor.tsx),
+// except that NETWORKS lags `tiktok` on purpose: el editor no puede pedir sus
+// opciones, así que solo este compositor y el lote lo ofrecen hasta que el publisher
+// (entrega 2) llegue.
 const ENABLED = new Set(['instagram', 'facebook', 'youtube', 'threads', 'x', 'tiktok'])
 
 export function Composer() {

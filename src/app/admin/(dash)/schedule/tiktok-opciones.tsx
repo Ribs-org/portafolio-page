@@ -4,11 +4,17 @@ import Image from 'next/image'
 import { useEffect, useState } from 'react'
 import { leerCreadorTikTok } from '@/app/admin/actions'
 import { Field, GroupLabel, Select, Toggle } from '@/components/ui'
-import type { CreadorTikTok } from '@/lib/social/publish/tiktok-creador'
+import { TIKTOK_CREADOR_ILEGIBLE, type CreadorTikTok } from '@/lib/social/publish/tiktok-creador'
 import { ETIQUETA_PRIVACIDAD, PRIVACIDADES_TIKTOK, type PrivacidadTikTok } from '@/lib/social/publish/opciones'
 
 const MUSIC_USAGE = 'https://www.tiktok.com/legal/page/global/music-usage-confirmation/en'
 const BRANDED_CONTENT = 'https://www.tiktok.com/legal/page/global/bc-policy/en'
+
+// Cacheada a nivel de módulo: marcar y desmarcar TikTok en el compositor (soloFotos
+// cambia el árbol y remonta este componente) no debe repetir la consulta a
+// creator_info por cada toggle. Un error la limpia para que el siguiente montaje
+// reintente en vez de quedar pegado al mismo fallo.
+let creadorPromesa: ReturnType<typeof leerCreadorTikTok> | null = null
 
 /**
  * Lo que TikTok obliga a preguntar antes de publicar directo, en el orden y con los
@@ -27,11 +33,21 @@ export function TikTokOpciones({ soloFotos }: { soloFotos: boolean }) {
 
   useEffect(() => {
     let vivo = true
-    leerCreadorTikTok().then((r) => {
-      if (!vivo) return
-      if ('error' in r) setAviso(r.error)
-      else setCreador(r.creador)
-    })
+    if (!creadorPromesa) creadorPromesa = leerCreadorTikTok()
+    creadorPromesa
+      .then((r) => {
+        if (!vivo) return
+        if ('error' in r) {
+          creadorPromesa = null
+          setAviso(r.error)
+        } else {
+          setCreador(r.creador)
+        }
+      })
+      .catch(() => {
+        creadorPromesa = null
+        if (vivo) setAviso(TIKTOK_CREADOR_ILEGIBLE)
+      })
     return () => {
       vivo = false
     }
@@ -123,13 +139,20 @@ export function TikTokOpciones({ soloFotos }: { soloFotos: boolean }) {
                     type="radio"
                     name="tiktokTipoComercial"
                     checked={tipoComercial === 'patrocinado'}
-                    onChange={() => setTipoComercial('patrocinado')}
+                    onChange={() => {
+                      setTipoComercial('patrocinado')
+                      // «Solo yo» y patrocinado no coexisten: se vacía para que el
+                      // select required bloquee el envío en vez de solo avisar.
+                      if (privacidad === 'SELF_ONLY') setPrivacidad('')
+                    }}
                   />
                   Contenido patrocinado
                   <span className="text-xs text-fg-faint">Se etiquetará como Colaboración pagada</span>
                 </label>
-                {patrocinadoPrivado ? (
-                  <p className="text-xs text-negative">Un contenido patrocinado no puede ser privado. Elige otra privacidad.</p>
+                {patrocinadoPrivado || (patrocinado && privacidad === '') ? (
+                  <p className="text-xs text-negative">
+                    Un contenido patrocinado no puede ser privado. Vuelve a elegir quién puede verlo.
+                  </p>
                 ) : null}
               </div>
             ) : null}

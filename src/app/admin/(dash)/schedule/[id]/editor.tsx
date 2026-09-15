@@ -10,7 +10,10 @@ import { Button, Field, GroupLabel, Input, Textarea } from '@/components/ui'
 import { networkLabel } from '@/lib/networks'
 import { cn } from '@/lib/utils'
 
-// Twin of ENABLED in the composer (schedule/composer.tsx) — update both together.
+// Twin of PUBLISHABLE (publish/batch.ts) and ENABLED in the composer
+// (schedule/composer.tsx), except that `tiktok` lags here on purpose: this editor
+// cannot collect its options, so a destino de TikTok solo se lista aquí si ya existía
+// — nunca se ofrece para agregar — hasta que el publisher (entrega 2) llegue.
 const NETWORKS = ['instagram', 'facebook', 'youtube', 'threads', 'x']
 
 type MediaRow = { id: string; blobUrl: string; mediaType: string }
@@ -38,7 +41,7 @@ export function Editor({
   const published = new Set(targets.filter((t) => t.status === 'published').map((t) => t.network))
   const initialNetworks = new Set(targets.map((t) => t.network))
   // Un destino que ya existe se dibuja aunque su red aún no se pueda agregar desde aquí.
-  const drawn = [...NETWORKS, ...targets.map((t) => t.network).filter((n) => !NETWORKS.includes(n))]
+  const drawn = [...new Set([...NETWORKS, ...targets.map((t) => t.network)])]
   const resumen = new Map(targets.map((t) => [t.network, t.opciones]))
 
   const [kept, setKept] = useState<MediaRow[]>(media)
