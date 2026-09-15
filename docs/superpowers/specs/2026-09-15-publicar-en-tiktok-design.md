@@ -125,14 +125,14 @@ token cada 24 horas y sirve para los dos usos.
    (MP4, MOV o WebM), o de 1 a 35 fotos (JPG o WebP), nunca mezcla; caption hasta 2200.
    Frases fijas: `TIKTOK_MEDIA` («TikTok recibe un video, o hasta 35 fotos JPG o
    WebP.»).
-2. **Modo directo**: `POST /post/publish/creator_info/query/`. Guarda
-   `creator_nickname` para el log. Si `privacy_level_options` no contiene la privacidad
-   elegida → `failed` con `TIKTOK_PRIVACIDAD_NO_DISPONIBLE` («TikTok ya no permite esa
-   privacidad en tu cuenta; edita la publicación.»). Si `comment_disabled`,
-   `duet_disabled` o `stitch_disabled` vienen en `true` y la opción pide permitirlos, se
-   fuerzan a no permitidos sin fallar (TikTok los deshabilitaría igual). La duración no se
-   comprueba localmente: el repo no la conoce y `duration_check_failed` de TikTok la
-   cubre con `TIKTOK_ARCHIVO`. Error `scope_not_authorized` → `TIKTOK_RECONECTAR`.
+2. **Modo directo**: `POST /post/publish/creator_info/query/`. Si `privacy_level_options`
+   no contiene la privacidad elegida → `failed` con `TIKTOK_PRIVACIDAD_NO_DISPONIBLE`
+   («TikTok ya no permite esa privacidad en tu cuenta; edita la publicación.»). Si
+   `comment_disabled`, `duet_disabled` o `stitch_disabled` vienen en `true` y la opción
+   pide permitirlos, se fuerzan a no permitidos sin fallar (TikTok los deshabilitaría
+   igual). La duración no se comprueba localmente: el repo no la conoce y
+   `duration_check_failed` de TikTok la cubre con `TIKTOK_ARCHIVO`. Error
+   `scope_not_authorized` → `TIKTOK_RECONECTAR`.
 3. **Init**:
    - Video directo: `POST /post/publish/video/init/` con
      `post_info { title: caption, privacy_level, disable_comment, disable_duet,
@@ -178,9 +178,12 @@ y `post-attributes.ts` ya toleran null porque el join es por igualdad.
 
 Seis `init` por minuto y treinta `status/fetch` por minuto por token. Una corrida
 publica como mucho lo que venció en cinco minutos; no hace falta cola propia, pero el
-publisher devuelve `processing` sin llamar si en la misma corrida ya hizo seis `init`
-para esa cuenta (contador en memoria del módulo, se reinicia por invocación). En modo
-borrador TikTok admite cinco pendientes por 24 horas; el sexto falla con
+publisher devuelve `deferred` sin llamar si esa cuenta ya hizo seis `init` en el minuto
+de reloj en curso: el destino sigue programado, sin gastar intento ni dejar motivo, y la
+corrida siguiente lo retoma. El contador vive en memoria del módulo anclado al minuto de
+reloj, no a la invocación, porque con Fluid Compute dos corridas pueden compartir
+instancia. En modo borrador TikTok admite cinco pendientes por 24 horas; el sexto falla
+con
 `spam_risk_too_many_pending_share` → `TIKTOK_BANDEJA_LLENA` («Tienes 5 borradores
 pendientes en TikTok; publica alguno antes.»).
 
@@ -323,9 +326,9 @@ de TikTok al `console.error`. Las nuevas se listan en `publish/tiktok.ts` y
 - **Publisher** (`publish/tiktok.test.ts`, fixtures en `fixtures/tiktok-*.json`):
   cuerpo exacto de los cuatro `init` (video directo, fotos directo, video borrador,
   fotos borrador); mapeo completo de `status/fetch`; `PUBLISH_COMPLETE` con lista vacía
-  sigue esperando; error de red al consultar no gasta intento; `creator_info` sin la
-  privacidad elegida falla con su frase; casillas forzadas cuando `creator_info` las
-  deshabilita; tope de seis `init` por corrida; `fail_reason` a frase.
+  publica con `externalId` nulo; error de red al consultar no gasta intento;
+  `creator_info` sin la privacidad elegida falla con su frase; casillas forzadas cuando
+  `creator_info` las deshabilita; tope de seis `init` por corrida; `fail_reason` a frase.
 - **Opciones** (`publish/opciones.test.ts`): todas las reglas de §2.
 - **Validación de media** (`validate.test.ts`): un video, 35 fotos, 36 fotos, mezcla,
   formato no permitido.
@@ -449,4 +452,6 @@ Las entregas 1 y 2 se apilan en la rama `publicar-en-tiktok` y salen en **un sol
 
 Actualización 2026-09-15: la entrega 1 se fusionó sola (PR #83) a pedido del dueño para
 probar en producción; la 2 va en su propio PR y cierra la ventana en que un destino
-TikTok vencido fallaba en el cron.
+TikTok vencido fallaba en el cron. El cupo por minuto se resuelve con un resultado
+`deferred` del publisher, anclado al minuto de reloj (quinta desviación del plan de la
+entrega 2).
