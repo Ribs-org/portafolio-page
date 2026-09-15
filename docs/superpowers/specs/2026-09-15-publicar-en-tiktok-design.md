@@ -69,8 +69,9 @@ scopes ampliados.
 Las cuentas ya conectadas tienen tokens sin los scopes de escritura. `ensureCredential`
 no puede saberlo hasta que `creator_info` responda `scope_not_authorized`; el publisher
 convierte eso en la frase fija `TIKTOK_RECONECTAR` («Reconecta TikTok para autorizar la
-publicación.») y la tarjeta de Cuentas la muestra en rojo con el botón «Reconectar»,
-que ya existe.
+publicación.») y el chip del destino en el calendario muestra esa frase y el bloque del
+compositor la repite; la tarjeta de Cuentas no cambia, porque el publisher no escribe en
+la cuenta.
 
 ## 2. Opciones por destino: `scheduled_post_targets.opciones`
 
@@ -129,9 +130,9 @@ token cada 24 horas y sirve para los dos usos.
    elegida → `failed` con `TIKTOK_PRIVACIDAD_NO_DISPONIBLE` («TikTok ya no permite esa
    privacidad en tu cuenta; edita la publicación.»). Si `comment_disabled`,
    `duet_disabled` o `stitch_disabled` vienen en `true` y la opción pide permitirlos, se
-   fuerzan a no permitidos sin fallar (TikTok los deshabilitaría igual). Si
-   `max_video_post_duration_sec` es menor que la duración conocida del video, `failed`
-   con `TIKTOK_VIDEO_LARGO`. Error `scope_not_authorized` → `TIKTOK_RECONECTAR`.
+   fuerzan a no permitidos sin fallar (TikTok los deshabilitaría igual). La duración no se
+   comprueba localmente: el repo no la conoce y `duration_check_failed` de TikTok la
+   cubre con `TIKTOK_ARCHIVO`. Error `scope_not_authorized` → `TIKTOK_RECONECTAR`.
 3. **Init**:
    - Video directo: `POST /post/publish/video/init/` con
      `post_info { title: caption, privacy_level, disable_comment, disable_duet,
@@ -164,7 +165,7 @@ acepta portada externa; en video es el primer frame y en fotos la primera imagen
 
 | `status` | Resultado |
 |---|---|
-| `PUBLISH_COMPLETE` | `published` con `externalId` = primer `publicaly_available_post_id`; si la lista viene vacía (post privado, aún en moderación), se sigue en `processing` hasta que aparezca o venza el plazo de 24 h de `STALE_PROCESSING_HOURS`, que ya lo manda a `failed` con `PUBLISH_TIMEOUT`. El id que llega es el mismo `video.id` del connector de lectura; sin eso las métricas no cruzan |
+| `PUBLISH_COMPLETE` | `published` con `externalId` = primer `publicaly_available_post_id`, o `null` si la lista viene vacía: un post privado (lo único posible hasta la auditoría) puede no recibir el id nunca, y dejarlo 24 h en «publicando» para terminar en fallo sería mentir sobre un post que salió. Cuando llega, es el mismo `video.id` del connector de lectura y las métricas cruzan |
 | `SEND_TO_USER_INBOX` | Solo en modo borrador: `published` con `externalId: null`. El destino queda en el calendario con la leyenda «En tu bandeja de TikTok» (§4) |
 | `FAILED` | `failed` con frase según `fail_reason`: `file_format_check_failed`, `picture_size_check_failed`, `duration_check_failed`, `frame_rate_check_failed` → `TIKTOK_ARCHIVO` («TikTok no acepta el archivo: revisa formato, tamaño o duración.»); `auth_removed`, `scope_not_authorized` → `TIKTOK_RECONECTAR`; `url_ownership_unverified` → `TIKTOK_DOMINIO`; `spam_risk*` y el resto → `TIKTOK_RECHAZO` |
 | `PROCESSING_DOWNLOAD`, `PROCESSING_UPLOAD`, otro | sigue `processing` |
@@ -231,9 +232,10 @@ comentarios». Sin credencial, bajo el handle: «Comentarios sin conectar».
 
 ### Los cuatro gemelos
 
-`PUBLISHABLE` (`batch.ts`), `ENABLED` (`composer.tsx`), `NETWORKS` (`editor.tsx`) y
-`PUBLISHERS` (`publish/index.ts`) ganan `tiktok` en el mismo commit; `posts-kpis.ts`
-ya la tiene en su orden canónico.
+`PUBLISHABLE` (`batch.ts`), `ENABLED` (`composer.tsx`) y `PUBLISHERS` (`publish/index.ts`)
+tienen `tiktok`. `NETWORKS` del editor **no**: el editor no puede pedir las opciones y la
+acción rechaza crear ese destino desde ahí, así que la casilla sería un callejón sin
+salida; un destino TikTok ya existente se dibuja y se conserva igual.
 
 ## 5. Comentarios por la API for Business
 
@@ -444,3 +446,7 @@ We never read other users' data.
 Las entregas 1 y 2 se apilan en la rama `publicar-en-tiktok` y salen en **un solo PR a
 `main`**: sin publisher, un destino de TikTok programado fallaría en el cron con
 `NO_PUBLISH_TOKEN` y dispararía la alerta. La entrega 3 es su propio PR.
+
+Actualización 2026-09-15: la entrega 1 se fusionó sola (PR #83) a pedido del dueño para
+probar en producción; la 2 va en su propio PR y cierra la ventana en que un destino
+TikTok vencido fallaba en el cron.

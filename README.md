@@ -224,17 +224,30 @@ cuenta** en el bloque de la red.
 
 ### TikTok
 
-En [developers.tiktok.com](https://developers.tiktok.com), registra una app, agrega el
-producto **Login Kit** con los scopes `user.info.basic` y `video.list`, y usa como redirect URI:
+En [developers.tiktok.com](https://developers.tiktok.com), registra una app con los
+productos **Login Kit** y **Content Posting API** (con *Direct Post* activado) y los
+scopes `user.info.basic`, `video.list`, `video.upload` y `video.publish`. Redirect URI:
 
 ```
 https://TU-DOMINIO/api/social/tiktok/callback
 ```
 
+En *URL properties* verifica tu dominio raíz por registro TXT en el DNS: cubre el sitio y
+el subdominio de R2 (`R2_PUBLIC_BASE`), de donde TikTok descarga los archivos. No uses el
+archivo de firma dentro del bucket: el barrido diario lo borraría.
+
+Mientras TikTok no apruebe la app, solo el **sandbox** deja autorizar cuentas: créalo en
+la pestaña Sandbox, agrega tu usuario como *target user*, y usa **sus** credenciales:
+
 ```
 TIKTOK_CLIENT_KEY=
 TIKTOK_CLIENT_SECRET=
 ```
+
+Al pasar de solo lectura a publicar, las cuentas ya conectadas deben **reconectarse una
+vez** desde Cuentas para otorgar los scopes nuevos; el compositor lo pide con «Reconecta
+TikTok para autorizar la publicación». Hasta la auditoría de Content Posting, TikTok solo
+permite publicar como «Solo yo».
 
 ### Responder comentarios
 

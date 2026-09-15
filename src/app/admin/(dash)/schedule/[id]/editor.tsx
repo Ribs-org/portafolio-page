@@ -11,9 +11,9 @@ import { networkLabel } from '@/lib/networks'
 import { cn } from '@/lib/utils'
 
 // Twin of PUBLISHABLE (publish/batch.ts) and ENABLED in the composer
-// (schedule/composer.tsx), except that `tiktok` lags here on purpose: this editor
-// cannot collect its options, so a destino de TikTok solo se lista aquí si ya existía
-// — nunca se ofrece para agregar — hasta que el publisher (entrega 2) llegue.
+// (schedule/composer.tsx), but `tiktok` is not here: the editor cannot collect its
+// options, so creating a TikTok destination from here is rejected; an existing one
+// is drawn via `drawn`.
 const NETWORKS = ['instagram', 'facebook', 'youtube', 'threads', 'x']
 
 type MediaRow = { id: string; blobUrl: string; mediaType: string }
