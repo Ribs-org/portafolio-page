@@ -7,14 +7,8 @@ import { Button, Input } from '@/components/ui'
 import type { ScheduledPost, ScheduledPostTarget } from '@/db/schema'
 import { networkLabel } from '@/lib/networks'
 import { cn } from '@/lib/utils'
+import { etiquetaDestino } from './etiqueta'
 import { cortarCola } from './orden'
-
-const STATUS_LABEL: Record<string, string> = {
-  scheduled: 'Programado',
-  publishing: 'Publicando…',
-  published: 'Publicado',
-  failed: 'Falló',
-}
 
 // El mismo corte que la tabla de contenido: de entrada solo las primeras veinte, que
 // casi siempre alcanzan para todo lo pendiente. El resto espera detrás del botón.
@@ -111,7 +105,7 @@ export function Queue({
                     'bg-white/[0.08] text-fg-muted',
                 )}
               >
-                {networkLabel(target.network)}: {STATUS_LABEL[target.status]}
+                {networkLabel(target.network)}: {etiquetaDestino(target)}
                 {target.status === 'failed' && target.lastError && ` — ${target.lastError}`}
                 {target.status === 'failed' && (
                   <button
