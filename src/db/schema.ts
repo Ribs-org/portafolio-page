@@ -303,6 +303,10 @@ export const scheduledPostTargets = pgTable(
     externalId: text('external_id'),
     attemptCount: integer('attempt_count').notNull().default(0),
     lastError: text('last_error'),
+    // Lo que la red exige elegir por destino antes de publicar (TikTok: modo, privacidad,
+    // interacciones, comercial). Null en las redes que no piden nada. La forma la valida
+    // `lib/social/publish/opciones`; el editor la muestra pero no la cambia.
+    opciones: jsonb('opciones'),
     // precision 3 is load-bearing: the cron's optimistic claim and the editor's
     // guards compare this column by equality against a value that round-tripped
     // through a JS Date (millisecond precision). With Postgres's default
