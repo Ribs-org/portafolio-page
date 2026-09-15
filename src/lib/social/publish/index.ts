@@ -2,6 +2,7 @@ import type { Publisher } from './publisher'
 import { facebookPublisher } from './facebook'
 import { instagramPublisher } from './instagram'
 import { threadsPublisher } from './threads'
+import { tiktokPublisher } from './tiktok'
 import { xPublisher } from './x'
 import { youtubePublisher } from './youtube'
 
@@ -12,6 +13,7 @@ export const PUBLISHERS: Publisher[] = [
   threadsPublisher,
   youtubePublisher,
   xPublisher,
+  tiktokPublisher,
 ]
 
 export * from './publisher'

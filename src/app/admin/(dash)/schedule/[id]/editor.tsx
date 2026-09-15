@@ -10,10 +10,9 @@ import { Button, Field, GroupLabel, Input, Textarea } from '@/components/ui'
 import { networkLabel } from '@/lib/networks'
 import { cn } from '@/lib/utils'
 
-// Twin of PUBLISHABLE (publish/batch.ts) and ENABLED in the composer
-// (schedule/composer.tsx), except that `tiktok` lags here on purpose: this editor
-// cannot collect its options, so a destino de TikTok solo se lista aquí si ya existía
-// — nunca se ofrece para agregar — hasta que el publisher (entrega 2) llegue.
+// Gemelo de PUBLISHABLE (publish/batch.ts) y de ENABLED en el compositor
+// (schedule/composer.tsx). `tiktok` no se ofrece aquí porque el editor no puede
+// pedir sus opciones; un destino existente se dibuja vía `drawn`.
 const NETWORKS = ['instagram', 'facebook', 'youtube', 'threads', 'x']
 
 type MediaRow = { id: string; blobUrl: string; mediaType: string }

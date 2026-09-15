@@ -1,7 +1,7 @@
 // `creator_info` es la consulta que TikTok exige antes de cada publicación directa: dice
 // qué privacidades puede elegir el dueño hoy y qué interacciones tiene bloqueadas. La usa
-// el compositor para armar el bloque, y el publisher (entrega 2) para confirmar antes de
-// subir.
+// el compositor para armar el bloque, y el publisher (publish/tiktok.ts) para confirmar
+// antes de subir.
 import { PRIVACIDADES_TIKTOK, type PrivacidadTikTok } from './opciones'
 
 const API = 'https://open.tiktokapis.com/v2'

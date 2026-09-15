@@ -37,6 +37,27 @@ describe('resolveOutcome', () => {
     expect(patch.containerId).toBeNull()
   })
 
+  it('publicado sin id externo (un borrador a la bandeja) también cierra el destino', () => {
+    expect(resolveOutcome({ kind: 'published', externalId: null }, 2)).toEqual({
+      status: 'published',
+      containerId: null,
+      externalId: null,
+      attemptCount: 2,
+      lastError: null,
+    })
+  })
+
+  it('diferido vuelve a programado sin gastar intento ni dejar motivo', () => {
+    // La red pidió esperar (cupo por minuto): no es un fallo del post.
+    expect(resolveOutcome({ kind: 'deferred' }, 1)).toEqual({
+      status: 'scheduled',
+      containerId: null,
+      externalId: null,
+      attemptCount: 1,
+      lastError: null,
+    })
+  })
+
   it('el tercer fallo es definitivo', () => {
     const patch = resolveOutcome({ kind: 'failed', reason: PUBLISH_REJECTED }, MAX_PUBLISH_ATTEMPTS - 1)
     expect(patch.status).toBe('failed')

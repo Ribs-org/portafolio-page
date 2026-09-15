@@ -40,7 +40,10 @@ const SCOPES: Record<string, string> = {
     'https://www.googleapis.com/auth/youtube.upload https://www.googleapis.com/auth/youtube.force-ssl',
   threads: 'threads_basic,threads_content_publish',
   x: 'tweet.read tweet.write users.read offline.access',
-  tiktok: 'user.info.basic,video.list',
+  // video.upload viene pegado a Content Posting API en el portal y video.publish exige
+  // Direct Post activado; los cuatro se piden juntos porque TikTok no deja sumar scopes
+  // a un token existente: las cuentas conectadas antes deben reconectarse una vez.
+  tiktok: 'user.info.basic,video.list,video.upload,video.publish',
 }
 
 export async function GET(

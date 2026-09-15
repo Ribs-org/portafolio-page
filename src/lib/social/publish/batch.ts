@@ -47,7 +47,7 @@ export const PORTADA_NEEDS_VIDEO = 'La portada requiere un video en media.'
 export const PORTADA_NOT_IMAGE = 'La portada debe ser una imagen.'
 export const PORTADA_FORMAT = 'La portada debe ser JPG o PNG.'
 
-// The six networks with a publisher (TikTok's lands in the next delivery, same PR).
+// The six networks with a publisher.
 // Twin of ENABLED in the composer (schedule/composer.tsx) — update both together.
 export const PUBLISHABLE = new Set(['instagram', 'facebook', 'youtube', 'threads', 'x', 'tiktok'])
 
