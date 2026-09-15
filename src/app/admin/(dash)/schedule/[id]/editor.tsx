@@ -29,7 +29,7 @@ export function Editor({
   volver: string
   caption: string
   scheduledAtLocal: string
-  targets: Array<{ network: string; status: string }>
+  targets: Array<{ network: string; status: string; opciones: string | null }>
   media: MediaRow[]
   coverUrl: string | null
   atributos: string
@@ -37,6 +37,9 @@ export function Editor({
   const publishing = targets.some((t) => t.status === 'publishing')
   const published = new Set(targets.filter((t) => t.status === 'published').map((t) => t.network))
   const initialNetworks = new Set(targets.map((t) => t.network))
+  // Un destino que ya existe se dibuja aunque su red aún no se pueda agregar desde aquí.
+  const drawn = [...NETWORKS, ...targets.map((t) => t.network).filter((n) => !NETWORKS.includes(n))]
+  const resumen = new Map(targets.map((t) => [t.network, t.opciones]))
 
   const [kept, setKept] = useState<MediaRow[]>(media)
   const [keptCover, setKeptCover] = useState(coverUrl)
@@ -100,8 +103,9 @@ export function Editor({
           <div>
             <GroupLabel>Redes</GroupLabel>
             <div className="flex flex-wrap gap-3">
-              {NETWORKS.map((network) => {
+              {drawn.map((network) => {
                 const locked = published.has(network)
+                const linea = resumen.get(network)
                 return (
                   <label key={network} className={cn('flex items-center gap-1.5 text-sm', locked && 'opacity-70')}>
                     {/* A disabled checkbox never submits; the hidden twin keeps the
@@ -117,6 +121,7 @@ export function Editor({
                     />
                     {networkLabel(network)}
                     {locked ? ' ✓' : ''}
+                    {linea ? <span className="text-xs text-fg-faint">· {linea}</span> : null}
                   </label>
                 )
               })}
