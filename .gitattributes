@@ -1,0 +1,3 @@
+# El hash de cada migración se calcula sobre sus bytes: que no dependa del sistema.
+drizzle/*.sql text eol=lf
+drizzle/meta/*.json text eol=lf

@@ -187,8 +187,8 @@ export const socialPosts = pgTable(
   },
   (t) => [
     // Las columnas van en el orden físico de la tabla (external_id existe desde antes que
-    // account_id): drizzle-kit introspecta las uniques por ese orden, y declararlas al
-    // revés hace que cada `db:push` quiera recrearlas y pregunte si truncar la tabla.
+    // account_id): declararlas al revés haría que `drizzle-kit generate` propusiera
+    // recrear la unique.
     unique('social_posts_account_external_key').on(t.externalId, t.accountId),
     index('social_posts_campaign_idx').on(t.campaign),
     index('social_posts_published_idx').on(t.publishedAt),
@@ -318,9 +318,9 @@ export const scheduledPostTargets = pgTable(
   (t) => [
     unique('scheduled_post_targets_post_account_key').on(t.postId, t.accountId),
     index('scheduled_post_targets_status_idx').on(t.status),
-    // No unique: filas históricas pueden repetir external_id (o traerlo null) y una unique
-    // haría fallar el db:push. Solo acelera la búsqueda de reglas por cuenta + external_id
-    // que hace `aplicarReglas`/`reglasPara` en cada sondeo.
+    // No unique: filas históricas pueden repetir external_id (o traerlo null) y un unique
+    // fallaría al aplicarse sobre filas históricas. Solo acelera la búsqueda de reglas por
+    // cuenta + external_id que hace `aplicarReglas`/`reglasPara` en cada sondeo.
     index('scheduled_post_targets_account_external_idx').on(t.accountId, t.externalId),
   ],
 )
@@ -404,9 +404,10 @@ export const postComments = pgTable(
   },
   (t) => [
     // Al revés que en social_posts, por la misma regla: la unique va en el orden físico de
-    // la tabla, y como esta tabla todavía no existe, `db:push` la crea tal como está
-    // declarada y su orden de declaración es su orden físico. Con `account_id` primero
-    // sirve además la consulta del sondeo, que filtra por cuenta y luego por publicación.
+    // la tabla, y como esta tabla es nueva, la migración inicial la crea tal como está
+    // declarada, así que su orden de declaración es su orden físico. Con `account_id`
+    // primero sirve además la consulta del sondeo, que filtra por cuenta y luego por
+    // publicación.
     unique('post_comments_account_external_key').on(t.accountId, t.externalId),
     index('post_comments_state_idx').on(t.state),
     index('post_comments_published_idx').on(t.publishedAt),
@@ -474,8 +475,8 @@ export const sourcePosts = pgTable(
   },
   (t) => [
     // Mismo orden físico que la declaración: `author_id` es la segunda columna y
-    // `external_id` la cuarta. Declararla al revés haría que cada `db:push` futuro
-    // quisiera recrear la tabla.
+    // `external_id` la cuarta. Declararla al revés haría que `drizzle-kit generate`
+    // quisiera recrearla.
     unique('source_posts_author_external_key').on(t.authorId, t.externalId),
     index('source_posts_state_idx').on(t.state),
     index('source_posts_published_idx').on(t.publishedAt),

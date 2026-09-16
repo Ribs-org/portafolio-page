@@ -26,6 +26,16 @@ jobs:
       - run: npm test
       - run: npm run typecheck
       - run: npm run lint
+      # Sin base: `generate` solo compara el esquema con el snapshot. Si aparece un archivo
+      # nuevo es que alguien cambió el esquema y olvidó generar la migración.
+      # stdin cerrado: si generate quisiera preguntar por un rename, falla en vez de colgarse.
+      - run: npx drizzle-kit generate < /dev/null
+      - run: |
+          if [ -n "$(git status --porcelain -- drizzle)" ]; then
+            echo "El esquema cambió sin migración: corre npm run db:generate y commitea drizzle/"
+            git status --porcelain -- drizzle
+            exit 1
+          fi
       # Sin credenciales a propósito: el build tiene que pasar sin base ni secretos, y ya
       # está verificado que pasa.
       - run: npx next build
