@@ -57,6 +57,20 @@ export function postsAsondear(
 }
 
 /**
+ * Las publicaciones a vigilar salen de dos fuentes: las que el sync diario ya trajo y las
+ * que el calendario publicó desde entonces (su destino guarda el id de red al publicar).
+ * Sin la segunda, un post de hace diez minutos no entra a la cola hasta mañana. Manda la
+ * fila del sync: trae la fecha real de la red.
+ */
+export function unirPosts(
+  sync: Array<{ externalId: string; publishedAt: Date }>,
+  publicados: Array<{ externalId: string; publishedAt: Date }>,
+): Array<{ externalId: string; publishedAt: Date }> {
+  const vistos = new Set(sync.map((p) => p.externalId))
+  return [...sync, ...publicados.filter((p) => !vistos.has(p.externalId))]
+}
+
+/**
  * Si la corrida ya gastó su mitad del presupuesto y lo que falta queda para la pasada
  * siguiente. Las cuentas se recorren siempre en el mismo orden, así que un corte deja
  * afuera siempre a las mismas: por eso el reporte lleva cuántas quedaron sin sondear.

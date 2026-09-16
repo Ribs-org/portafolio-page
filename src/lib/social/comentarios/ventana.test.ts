@@ -9,6 +9,7 @@ import {
   recortar,
   seAcaboElTiempo,
   tocaSondear,
+  unirPosts,
 } from './ventana'
 
 const now = new Date('2026-09-11T12:00:00Z')
@@ -191,5 +192,25 @@ describe('estadoInicial', () => {
     expect(estadoInicial(null, cuenta)).toBe('pendiente')
     expect(estadoInicial(cuenta, null)).toBe('pendiente')
     expect(estadoInicial(null, null)).toBe('pendiente')
+  })
+})
+
+describe('unirPosts', () => {
+  it('suma los destinos publicados que el sync aún no trajo, sin repetir', () => {
+    const sync = [{ externalId: 'a', publishedAt: hace(2) }]
+    const publicados = [
+      { externalId: 'a', publishedAt: hace(1) },
+      { externalId: 'b', publishedAt: hace(0.01) },
+    ]
+    expect(unirPosts(sync, publicados)).toEqual([
+      { externalId: 'a', publishedAt: hace(2) },
+      { externalId: 'b', publishedAt: hace(0.01) },
+    ])
+  })
+
+  it('con una sola fuente devuelve esa fuente', () => {
+    const solo = [{ externalId: 'x', publishedAt: hace(1) }]
+    expect(unirPosts(solo, [])).toEqual(solo)
+    expect(unirPosts([], solo)).toEqual(solo)
   })
 })

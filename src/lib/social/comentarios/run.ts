@@ -1,11 +1,11 @@
 import 'server-only'
 import { and, desc, eq, gte, inArray, isNotNull, isNull } from 'drizzle-orm'
-import { getDb, postComments, socialAccounts, socialPosts } from '@/db'
+import { getDb, postComments, scheduledPostTargets, socialAccounts, socialPosts } from '@/db'
 import type { SocialAccount } from '@/db'
 import { connectorFor } from '../index'
 import { comentaristaFor } from './index'
 import { redactarPendientes, type RedaccionReport } from './redaccion'
-import { DIAS_VENTANA, estadoInicial, postsAsondear, seAcaboElTiempo, tocaSondear } from './ventana'
+import { DIAS_VENTANA, estadoInicial, postsAsondear, seAcaboElTiempo, tocaSondear, unirPosts } from './ventana'
 
 /**
  * Lo único que el dueño llega a leer de un sondeo fallido. El detalle de la red —que trae
@@ -52,22 +52,42 @@ async function sondearCuenta(account: SocialAccount, now: Date): Promise<Cuenta>
   // cuyo permiso nuevo todavía no autorizó. Se sale antes de tocar la red.
   if (!token) return vacio
 
-  // Las publicaciones ya están en la base: la sincronización diaria las trajo. El sondeo
-  // no vuelve a preguntarle a la red cuáles son.
+  // Las publicaciones ya están en la base: la sincronización diaria las trajo. Y las que
+  // el calendario publicó después del último sync también, con el id que la red devolvió
+  // al publicar: sin ellas un post de hace diez minutos no entraría a la cola hasta mañana.
   const desde = new Date(now.getTime() - DIAS_VENTANA * 864e5)
-  const recientes = await db
-    .select({ externalId: socialPosts.externalId, publishedAt: socialPosts.publishedAt })
-    .from(socialPosts)
-    .where(
-      and(
-        eq(socialPosts.accountId, account.id),
-        isNull(socialPosts.archivedAt),
-        gte(socialPosts.publishedAt, desde),
+  const [recientes, publicados] = await Promise.all([
+    db
+      .select({ externalId: socialPosts.externalId, publishedAt: socialPosts.publishedAt })
+      .from(socialPosts)
+      .where(
+        and(
+          eq(socialPosts.accountId, account.id),
+          isNull(socialPosts.archivedAt),
+          gte(socialPosts.publishedAt, desde),
+        ),
+      )
+      .orderBy(desc(socialPosts.publishedAt)),
+    db
+      .select({ externalId: scheduledPostTargets.externalId, publishedAt: scheduledPostTargets.updatedAt })
+      .from(scheduledPostTargets)
+      .where(
+        and(
+          eq(scheduledPostTargets.accountId, account.id),
+          eq(scheduledPostTargets.status, 'published'),
+          isNotNull(scheduledPostTargets.externalId),
+          gte(scheduledPostTargets.updatedAt, desde),
+        ),
       ),
-    )
-    .orderBy(desc(socialPosts.publishedAt))
+  ])
 
-  const ids = postsAsondear(recientes, now)
+  const ids = postsAsondear(
+    unirPosts(
+      recientes,
+      publicados.flatMap((p) => (p.externalId ? [{ externalId: p.externalId, publishedAt: p.publishedAt }] : [])),
+    ),
+    now,
+  )
   if (ids.length === 0) return vacio
 
   // Todos los comentarios ya conocidos de esta cuenta en esos posts, de una consulta:

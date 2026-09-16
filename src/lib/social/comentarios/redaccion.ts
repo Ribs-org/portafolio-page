@@ -1,6 +1,6 @@
 import 'server-only'
 import { and, desc, eq, inArray, isNull } from 'drizzle-orm'
-import { getDb, postComments, socialPosts } from '@/db'
+import { getDb, postComments, scheduledPostTargets, scheduledPosts, socialPosts } from '@/db'
 import { leerAjuste } from '@/lib/ajustes'
 import { CLAVE_INSTRUCCIONES, normalizarInstrucciones } from './instrucciones'
 import { comentaristaFor } from './index'
@@ -18,14 +18,25 @@ export type RedaccionReport = {
   sinPasarela: boolean
 }
 
-/** El caption de la publicación comentada, o null si la sincronización todavía no la trajo. */
+/**
+ * El caption de la publicación comentada: del sync si ya la trajo, y si no del post
+ * programado que la publicó (la red aún no la devolvió). Null si ninguno la tiene.
+ */
 async function captionDe(accountId: string, postExternalId: string): Promise<string | null> {
-  const [post] = await getDb()
+  const db = getDb()
+  const [post] = await db
     .select({ caption: socialPosts.caption })
     .from(socialPosts)
     .where(and(eq(socialPosts.accountId, accountId), eq(socialPosts.externalId, postExternalId)))
     .limit(1)
-  return post?.caption ?? null
+  if (post?.caption) return post.caption
+  const [programado] = await db
+    .select({ caption: scheduledPosts.caption })
+    .from(scheduledPostTargets)
+    .innerJoin(scheduledPosts, eq(scheduledPosts.id, scheduledPostTargets.postId))
+    .where(and(eq(scheduledPostTargets.accountId, accountId), eq(scheduledPostTargets.externalId, postExternalId)))
+    .limit(1)
+  return programado?.caption ?? null
 }
 
 /**
