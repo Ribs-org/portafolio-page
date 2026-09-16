@@ -65,6 +65,28 @@ describe('enlaceMedible', () => {
       'https://vicente-pareja.cl/guia?s=dm-guia',
     )
   })
+
+  it('saca la puntuación de cierre de la frase, etiqueta, y la vuelve a pegar', () => {
+    expect(enlaceMedible('Acá: https://www.vicente-pareja.cl/guia.', 'guia', host)).toBe(
+      'Acá: https://www.vicente-pareja.cl/guia?s=dm-guia.',
+    )
+  })
+
+  it('con fragmento, la etiqueta va antes del #', () => {
+    expect(enlaceMedible('https://www.vicente-pareja.cl/guia#bonos', 'guia', host)).toBe(
+      'https://www.vicente-pareja.cl/guia?s=dm-guia#bonos',
+    )
+  })
+
+  it('solo etiqueta el primer enlace propio, aunque antes venga uno externo', () => {
+    expect(
+      enlaceMedible(
+        'https://notion.so/x y https://www.vicente-pareja.cl/a y https://www.vicente-pareja.cl/b',
+        'guia',
+        host,
+      ),
+    ).toBe('https://notion.so/x y https://www.vicente-pareja.cl/a?s=dm-guia y https://www.vicente-pareja.cl/b')
+  })
 })
 
 describe('validarRegla', () => {

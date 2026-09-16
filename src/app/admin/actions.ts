@@ -480,9 +480,16 @@ export async function leerCreadorTikTok(): Promise<{ creador: CreadorTikTok } | 
 }
 
 /** Los tres campos del bloque de palabra clave, crudos, listos para `validarRegla`. */
+/**
+ * Palabra vacía = sin regla, aunque el mensaje o la respuesta pública sigan escritos: es
+ * la forma de borrar la regla desde el compositor o el editor sin tener que vaciar los
+ * tres campos. `undefined` es lo que `validarRegla` lee como «sin regla».
+ */
 function reglaDesdeFormulario(formData: FormData): unknown {
+  const palabra = String(formData.get('reglaPalabra') ?? '')
+  if (palabra.trim().length === 0) return undefined
   return {
-    palabra: String(formData.get('reglaPalabra') ?? ''),
+    palabra,
     mensaje: String(formData.get('reglaMensaje') ?? ''),
     respuestaPublica: String(formData.get('reglaRespuesta') ?? ''),
   }

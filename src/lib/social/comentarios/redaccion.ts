@@ -97,7 +97,8 @@ export async function redactarPendientes(inicio: number): Promise<RedaccionRepor
   if (pendientes.length === 0) return reporte
 
   // Un comentario que dice la palabra clave lo responde la regla en el sondeo, no el
-  // modelo: si quedó pendiente fue por el cupo de la corrida, y la siguiente lo toma.
+  // modelo: si quedó pendiente fue por el cupo de la corrida o el reloj, y el sondeo
+  // (`aplicarReglas`, no esta función) lo retoma en la corrida siguiente.
   const porCuenta = new Map<string, string[]>()
   for (const f of pendientes) porCuenta.set(f.accountId, [...(porCuenta.get(f.accountId) ?? []), f.postExternalId])
   const reglasPorCuenta = new Map<string, Map<string, ReglaLimpia>>()

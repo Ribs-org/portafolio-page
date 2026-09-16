@@ -318,6 +318,10 @@ export const scheduledPostTargets = pgTable(
   (t) => [
     unique('scheduled_post_targets_post_account_key').on(t.postId, t.accountId),
     index('scheduled_post_targets_status_idx').on(t.status),
+    // No unique: filas históricas pueden repetir external_id (o traerlo null) y una unique
+    // haría fallar el db:push. Solo acelera la búsqueda de reglas por cuenta + external_id
+    // que hace `aplicarReglas`/`reglasPara` en cada sondeo.
+    index('scheduled_post_targets_account_external_idx').on(t.accountId, t.externalId),
   ],
 )
 

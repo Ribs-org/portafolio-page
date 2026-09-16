@@ -1,7 +1,8 @@
 // La regla de palabra clave: qué es una palabra válida, cuándo un comentario la dice, y
 // qué se responde. Puro: sin base, sin red. El orquestador vive en automatico.ts.
 
-import { DIAS_PRIVADO } from './privado'
+/** Meta acepta un solo privado a quien comentó, dentro de este plazo desde el comentario. */
+export const DIAS_PRIVADO = 7
 
 export const RESPUESTA_PUBLICA_POR_DEFECTO = 'Te lo mandé por privado 📩'
 export const REGLA_PALABRA = 'La palabra clave es una sola palabra, sin espacios, hasta 30 letras.'
@@ -45,23 +46,31 @@ function mismoHost(a: string, b: string): boolean {
 /**
  * Agrega `s=dm-<palabra>` al primer enlace del mensaje que apunte al sitio propio, para que
  * Analítica lo cuente como fila aparte. Un enlace externo no lo lee nuestra analítica y
- * queda igual.
+ * queda igual. La puntuación de cierre de la frase (`.`, `,`, `;`, `:`, `!`, `?`) que haya
+ * quedado pegada al final del enlace se saca antes de interpretarlo como URL y se vuelve a
+ * pegar después de etiquetarlo, para no mandar esa puntuación como parte del enlace. Si el
+ * enlace tiene fragmento (`#…`), la etiqueta va antes de él: un `#` corta la query, así que
+ * después de él la etiqueta no llegaría al servidor.
  */
 export function enlaceMedible(mensaje: string, palabra: string, sitioHost: string | null): string {
   if (!sitioHost) return mensaje
   let hecho = false
   return mensaje.replace(/https?:\/\/[^\s<>"')\]]+/g, (crudo) => {
     if (hecho) return crudo
+    const cierre = crudo.match(/^(.*?)([.,;:!?]+)$/)
+    const cuerpo = cierre ? cierre[1] : crudo
+    const puntuacion = cierre ? cierre[2] : ''
     let url: URL
     try {
-      url = new URL(crudo)
+      url = new URL(cuerpo)
     } catch {
       return crudo
     }
     if (!mismoHost(url.hostname, sitioHost)) return crudo
     hecho = true
-    const separador = crudo.includes('?') ? '&' : '?'
-    return `${crudo}${separador}s=dm-${palabra}`
+    const separador = url.search ? '&' : '?'
+    const etiquetado = `${url.origin}${url.pathname}${url.search}${separador}s=dm-${palabra}${url.hash}`
+    return `${etiquetado}${puntuacion}`
   })
 }
 

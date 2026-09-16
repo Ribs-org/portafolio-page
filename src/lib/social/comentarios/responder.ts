@@ -58,6 +58,9 @@ export async function responderComentario(id: string, texto: string): Promise<Re
   }
 
   // Se guarda lo que salió de verdad, editado o no: es lo que la cola muestra en «enviados».
+  // `automatico: false` porque este envío lo mandó el dueño desde la cola, así que la
+  // etiqueta «Automática» (y el filtro que la usa) no debe quedarle pegada a una fila que
+  // antes había fallado como automática y ahora el dueño reenvió a mano.
   await db
     .update(postComments)
     .set({
@@ -65,6 +68,7 @@ export async function responderComentario(id: string, texto: string): Promise<Re
       replyExternalId: replyId,
       draft: validado.texto,
       error: null,
+      automatico: false,
       updatedAt: new Date(),
     })
     .where(eq(postComments.id, id))
