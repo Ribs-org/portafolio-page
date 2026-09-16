@@ -1,7 +1,7 @@
 import type { BatchItem } from './batch'
 
 export const CSV_HEADER_ERROR =
-  'El encabezado del CSV debe ser exactamente: fecha,texto,redes,media — con portada opcional como quinta columna y opciones como sexta.'
+  'El encabezado del CSV debe ser exactamente: fecha,texto,redes,media — con portada opcional como quinta columna, opciones como sexta y regla como séptima.'
 
 /** RFC 4180 in ~40 lines: quoted fields may hold commas, newlines and "" quotes. */
 export function parseCsv(text: string): string[][] {
@@ -52,7 +52,7 @@ function splitPipe(cell: string): string[] {
     .filter((part) => part.length > 0)
 }
 
-const COLUMNAS = ['fecha', 'texto', 'redes', 'media', 'portada', 'opciones'] as const
+const COLUMNAS = ['fecha', 'texto', 'redes', 'media', 'portada', 'opciones', 'regla'] as const
 
 /** La celda de opciones: JSON parseado, o el texto crudo para que la validación lo rechace, o nada. */
 function opcionesDeCelda(cell: string): unknown {
@@ -80,7 +80,8 @@ export function csvToBatchItems(text: string): { items: BatchItem[] } | { error:
       redes: splitPipe(row[2] ?? ''),
       media: splitPipe(row[3] ?? ''),
       portada: header.length >= 5 ? (row[4] ?? '').trim() : '',
-      opciones: header.length === 6 ? opcionesDeCelda(row[5] ?? '') : undefined,
+      opciones: header.length >= 6 ? opcionesDeCelda(row[5] ?? '') : undefined,
+      regla: header.length === 7 ? opcionesDeCelda(row[6] ?? '') : undefined,
     })),
   }
 }

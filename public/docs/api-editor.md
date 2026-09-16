@@ -158,6 +158,21 @@ Media de TikTok: **un solo video** (mp4, mov, webm) **o de 1 a 35 fotos** (jpg, 
 nunca mezcla. En el CSV, `opciones` es la sexta columna, después de `portada`, con el mismo
 JSON entre comillas dobles escapadas.
 
+### `regla` (opcional) — respuesta automática por palabra clave
+
+```json
+"regla": { "palabra": "GUIA", "mensaje": "Acá tienes la guía: https://www.vicente-pareja.cl/guia", "respuestaPublica": "Te lo mandé por privado 📩" }
+```
+
+Cuando alguien comente esa palabra (completa, sin importar mayúsculas ni tildes), el
+sistema responde solo en la corrida siguiente del cron. Donde hay privado (Instagram y
+Facebook, con el privado encendido) responde `respuestaPublica` en público y manda
+`mensaje` por privado; donde no lo hay (TikTok, YouTube, o privado apagado) publica
+`mensaje` como respuesta. Si el enlace es del sitio propio se le agrega `?s=dm-<palabra>`
+y aparece como fila propia en Analítica. `palabra`: una sola palabra, hasta 30 letras.
+`mensaje`: 1 a 1000 caracteres. `respuestaPublica`: opcional, 1 a 300. En el CSV es la
+séptima columna, después de `opciones`.
+
 ## Reglas por red (las que rechazan una fila)
 
 | Regla | Cuándo se rompe | Frase exacta |
@@ -195,6 +210,9 @@ Instagram acepta: 1 foto, 1 video, o 2–10 fotos (carrusel).
 | `Un contenido patrocinado no puede ser privado.` | `comercial: patrocinado` con `SELF_ONLY` |
 | `Las opciones de la red no se entendieron.` | `opciones` no es objeto, `modo` desconocido, casilla no booleana, u opciones para una red que no pide |
 | `TikTok recibe un video, o hasta 35 fotos JPG o WebP.` | dos videos, mezcla, más de 35 fotos, png/gif, o video que no es mp4/mov/webm |
+| `La palabra clave es una sola palabra, sin espacios, hasta 30 letras.` | `regla.palabra` vacía con mensaje, con espacios o símbolos, o `regla` que no es objeto |
+| `El mensaje del privado va de 1 a 1000 caracteres.` | `regla.mensaje` ausente, vacío o largo |
+| `La respuesta pública va de 1 a 300 caracteres.` | `regla.respuestaPublica` larga |
 | `No se pudo guardar la fila. Inténtalo de nuevo.` | fallo transitorio de base de datos |
 
 ## Respuesta

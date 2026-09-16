@@ -113,3 +113,20 @@ describe('opciones en el CSV', () => {
     expect(csvToBatchItems('fecha,texto,redes,media,opciones\n')).toEqual({ error: CSV_HEADER_ERROR })
   })
 })
+
+describe('regla en el CSV', () => {
+  it('la séptima columna trae la regla en JSON; vacía es sin regla', () => {
+    const text = [
+      'fecha,texto,redes,media,portada,opciones,regla',
+      '2026-09-17 10:00,Con regla,threads,,,,"{""palabra"":""guia"",""mensaje"":""Toma: https://x.cl""}"',
+      '2026-09-17 11:00,Sin regla,threads,,,,',
+    ].join('\n')
+    expect(csvToBatchItems(text)).toMatchObject({
+      items: [{ regla: { palabra: 'guia', mensaje: 'Toma: https://x.cl' } }, { regla: undefined }],
+    })
+  })
+
+  it('regla solo puede ir séptima, después de opciones', () => {
+    expect(csvToBatchItems('fecha,texto,redes,media,portada,regla\n')).toEqual({ error: CSV_HEADER_ERROR })
+  })
+})
