@@ -87,7 +87,9 @@ En tu proyecto de Vercel, pestaña **Storage**:
 
 ### 4. Crea las tablas
 
-`db:setup` migra el esquema y siembra dos perfiles de ejemplo. Esto es lo único que no se puede hacer desde el navegador. En tu computador, sobre el repositorio que Vercel acaba de crear en tu GitHub:
+`db:setup` migra el esquema y siembra dos perfiles de ejemplo; desde ahí el esquema viaja
+solo con cada despliegue. Esto es lo único que no se puede hacer desde el navegador. En tu
+computador, sobre el repositorio que Vercel acaba de crear en tu GitHub:
 
 ```bash
 git clone https://github.com/TU-USUARIO/portafolio.git
@@ -345,8 +347,7 @@ darlo de alta en cron-job.org apuntando a `/api/cron/traer-ideas` con el mismo
 corre: sin esa entrada el endpoint existe y no lo llama nadie, y el síntoma sería una baraja
 vacía sin ningún error a la vista.
 
-Después de fusionar, la migración se aplica sola al desplegar, porque las tablas de
-creadores y de fichas son nuevas.
+Las tablas de creadores y de fichas son nuevas; su migración se aplica sola al desplegar.
 
 Los creadores todavía no tienen pantalla: son filas que insertas a mano en la tabla
 `source_authors`. Con los valores por defecto te basta la red y el nombre de usuario:
@@ -355,9 +356,9 @@ va sin arroba.
 
 ### Conectar y sincronizar
 
-Antes que nada, la migración se aplica sola al desplegar: la analítica de posts agrega tablas nuevas, y este
-proyecto no lleva archivos de migración. Si el deploy sale antes que el esquema,
-`/admin/analytics` responde 500 y el cron también.
+Antes que nada, la migración se aplica sola al desplegar: la analítica de posts agrega
+tablas nuevas. La migración corre antes del build, así que ese peligro no existe:
+`/admin/analytics` y el cron nunca corren contra un esquema viejo.
 
 Con eso hecho, las variables puestas y un redeploy encima, entra a `/admin/accounts` (la
 pestaña **Cuentas**) y aprieta *Conectar* en cada red; con varias páginas o cuentas, elige
@@ -370,20 +371,23 @@ pégalo en el post, y de ahí en adelante el cruce es automático.
 #### Migrar a multicuentas (una vez, 2026-09)
 
 El esquema pasa a identificar posts, métricas y destinos por cuenta. Con datos ya
-cargados, el orden importa:
+cargados, el orden importaba.
 
-0. `.env.local` debe apuntar a la base de producción (`npx vercel env pull .env.local`);
-   y esta consulta debe devolver cero filas: `select network, external_id from
-   social_accounts where external_id is null;` — una cuenta sin id externo no tiene
-   identidad para la migración; reconéctala antes.
-1. Con el código de **antes** del cambio corriendo en producción, la migración de fase 1
-   del esquema se aplica sola al desplegar: desde el commit `f47bca7`, «Agrega account_id a posts, métricas y
-   destinos, con su backfill».
-2. `npm run cuentas:backfill`: asigna cada fila a la única cuenta de su red. Debe
-   terminar en «Filas sin cuenta: 0».
-3. Despliega el código nuevo (merge y promoción a `main`).
-4. Vuelve a correr `npm run cuentas:backfill` (por si una sincronización corrió entre
-   los pasos 2 y 3) y, desde `main`, la migración de fase 2 se aplica sola al desplegar: columnas
+(Hecho el 2026-09-1x, antes de las migraciones versionadas; se conserva como historia.
+Hoy un cambio así iría en dos PRs, ver «Cómo cambia el esquema».)
+
+0. `.env.local` apuntaba a la base de producción (`npx vercel env pull .env.local`); y
+   esta consulta tenía que devolver cero filas: `select network, external_id from
+   social_accounts where external_id is null;` — una cuenta sin id externo no tenía
+   identidad para la migración; se reconectó antes.
+1. Con el código de **antes** del cambio corriendo en producción, se corrió `npm run
+   db:push` para la fase 1 del esquema: desde el commit `f47bca7`, «Agrega account_id a
+   posts, métricas y destinos, con su backfill».
+2. Se corrió `npm run cuentas:backfill`: asignó cada fila a la única cuenta de su red.
+   Terminó en «Filas sin cuenta: 0».
+3. Se desplegó el código nuevo (merge y promoción a `main`).
+4. Se volvió a correr `npm run cuentas:backfill` (por si una sincronización corrió entre
+   los pasos 2 y 3) y, desde `main`, se corrió `npm run db:push` para la fase 2: columnas
    obligatorias y claves únicas viejas retiradas.
 
 El backfill del paso 4 corre **inmediatamente después del deploy, antes del próximo
@@ -443,11 +447,13 @@ npm run lint         # eslint
 **Base de datos**
 
 ```bash
-npm run setup        # crea .env.local a partir de .env.example, con secretos generados
-npm run db:setup     # db:migrate + db:seed, para un proyecto recién creado
-npm run db:migrate   # aplica las migraciones al desplegar (Vercel lo corre automáticamente)
-npm run db:seed      # crea los dos perfiles iniciales (solo si no hay ninguno)
-npm run db:studio    # explorador visual de las tablas
+npm run setup             # crea .env.local a partir de .env.example, con secretos generados
+npm run db:setup          # db:migrate:local + db:seed, para un proyecto recién creado
+npm run db:migrate        # lo corre Vercel en el build; sin .env.local, a mano no hace nada
+npm run db:migrate:local  # aplica las migraciones pendientes con .env.local
+npm run db:baseline       # una sola vez sobre una base que ya tenía el esquema; antes de fusionar el cambio a migraciones
+npm run db:seed           # crea los dos perfiles iniciales (solo si no hay ninguno)
+npm run db:studio         # explorador visual de las tablas
 ```
 
 **Analítica**
@@ -475,13 +481,31 @@ PR y se revisan como código:
    falla, el código nuevo no se promueve. Los previews migran contra su propia rama de
    Neon cuando la integración la crea (`MIGRAR_PREVIEWS=1`); hasta entonces se saltan.
 
+Mientras los previews no migren, un preview de un PR que agrega una columna corre código
+nuevo contra la base de producción sin esa columna: las páginas que la usan responden 500
+hasta que el cambio llegue a producción.
+
 **Regla de convivencia:** una migración tiene que convivir con el código anterior mientras
 dura el despliegue y ante un rollback instantáneo. Agregar columnas con default o nulables,
 tablas e índices, sí. Borrar o renombrar, solo en un PR posterior al que dejó de usarlas.
 
 Una base que ya tenía el esquema antes de las migraciones (producción el 2026-09-16) se
 registra una sola vez con `npm run db:baseline`; una base nueva se crea entera con
-`db:setup`.
+`db:setup`. Se corre **antes** de fusionar el cambio que trae las migraciones: si
+producción se despliega primero, el build intentará aplicar la migración inicial entera,
+fallará en la primera tabla que ya existe y no se promoverá (sin daño, pero un deploy
+perdido).
+
+### Si una migración falla a medias
+
+El migrador de neon-http aplica las sentencias de cada archivo una por una, sin
+transacción, y solo registra la migración cuando todas terminan bien. Si una falla a
+mitad de camino, las sentencias anteriores quedan aplicadas y nada queda registrado: el
+próximo build vuelve a intentar el mismo archivo desde el principio y falla en la primera
+sentencia con «already exists». Se repara a mano: se aplican las sentencias que faltaban y
+se inserta la fila correspondiente en `drizzle.__drizzle_migrations`, con el hash del
+archivo y el `when` del journal. Por eso conviene una sola sentencia por migración: así una
+falla a medias dura cero sentencias aplicadas.
 
 ## Variables de entorno
 
