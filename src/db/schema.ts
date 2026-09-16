@@ -494,6 +494,44 @@ export const ajustes = pgTable('ajustes', {
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 })
 
+export const ROLES = ['admin', 'usuario'] as const
+export type Rol = (typeof ROLES)[number]
+
+/**
+ * Quién usa Parrilla. Hasta el subproyecto de inquilinos todo el mundo ve todo; esta tabla
+ * existe para que la sesión diga quién eres y para invitar. `sesion_version` cierra las
+ * sesiones de una persona sin tocar a las demás ni rotar `AUTH_SECRET`, que además cifra
+ * los tokens sociales.
+ */
+export const users = pgTable('users', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  correo: text('correo').notNull().unique(),
+  nombre: text('nombre'),
+  rol: text('rol').$type<Rol>().notNull().default('usuario'),
+  sesionVersion: integer('sesion_version').notNull().default(1),
+  invitadoEn: timestamp('invitado_en', { withTimezone: true }).notNull().defaultNow(),
+  primerIngresoEn: timestamp('primer_ingreso_en', { withTimezone: true }),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+})
+
+/** Un código de ingreso por correo: nunca el código, solo su hash. Diez minutos, un uso. */
+export const codigosIngreso = pgTable(
+  'codigos_ingreso',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    hash: text('hash').notNull(),
+    expiraEn: timestamp('expira_en', { withTimezone: true }).notNull(),
+    usadoEn: timestamp('usado_en', { withTimezone: true }),
+    intentos: integer('intentos').notNull().default(0),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index('codigos_ingreso_user_idx').on(t.userId, t.createdAt)],
+)
+
 export type Profile = typeof profiles.$inferSelect
 export type Link = typeof links.$inferSelect
 export type Visit = typeof visits.$inferSelect
@@ -509,3 +547,5 @@ export type PostComment = typeof postComments.$inferSelect
 export type SourceAuthor = typeof sourceAuthors.$inferSelect
 export type SourcePost = typeof sourcePosts.$inferSelect
 export type Ajuste = typeof ajustes.$inferSelect
+export type Usuario = typeof users.$inferSelect
+export type CodigoIngreso = typeof codigosIngreso.$inferSelect
