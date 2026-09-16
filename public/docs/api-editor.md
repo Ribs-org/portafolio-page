@@ -165,13 +165,14 @@ JSON entre comillas dobles escapadas.
 ```
 
 Cuando alguien comente esa palabra (completa, sin importar mayúsculas ni tildes), el
-sistema responde solo en la corrida siguiente del cron. Donde hay privado (Instagram y
-Facebook, con el privado encendido) responde `respuestaPublica` en público y manda
-`mensaje` por privado; donde no lo hay (TikTok, YouTube, o privado apagado) publica
-`mensaje` como respuesta. Si el enlace es del sitio propio se le agrega `?s=dm-<palabra>`
-y aparece como fila propia en Analítica. `palabra`: una sola palabra, hasta 30 letras.
-`mensaje`: 1 a 1000 caracteres. `respuestaPublica`: opcional, 1 a 300. En el CSV es la
-séptima columna, después de `opciones`.
+sistema responde solo en la corrida siguiente del cron, en Instagram, Facebook y YouTube
+(TikTok todavía no tiene cola de comentarios, así que una regla en un post que solo va a
+TikTok no hace nada). Hoy el mensaje con el enlace se publica siempre como `mensaje`, la
+respuesta pública; el privado (`respuestaPublica` en público y `mensaje` por DM, en
+Instagram y Facebook) llega en una próxima entrega. Si el enlace es del sitio propio se le
+agrega `?s=dm-<palabra>` y aparece como fila propia en Analítica. `palabra`: una sola
+palabra, hasta 30 letras. `mensaje`: 1 a 1000 caracteres. `respuestaPublica`: opcional, 1 a
+300. En el CSV es la séptima columna, después de `opciones`.
 
 ## Reglas por red (las que rechazan una fila)
 
