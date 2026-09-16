@@ -5,9 +5,10 @@ import { env } from './env'
 /**
  * La credencial que la app Android guarda en el almacén de claves del teléfono.
  *
- * No expira: el dueño es el único usuario y pedirle la contraseña cada semana no
- * compra seguridad, el candado del dispositivo sí. Lo que sí existe es una forma de
- * revocarla — `MOBILE_TOKEN_VERSION` — porque un teléfono se pierde.
+ * No expira: pedirle la contraseña cada semana no compra seguridad, el candado
+ * del dispositivo sí. Lo que sí existe es una forma de revocarla — `MOBILE_TOKEN_VERSION` —
+ * porque un teléfono se pierde. El token lleva el sujeto (usuario) y su versión
+ * de sesión, lo que permite revocar solo los tokens de una persona.
  *
  * La llave se deriva de `AUTH_SECRET` en vez de usarlo pelado, y esa distinción es
  * el punto: `AUTH_SECRET` también cifra los tokens de Instagram, Facebook y YouTube
@@ -27,20 +28,23 @@ function version(): string {
   return env('MOBILE_TOKEN_VERSION') ?? '1'
 }
 
-export function mintMobileToken(): Promise<string> {
-  return new SignJWT({ purpose: PURPOSE, v: version() })
+export function mintMobileToken(claims: { sub: string; sv: number }): Promise<string> {
+  return new SignJWT({ purpose: PURPOSE, v: version(), sv: claims.sv })
+    .setSubject(claims.sub)
     .setProtectedHeader({ alg: 'HS256' })
     .setIssuedAt()
     .sign(key())
 }
 
-/** Falso ante cualquier duda: firma ajena, propósito ajeno o versión revocada. */
-export async function mobileTokenIsValid(token: string): Promise<boolean> {
-  if (!token) return false
+/** Null ante cualquier duda: firma ajena, propósito ajeno, versión revocada o sin sujeto. */
+export async function leerTokenMovil(token: string): Promise<{ sub: string; sv: number } | null> {
+  if (!token) return null
   try {
     const { payload } = await jwtVerify(token, key())
-    return payload.purpose === PURPOSE && payload.v === version()
+    if (payload.purpose !== PURPOSE || payload.v !== version()) return null
+    if (typeof payload.sub !== 'string' || typeof payload.sv !== 'number') return null
+    return { sub: payload.sub, sv: payload.sv }
   } catch {
-    return false
+    return null
   }
 }
