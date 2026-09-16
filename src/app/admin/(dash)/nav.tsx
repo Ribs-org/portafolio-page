@@ -14,7 +14,7 @@ const TABS = [
   { href: '/admin/profiles', label: 'Perfiles' },
 ]
 
-export function AdminNav() {
+export function AdminNav({ esAdmin }: { esAdmin?: boolean }) {
   const pathname = usePathname()
 
   return (

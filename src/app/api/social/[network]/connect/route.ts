@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createHash, randomBytes } from 'node:crypto'
-import { isAuthenticated } from '@/lib/auth'
+import { usuarioActual } from '@/lib/auth'
 import { env } from '@/lib/env'
 import { signOAuthState } from '@/lib/social/oauth-state'
 
@@ -50,7 +50,7 @@ export async function GET(
   request: Request,
   { params }: { params: Promise<{ network: string }> },
 ) {
-  if (!(await isAuthenticated())) return new NextResponse('No autorizado', { status: 401 })
+  if (!(await usuarioActual())) return new NextResponse('No autorizado', { status: 401 })
 
   const { network } = await params
   const scope = SCOPES[network]
