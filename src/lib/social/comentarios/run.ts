@@ -68,15 +68,24 @@ async function sondearCuenta(account: SocialAccount, now: Date): Promise<Cuenta>
         ),
       )
       .orderBy(desc(socialPosts.publishedAt)),
+    // Lo que el sync ya archivó (borrado en la red) no vuelve por esta puerta.
     db
       .select({ externalId: scheduledPostTargets.externalId, publishedAt: scheduledPostTargets.updatedAt })
       .from(scheduledPostTargets)
+      .leftJoin(
+        socialPosts,
+        and(
+          eq(socialPosts.accountId, scheduledPostTargets.accountId),
+          eq(socialPosts.externalId, scheduledPostTargets.externalId),
+        ),
+      )
       .where(
         and(
           eq(scheduledPostTargets.accountId, account.id),
           eq(scheduledPostTargets.status, 'published'),
           isNotNull(scheduledPostTargets.externalId),
           gte(scheduledPostTargets.updatedAt, desde),
+          isNull(socialPosts.archivedAt),
         ),
       ),
   ])
