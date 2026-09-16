@@ -87,8 +87,7 @@ En tu proyecto de Vercel, pestaña **Storage**:
 
 ### 4. Crea las tablas
 
-Esto es lo único que no se puede hacer desde el navegador. En tu computador, sobre el
-repositorio que Vercel acaba de crear en tu GitHub:
+`db:setup` migra el esquema y siembra dos perfiles de ejemplo. Esto es lo único que no se puede hacer desde el navegador. En tu computador, sobre el repositorio que Vercel acaba de crear en tu GitHub:
 
 ```bash
 git clone https://github.com/TU-USUARIO/portafolio.git
@@ -258,7 +257,7 @@ viaja en la misma corrida que publica, cada cinco minutos, y mira tus publicacio
 diaria es la misma que usa la sincronización de métricas, y gastarla acá te dejaría sin
 las dos cosas.
 
-Después de fusionar, corre `npm run db:push` una vez: las tablas de comentarios y de
+Después de fusionar, la migración se aplica sola al desplegar: las tablas de comentarios y de
 ajustes son nuevas, y sin ellas el sondeo no tiene dónde guardar nada.
 
 Para que funcione hay que **reconectar una vez cada red**, porque el permiso se concede
@@ -305,7 +304,7 @@ El mensaje privado a quien comentó está escrito y **apagado**. Meta exige para
 consigas, `COMENTARIOS_DM=1` en Vercel lo enciende para Instagram y Facebook, dentro de los
 siete días que Meta permite. Hasta entonces la cola no muestra nada del privado.
 
-Después de fusionar hay que correr `npm run db:push` otra vez: la tabla de comentarios gana
+Después de fusionar, la migración se aplica sola al desplegar: la tabla de comentarios gana
 dos columnas para el estado del privado.
 
 #### Respuesta automática por palabra clave
@@ -346,7 +345,7 @@ darlo de alta en cron-job.org apuntando a `/api/cron/traer-ideas` con el mismo
 corre: sin esa entrada el endpoint existe y no lo llama nadie, y el síntoma sería una baraja
 vacía sin ningún error a la vista.
 
-Después de fusionar hay que correr `npm run db:push` otra vez, porque las tablas de
+Después de fusionar, la migración se aplica sola al desplegar, porque las tablas de
 creadores y de fichas son nuevas.
 
 Los creadores todavía no tienen pantalla: son filas que insertas a mano en la tabla
@@ -356,7 +355,7 @@ va sin arroba.
 
 ### Conectar y sincronizar
 
-Antes que nada, `npm run db:push`: la analítica de posts agrega tablas nuevas, y este
+Antes que nada, la migración se aplica sola al desplegar: la analítica de posts agrega tablas nuevas, y este
 proyecto no lleva archivos de migración. Si el deploy sale antes que el esquema,
 `/admin/analytics` responde 500 y el cron también.
 
@@ -377,14 +376,14 @@ cargados, el orden importa:
    y esta consulta debe devolver cero filas: `select network, external_id from
    social_accounts where external_id is null;` — una cuenta sin id externo no tiene
    identidad para la migración; reconéctala antes.
-1. Con el código de **antes** del cambio corriendo en producción, aplica solo la fase 1
-   del esquema: desde el commit `f47bca7`, «Agrega account_id a posts, métricas y
-   destinos, con su backfill», `npm run db:push`.
+1. Con el código de **antes** del cambio corriendo en producción, la migración de fase 1
+   del esquema se aplica sola al desplegar: desde el commit `f47bca7`, «Agrega account_id a posts, métricas y
+   destinos, con su backfill».
 2. `npm run cuentas:backfill`: asigna cada fila a la única cuenta de su red. Debe
    terminar en «Filas sin cuenta: 0».
 3. Despliega el código nuevo (merge y promoción a `main`).
 4. Vuelve a correr `npm run cuentas:backfill` (por si una sincronización corrió entre
-   los pasos 2 y 3) y, desde `main`, `npm run db:push` para la fase 2: columnas
+   los pasos 2 y 3) y, desde `main`, la migración de fase 2 se aplica sola al desplegar: columnas
    obligatorias y claves únicas viejas retiradas.
 
 El backfill del paso 4 corre **inmediatamente después del deploy, antes del próximo
@@ -445,8 +444,8 @@ npm run lint         # eslint
 
 ```bash
 npm run setup        # crea .env.local a partir de .env.example, con secretos generados
-npm run db:setup     # db:push + db:seed, para un proyecto recién creado
-npm run db:push      # aplica el esquema a Neon
+npm run db:setup     # db:migrate + db:seed, para un proyecto recién creado
+npm run db:migrate   # aplica las migraciones al desplegar (Vercel lo corre automáticamente)
 npm run db:seed      # crea los dos perfiles iniciales (solo si no hay ninguno)
 npm run db:studio    # explorador visual de las tablas
 ```
@@ -463,6 +462,26 @@ npm run analytics:check  # imprime la última visita y el último click
 `demo:seed` sirve para ver cómo se ve el dashboard antes de tener tráfico real. Las filas
 que crea llevan un prefijo `demo:` en `visitor_hash`, así que `demo:clear` las quita sin
 tocar nada real.
+
+## Cómo cambia el esquema
+
+El esquema vive en `src/db/schema.ts` y cambia por migraciones en `drizzle/`, que van en el
+PR y se revisan como código:
+
+1. Edita `src/db/schema.ts`.
+2. `npm run db:generate` crea `drizzle/NNNN_*.sql`; commitéalo junto al cambio. El CI falla
+   si el esquema cambió y la migración no está.
+3. Al desplegar, Vercel corre `npm run db:migrate` antes de construir: si la migración
+   falla, el código nuevo no se promueve. Los previews migran contra su propia rama de
+   Neon cuando la integración la crea (`MIGRAR_PREVIEWS=1`); hasta entonces se saltan.
+
+**Regla de convivencia:** una migración tiene que convivir con el código anterior mientras
+dura el despliegue y ante un rollback instantáneo. Agregar columnas con default o nulables,
+tablas e índices, sí. Borrar o renombrar, solo en un PR posterior al que dejó de usarlas.
+
+Una base que ya tenía el esquema antes de las migraciones (producción el 2026-09-16) se
+registra una sola vez con `npm run db:baseline`; una base nueva se crea entera con
+`db:setup`.
 
 ## Variables de entorno
 
@@ -494,6 +513,7 @@ Vercel y bajan con `vercel env pull .env.local`.
 | `X_CLIENT_ID` | Conectar X para publicar (OAuth 2.0 + PKCE) | El Client ID de la app en developer.x.com |
 | `X_CLIENT_SECRET` | El secreto de esa app | Junto con el anterior |
 | `CRON_SECRET` | Autoriza las corridas programadas (sync diario y publicación cada 5 minutos) | No — la pone Vercel solo, al declarar el cron |
+| `MIGRAR_PREVIEWS` | Que los previews migren su rama de Neon | Solo cuando la integración de Neon crea una rama por preview |
 | `SCHEDULE_API_KEY` | Autoriza `POST /api/schedule/batch` (carga masiva), `GET /api/schedule/posts` (calendario) y `GET /api/metrics/posts` (métricas) | Sin ella los tres endpoints quedan cerrados; genérala igual que `CRON_SECRET` |
 | `RESEND_API_KEY` | Enviar el email de aviso cuando una publicación programada falla | La provisiona la integración de Resend del marketplace de Vercel |
 | `PUBLISH_ALERT_TO` | A qué correo llega el aviso de fallo | Sin ella no se envía ningún email; el calendario sigue mostrando el fallo |
