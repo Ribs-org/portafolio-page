@@ -6,6 +6,7 @@ import { Field, GroupLabel, Input, Submit, Textarea } from '@/components/ui'
 import { SOCIAL_NETWORKS } from '@/db/schema'
 import { networkLabel } from '@/lib/networks'
 import { cn } from '@/lib/utils'
+import { ReglaClave } from './regla-clave'
 import { TikTokOpciones } from './tiktok-opciones'
 
 // Twin of PUBLISHABLE (publish/batch.ts). NETWORKS in the editor
@@ -76,6 +77,8 @@ export function Composer() {
         </div>
 
         {tiktok ? <TikTokOpciones soloFotos={soloFotos} /> : null}
+
+        <ReglaClave />
 
         <Field label="Fecha y hora">
           <Input type="datetime-local" name="scheduledAt" required className="max-w-[16rem]" />

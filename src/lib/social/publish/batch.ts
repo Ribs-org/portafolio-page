@@ -4,9 +4,10 @@ import { extensionDe, validateScheduleDraft } from './validate'
 import { validateAtributos } from './atributos'
 import { validarOpcionesPorRed, OPCIONES_ERROR, type OpcionesDestino } from './opciones'
 import { guardar } from '@/lib/storage'
-import { getDb, scheduledPosts, scheduledPostMedia, scheduledPostTargets } from '@/db'
+import { getDb, scheduledPosts, scheduledPostMedia, scheduledPostTargets, reglasClave } from '@/db'
 import { randomUUID } from 'node:crypto'
 import { SinCuenta, exigirCuentas } from '../cuentas'
+import { validarRegla } from '../comentarios/reglas'
 
 // Same derivation as SITE_TIMEZONE in lib/analytics — duplicated here because that
 // module is server-only and this one must stay importable by vitest.
@@ -35,6 +36,8 @@ export type BatchItem = {
   atributos?: unknown
   /** Lo que cada red exige por destino, por red: `{ "tiktok": { … } }`. Se valida con validarOpcionesPorRed. */
   opciones?: unknown
+  /** { palabra, mensaje, respuestaPublica? }; se valida con validarRegla. */
+  regla?: unknown
 }
 
 export type BatchResult =
@@ -185,6 +188,9 @@ export function validateBatchItem(item: BatchItem, now: Date): string | null {
   const opcionesCheck = opcionesDeFila(item)
   if ('error' in opcionesCheck) return opcionesCheck.error
 
+  const reglaCheck = validarRegla(item.regla)
+  if ('error' in reglaCheck) return reglaCheck.error
+
   return validateScheduleDraft(
     {
       caption: item.texto,
@@ -319,6 +325,7 @@ export async function scheduleBatch(items: BatchItem[]): Promise<BatchResult[]> 
 
       const atributosCheck = validateAtributos(item.atributos)
       const atributos = 'error' in atributosCheck ? null : atributosCheck.atributos
+      const reglaCheck = validarRegla(item.regla)
 
       const [post] = await db
         .insert(scheduledPosts)
@@ -351,6 +358,10 @@ export async function scheduleBatch(items: BatchItem[]): Promise<BatchResult[]> 
           opciones: opciones[network] ?? null,
         })),
       )
+
+      if (!('error' in reglaCheck) && reglaCheck.regla) {
+        await db.insert(reglasClave).values({ postId: post!.id, ...reglaCheck.regla })
+      }
 
       results.push({ index, ok: true, postId: post!.id })
     } catch (error) {

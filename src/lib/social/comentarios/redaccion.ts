@@ -1,11 +1,13 @@
 import 'server-only'
 import { and, desc, eq, inArray, isNull } from 'drizzle-orm'
-import { getDb, postComments, socialPosts } from '@/db'
+import { getDb, postComments, scheduledPostTargets, scheduledPosts, socialPosts } from '@/db'
 import { leerAjuste } from '@/lib/ajustes'
+import { reglasPara } from './automatico'
 import { CLAVE_INSTRUCCIONES, normalizarInstrucciones } from './instrucciones'
 import { comentaristaFor } from './index'
 import { hayPasarela, pedirBorrador, SIN_BORRADOR } from './modelo'
 import { limpiarBorrador } from './prompt'
+import { coincide, type ReglaLimpia } from './reglas'
 import { MAX_BORRADORES_POR_CORRIDA, seAcaboElTiempo } from './ventana'
 
 /** Tres fallos seguidos no son tres comentarios raros: es la pasarela, y marcarlos por ella envenenaría la cola. */
@@ -18,14 +20,25 @@ export type RedaccionReport = {
   sinPasarela: boolean
 }
 
-/** El caption de la publicación comentada, o null si la sincronización todavía no la trajo. */
+/**
+ * El caption de la publicación comentada: del sync si ya la trajo, y si no del post
+ * programado que la publicó (la red aún no la devolvió). Null si ninguno la tiene.
+ */
 async function captionDe(accountId: string, postExternalId: string): Promise<string | null> {
-  const [post] = await getDb()
+  const db = getDb()
+  const [post] = await db
     .select({ caption: socialPosts.caption })
     .from(socialPosts)
     .where(and(eq(socialPosts.accountId, accountId), eq(socialPosts.externalId, postExternalId)))
     .limit(1)
-  return post?.caption ?? null
+  if (post?.caption) return post.caption
+  const [programado] = await db
+    .select({ caption: scheduledPosts.caption })
+    .from(scheduledPostTargets)
+    .innerJoin(scheduledPosts, eq(scheduledPosts.id, scheduledPostTargets.postId))
+    .where(and(eq(scheduledPostTargets.accountId, accountId), eq(scheduledPostTargets.externalId, postExternalId)))
+    .limit(1)
+  return programado?.caption ?? null
 }
 
 /**
@@ -83,6 +96,18 @@ export async function redactarPendientes(inicio: number): Promise<RedaccionRepor
 
   if (pendientes.length === 0) return reporte
 
+  // Un comentario que dice la palabra clave lo responde la regla en el sondeo, no el
+  // modelo: si quedó pendiente fue por el cupo de la corrida o el reloj, y el sondeo
+  // (`aplicarReglas`, no esta función) lo retoma en la corrida siguiente.
+  const porCuenta = new Map<string, string[]>()
+  for (const f of pendientes) porCuenta.set(f.accountId, [...(porCuenta.get(f.accountId) ?? []), f.postExternalId])
+  const reglasPorCuenta = new Map<string, Map<string, ReglaLimpia>>()
+  for (const [accountId, posts] of porCuenta) reglasPorCuenta.set(accountId, await reglasPara(accountId, [...new Set(posts)]))
+  const aRedactar = pendientes.filter((f) => {
+    const regla = reglasPorCuenta.get(f.accountId)?.get(f.postExternalId)
+    return !regla || !coincide(f.text, regla.palabra)
+  })
+
   const instrucciones = normalizarInstrucciones(await leerAjuste(CLAVE_INSTRUCCIONES))
 
   // La marca no se estampa en el momento del fallo: se junta acá y se decide al final.
@@ -90,7 +115,7 @@ export async function redactarPendientes(inicio: number): Promise<RedaccionRepor
   let seguidos = 0
   let abandonada = false
 
-  for (const fila of pendientes) {
+  for (const fila of aRedactar) {
     if (seAcaboElTiempo(inicio, Date.now())) break
 
     const comentarista = comentaristaFor(fila.network)

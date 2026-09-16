@@ -318,6 +318,10 @@ export const scheduledPostTargets = pgTable(
   (t) => [
     unique('scheduled_post_targets_post_account_key').on(t.postId, t.accountId),
     index('scheduled_post_targets_status_idx').on(t.status),
+    // No unique: filas históricas pueden repetir external_id (o traerlo null) y una unique
+    // haría fallar el db:push. Solo acelera la búsqueda de reglas por cuenta + external_id
+    // que hace `aplicarReglas`/`reglasPara` en cada sondeo.
+    index('scheduled_post_targets_account_external_idx').on(t.accountId, t.externalId),
   ],
 )
 
@@ -335,6 +339,24 @@ export const scheduledPostMedia = pgTable(
   },
   (t) => [index('scheduled_post_media_post_idx').on(t.postId)],
 )
+
+/**
+ * La palabra clave de un post programado y qué responder cuando alguien la comenta. Una
+ * por post; se edita después de publicar (a diferencia de `opciones`), así que vive en
+ * su propia tabla y no en el post. `palabra` se guarda ya normalizada.
+ */
+export const reglasClave = pgTable('reglas_clave', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  postId: uuid('post_id')
+    .notNull()
+    .unique()
+    .references(() => scheduledPosts.id, { onDelete: 'cascade' }),
+  palabra: text('palabra').notNull(),
+  mensaje: text('mensaje').notNull(),
+  respuestaPublica: text('respuesta_publica').notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+})
 
 export const COMMENT_STATES = ['pendiente', 'enviado', 'descartado', 'propio', 'fallido'] as const
 export type CommentState = (typeof COMMENT_STATES)[number]
@@ -374,6 +396,9 @@ export const postComments = pgTable(
     error: text('error'),
     dmState: text('dm_state').$type<DmState>().notNull().default('no'),
     dmError: text('dm_error'),
+    // Lo respondió una regla de palabra clave, no el dueño: la cola lo etiqueta y la IA
+    // nunca le pidió borrador.
+    automatico: boolean('automatico').notNull().default(false),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
@@ -478,6 +503,7 @@ export type PostMetric = typeof postMetrics.$inferSelect
 export type ScheduledPost = typeof scheduledPosts.$inferSelect
 export type ScheduledPostTarget = typeof scheduledPostTargets.$inferSelect
 export type ScheduledPostMedia = typeof scheduledPostMedia.$inferSelect
+export type ReglaClave = typeof reglasClave.$inferSelect
 export type PostComment = typeof postComments.$inferSelect
 export type SourceAuthor = typeof sourceAuthors.$inferSelect
 export type SourcePost = typeof sourcePosts.$inferSelect

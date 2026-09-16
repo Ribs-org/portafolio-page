@@ -1,11 +1,13 @@
 import 'server-only'
 import { and, desc, eq, gte, inArray, isNotNull, isNull } from 'drizzle-orm'
-import { getDb, postComments, socialAccounts, socialPosts } from '@/db'
+import { getDb, postComments, scheduledPostTargets, socialAccounts, socialPosts } from '@/db'
 import type { SocialAccount } from '@/db'
 import { connectorFor } from '../index'
+import { aplicarReglas } from './automatico'
 import { comentaristaFor } from './index'
 import { redactarPendientes, type RedaccionReport } from './redaccion'
-import { DIAS_VENTANA, estadoInicial, postsAsondear, seAcaboElTiempo, tocaSondear } from './ventana'
+import { MAX_AUTOMATICAS_POR_CORRIDA } from './reglas'
+import { DIAS_VENTANA, estadoInicial, postsAsondear, seAcaboElTiempo, tocaSondear, unirPosts } from './ventana'
 
 /**
  * Lo único que el dueño llega a leer de un sondeo fallido. El detalle de la red —que trae
@@ -28,6 +30,8 @@ export type SondeoReport = {
     nuevos: number
     /** Publicaciones que la red no dejó leer en esta pasada; las demás igual se sondearon. */
     salteados: number
+    /** Comentarios que una regla de palabra clave respondió en el acto, en esta pasada. */
+    automaticas: number
     error?: string
   }>
   /** Cuentas que el tope de tiempo dejó para la pasada siguiente; no es un fallo. */
@@ -36,10 +40,15 @@ export type SondeoReport = {
   redaccion: RedaccionReport
 }
 
-type Cuenta = { posts: number; nuevos: number; salteados: number }
+type Cuenta = { posts: number; nuevos: number; salteados: number; automaticas: number }
 
-async function sondearCuenta(account: SocialAccount, now: Date): Promise<Cuenta> {
-  const vacio: Cuenta = { posts: 0, nuevos: 0, salteados: 0 }
+async function sondearCuenta(
+  account: SocialAccount,
+  now: Date,
+  cupo: { restantes: number },
+  inicio: number,
+): Promise<Cuenta> {
+  const vacio: Cuenta = { posts: 0, nuevos: 0, salteados: 0, automaticas: 0 }
   const comentarista = comentaristaFor(account.network)
   if (!comentarista) return vacio
   const db = getDb()
@@ -52,22 +61,51 @@ async function sondearCuenta(account: SocialAccount, now: Date): Promise<Cuenta>
   // cuyo permiso nuevo todavía no autorizó. Se sale antes de tocar la red.
   if (!token) return vacio
 
-  // Las publicaciones ya están en la base: la sincronización diaria las trajo. El sondeo
-  // no vuelve a preguntarle a la red cuáles son.
+  // Las publicaciones ya están en la base: la sincronización diaria las trajo. Y las que
+  // el calendario publicó después del último sync también, con el id que la red devolvió
+  // al publicar: sin ellas un post de hace diez minutos no entraría a la cola hasta mañana.
   const desde = new Date(now.getTime() - DIAS_VENTANA * 864e5)
-  const recientes = await db
-    .select({ externalId: socialPosts.externalId, publishedAt: socialPosts.publishedAt })
-    .from(socialPosts)
-    .where(
-      and(
-        eq(socialPosts.accountId, account.id),
-        isNull(socialPosts.archivedAt),
-        gte(socialPosts.publishedAt, desde),
+  const [recientes, publicados] = await Promise.all([
+    db
+      .select({ externalId: socialPosts.externalId, publishedAt: socialPosts.publishedAt })
+      .from(socialPosts)
+      .where(
+        and(
+          eq(socialPosts.accountId, account.id),
+          isNull(socialPosts.archivedAt),
+          gte(socialPosts.publishedAt, desde),
+        ),
+      )
+      .orderBy(desc(socialPosts.publishedAt)),
+    // Lo que el sync ya archivó (borrado en la red) no vuelve por esta puerta.
+    db
+      .select({ externalId: scheduledPostTargets.externalId, publishedAt: scheduledPostTargets.updatedAt })
+      .from(scheduledPostTargets)
+      .leftJoin(
+        socialPosts,
+        and(
+          eq(socialPosts.accountId, scheduledPostTargets.accountId),
+          eq(socialPosts.externalId, scheduledPostTargets.externalId),
+        ),
+      )
+      .where(
+        and(
+          eq(scheduledPostTargets.accountId, account.id),
+          eq(scheduledPostTargets.status, 'published'),
+          isNotNull(scheduledPostTargets.externalId),
+          gte(scheduledPostTargets.updatedAt, desde),
+          isNull(socialPosts.archivedAt),
+        ),
       ),
-    )
-    .orderBy(desc(socialPosts.publishedAt))
+  ])
 
-  const ids = postsAsondear(recientes, now)
+  const ids = postsAsondear(
+    unirPosts(
+      recientes,
+      publicados.flatMap((p) => (p.externalId ? [{ externalId: p.externalId, publishedAt: p.publishedAt }] : [])),
+    ),
+    now,
+  )
   if (ids.length === 0) return vacio
 
   // Todos los comentarios ya conocidos de esta cuenta en esos posts, de una consulta:
@@ -83,6 +121,7 @@ async function sondearCuenta(account: SocialAccount, now: Date): Promise<Cuenta>
 
   let nuevos = 0
   let salteados = 0
+  let automaticas = 0
   let seguidos = 0
   for (const [i, postExternalId] of ids.entries()) {
     // Cada publicación va sola. Una borrada en la red sigue sin `archivedAt` hasta el sync
@@ -94,7 +133,7 @@ async function sondearCuenta(account: SocialAccount, now: Date): Promise<Cuenta>
       const frescos = leidos.filter((c) => !conocidos.has(c.externalId))
       if (frescos.length === 0) continue
 
-      await db
+      const insertados = await db
         .insert(postComments)
         .values(
           frescos.map((c) => ({
@@ -112,8 +151,24 @@ async function sondearCuenta(account: SocialAccount, now: Date): Promise<Cuenta>
         // Dos pasadas que se solapan verían los mismos comentarios; la unique decide y la
         // segunda no pisa nada.
         .onConflictDoNothing({ target: [postComments.accountId, postComments.externalId] })
+        .returning({ id: postComments.id, externalId: postComments.externalId })
+      const idPorExternal = new Map(insertados.map((f) => [f.externalId, f.id]))
       for (const c of frescos) conocidos.add(c.externalId)
       nuevos += frescos.length
+
+      const { respondidos } = await aplicarReglas(
+        account,
+        token,
+        frescos.flatMap((c) => {
+          const id = idPorExternal.get(c.externalId)
+          return id
+            ? [{ id, postExternalId: c.postExternalId, externalId: c.externalId, authorExternalId: c.authorExternalId, text: c.text, publishedAt: c.publishedAt, state: estadoInicial(c.authorExternalId, account.externalId) }]
+            : []
+        }),
+        cupo,
+        inicio,
+      )
+      automaticas += respondidos
     } catch (error) {
       console.error(
         `[comentarios] ${account.network} ${postExternalId}:`,
@@ -132,7 +187,7 @@ async function sondearCuenta(account: SocialAccount, now: Date): Promise<Cuenta>
     }
   }
 
-  return { posts: ids.length, nuevos, salteados }
+  return { posts: ids.length, nuevos, salteados, automaticas }
 }
 
 /**
@@ -157,6 +212,9 @@ export async function sondearComentarios(now: Date = new Date()): Promise<Sondeo
     sinSondear: 0,
     redaccion: { redactados: 0, fallidos: 0, sinPasarela: false },
   }
+  // Compartido por toda la corrida: la primera cuenta no puede gastarse las veinte
+  // automáticas de las que vienen después.
+  const cupo = { restantes: MAX_AUTOMATICAS_POR_CORRIDA }
   // En serie, como la sincronización: la casa nunca pega concurrente contra Meta.
   for (const [i, cuenta] of aSondear.entries()) {
     // El tope por cuenta no acota la corrida: con varias cuentas son veinte llamadas por
@@ -169,7 +227,7 @@ export async function sondearComentarios(now: Date = new Date()): Promise<Sondeo
       reporte.cuentas.push({
         network: cuenta.network,
         handle: cuenta.handle,
-        ...(await sondearCuenta(cuenta, now)),
+        ...(await sondearCuenta(cuenta, now, cupo, inicio)),
       })
     } catch (error) {
       // El detalle de la red se queda en el log: la respuesta del cron lleva una frase fija.
@@ -180,6 +238,7 @@ export async function sondearComentarios(now: Date = new Date()): Promise<Sondeo
         posts: 0,
         nuevos: 0,
         salteados: 0,
+        automaticas: 0,
         error: SONDEO_FALLIDO,
       })
     }

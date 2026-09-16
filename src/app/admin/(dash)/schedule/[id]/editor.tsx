@@ -9,6 +9,7 @@ import { deleteScheduledPost, updateScheduledPost, type FormState } from '@/app/
 import { Button, Field, GroupLabel, Input, Textarea } from '@/components/ui'
 import { networkLabel } from '@/lib/networks'
 import { cn } from '@/lib/utils'
+import { ReglaClave } from '../regla-clave'
 
 // Gemelo de PUBLISHABLE (publish/batch.ts) y de ENABLED en el compositor
 // (schedule/composer.tsx). `tiktok` no se ofrece aquí porque el editor no puede
@@ -26,6 +27,7 @@ export function Editor({
   media,
   coverUrl,
   atributos,
+  regla,
 }: {
   postId: string
   volver: string
@@ -35,6 +37,7 @@ export function Editor({
   media: MediaRow[]
   coverUrl: string | null
   atributos: string
+  regla: { palabra: string; mensaje: string; respuestaPublica: string } | null
 }) {
   const publishing = targets.some((t) => t.status === 'publishing')
   const published = new Set(targets.filter((t) => t.status === 'published').map((t) => t.network))
@@ -207,6 +210,8 @@ export function Editor({
               <Input type="text" name="portadaUrl" placeholder="https://…/portada.jpg" />
             </Field>
           </div>
+
+          <ReglaClave inicial={regla} />
 
           <Field label="Atributos (JSON del editor de contenido)">
             <Textarea

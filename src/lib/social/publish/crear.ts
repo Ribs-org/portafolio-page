@@ -1,5 +1,6 @@
-import { getDb, scheduledPostMedia, scheduledPosts, scheduledPostTargets } from '@/db'
+import { getDb, reglasClave, scheduledPostMedia, scheduledPosts, scheduledPostTargets } from '@/db'
 import { exigirCuentas } from '../cuentas'
+import type { ReglaLimpia } from '../comentarios/reglas'
 import type { OpcionesDestino } from './opciones'
 
 export type MediaSubida = { url: string; mediaType: 'image' | 'video' }
@@ -20,6 +21,7 @@ export async function crearPostProgramado(input: {
   media: MediaSubida[]
   networks: string[]
   opciones?: Record<string, OpcionesDestino>
+  regla?: ReglaLimpia | null
 }): Promise<string> {
   const db = getDb()
   // Antes de escribir nada: un post sin cuenta a la que salir no debe quedar a medias.
@@ -46,5 +48,8 @@ export async function crearPostProgramado(input: {
       opciones: input.opciones?.[network] ?? null,
     })),
   )
+  if (input.regla) {
+    await db.insert(reglasClave).values({ postId: post!.id, ...input.regla })
+  }
   return post!.id
 }

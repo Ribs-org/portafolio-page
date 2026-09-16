@@ -12,6 +12,7 @@ import {
 import { ATRIBUTOS_ERROR } from './atributos'
 import { TIKTOK_SIN_PRIVACIDAD, OPCIONES_ERROR } from './opciones'
 import { TIKTOK_MEDIA } from './validate'
+import { REGLA_PALABRA, REGLA_MENSAJE } from '../comentarios/reglas'
 
 const now = new Date('2026-09-02T12:00:00Z')
 const base: BatchItem = {
@@ -234,5 +235,18 @@ describe('opciones por red en el lote', () => {
       TIKTOK_MEDIA,
     )
     expect(validateBatchItem({ ...fila, media: ['https://drive.google.com/uc?id=x'] }, now)).toBeNull()
+  })
+})
+
+describe('regla de palabra clave en el lote', () => {
+  it('acepta una regla completa y una fila sin regla', () => {
+    expect(validateBatchItem({ ...base, regla: { palabra: 'GUÍA', mensaje: 'Toma: https://x.cl' } }, now)).toBeNull()
+    expect(validateBatchItem({ ...base, regla: undefined }, now)).toBeNull()
+  })
+
+  it('rechaza la regla malformada con la frase del campo', () => {
+    expect(validateBatchItem({ ...base, regla: { palabra: 'dos palabras', mensaje: 'm' } }, now)).toBe(REGLA_PALABRA)
+    expect(validateBatchItem({ ...base, regla: { palabra: 'guia' } }, now)).toBe(REGLA_MENSAJE)
+    expect(validateBatchItem({ ...base, regla: 'guia' }, now)).toBe(REGLA_PALABRA)
   })
 })

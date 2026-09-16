@@ -1,10 +1,13 @@
 import { env } from '@/lib/env'
 import type { SocialAccount } from '@/db'
+import { DIAS_PRIVADO } from './reglas'
 
 const GRAPH = 'https://graph.facebook.com/v23.0'
 
-/** Meta acepta un solo privado a quien comentó, dentro de este plazo desde el comentario. */
-export const DIAS_PRIVADO = 7
+// `DIAS_PRIVADO` vive en `reglas.ts` (puro, sin dependencias de red) para que este módulo,
+// que solo importan las rutas que hablan con Meta, no entre en el bundle del cliente. Se
+// reexporta para no romper a quien ya lo importaba de acá (`privado.test.ts` incluido).
+export { DIAS_PRIVADO }
 
 const REDES_CON_PRIVADO = new Set(['instagram', 'facebook'])
 
