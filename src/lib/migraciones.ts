@@ -6,16 +6,23 @@ export const SIN_MIGRACIONES = 'No hay migraciones en drizzle/: corre npm run db
 export type Decision = { accion: 'migrar' } | { accion: 'saltar'; motivo: string }
 
 /**
- * El build del CI no tiene base y no debe fallar por eso. Un preview tampoco migra salvo
- * que la integración de Neon le haya dado su propia rama: hasta entonces tocaría
- * producción. Todo lo demás (producción, development, la máquina del dueño) migra.
+ * El build del CI no tiene base y no debe fallar por eso: no trae VERCEL_ENV. Un build de
+ * producción sí lo trae siempre, así que si falta DATABASE_URL ahí es una base mal
+ * configurada, no el CI, y debe fallar en vez de saltarse en silencio. Un preview tampoco
+ * migra salvo que la integración de Neon le haya dado su propia rama: hasta entonces
+ * tocaría producción. Todo lo demás (producción, development, la máquina del dueño) migra.
  */
 export function decidirMigracion(env: {
   databaseUrl?: string
   vercelEnv?: string
   migrarPreviews?: string
 }): Decision {
-  if (!env.databaseUrl) return { accion: 'saltar', motivo: 'sin DATABASE_URL: build sin base, como el CI' }
+  if (!env.databaseUrl) {
+    if (env.vercelEnv === 'production') {
+      throw new Error('build de producción sin DATABASE_URL: no se puede migrar')
+    }
+    return { accion: 'saltar', motivo: 'sin DATABASE_URL: build sin base, como el CI' }
+  }
   if (env.vercelEnv === 'preview' && env.migrarPreviews !== '1') {
     return { accion: 'saltar', motivo: 'preview sin rama de Neon propia (MIGRAR_PREVIEWS no es 1)' }
   }

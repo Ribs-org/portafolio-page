@@ -4,7 +4,11 @@ import { SIN_MIGRACIONES, decidirMigracion, filaBaseline } from './migraciones'
 describe('decidirMigracion', () => {
   it('sin DATABASE_URL se salta: es el build del CI', () => {
     expect(decidirMigracion({})).toEqual({ accion: 'saltar', motivo: 'sin DATABASE_URL: build sin base, como el CI' })
-    expect(decidirMigracion({ databaseUrl: '', vercelEnv: 'production' })).toMatchObject({ accion: 'saltar' })
+  })
+
+  it('sin DATABASE_URL en producción es una base mal configurada: falla en vez de saltarse', () => {
+    expect(() => decidirMigracion({ vercelEnv: 'production' })).toThrow('build de producción sin DATABASE_URL')
+    expect(() => decidirMigracion({ databaseUrl: '', vercelEnv: 'production' })).toThrow('build de producción sin DATABASE_URL')
   })
 
   it('un preview solo migra con la bandera encendida', () => {
