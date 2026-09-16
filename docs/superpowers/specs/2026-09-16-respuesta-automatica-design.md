@@ -161,10 +161,10 @@ comentario nuevo con `state = 'pendiente'`:
 6. **Privado** (si tocaba): éxito → `dm_state = 'enviado'`; fallo → `dm_state =
    'fallido'`, `dm_error = PRIVADO_RECHAZADO`. Un privado fallido nunca deshace la
    respuesta pública. Comentario ya borrado (`COMENTARIO_AUSENTE`) → `descartado`.
-7. Tope `MAX_AUTOMATICAS_POR_CORRIDA` por corrida (todas las cuentas); lo que sobre
-   queda `pendiente` y lo toma la corrida siguiente, antes que la IA: `aplicarReglas`
-   corre antes de `redactarPendientes` y `redactarPendientes` salta los comentarios que
-   coinciden con una regla (misma función `coincide`), para no gastar modelo en ellos.
+7. Tope `MAX_AUTOMATICAS_POR_CORRIDA` por corrida (todas las cuentas); lo que sobre queda
+   `pendiente`; en la corrida siguiente `aplicarReglas` lo retoma desde la base
+   (pendientes sin `automatico` en posts con regla), antes que la IA, que sigue saltando
+   lo que coincide con una regla.
 
 Los comentarios del dueño (`state = 'propio'`) y los de otras cuentas del mismo dueño
 nunca disparan reglas.
@@ -261,10 +261,14 @@ mano, habilita el privado de las reglas.
 
 1. **Regla y sondeo**: tabla, `reglas.ts`, el sondeo con los destinos publicados,
    `aplicarReglas` en modo degradado (sin privado), compositor, editor, lote y CSV, cola
-   con etiqueta y filtro. Funciona de inmediato en las cuatro redes respondiendo en
-   público.
+   con etiqueta y filtro. Funciona de inmediato en Instagram, Facebook y YouTube
+   respondiendo en público; TikTok no tiene cola de comentarios todavía.
 2. **Privado**: scopes nuevos (tras la activación del dueño), privado dentro de
    `aplicarReglas`, un privado por persona, «Reintentar privado», README. Se prueba en
    preview con la bandera encendida y se graba el video de Meta.
 
 Cada entrega es su propio PR a `main`.
+
+Actualización 2026-09-16: la entrega 1 agrega el índice `(account_id, external_id)` en
+`scheduled_post_targets`, mueve `DIAS_PRIVADO` a `reglas.ts`, y en el compositor/editor una
+palabra vacía borra la regla aunque el mensaje siga escrito.
