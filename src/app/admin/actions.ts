@@ -6,11 +6,12 @@ import { redirect } from 'next/navigation'
 import { cookies, headers } from 'next/headers'
 import { guardar, SIN_ALMACEN } from '@/lib/storage'
 import { and, asc, eq, inArray, max, ne, sql } from 'drizzle-orm'
-import { getDb, links, profiles, socialAccounts, socialPosts, scheduledPosts, scheduledPostTargets, scheduledPostMedia } from '@/db'
+import { getDb, links, profiles, socialAccounts, socialPosts, scheduledPosts, scheduledPostTargets, scheduledPostMedia, reglasClave } from '@/db'
 import { LINK_KINDS, type LinkKind } from '@/db/schema'
 import { SITE_TIMEZONE } from '@/lib/analytics'
 import { createSession, destroySession, isAuthenticated, passwordMatches } from '@/lib/auth'
 import { normalizeCampaignTag } from '@/lib/social/campaign'
+import { validarRegla } from '@/lib/social/comentarios/reglas'
 import { csvToBatchItems } from '@/lib/social/publish/csv'
 import {
   scheduleBatch,
@@ -478,6 +479,15 @@ export async function leerCreadorTikTok(): Promise<{ creador: CreadorTikTok } | 
   return consultarCreador(token)
 }
 
+/** Los tres campos del bloque de palabra clave, crudos, listos para `validarRegla`. */
+function reglaDesdeFormulario(formData: FormData): unknown {
+  return {
+    palabra: String(formData.get('reglaPalabra') ?? ''),
+    mensaje: String(formData.get('reglaMensaje') ?? ''),
+    respuestaPublica: String(formData.get('reglaRespuesta') ?? ''),
+  }
+}
+
 export async function createScheduledPost(_prev: FormState, formData: FormData): Promise<FormState> {
   await requireAuth()
 
@@ -509,6 +519,9 @@ export async function createScheduledPost(_prev: FormState, formData: FormData):
   const opcionesCheck = validarOpcionesPorRed(networks, opcionesDesdeFormulario(formData, networks))
   if ('error' in opcionesCheck) return { error: opcionesCheck.error }
 
+  const reglaCheck = validarRegla(reglaDesdeFormulario(formData))
+  if ('error' in reglaCheck) return { error: reglaCheck.error }
+
   const uploaded: Array<{ url: string; mediaType: 'image' | 'video' }> = []
   for (const file of files) {
     // Público a propósito: la Graph API de Instagram descarga la media desde esta URL.
@@ -523,6 +536,7 @@ export async function createScheduledPost(_prev: FormState, formData: FormData):
       media: uploaded,
       networks,
       opciones: opcionesCheck.opciones,
+      regla: reglaCheck.regla,
     })
   } catch (error) {
     if (error instanceof SinCuenta) return { error: error.message }
@@ -608,6 +622,9 @@ export async function updateScheduledPost(
     const check = validarOpciones(network, null)
     if ('error' in check) return { error: check.error }
   }
+
+  const reglaCheck = validarRegla(reglaDesdeFormulario(formData))
+  if ('error' in reglaCheck) return { error: reglaCheck.error }
 
   // Pre-validation before touching storage: kept media with their stored types, files
   // with their real types, URLs counted as images — the batch's deferred-type rule
@@ -790,6 +807,20 @@ export async function updateScheduledPost(
           eq(scheduledPostTargets.updatedAt, readTargets.get(id)!.updatedAt),
         ),
       )
+  }
+
+  // La regla se edita siempre, incluso publicado el post: rige para los comentarios que
+  // lleguen desde ahora. Palabra vacía la borra.
+  if (reglaCheck.regla) {
+    await db
+      .insert(reglasClave)
+      .values({ postId, ...reglaCheck.regla })
+      .onConflictDoUpdate({
+        target: reglasClave.postId,
+        set: { ...reglaCheck.regla, updatedAt: new Date() },
+      })
+  } else {
+    await db.delete(reglasClave).where(eq(reglasClave.postId, postId))
   }
 
   revalidatePath('/admin/schedule')

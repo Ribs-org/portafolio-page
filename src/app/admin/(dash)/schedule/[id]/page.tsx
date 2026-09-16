@@ -1,6 +1,6 @@
 import { notFound } from 'next/navigation'
 import { asc, eq } from 'drizzle-orm'
-import { getDb, scheduledPosts, scheduledPostTargets, scheduledPostMedia } from '@/db'
+import { getDb, scheduledPosts, scheduledPostTargets, scheduledPostMedia, reglasClave } from '@/db'
 import { SITE_TIMEZONE } from '@/lib/analytics'
 import { toZonedInput } from '@/lib/utils'
 import { resumenOpciones } from '@/lib/social/publish/opciones'
@@ -26,13 +26,14 @@ export default async function EditScheduledPostPage({
   const [post] = await db.select().from(scheduledPosts).where(eq(scheduledPosts.id, id))
   if (!post) notFound()
 
-  const [targets, media] = await Promise.all([
+  const [targets, media, [regla]] = await Promise.all([
     db.select().from(scheduledPostTargets).where(eq(scheduledPostTargets.postId, id)),
     db
       .select()
       .from(scheduledPostMedia)
       .where(eq(scheduledPostMedia.postId, id))
       .orderBy(asc(scheduledPostMedia.position)),
+    db.select().from(reglasClave).where(eq(reglasClave.postId, id)),
   ])
 
   return (
@@ -49,6 +50,7 @@ export default async function EditScheduledPostPage({
       media={media.map((m) => ({ id: m.id, blobUrl: m.blobUrl, mediaType: m.mediaType }))}
       coverUrl={post.coverUrl}
       atributos={post.atributos ? JSON.stringify(post.atributos, null, 2) : ''}
+      regla={regla ? { palabra: regla.palabra, mensaje: regla.mensaje, respuestaPublica: regla.respuestaPublica } : null}
     />
   )
 }
