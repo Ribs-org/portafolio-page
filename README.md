@@ -308,6 +308,19 @@ siete días que Meta permite. Hasta entonces la cola no muestra nada del privado
 Después de fusionar hay que correr `npm run db:push` otra vez: la tabla de comentarios gana
 dos columnas para el estado del privado.
 
+#### Respuesta automática por palabra clave
+
+Al programar un post puedes ponerle una palabra clave, un mensaje con enlace y una
+respuesta pública. Cuando alguien comenta esa palabra, la corrida siguiente del cron (cinco
+minutos como mucho) responde sola, sin pasar por la cola de aprobación, y la cola lo marca
+como «Automática». En Instagram y Facebook con el privado encendido (`COMENTARIOS_DM=1`,
+ver arriba) responde corto en público y manda el mensaje por privado; en TikTok, YouTube o
+con el privado apagado publica el mensaje con el enlace como respuesta. Si el enlace es de
+tu sitio, se le agrega `?s=dm-<palabra>` y aparece como fila propia en Analítica → «Qué
+contenido te trae gente». Para eso el servidor necesita saber cuál es tu dominio:
+`SITE_URL=https://www.tu-dominio.cl` (si falta, usa el dominio de producción que Vercel
+inyecta).
+
 ### Modo Tinder
 
 El panel puede leer los tuits nuevos de una lista de creadores que tú curas y —en las

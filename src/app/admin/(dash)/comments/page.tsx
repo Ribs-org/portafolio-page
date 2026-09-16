@@ -19,6 +19,7 @@ const REDES = ['instagram', 'facebook', 'youtube'] as const
 const ETIQUETA_ESTADO: Record<EstadoCola, string> = {
   pendientes: 'Pendientes',
   enviados: 'Enviados',
+  automaticas: 'Automáticas',
   descartados: 'Descartados',
   todos: 'Todos',
 }

@@ -129,4 +129,14 @@ describe('regla en el CSV', () => {
   it('regla solo puede ir séptima, después de opciones', () => {
     expect(csvToBatchItems('fecha,texto,redes,media,portada,regla\n')).toEqual({ error: CSV_HEADER_ERROR })
   })
+
+  it('una fila de 7 columnas puede traer opciones y regla a la vez', () => {
+    const text = [
+      'fecha,texto,redes,media,portada,opciones,regla',
+      '2026-09-17 10:00,Con las dos,tiktok,,,"{""tiktok"":{""modo"":""borrador""}}","{""palabra"":""guia"",""mensaje"":""m""}"',
+    ].join('\n')
+    expect(csvToBatchItems(text)).toMatchObject({
+      items: [{ opciones: { tiktok: { modo: 'borrador' } }, regla: { palabra: 'guia', mensaje: 'm' } }],
+    })
+  })
 })

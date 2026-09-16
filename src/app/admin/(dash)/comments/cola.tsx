@@ -73,6 +73,9 @@ export function Cola({
                 ) : (
                   <p className="line-clamp-2 text-sm text-fg-muted">{primero.postCaption ?? '(sin texto)'}</p>
                 )}
+                {primero.reglaPalabra ? (
+                  <p className="text-[0.72rem] text-fg-faint">Palabra clave: {primero.reglaPalabra.toUpperCase()}</p>
+                ) : null}
               </div>
             </header>
             {g.comentarios.map((c) => (
@@ -130,6 +133,11 @@ function Tarjeta({ fila, mostrarPrivado }: { fila: ComentarioFila; mostrarPrivad
           {fila.draft === null && fila.draftError ? (
             <p className="mt-3 text-sm text-negative">{fila.draftError}</p>
           ) : null}
+          {fila.automatico && fila.state === 'fallido' ? (
+            <p className="mt-3 text-[0.72rem] text-fg-faint">
+              La regla de palabra clave intentó responder y la red no aceptó; «Enviar» lo reintenta.
+            </p>
+          ) : null}
           <Textarea
             aria-label="Tu respuesta"
             className="mt-3"
@@ -157,6 +165,11 @@ function Tarjeta({ fila, mostrarPrivado }: { fila: ComentarioFila; mostrarPrivad
           {fila.state === 'enviado' ? (
             <p className="text-fg-muted">
               <span className="text-positive">Respondido:</span> {fila.draft}
+              {fila.automatico ? (
+                <span className="ml-2 rounded-full bg-white/[0.08] px-2 py-0.5 text-[0.68rem] text-fg-faint">
+                  Automática
+                </span>
+              ) : null}
             </p>
           ) : (
             <p className="text-fg-faint">Descartado{fila.error ? ` · ${fila.error}` : ''}</p>
