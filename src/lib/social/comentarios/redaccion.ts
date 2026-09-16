@@ -2,10 +2,12 @@ import 'server-only'
 import { and, desc, eq, inArray, isNull } from 'drizzle-orm'
 import { getDb, postComments, scheduledPostTargets, scheduledPosts, socialPosts } from '@/db'
 import { leerAjuste } from '@/lib/ajustes'
+import { reglasPara } from './automatico'
 import { CLAVE_INSTRUCCIONES, normalizarInstrucciones } from './instrucciones'
 import { comentaristaFor } from './index'
 import { hayPasarela, pedirBorrador, SIN_BORRADOR } from './modelo'
 import { limpiarBorrador } from './prompt'
+import { coincide, type ReglaLimpia } from './reglas'
 import { MAX_BORRADORES_POR_CORRIDA, seAcaboElTiempo } from './ventana'
 
 /** Tres fallos seguidos no son tres comentarios raros: es la pasarela, y marcarlos por ella envenenaría la cola. */
@@ -94,6 +96,17 @@ export async function redactarPendientes(inicio: number): Promise<RedaccionRepor
 
   if (pendientes.length === 0) return reporte
 
+  // Un comentario que dice la palabra clave lo responde la regla en el sondeo, no el
+  // modelo: si quedó pendiente fue por el cupo de la corrida, y la siguiente lo toma.
+  const porCuenta = new Map<string, string[]>()
+  for (const f of pendientes) porCuenta.set(f.accountId, [...(porCuenta.get(f.accountId) ?? []), f.postExternalId])
+  const reglasPorCuenta = new Map<string, Map<string, ReglaLimpia>>()
+  for (const [accountId, posts] of porCuenta) reglasPorCuenta.set(accountId, await reglasPara(accountId, [...new Set(posts)]))
+  const aRedactar = pendientes.filter((f) => {
+    const regla = reglasPorCuenta.get(f.accountId)?.get(f.postExternalId)
+    return !regla || !coincide(f.text, regla.palabra)
+  })
+
   const instrucciones = normalizarInstrucciones(await leerAjuste(CLAVE_INSTRUCCIONES))
 
   // La marca no se estampa en el momento del fallo: se junta acá y se decide al final.
@@ -101,7 +114,7 @@ export async function redactarPendientes(inicio: number): Promise<RedaccionRepor
   let seguidos = 0
   let abandonada = false
 
-  for (const fila of pendientes) {
+  for (const fila of aRedactar) {
     if (seAcaboElTiempo(inicio, Date.now())) break
 
     const comentarista = comentaristaFor(fila.network)
