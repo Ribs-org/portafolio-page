@@ -30,16 +30,16 @@ async function main() {
  * y no puede esperar a que alguien entre al panel: la entrega 3 pone la columna NOT NULL.
  * Idempotente: en un despliegue sin huérfanas no escribe nada.
  *
- * Si esto falla, el build cae a propósito: el código nuevo filtra por dueño, así que
- * promoverlo con filas sin adoptar dejaría el panel en blanco, que parece pérdida de datos.
+ * Si esto falla, el build cae a propósito, igual que sin DATABASE_URL: el código nuevo
+ * filtra por dueño, así que promoverlo con filas sin adoptar dejaría el panel en blanco,
+ * que parece pérdida de datos.
  */
 const CON_DUENO = ['profiles', 'social_accounts', 'scheduled_posts', 'source_authors', 'social_posts', 'ajustes']
 
 async function adoptarHuerfanas(sql: NeonQueryFunction<false, false>): Promise<void> {
   const correo = process.env.ADMIN_EMAIL?.replace(/^﻿/, '').trim().toLowerCase()
   if (!correo) {
-    console.warn('[migraciones] sin ADMIN_EMAIL: quedan filas sin dueño')
-    return
+    throw new Error('ADMIN_EMAIL no está configurada: no se pueden adoptar las filas sin dueño')
   }
   const filas = await sql`
     insert into users (correo, rol) values (${correo}, 'admin')

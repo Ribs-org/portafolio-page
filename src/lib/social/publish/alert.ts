@@ -13,6 +13,11 @@ export function failureEmail(
   }
 }
 
+/** El correo del dueño del post manda; si no hay, el del despliegue. Vacío cuenta como no hay. */
+export function destinatario(delDueno: string | undefined): string | undefined {
+  return delDueno?.trim() || env('PUBLISH_ALERT_TO')
+}
+
 /**
  * Best-effort by design: the calendar's 'failed' state is the source of truth, and a
  * mail provider outage must never turn into a crashed cron run. Hence the swallow.
@@ -25,7 +30,7 @@ export async function sendFailureAlert(
 ): Promise<void> {
   const apiKey = env('RESEND_API_KEY')
   // Al dueño del post, no al del despliegue: el fallo es de su publicación.
-  const to = para || env('PUBLISH_ALERT_TO')
+  const to = destinatario(para)
   if (!apiKey || !to) return
 
   const { subject, text } = failureEmail(caption, network, reason)

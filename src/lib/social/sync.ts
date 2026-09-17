@@ -5,7 +5,7 @@ import { accountMetrics, getDb, postMetrics, socialAccounts, socialPosts } from 
 import type { SocialAccount } from '@/db'
 import { localDay } from '../analytics'
 import { env } from '../env'
-import { asegurarAdmin } from '../usuarios'
+import { adminId } from '../usuarios'
 import { postsToArchive } from './archive'
 import { campaignTagFor, type CuentaTag } from './campaign'
 import type { FetchedPost } from './connector'
@@ -23,7 +23,7 @@ async function ensureYouTubeAccount(): Promise<void> {
   if (!channelId || !env('YOUTUBE_API_KEY')) return
 
   // La cuenta que nace de YOUTUBE_CHANNEL_ID es del despliegue: la entrega 3 la ata mejor.
-  const { id: ownerId } = await asegurarAdmin()
+  const ownerId = await adminId()
 
   await getDb()
     .insert(socialAccounts)
