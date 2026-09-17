@@ -1,6 +1,6 @@
 // La consulta que resuelve red → cuenta mientras el resto del sistema sigue hablando
 // en redes. Sin `server-only`: `crear.ts` lo importa y `actions.ts` ya es server.
-import { and, asc, inArray, isNotNull } from 'drizzle-orm'
+import { and, asc, eq, inArray, isNotNull } from 'drizzle-orm'
 import { getDb, socialAccounts } from '@/db'
 import { SIN_CUENTA, agruparPorRed, primariaDe } from './cuenta'
 
@@ -11,17 +11,23 @@ export class SinCuenta extends Error {
 }
 
 /**
- * Red → id de su cuenta primaria (la más antigua), para las redes pedidas. Solo cuentas
- * con credencial: una desconectada no puede recibir destinos. Una red sin fila no
+ * Red → id de su cuenta primaria (la más antigua del dueño), para las redes pedidas. Solo
+ * cuentas con credencial: una desconectada no puede recibir destinos. Una red sin fila no
  * aparece: quien escribe decide qué frase dar. Hasta que la entrega 3 traiga
  * `destinos`, «la cuenta de facebook» es esta.
  */
-export async function cuentasPrimarias(networks: string[]): Promise<Map<string, string>> {
+export async function cuentasPrimarias(ownerId: string, networks: string[]): Promise<Map<string, string>> {
   if (networks.length === 0) return new Map()
   const filas = await getDb()
     .select({ id: socialAccounts.id, network: socialAccounts.network, createdAt: socialAccounts.createdAt })
     .from(socialAccounts)
-    .where(and(inArray(socialAccounts.network, networks), isNotNull(socialAccounts.accessToken)))
+    .where(
+      and(
+        inArray(socialAccounts.network, networks),
+        isNotNull(socialAccounts.accessToken),
+        eq(socialAccounts.ownerId, ownerId),
+      ),
+    )
     .orderBy(asc(socialAccounts.createdAt))
   const porRed = agruparPorRed(filas)
   const resultado = new Map<string, string>()
@@ -33,8 +39,8 @@ export async function cuentasPrimarias(networks: string[]): Promise<Map<string, 
 }
 
 /** Como `cuentasPrimarias`, pero lanza `SinCuenta` a la primera red sin cuenta. */
-export async function exigirCuentas(networks: string[]): Promise<Map<string, string>> {
-  const cuentas = await cuentasPrimarias(networks)
+export async function exigirCuentas(ownerId: string, networks: string[]): Promise<Map<string, string>> {
+  const cuentas = await cuentasPrimarias(ownerId, networks)
   for (const network of networks) {
     if (!cuentas.has(network)) throw new SinCuenta(network)
   }

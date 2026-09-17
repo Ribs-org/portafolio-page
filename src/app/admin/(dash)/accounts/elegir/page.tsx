@@ -4,6 +4,7 @@ import { and, eq, isNotNull } from 'drizzle-orm'
 import { conectarElegidas } from '@/app/admin/actions'
 import { Submit } from '@/components/ui'
 import { getDb, socialAccounts } from '@/db'
+import { requireUser } from '@/lib/auth'
 import { networkLabel } from '@/lib/networks'
 import { COOKIE_PENDIENTE, LOGIN_VENCIDO, leerPendiente } from '@/lib/social/pendiente'
 
@@ -20,7 +21,9 @@ export default async function Elegir({
 }) {
   const params = await searchParams
   const mensaje = typeof params.mensaje === 'string' ? params.mensaje.slice(0, 200) : null
-  const pendiente = leerPendiente((await cookies()).get(COOKIE_PENDIENTE)?.value)
+  const { id: ownerId } = await requireUser()
+  const pendienteCrudo = leerPendiente((await cookies()).get(COOKIE_PENDIENTE)?.value)
+  const pendiente = pendienteCrudo && pendienteCrudo.sub === ownerId ? pendienteCrudo : null
 
   if (!pendiente) {
     return (
@@ -42,7 +45,11 @@ export default async function Elegir({
         .select({ externalId: socialAccounts.externalId })
         .from(socialAccounts)
         .where(
-          and(eq(socialAccounts.network, pendiente.network), isNotNull(socialAccounts.accessToken)),
+          and(
+            eq(socialAccounts.network, pendiente.network),
+            isNotNull(socialAccounts.accessToken),
+            eq(socialAccounts.ownerId, ownerId),
+          ),
         )
     ).map((r) => r.externalId),
   )

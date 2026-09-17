@@ -25,7 +25,9 @@ export async function crearPostProgramado(input: {
 }): Promise<string> {
   const db = getDb()
   // Antes de escribir nada: un post sin cuenta a la que salir no debe quedar a medias.
-  const cuentas = await exigirCuentas(input.networks)
+  // TRANSICIÓN: el dueño real llega en la tarea de esta capa; hasta entonces, el admin.
+  const { asegurarAdmin } = await import('@/lib/usuarios')
+  const cuentas = await exigirCuentas((await asegurarAdmin()).id, input.networks)
   const [post] = await db
     .insert(scheduledPosts)
     .values({ caption: input.caption, scheduledAt: input.scheduledAt })

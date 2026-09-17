@@ -378,7 +378,8 @@ export async function GET(
   request: Request,
   { params }: { params: Promise<{ network: string }> },
 ) {
-  if (!(await usuarioActual())) return new NextResponse('No autorizado', { status: 401 })
+  const usuario = await usuarioActual()
+  if (!usuario) return new NextResponse('No autorizado', { status: 401 })
 
   const { network } = await params
   const url = new URL(request.url)
@@ -398,7 +399,7 @@ export async function GET(
   try {
     // Verifies, but as something other than a state we minted for this network — a
     // session cookie replayed here would land exactly there.
-    if (!(await oauthStateMatches(state, network))) {
+    if (!(await oauthStateMatches(state, network, usuario.id))) {
       return back('El estado no corresponde a esa red.')
     }
   } catch {
@@ -415,7 +416,7 @@ export async function GET(
 
     if (credential.candidatas.length === 1) {
       const [unica] = credential.candidatas
-      await guardarCuenta(network, {
+      await guardarCuenta(usuario.id, network, {
         externalId: unica.externalId,
         handle: unica.handle,
         // Facebook publica y lee con el token de la página, no con el del usuario; las
@@ -445,6 +446,7 @@ export async function GET(
         expiresAt: credential.expiresAt?.toISOString() ?? null,
         candidatas: credential.candidatas.map(({ externalId, handle }) => ({ externalId, handle })),
         emitidoEn: Date.now(),
+        sub: usuario.id,
       }),
       { httpOnly: true, secure: true, sameSite: 'lax', maxAge: PENDIENTE_MAX_AGE, path: '/admin/accounts' },
     )

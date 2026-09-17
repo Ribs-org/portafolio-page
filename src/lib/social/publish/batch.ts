@@ -251,6 +251,9 @@ export async function scheduleBatch(items: BatchItem[]): Promise<BatchResult[]> 
   const db = getDb()
   const now = new Date()
   const results: BatchResult[] = []
+  // TRANSICIÓN: el dueño real llega en la tarea de esta capa; hasta entonces, el admin.
+  const { asegurarAdmin } = await import('@/lib/usuarios')
+  const ownerId = (await asegurarAdmin()).id
 
   for (const [index, item] of items.entries()) {
     const invalid = validateBatchItem(item, now)
@@ -262,7 +265,7 @@ export async function scheduleBatch(items: BatchItem[]): Promise<BatchResult[]> 
     try {
       // Antes de subir nada: un destino sin cuenta se rechaza acá, no después de gastar
       // la subida de toda la media de la fila.
-      const cuentas = await exigirCuentas(item.redes)
+      const cuentas = await exigirCuentas(ownerId, item.redes)
 
       const uploaded: Array<{ url: string; mediaType: 'image' | 'video' }> = []
       let mediaFailed = false

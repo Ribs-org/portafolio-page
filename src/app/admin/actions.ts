@@ -35,7 +35,7 @@ import { tiktokConnector } from '@/lib/social/tiktok'
 import { TIKTOK_SIN_CUENTA, consultarCreador, type CreadorTikTok } from '@/lib/social/publish/tiktok-creador'
 import { COOKIE_PENDIENTE, LOGIN_VENCIDO, elegidas, leerPendiente } from '@/lib/social/pendiente'
 import { networkLabel } from '@/lib/networks'
-import { cerrarSesiones, invitar, pedir, quitar } from '@/lib/usuarios'
+import { asegurarAdmin, cerrarSesiones, invitar, pedir, quitar } from '@/lib/usuarios'
 import { fromZonedInput, normalizeUrl, slugify } from '@/lib/utils'
 
 export type FormState = { error?: string; ok?: boolean; aviso?: string }
@@ -320,12 +320,12 @@ export async function syncSocialNow(): Promise<{ ok?: boolean; error?: string }>
 }
 
 export async function disconnectAccount(accountId: string): Promise<void> {
-  await requireUser()
+  const usuario = await requireUser()
   // Revoca credenciales, no identidad: la fila, sus posts y sus métricas se quedan.
   await getDb()
     .update(socialAccounts)
     .set({ accessToken: null, refreshToken: null, expiresAt: null, lastSyncError: null })
-    .where(eq(socialAccounts.id, accountId))
+    .where(and(eq(socialAccounts.id, accountId), eq(socialAccounts.ownerId, usuario.id)))
   revalidatePath('/admin/accounts')
 }
 
@@ -335,10 +335,12 @@ export async function disconnectAccount(accountId: string): Promise<void> {
  * decide es qué casillas marcó.
  */
 export async function conectarElegidas(formData: FormData): Promise<void> {
-  await requireUser()
+  const usuario = await requireUser()
   const jar = await cookies()
   const pendiente = leerPendiente(jar.get(COOKIE_PENDIENTE)?.value)
-  if (!pendiente) redirect(`/admin/accounts?mensaje=${encodeURIComponent(LOGIN_VENCIDO)}`)
+  if (!pendiente || pendiente.sub !== usuario.id) {
+    redirect(`/admin/accounts?mensaje=${encodeURIComponent(LOGIN_VENCIDO)}`)
+  }
 
   const marcadas = elegidas(pendiente.candidatas, formData.getAll('ids').map(String))
   if (marcadas.length === 0) {
@@ -365,7 +367,7 @@ export async function conectarElegidas(formData: FormData): Promise<void> {
   let fallo: string | null = null
   try {
     for (const cuenta of marcadas) {
-      await guardarCuenta(pendiente.network, {
+      await guardarCuenta(usuario.id, pendiente.network, {
         externalId: cuenta.externalId,
         handle: cuenta.handle,
         accessToken:
@@ -431,7 +433,8 @@ export async function updatePostCampaign(
  */
 export async function leerCreadorTikTok(): Promise<{ creador: CreadorTikTok } | { error: string }> {
   await requireUser()
-  const cuentas = await cuentasPrimarias(['tiktok'])
+  // TRANSICIÓN: el dueño real llega en la tarea de esta capa; hasta entonces, el admin.
+  const cuentas = await cuentasPrimarias((await asegurarAdmin()).id, ['tiktok'])
   const id = cuentas.get('tiktok')
   if (!id) return { error: TIKTOK_SIN_CUENTA }
   const [account] = await getDb().select().from(socialAccounts).where(eq(socialAccounts.id, id))
@@ -737,7 +740,8 @@ export async function updateScheduledPost(
   if (targetsPlan.create.length > 0) {
     let cuentas: Map<string, string>
     try {
-      cuentas = await exigirCuentas(targetsPlan.create)
+      // TRANSICIÓN: el dueño real llega en la tarea de esta capa; hasta entonces, el admin.
+      cuentas = await exigirCuentas((await asegurarAdmin()).id, targetsPlan.create)
     } catch (error) {
       if (error instanceof SinCuenta) return { error: error.message }
       throw error

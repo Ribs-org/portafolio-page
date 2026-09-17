@@ -17,7 +17,8 @@ export const dynamic = 'force-dynamic'
  * del dueño. Solo cuenta archivos; las URLs todavía no existen.
  */
 export async function POST(request: Request) {
-  if (!(await requireMobileUser(request))) {
+  const usuario = await requireMobileUser(request)
+  if (!usuario) {
     return new NextResponse('No autorizado', { status: 401 })
   }
 
@@ -47,7 +48,7 @@ export async function POST(request: Request) {
 
   // Este chequeo existe para fallar antes de la subida, así que también tiene que saberlo.
   try {
-    await exigirCuentas(borrador.redes)
+    await exigirCuentas(usuario.id, borrador.redes)
   } catch (fallo) {
     if (fallo instanceof SinCuenta) return NextResponse.json({ error: fallo.message }, { status: 400 })
     throw fallo

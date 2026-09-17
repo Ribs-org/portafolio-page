@@ -12,7 +12,7 @@ export type CuentaAConectar = {
 }
 
 /** Upsert por (red, id externo): la misma cuenta renueva su token; un id nuevo es una fila nueva. */
-export async function guardarCuenta(network: string, cuenta: CuentaAConectar): Promise<void> {
+export async function guardarCuenta(ownerId: string, network: string, cuenta: CuentaAConectar): Promise<void> {
   const valores = {
     handle: cuenta.handle,
     accessToken: encryptToken(cuenta.accessToken),
@@ -22,7 +22,9 @@ export async function guardarCuenta(network: string, cuenta: CuentaAConectar): P
   }
   await getDb()
     .insert(socialAccounts)
-    .values({ network, externalId: cuenta.externalId, ...valores })
+    .values({ network, externalId: cuenta.externalId, ownerId, ...valores })
+    // El target sigue siendo (network, external_id) hasta la entrega 3: mientras tanto dos
+    // usuarios no pueden conectar la misma cuenta, y es preferible a que uno pise al otro.
     .onConflictDoUpdate({ target: [socialAccounts.network, socialAccounts.externalId], set: valores })
 }
 

@@ -14,6 +14,8 @@ import { env } from '../env'
  * Minting and checking live together on purpose. Split across the two routes, the claim
  * is one careless edit away from being written but never read, which is exactly the
  * hole this closes.
+ *
+ * It ties the round trip to this user and this network.
  */
 const PURPOSE = 'social-oauth-state'
 
@@ -24,16 +26,21 @@ function secret(): Uint8Array {
 }
 
 /** Short-lived by design: it only has to outlive the owner's trip through a consent screen. */
-export function signOAuthState(network: string): Promise<string> {
+export function signOAuthState(network: string, ownerId: string): Promise<string> {
   return new SignJWT({ purpose: PURPOSE, network })
     .setProtectedHeader({ alg: 'HS256' })
     .setIssuedAt()
     .setExpirationTime('10m')
+    .setSubject(ownerId)
     .sign(secret())
 }
 
-/** True only for a state this app minted, for this same network. */
-export async function oauthStateMatches(state: string, network: string): Promise<boolean> {
-  const { payload } = await jwtVerify(state, secret())
-  return payload.purpose === PURPOSE && payload.network === network
+/** True only for a state this app minted, for this same network and this same owner. */
+export async function oauthStateMatches(state: string, network: string, ownerId: string): Promise<boolean> {
+  try {
+    const { payload } = await jwtVerify(state, secret())
+    return payload.purpose === PURPOSE && payload.network === network && payload.sub === ownerId
+  } catch {
+    return false
+  }
 }
