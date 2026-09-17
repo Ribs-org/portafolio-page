@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import { useActionState } from 'react'
 import { Submit } from '@/components/ui'
+import { CODIGO_ENVIADO } from '@/lib/ingreso'
 import { canjearCodigo, pedirCodigo, type FormState } from './acciones'
 
 const CAMPO =
@@ -10,7 +11,6 @@ const CAMPO =
 
 export function FormularioCorreo() {
   const [state, action] = useActionState<FormState, FormData>(pedirCodigo, {})
-  if (state.ok && state.correo) return <FormularioCodigo correo={state.correo} />
   return (
     <form action={action} className="mt-6 space-y-3">
       <label htmlFor="correo" className="sr-only">Correo</label>
@@ -32,7 +32,7 @@ export function FormularioCodigo({ correo }: { correo: string }) {
   const [state, action] = useActionState<FormState, FormData>(canjearCodigo, {})
   return (
     <form action={action} className="mt-6 space-y-3">
-      <p className="text-sm text-fg-muted">Si {correo} está invitado, te llegó un código de seis dígitos. Vale diez minutos.</p>
+      <p className="text-sm text-fg-muted">{CODIGO_ENVIADO} Vale diez minutos.</p>
       <input type="hidden" name="correo" value={correo} />
       <label htmlFor="codigo" className="sr-only">Código</label>
       <input id="codigo" name="codigo" inputMode="numeric" autoComplete="one-time-code" pattern="[0-9]{6}" maxLength={6} autoFocus placeholder="000000" className={`${CAMPO} tracking-[0.4em]`} />

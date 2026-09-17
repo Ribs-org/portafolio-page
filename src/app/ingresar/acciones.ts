@@ -6,7 +6,6 @@ import { codigosIngreso, getDb, users } from '@/db'
 import { createSession } from '@/lib/auth'
 import { enviarCorreo } from '@/lib/correo'
 import {
-  CODIGO_ENVIADO,
   CODIGO_INCORRECTO,
   CORREO_INVALIDO,
   DEMASIADOS_INTENTOS,
@@ -33,30 +32,30 @@ export async function pedirCodigo(_prev: FormState, formData: FormData): Promise
   if (!correo) return { error: CORREO_INVALIDO }
   await asegurarAdmin()
   const usuario = await buscarPorCorreo(correo)
-  if (!usuario) return { ok: true, correo }
-
-  const now = new Date()
-  if (!puedePedir(await pedidosRecientes(usuario.id, now), now)) return { ok: true, correo }
-
-  const db = getDb()
-  // Un código nuevo invalida los vivos: solo el último sirve.
-  await db
-    .update(codigosIngreso)
-    .set({ usadoEn: now })
-    .where(and(eq(codigosIngreso.userId, usuario.id), isNull(codigosIngreso.usadoEn)))
-  const codigo = generarCodigo()
-  await db.insert(codigosIngreso).values({
-    userId: usuario.id,
-    hash: hashCodigo(codigo, claveCodigos()),
-    expiraEn: new Date(now.getTime() + VIGENCIA_MS),
-  })
-  const enviado = await enviarCorreo({
-    to: usuario.correo,
-    subject: `${codigo} es tu código para entrar a Parrilla`,
-    text: `Tu código para entrar a Parrilla es ${codigo}. Vale diez minutos. Si no lo pediste, ignora este correo.`,
-  })
-  if (!enviado) console.error('[ingreso] no se pudo mandar el código a', usuario.correo)
-  return { ok: true, correo }
+  if (usuario) {
+    const now = new Date()
+    if (puedePedir(await pedidosRecientes(usuario.id, now), now)) {
+      const db = getDb()
+      // Un código nuevo invalida los vivos: solo el último sirve.
+      await db
+        .update(codigosIngreso)
+        .set({ usadoEn: now })
+        .where(and(eq(codigosIngreso.userId, usuario.id), isNull(codigosIngreso.usadoEn)))
+      const codigo = generarCodigo()
+      await db.insert(codigosIngreso).values({
+        userId: usuario.id,
+        hash: hashCodigo(codigo, claveCodigos()),
+        expiraEn: new Date(now.getTime() + VIGENCIA_MS),
+      })
+      const enviado = await enviarCorreo({
+        to: usuario.correo,
+        subject: `${codigo} es tu código para entrar a Parrilla`,
+        text: `Tu código para entrar a Parrilla es ${codigo}. Vale diez minutos. Si no lo pediste, ignora este correo.`,
+      })
+      if (!enviado) console.error('[ingreso] no se pudo mandar el código a', usuario.correo)
+    }
+  }
+  redirect(`/ingresar/codigo?correo=${encodeURIComponent(correo)}`)
 }
 
 export async function canjearCodigo(_prev: FormState, formData: FormData): Promise<FormState> {
@@ -74,7 +73,10 @@ export async function canjearCodigo(_prev: FormState, formData: FormData): Promi
     .where(and(eq(codigosIngreso.userId, usuario.id), isNull(codigosIngreso.usadoEn), gt(codigosIngreso.expiraEn, now)))
     .orderBy(desc(codigosIngreso.createdAt))
     .limit(1)
-  if (!fila || !vigente(fila, now)) return { error: CODIGO_INCORRECTO, correo }
+  if (!fila) return { error: CODIGO_INCORRECTO, correo }
+  // Los intentos agotados se dicen en cada reintento, no solo en el que agota el contador.
+  if (fila.intentos >= MAX_INTENTOS) return { error: DEMASIADOS_INTENTOS, correo }
+  if (!vigente(fila, now)) return { error: CODIGO_INCORRECTO, correo }
 
   if (!codigoCoincide(codigo, fila.hash, claveCodigos())) {
     const intentos = fila.intentos + 1
