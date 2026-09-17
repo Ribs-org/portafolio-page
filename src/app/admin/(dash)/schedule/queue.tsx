@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { useState, useTransition } from 'react'
-import { deleteScheduledPost, rescheduleTarget } from '@/app/admin/actions'
+import { deleteScheduledPost, rescheduleTarget, subirAhora } from '@/app/admin/actions'
 import { Button, Input } from '@/components/ui'
 import type { ScheduledPost, ScheduledPostTarget } from '@/db/schema'
 import { networkLabel } from '@/lib/networks'
@@ -23,6 +23,8 @@ export function Queue({
 }) {
   const [pending, start] = useTransition()
   const [error, setError] = useState<string | null>(null)
+  // Lo que devolvió «Subir ahora»: cuántos destinos salieron y cuántos quedaron en proceso.
+  const [aviso, setAviso] = useState<string | null>(null)
   // El destino que está pidiendo hora nueva, y la hora que lleva escrita. Uno solo a
   // la vez: abrir otro cierra el anterior sin dejar dos fechas a medio llenar.
   const [rescheduling, setRescheduling] = useState<string | null>(null)
@@ -62,6 +64,7 @@ export function Queue({
   return (
     <>
       {error && <p className="mb-3 text-sm text-negative">{error}</p>}
+      {aviso && <p className="mb-3 text-sm text-positive">{aviso}</p>}
       <ul className="space-y-3">
       {mostrados.map(({ post, targets }) => {
         // El formulario de hora nueva vive bajo el post dueño del destino, no dentro
@@ -83,6 +86,25 @@ export function Queue({
               >
                 Editar
               </Link>
+              {targets.some((t) => t.status === 'scheduled' || t.status === 'publishing') ? (
+                <button
+                  type="button"
+                  disabled={pending}
+                  onClick={() => {
+                    if (!confirm('¿Subirlo ahora, sin esperar la hora programada? Se publica en tus redes de inmediato.')) return
+                    start(async () => {
+                      setError(null)
+                      setAviso(null)
+                      const result = await subirAhora(post.id)
+                      if (result.error) setError(result.error)
+                      else if (result.ok) setAviso(result.ok)
+                    })
+                  }}
+                  className="text-xs text-fg-faint hover:text-fg"
+                >
+                  {pending ? 'Subiendo…' : 'Subir ahora'}
+                </button>
+              ) : null}
               <button
                 type="button"
                 disabled={pending}
