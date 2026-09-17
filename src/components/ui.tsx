@@ -4,8 +4,11 @@ import { useId } from 'react'
 import { useFormStatus } from 'react-dom'
 import { cn } from '@/lib/utils'
 
+// `color-scheme: dark` es para lo que dibuja el sistema y no el CSS: la lista desplegable de
+// un `<select>` y el calendario de un `datetime-local`. Sin él salen con fondo claro y
+// heredan el texto claro del panel, así que se leen blanco sobre blanco.
 const CONTROL =
-  'w-full rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2 text-sm outline-none transition-colors placeholder:text-fg-faint focus:border-white/25'
+  'w-full rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2 text-sm outline-none transition-colors [color-scheme:dark] placeholder:text-fg-faint focus:border-white/25'
 
 /**
  * Encabezado de un grupo de controles. `Field` rotula uno solo: su `<label>` alrededor
@@ -156,10 +159,16 @@ export function Switch({
         className,
       )}
     >
+      {/*
+        `left-0` no es decorativo: sin él, la posición estática de un absoluto dentro de un
+        botón la decide el `text-align: center` del botón, así que la perilla nacía centrada
+        y al encenderse se salía de la pista. Con `left-0`, apagada queda a 2px del borde
+        izquierdo y encendida a 2px del derecho (36 - 16 - 2 = 18px = 1.125rem).
+      */}
       <span
         className={cn(
-          'absolute top-0.5 h-4 w-4 rounded-full bg-fg transition-transform',
-          checked ? 'translate-x-[1.15rem]' : 'translate-x-0.5',
+          'absolute left-0 top-0.5 h-4 w-4 rounded-full bg-fg transition-transform',
+          checked ? 'translate-x-[1.125rem]' : 'translate-x-0.5',
         )}
       />
     </button>
