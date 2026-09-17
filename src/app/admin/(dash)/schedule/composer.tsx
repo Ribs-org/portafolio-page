@@ -5,7 +5,7 @@ import { createScheduledPost } from '@/app/admin/actions'
 import { Button, Field, GroupLabel, Input, Submit, Textarea } from '@/components/ui'
 import { SOCIAL_NETWORKS } from '@/db/schema'
 import { networkLabel } from '@/lib/networks'
-import { cn, toZonedInput } from '@/lib/utils'
+import { cn } from '@/lib/utils'
 import { ReglaClave } from './regla-clave'
 import { TikTokOpciones } from './tiktok-opciones'
 
@@ -14,12 +14,14 @@ import { TikTokOpciones } from './tiktok-opciones'
 // its options, so that destination is created here or in the batch only.
 const ENABLED = new Set(['instagram', 'facebook', 'youtube', 'threads', 'x', 'tiktok'])
 
-export function Composer({ zona }: { zona: string }) {
+export function Composer() {
   const [state, action] = useActionState(createScheduledPost, {})
   const captionId = useId()
   const [tiktok, setTiktok] = useState(false)
   const [soloFotos, setSoloFotos] = useState(false)
   const [cuando, setCuando] = useState('')
+  // «Ahora» deja el campo de fecha fuera de juego: la hora la decide el servidor.
+  const [ahora, setAhora] = useState(false)
 
   return (
     <details
@@ -86,18 +88,21 @@ export function Composer({ zona }: { zona: string }) {
             <Input
               type="datetime-local"
               name="scheduledAt"
-              required
+              required={!ahora}
+              disabled={ahora}
               className="max-w-[16rem]"
-              value={cuando}
+              value={ahora ? '' : cuando}
               onChange={(event) => setCuando(event.target.value)}
             />
             {/*
-              Un minuto y no «ahora»: el cron publica lo vencido, así que una hora ya pasada
-              sale igual de rápido, pero deja el calendario mostrando un futuro que nunca fue.
+              «Ahora» no escribe una hora en el campo: manda una marca y la hora la pone el
+              servidor. El reloj del navegador puede ir atrasado, y entonces el minuto que
+              sumáramos aquí caería en el pasado del servidor y la validación lo rechazaría.
             */}
-            <Button type="button" onClick={() => setCuando(toZonedInput(new Date(Date.now() + 60_000), zona))}>
-              En un minuto
+            <Button type="button" variant={ahora ? 'primary' : 'ghost'} onClick={() => setAhora(!ahora)}>
+              Ahora
             </Button>
+            {ahora ? <input type="hidden" name="cuandoAhora" value="on" /> : null}
           </div>
         </Field>
 

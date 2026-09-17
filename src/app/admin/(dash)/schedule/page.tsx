@@ -98,7 +98,7 @@ export default async function SchedulePage({
       </header>
 
       <div className="space-y-6">
-        <Composer zona={SITE_TIMEZONE} />
+        <Composer />
         <BatchUpload />
         <div>
           <div className="mb-3 flex items-center gap-1.5">
