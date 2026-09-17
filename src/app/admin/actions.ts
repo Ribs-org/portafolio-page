@@ -526,7 +526,13 @@ export async function createScheduledPost(_prev: FormState, formData: FormData):
 
   const caption = String(formData.get('caption') ?? '').trim()
   const networks = formData.getAll('networks').map(String)
-  const scheduledAt = fromZonedInput(String(formData.get('scheduledAt') ?? ''), SITE_TIMEZONE)
+  // El botón «Ahora» del compositor no manda una hora, manda esta marca: el reloj del
+  // navegador puede ir atrasado y quien decide si algo está en el futuro es este proceso.
+  // Un minuto de margen para que la validación no dependa de cuánto tardó el envío.
+  const scheduledAt =
+    formData.get('cuandoAhora') === 'on'
+      ? new Date(Date.now() + 60_000)
+      : fromZonedInput(String(formData.get('scheduledAt') ?? ''), SITE_TIMEZONE)
   const files = formData.getAll('media').filter((f): f is File => f instanceof File && f.size > 0)
 
   // f.type viene vacío para algunos .mov del navegador: tipoArchivo cae a la extensión
