@@ -35,7 +35,7 @@ import { tiktokConnector } from '@/lib/social/tiktok'
 import { TIKTOK_SIN_CUENTA, consultarCreador, type CreadorTikTok } from '@/lib/social/publish/tiktok-creador'
 import { COOKIE_PENDIENTE, LOGIN_VENCIDO, elegidas, leerPendiente } from '@/lib/social/pendiente'
 import { networkLabel } from '@/lib/networks'
-import { asegurarAdmin, cerrarSesiones, invitar, pedir, quitar } from '@/lib/usuarios'
+import { cerrarSesiones, invitar, pedir, quitar } from '@/lib/usuarios'
 import { fromZonedInput, normalizeUrl, slugify } from '@/lib/utils'
 
 export type FormState = { error?: string; ok?: boolean; aviso?: string }
@@ -66,13 +66,14 @@ function readProfileForm(formData: FormData) {
 }
 
 export async function createProfile(): Promise<never> {
-  await requireUser()
+  const { id: ownerId } = await requireUser()
   const db = getDb()
   const suffix = randomUUID().slice(0, 6)
 
   const [row] = await db
     .insert(profiles)
     .values({
+      ownerId,
       slug: `perfil-${suffix}`,
       displayName: 'Perfil nuevo',
       accentColor: '#8b7cff',
@@ -90,13 +91,16 @@ export async function updateProfile(
   _prev: FormState,
   formData: FormData,
 ): Promise<FormState> {
-  await requireUser()
+  const { id: ownerId } = await requireUser()
   const values = readProfileForm(formData)
 
   if (!values.displayName) return { error: 'El nombre no puede quedar vacío.' }
 
   try {
-    await getDb().update(profiles).set(values).where(eq(profiles.id, profileId))
+    await getDb()
+      .update(profiles)
+      .set(values)
+      .where(and(eq(profiles.id, profileId), eq(profiles.ownerId, ownerId)))
   } catch (error) {
     const message = String(error)
     if (message.includes('profiles_slug_unique') || message.includes('duplicate key')) {
@@ -113,35 +117,41 @@ export async function updateProfile(
 
 /** Exactly one profile is served at `/`, so promoting one demotes the rest. */
 export async function makeDefault(profileId: string) {
-  await requireUser()
+  const { id: ownerId } = await requireUser()
   const db = getDb()
-  await db.update(profiles).set({ isDefault: false }).where(ne(profiles.id, profileId))
+  await db
+    .update(profiles)
+    .set({ isDefault: false })
+    .where(and(ne(profiles.id, profileId), eq(profiles.ownerId, ownerId)))
   await db
     .update(profiles)
     .set({ isDefault: true, isPublished: true })
-    .where(eq(profiles.id, profileId))
+    .where(and(eq(profiles.id, profileId), eq(profiles.ownerId, ownerId)))
 
   revalidatePath('/admin/profiles')
   revalidatePath('/', 'layout')
 }
 
 export async function deleteProfile(profileId: string) {
-  await requireUser()
-  await getDb().delete(profiles).where(eq(profiles.id, profileId))
+  const { id: ownerId } = await requireUser()
+  await getDb().delete(profiles).where(and(eq(profiles.id, profileId), eq(profiles.ownerId, ownerId)))
   revalidatePath('/admin/profiles')
   redirect('/admin/profiles')
 }
 
 /** A fresh random suffix, for when a private URL has been shared too widely. */
 export async function rotateSlug(profileId: string) {
-  await requireUser()
-  const [row] = await getDb().select({ slug: profiles.slug }).from(profiles).where(eq(profiles.id, profileId))
+  const { id: ownerId } = await requireUser()
+  const [row] = await getDb()
+    .select({ slug: profiles.slug })
+    .from(profiles)
+    .where(and(eq(profiles.id, profileId), eq(profiles.ownerId, ownerId)))
   const base = (row?.slug ?? 'perfil').replace(/-[0-9a-f]{8}$/, '')
 
   await getDb()
     .update(profiles)
     .set({ slug: `${base}-${randomUUID().slice(0, 8)}`, updatedAt: new Date() })
-    .where(eq(profiles.id, profileId))
+    .where(and(eq(profiles.id, profileId), eq(profiles.ownerId, ownerId)))
 
   revalidatePath(`/admin/profiles/${profileId}`)
   revalidatePath('/admin/profiles')
@@ -172,13 +182,19 @@ export async function createLink(
   _prev: FormState,
   formData: FormData,
 ): Promise<FormState> {
-  await requireUser()
+  const { id: ownerId } = await requireUser()
   const values = readLinkForm(formData)
 
   if (!values.label) return { error: 'Ponle un nombre al link.' }
   if (!values.url) return { error: 'Falta la URL.' }
 
   const db = getDb()
+  const [profile] = await db
+    .select({ id: profiles.id })
+    .from(profiles)
+    .where(and(eq(profiles.id, profileId), eq(profiles.ownerId, ownerId)))
+  if (!profile) return { error: 'El perfil ya no existe.' }
+
   const [{ highest }] = await db
     .select({ highest: max(links.position) })
     .from(links)
@@ -197,7 +213,7 @@ export async function updateLink(
   _prev: FormState,
   formData: FormData,
 ): Promise<FormState> {
-  await requireUser()
+  const { id: ownerId } = await requireUser()
   const values = readLinkForm(formData)
 
   if (!values.label) return { error: 'Ponle un nombre al link.' }
@@ -206,7 +222,13 @@ export async function updateLink(
   await getDb()
     .update(links)
     .set(values)
-    .where(and(eq(links.id, linkId), eq(links.profileId, profileId)))
+    .where(
+      and(
+        eq(links.id, linkId),
+        eq(links.profileId, profileId),
+        inArray(links.profileId, getDb().select({ id: profiles.id }).from(profiles).where(eq(profiles.ownerId, ownerId))),
+      ),
+    )
 
   revalidatePath(`/admin/profiles/${profileId}`)
   revalidatePath('/', 'layout')
@@ -214,19 +236,33 @@ export async function updateLink(
 }
 
 export async function toggleLink(linkId: string, profileId: string) {
-  await requireUser()
+  const { id: ownerId } = await requireUser()
   await getDb()
     .update(links)
     .set({ isActive: sql`not ${links.isActive}` })
-    .where(and(eq(links.id, linkId), eq(links.profileId, profileId)))
+    .where(
+      and(
+        eq(links.id, linkId),
+        eq(links.profileId, profileId),
+        inArray(links.profileId, getDb().select({ id: profiles.id }).from(profiles).where(eq(profiles.ownerId, ownerId))),
+      ),
+    )
 
   revalidatePath(`/admin/profiles/${profileId}`)
   revalidatePath('/', 'layout')
 }
 
 export async function deleteLink(linkId: string, profileId: string) {
-  await requireUser()
-  await getDb().delete(links).where(and(eq(links.id, linkId), eq(links.profileId, profileId)))
+  const { id: ownerId } = await requireUser()
+  await getDb()
+    .delete(links)
+    .where(
+      and(
+        eq(links.id, linkId),
+        eq(links.profileId, profileId),
+        inArray(links.profileId, getDb().select({ id: profiles.id }).from(profiles).where(eq(profiles.ownerId, ownerId))),
+      ),
+    )
 
   revalidatePath(`/admin/profiles/${profileId}`)
   revalidatePath('/', 'layout')
@@ -234,7 +270,7 @@ export async function deleteLink(linkId: string, profileId: string) {
 
 /** Persists the order produced by the drag-and-drop list. */
 export async function reorderLinks(profileId: string, orderedIds: string[]) {
-  await requireUser()
+  const { id: ownerId } = await requireUser()
   const db = getDb()
 
   await Promise.all(
@@ -242,7 +278,13 @@ export async function reorderLinks(profileId: string, orderedIds: string[]) {
       db
         .update(links)
         .set({ position })
-        .where(and(eq(links.id, id), eq(links.profileId, profileId))),
+        .where(
+          and(
+            eq(links.id, id),
+            eq(links.profileId, profileId),
+            inArray(links.profileId, db.select({ id: profiles.id }).from(profiles).where(eq(profiles.ownerId, ownerId))),
+          ),
+        ),
     ),
   )
 
@@ -401,13 +443,16 @@ export async function updatePostCampaign(
   postId: string,
   campaign: string,
 ): Promise<{ ok?: boolean; campaign?: string; error?: string }> {
-  await requireUser()
+  const { id: ownerId } = await requireUser()
 
   const clean = normalizeCampaignTag(campaign)
   if (!clean) return { error: 'La etiqueta no puede quedar vacía.' }
 
   try {
-    await getDb().update(socialPosts).set({ campaign: clean }).where(eq(socialPosts.id, postId))
+    await getDb()
+      .update(socialPosts)
+      .set({ campaign: clean })
+      .where(and(eq(socialPosts.id, postId), eq(socialPosts.ownerId, ownerId)))
   } catch (error) {
     // Deferred with syncAll's rationale: isCampaignUniqueViolation lives in sync.ts,
     // which pulls in the connector tree, and that weight has no reason to load just to
@@ -436,12 +481,14 @@ export async function updatePostCampaign(
  * la que `crearPostProgramado` va a apuntar el destino.
  */
 export async function leerCreadorTikTok(): Promise<{ creador: CreadorTikTok } | { error: string }> {
-  await requireUser()
-  // TRANSICIÓN: el dueño real llega en la tarea de esta capa; hasta entonces, el admin.
-  const cuentas = await cuentasPrimarias((await asegurarAdmin()).id, ['tiktok'])
+  const { id: ownerId } = await requireUser()
+  const cuentas = await cuentasPrimarias(ownerId, ['tiktok'])
   const id = cuentas.get('tiktok')
   if (!id) return { error: TIKTOK_SIN_CUENTA }
-  const [account] = await getDb().select().from(socialAccounts).where(eq(socialAccounts.id, id))
+  const [account] = await getDb()
+    .select()
+    .from(socialAccounts)
+    .where(and(eq(socialAccounts.id, id), eq(socialAccounts.ownerId, ownerId)))
   const token = account ? await tiktokConnector.ensureCredential(account) : null
   if (!token) return { error: TIKTOK_SIN_CUENTA }
   return consultarCreador(token)
@@ -527,10 +574,13 @@ export async function updateScheduledPost(
   _prev: FormState,
   formData: FormData,
 ): Promise<FormState> {
-  await requireUser()
+  const { id: ownerId } = await requireUser()
   const db = getDb()
 
-  const [post] = await db.select().from(scheduledPosts).where(eq(scheduledPosts.id, postId))
+  const [post] = await db
+    .select()
+    .from(scheduledPosts)
+    .where(and(eq(scheduledPosts.id, postId), eq(scheduledPosts.ownerId, ownerId)))
   if (!post) return { error: 'El post ya no existe.' }
 
   const targets = await db
@@ -744,8 +794,7 @@ export async function updateScheduledPost(
   if (targetsPlan.create.length > 0) {
     let cuentas: Map<string, string>
     try {
-      // TRANSICIÓN: el dueño real llega en la tarea de esta capa; hasta entonces, el admin.
-      cuentas = await exigirCuentas((await asegurarAdmin()).id, targetsPlan.create)
+      cuentas = await exigirCuentas(ownerId, targetsPlan.create)
     } catch (error) {
       if (error instanceof SinCuenta) return { error: error.message }
       throw error
@@ -808,7 +857,7 @@ export async function updateScheduledPost(
 }
 
 export async function rescheduleTarget(targetId: string, localDatetime: string): Promise<FormState> {
-  await requireUser()
+  const { id: ownerId } = await requireUser()
 
   const scheduledAt = fromZonedInput(localDatetime, SITE_TIMEZONE)
   if (!scheduledAt || scheduledAt.getTime() <= Date.now()) {
@@ -819,7 +868,15 @@ export async function rescheduleTarget(targetId: string, localDatetime: string):
   const [target] = await db
     .select()
     .from(scheduledPostTargets)
-    .where(eq(scheduledPostTargets.id, targetId))
+    .where(
+      and(
+        eq(scheduledPostTargets.id, targetId),
+        inArray(
+          scheduledPostTargets.postId,
+          db.select({ id: scheduledPosts.id }).from(scheduledPosts).where(eq(scheduledPosts.ownerId, ownerId)),
+        ),
+      ),
+    )
   if (!target) return { error: 'Ese destino ya no existe.' }
 
   await db.update(scheduledPosts).set({ scheduledAt, updatedAt: new Date() }).where(eq(scheduledPosts.id, target.postId))
@@ -834,19 +891,27 @@ export async function rescheduleTarget(targetId: string, localDatetime: string):
 }
 
 export async function deleteScheduledPost(postId: string): Promise<FormState> {
-  await requireUser()
+  const { id: ownerId } = await requireUser()
 
   const db = getDb()
   const targets = await db
     .select()
     .from(scheduledPostTargets)
-    .where(eq(scheduledPostTargets.postId, postId))
+    .where(
+      and(
+        eq(scheduledPostTargets.postId, postId),
+        inArray(
+          scheduledPostTargets.postId,
+          db.select({ id: scheduledPosts.id }).from(scheduledPosts).where(eq(scheduledPosts.ownerId, ownerId)),
+        ),
+      ),
+    )
   // Deleting the row cannot unpublish the post on the network — refuse instead of lying.
   if (targets.some((t) => t.status === 'published' || t.status === 'publishing')) {
     return { error: 'Ya se publicó (o está publicando): elimínalo en la red.' }
   }
 
-  await db.delete(scheduledPosts).where(eq(scheduledPosts.id, postId))
+  await db.delete(scheduledPosts).where(and(eq(scheduledPosts.id, postId), eq(scheduledPosts.ownerId, ownerId)))
   revalidatePath('/admin/schedule')
   return { ok: true }
 }
