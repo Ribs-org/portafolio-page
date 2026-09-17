@@ -119,6 +119,12 @@ export async function updateProfile(
 export async function makeDefault(profileId: string) {
   const { id: ownerId } = await requireUser()
   const db = getDb()
+  const [profile] = await db
+    .select({ id: profiles.id })
+    .from(profiles)
+    .where(and(eq(profiles.id, profileId), eq(profiles.ownerId, ownerId)))
+  if (!profile) return
+
   await db
     .update(profiles)
     .set({ isDefault: false })
@@ -511,7 +517,7 @@ function reglaDesdeFormulario(formData: FormData): unknown {
 }
 
 export async function createScheduledPost(_prev: FormState, formData: FormData): Promise<FormState> {
-  await requireUser()
+  const { id: ownerId } = await requireUser()
 
   const caption = String(formData.get('caption') ?? '').trim()
   const networks = formData.getAll('networks').map(String)
@@ -552,7 +558,7 @@ export async function createScheduledPost(_prev: FormState, formData: FormData):
   }
 
   try {
-    await crearPostProgramado({
+    await crearPostProgramado(ownerId, {
       caption,
       scheduledAt: scheduledAt!,
       media: uploaded,
@@ -922,7 +928,7 @@ export type BatchRow = { fila: number; ok: boolean; detalle: string }
 export type BatchState = { error?: string; filas?: BatchRow[] }
 
 export async function uploadBatch(_prev: BatchState, formData: FormData): Promise<BatchState> {
-  await requireUser()
+  const { id: ownerId } = await requireUser()
 
   const file = formData.get('archivo')
   if (!(file instanceof File) || file.size === 0) return { error: 'Adjunta un archivo CSV.' }
@@ -934,7 +940,7 @@ export async function uploadBatch(_prev: BatchState, formData: FormData): Promis
     return { error: `Máximo ${MAX_BATCH_ITEMS} posts por lote.` }
   }
 
-  const resultados = await scheduleBatch(parsed.items)
+  const resultados = await scheduleBatch(ownerId, parsed.items)
   revalidatePath('/admin/schedule')
   return {
     // +2: la fila 1 del archivo es el encabezado, y la gente cuenta desde 1.

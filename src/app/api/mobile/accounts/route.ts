@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
-import { asc } from 'drizzle-orm'
-import { accountMetrics, getDb } from '@/db'
+import { asc, eq, inArray } from 'drizzle-orm'
+import { accountMetrics, getDb, socialAccounts } from '@/db'
 import { localDay } from '@/lib/analytics'
 import { buildAccountCards, buildAccountSeries } from '@/lib/account-stats'
 import { requireMobileUser } from '@/lib/mobile-guardia'
@@ -9,7 +9,8 @@ import { parseRango } from '@/lib/mobile-api'
 export const dynamic = 'force-dynamic'
 
 export async function GET(request: Request) {
-  if (!(await requireMobileUser(request))) {
+  const usuario = await requireMobileUser(request)
+  if (!usuario) {
     return new NextResponse('No autorizado', { status: 401 })
   }
 
@@ -26,6 +27,12 @@ export async function GET(request: Request) {
       reach: accountMetrics.reach,
     })
     .from(accountMetrics)
+    .where(
+      inArray(
+        accountMetrics.accountId,
+        getDb().select({ id: socialAccounts.id }).from(socialAccounts).where(eq(socialAccounts.ownerId, usuario.id)),
+      ),
+    )
     .orderBy(asc(accountMetrics.day), asc(accountMetrics.network))
 
   const desde = localDay(from)

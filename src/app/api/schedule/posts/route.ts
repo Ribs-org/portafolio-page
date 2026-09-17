@@ -4,6 +4,7 @@ import { getDb, scheduledPosts, scheduledPostMedia, scheduledPostTargets } from 
 import { SITE_TIMEZONE } from '@/lib/analytics'
 import { env } from '@/lib/env'
 import { armarProgramados, parseVentana } from '@/lib/schedule-api'
+import { adminId } from '@/lib/usuarios'
 
 export const dynamic = 'force-dynamic'
 
@@ -29,12 +30,21 @@ export async function GET(request: Request) {
   )
   if ('error' in ventana) return NextResponse.json({ error: ventana.error }, { status: 400 })
 
+  // La llave de API es del despliegue, no de una persona: lo que entra por ahí es del admin.
+  const ownerId = await adminId()
+
   const db = getDb()
   const filas = await db
     .select({ post: scheduledPosts, target: scheduledPostTargets })
     .from(scheduledPosts)
     .innerJoin(scheduledPostTargets, eq(scheduledPostTargets.postId, scheduledPosts.id))
-    .where(and(gte(scheduledPosts.scheduledAt, ventana.from), lt(scheduledPosts.scheduledAt, ventana.to)))
+    .where(
+      and(
+        eq(scheduledPosts.ownerId, ownerId),
+        gte(scheduledPosts.scheduledAt, ventana.from),
+        lt(scheduledPosts.scheduledAt, ventana.to),
+      ),
+    )
     .orderBy(asc(scheduledPosts.scheduledAt), asc(scheduledPostTargets.network))
 
   const ids = [...new Set(filas.map((f) => f.post.id))]

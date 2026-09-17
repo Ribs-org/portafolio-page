@@ -15,22 +15,23 @@ export type MediaSubida = { url: string; mediaType: 'image' | 'video' }
  * Lanza `SinCuenta` si una red no tiene cuenta conectada; el llamador la traduce a su
  * frase.
  */
-export async function crearPostProgramado(input: {
-  caption: string
-  scheduledAt: Date
-  media: MediaSubida[]
-  networks: string[]
-  opciones?: Record<string, OpcionesDestino>
-  regla?: ReglaLimpia | null
-}): Promise<string> {
+export async function crearPostProgramado(
+  ownerId: string,
+  input: {
+    caption: string
+    scheduledAt: Date
+    media: MediaSubida[]
+    networks: string[]
+    opciones?: Record<string, OpcionesDestino>
+    regla?: ReglaLimpia | null
+  },
+): Promise<string> {
   const db = getDb()
   // Antes de escribir nada: un post sin cuenta a la que salir no debe quedar a medias.
-  // TRANSICIÓN: el dueño real llega en la tarea de esta capa; hasta entonces, el admin.
-  const { asegurarAdmin } = await import('@/lib/usuarios')
-  const cuentas = await exigirCuentas((await asegurarAdmin()).id, input.networks)
+  const cuentas = await exigirCuentas(ownerId, input.networks)
   const [post] = await db
     .insert(scheduledPosts)
-    .values({ caption: input.caption, scheduledAt: input.scheduledAt })
+    .values({ ownerId, caption: input.caption, scheduledAt: input.scheduledAt })
     .returning()
   if (input.media.length > 0) {
     await db.insert(scheduledPostMedia).values(

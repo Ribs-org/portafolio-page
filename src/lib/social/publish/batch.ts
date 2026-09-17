@@ -247,13 +247,10 @@ export async function mediaToBlob(
  * hosting is how you meet rate limits. A failed row records its fixed sentence and
  * the loop keeps going — partial success is the contract, Buffer-style.
  */
-export async function scheduleBatch(items: BatchItem[]): Promise<BatchResult[]> {
+export async function scheduleBatch(ownerId: string, items: BatchItem[]): Promise<BatchResult[]> {
   const db = getDb()
   const now = new Date()
   const results: BatchResult[] = []
-  // TRANSICIÓN: el dueño real llega en la tarea de esta capa; hasta entonces, el admin.
-  const { asegurarAdmin } = await import('@/lib/usuarios')
-  const ownerId = (await asegurarAdmin()).id
 
   for (const [index, item] of items.entries()) {
     const invalid = validateBatchItem(item, now)
@@ -332,7 +329,7 @@ export async function scheduleBatch(items: BatchItem[]): Promise<BatchResult[]> 
 
       const [post] = await db
         .insert(scheduledPosts)
-        .values({ caption: item.texto, scheduledAt, coverUrl, atributos })
+        .values({ ownerId, caption: item.texto, scheduledAt, coverUrl, atributos })
         .returning()
       if (uploaded.length > 0) {
         await db.insert(scheduledPostMedia).values(

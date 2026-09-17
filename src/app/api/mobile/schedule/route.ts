@@ -25,7 +25,8 @@ const DIAS_ATRAS = 7
 const DIAS_ADELANTE = 30
 
 export async function GET(request: Request) {
-  if (!(await requireMobileUser(request))) {
+  const usuario = await requireMobileUser(request)
+  if (!usuario) {
     return new NextResponse('No autorizado', { status: 401 })
   }
 
@@ -37,6 +38,7 @@ export async function GET(request: Request) {
     .innerJoin(scheduledPostTargets, eq(scheduledPostTargets.postId, scheduledPosts.id))
     .where(
       and(
+        eq(scheduledPosts.ownerId, usuario.id),
         gt(scheduledPosts.scheduledAt, new Date(now.getTime() - DIAS_ATRAS * 864e5)),
         lte(scheduledPosts.scheduledAt, new Date(now.getTime() + DIAS_ADELANTE * 864e5)),
       ),
@@ -87,7 +89,8 @@ export async function GET(request: Request) {
  * vuelta, y no vale la pena pagarlo si el post ya iba a rechazarse por otra razón).
  */
 export async function POST(request: Request) {
-  if (!(await requireMobileUser(request))) {
+  const usuario = await requireMobileUser(request)
+  if (!usuario) {
     return new NextResponse('No autorizado', { status: 401 })
   }
 
@@ -134,7 +137,7 @@ export async function POST(request: Request) {
   }
 
   try {
-    const id = await crearPostProgramado({
+    const id = await crearPostProgramado(usuario.id, {
       caption: borrador.texto,
       scheduledAt: scheduledAt!,
       media,

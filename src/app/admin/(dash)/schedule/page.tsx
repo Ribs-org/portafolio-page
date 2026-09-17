@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { asc, eq, inArray } from 'drizzle-orm'
 import { getDb, scheduledPosts, scheduledPostTargets, scheduledPostMedia } from '@/db'
 import { SITE_TIMEZONE } from '@/lib/analytics'
+import { requireUser } from '@/lib/auth'
 import { addDays, normalizeWeekParam } from '@/lib/schedule-week'
 import { cn } from '@/lib/utils'
 import { Composer } from './composer'
@@ -46,11 +47,13 @@ export default async function SchedulePage({
     SITE_TIMEZONE,
   )
 
+  const { id: ownerId } = await requireUser()
   const db = getDb()
   const rows = await db
     .select({ post: scheduledPosts, target: scheduledPostTargets })
     .from(scheduledPosts)
     .innerJoin(scheduledPostTargets, eq(scheduledPostTargets.postId, scheduledPosts.id))
+    .where(eq(scheduledPosts.ownerId, ownerId))
     .orderBy(asc(scheduledPosts.scheduledAt))
 
   const posts = new Map<

@@ -1,7 +1,8 @@
 import { notFound } from 'next/navigation'
-import { asc, eq } from 'drizzle-orm'
+import { and, asc, eq } from 'drizzle-orm'
 import { getDb, scheduledPosts, scheduledPostTargets, scheduledPostMedia, reglasClave } from '@/db'
 import { SITE_TIMEZONE } from '@/lib/analytics'
+import { requireUser } from '@/lib/auth'
 import { toZonedInput } from '@/lib/utils'
 import { resumenOpciones } from '@/lib/social/publish/opciones'
 import { Editor } from './editor'
@@ -22,8 +23,12 @@ export default async function EditScheduledPostPage({
       ? query.volver
       : '/admin/schedule'
 
+  const { id: ownerId } = await requireUser()
   const db = getDb()
-  const [post] = await db.select().from(scheduledPosts).where(eq(scheduledPosts.id, id))
+  const [post] = await db
+    .select()
+    .from(scheduledPosts)
+    .where(and(eq(scheduledPosts.id, id), eq(scheduledPosts.ownerId, ownerId)))
   if (!post) notFound()
 
   const [targets, media, [regla]] = await Promise.all([
