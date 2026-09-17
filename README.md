@@ -58,7 +58,7 @@ El primero es `AUTH_SECRET` (firma tu sesión del panel), el segundo `FINGERPRIN
 
 ### 2. Aprieta el botón
 
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2FRibs-org%2Fportafolio-page&env=ADMIN_PASSWORD,ADMIN_EMAIL,AUTH_SECRET,FINGERPRINT_SALT&envDescription=Tu%20correo%2C%20la%20contrase%C3%B1a%20de%20tu%20app%20y%20los%20dos%20secretos%20que%20generaste&envLink=https%3A%2F%2Fgithub.com%2FRibs-org%2Fportafolio-page%2Fblob%2Fmain%2F.env.example&project-name=portafolio&repository-name=portafolio)
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2FRibs-org%2Fportafolio-page&env=ADMIN_EMAIL,ADMIN_PASSWORD,AUTH_SECRET,FINGERPRINT_SALT&envDescription=Tu%20correo%2C%20la%20contrase%C3%B1a%20de%20tu%20app%20y%20los%20dos%20secretos%20que%20generaste&envLink=https%3A%2F%2Fgithub.com%2FRibs-org%2Fportafolio-page%2Fblob%2Fmain%2F.env.example&project-name=portafolio&repository-name=portafolio)
 
 Vercel copia este repositorio a tu cuenta de GitHub y te pide cuatro variables:
 
