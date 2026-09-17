@@ -289,6 +289,10 @@ export const tiktokPublisher: Publisher = {
         console.error('TikTok status/fetch:', estado(r), codigo(r), mensaje(r).slice(0, 300))
         return { kind: 'processing', containerId: input.containerId }
       }
+      // Lo que TikTok contesta en cada sondeo, sin filtrar: cuando un post se queda
+      // «publicando» sin avanzar, esta línea es la única forma de saber si la red dice que
+      // sigue procesando, que falló con un motivo, o algo que no sabemos leer.
+      console.log('TikTok status/fetch:', r.texto.slice(0, 400))
       const veredicto = veredictoEstado(r.body?.data, idsDesdeTexto(r.texto))
       if (veredicto.kind === 'complete') return { kind: 'published', externalId: veredicto.postId }
       if (veredicto.kind === 'inbox') return { kind: 'published', externalId: null }
