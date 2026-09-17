@@ -2,14 +2,15 @@ import { NextResponse } from 'next/server'
 import { SOCIAL_NETWORKS } from '@/db/schema'
 import { SITE_TIMEZONE, localDay } from '@/lib/analytics'
 import { buildMetricPost } from '@/lib/metrics-api'
-import { MAX_POSTS, parseRango, requireMobile } from '@/lib/mobile-api'
+import { requireMobileUser } from '@/lib/mobile-guardia'
+import { MAX_POSTS, parseRango } from '@/lib/mobile-api'
 import { attributesFor } from '@/lib/post-attributes'
 import { getPostRows } from '@/lib/posts'
 
 export const dynamic = 'force-dynamic'
 
 export async function GET(request: Request) {
-  if (!(await requireMobile(request))) {
+  if (!(await requireMobileUser(request))) {
     return new NextResponse('No autorizado', { status: 401 })
   }
 

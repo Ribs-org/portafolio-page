@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server'
+import { requireMobileUser } from '@/lib/mobile-guardia'
 import {
   CUERPO_ILEGIBLE,
   parseBorradorMovil,
   parseConteos,
-  requireMobile,
   resolverCuando,
 } from '@/lib/mobile-api'
 import { validateScheduleDraft } from '@/lib/social/publish/validate'
@@ -17,7 +17,7 @@ export const dynamic = 'force-dynamic'
  * del dueño. Solo cuenta archivos; las URLs todavía no existen.
  */
 export async function POST(request: Request) {
-  if (!(await requireMobile(request))) {
+  if (!(await requireMobileUser(request))) {
     return new NextResponse('No autorizado', { status: 401 })
   }
 

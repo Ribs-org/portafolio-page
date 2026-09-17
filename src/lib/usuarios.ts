@@ -1,19 +1,24 @@
 import 'server-only'
 import { hkdfSync } from 'node:crypto'
-import { and, asc, desc, eq, isNull } from 'drizzle-orm'
+import { and, asc, desc, eq, gt, isNull } from 'drizzle-orm'
 import { codigosIngreso, getDb, users, type Usuario } from '@/db'
 import { enviarCorreo } from './correo'
 import { env } from './env'
 import {
+  CODIGO_INCORRECTO,
   CORREO_INVALIDO,
+  DEMASIADOS_INTENTOS,
+  MAX_INTENTOS,
   USUARIO_CON_INGRESOS,
   USUARIO_YA_INVITADO,
   VENTANA_MS,
   VIGENCIA_MS,
+  codigoCoincide,
   generarCodigo,
   hashCodigo,
   normalizarCorreo,
   puedePedir,
+  vigente,
 } from './ingreso'
 
 /** La clave con la que se hashean los códigos: derivada, para no reutilizar AUTH_SECRET. */
@@ -110,4 +115,39 @@ export async function pedir(correo: string): Promise<void> {
     text: `Tu código para entrar a Parrilla es ${codigo}. Vale diez minutos. Si no lo pediste, ignora este correo.`,
   })
   if (!enviado) console.error('[ingreso] no se pudo mandar el código a', usuario.correo)
+}
+
+/**
+ * Consume el último código vivo de ese correo. Devuelve al usuario o la frase que
+ * corresponda; quien llama decide si abre una sesión web o emite un token del teléfono.
+ */
+export async function canjear(correo: string, codigo: string): Promise<{ usuario: Usuario } | { error: string }> {
+  const usuario = await buscarPorCorreo(correo)
+  if (!usuario) return { error: CODIGO_INCORRECTO }
+
+  const db = getDb()
+  const now = new Date()
+  const [fila] = await db
+    .select()
+    .from(codigosIngreso)
+    .where(and(eq(codigosIngreso.userId, usuario.id), isNull(codigosIngreso.usadoEn), gt(codigosIngreso.expiraEn, now)))
+    .orderBy(desc(codigosIngreso.createdAt))
+    .limit(1)
+  if (!fila) return { error: CODIGO_INCORRECTO }
+  // Los intentos agotados se dicen en cada reintento, no solo en el que agota el contador.
+  if (fila.intentos >= MAX_INTENTOS) return { error: DEMASIADOS_INTENTOS }
+  if (!vigente(fila, now)) return { error: CODIGO_INCORRECTO }
+
+  if (!codigoCoincide(codigo, fila.hash, claveCodigos())) {
+    const intentos = fila.intentos + 1
+    await db.update(codigosIngreso).set({ intentos }).where(eq(codigosIngreso.id, fila.id))
+    return { error: intentos >= MAX_INTENTOS ? DEMASIADOS_INTENTOS : CODIGO_INCORRECTO }
+  }
+
+  await db.update(codigosIngreso).set({ usadoEn: now }).where(eq(codigosIngreso.id, fila.id))
+  await db
+    .update(users)
+    .set({ primerIngresoEn: usuario.primerIngresoEn ?? now, updatedAt: now })
+    .where(eq(users.id, usuario.id))
+  return { usuario }
 }

@@ -3,14 +3,15 @@ import { and, asc, eq, gt, lte } from 'drizzle-orm'
 import { accountMetrics, getDb, scheduledPosts, scheduledPostTargets } from '@/db'
 import { SITE_TIMEZONE, getKpis, localDay } from '@/lib/analytics'
 import { isoInZone } from '@/lib/metrics-api'
-import { MAX_POSTS, parseRango, requireMobile } from '@/lib/mobile-api'
+import { requireMobileUser } from '@/lib/mobile-guardia'
+import { MAX_POSTS, parseRango } from '@/lib/mobile-api'
 import { getPostRows } from '@/lib/posts'
 import { postKpisFrom } from '@/lib/posts-kpis'
 
 export const dynamic = 'force-dynamic'
 
 export async function GET(request: Request) {
-  if (!(await requireMobile(request))) {
+  if (!(await requireMobileUser(request))) {
     return new NextResponse('No autorizado', { status: 401 })
   }
 

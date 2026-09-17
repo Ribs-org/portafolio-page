@@ -3,12 +3,13 @@ import { asc } from 'drizzle-orm'
 import { accountMetrics, getDb } from '@/db'
 import { localDay } from '@/lib/analytics'
 import { buildAccountCards, buildAccountSeries } from '@/lib/account-stats'
-import { parseRango, requireMobile } from '@/lib/mobile-api'
+import { requireMobileUser } from '@/lib/mobile-guardia'
+import { parseRango } from '@/lib/mobile-api'
 
 export const dynamic = 'force-dynamic'
 
 export async function GET(request: Request) {
-  if (!(await requireMobile(request))) {
+  if (!(await requireMobileUser(request))) {
     return new NextResponse('No autorizado', { status: 401 })
   }
 

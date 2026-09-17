@@ -3,6 +3,7 @@ import { and, asc, eq, gt, inArray, lte } from 'drizzle-orm'
 import { getDb, scheduledPosts, scheduledPostMedia, scheduledPostTargets } from '@/db'
 import { SITE_TIMEZONE } from '@/lib/analytics'
 import { isoInZone } from '@/lib/metrics-api'
+import { requireMobileUser } from '@/lib/mobile-guardia'
 import {
   ARCHIVO_AJENO,
   ARCHIVO_FALTANTE,
@@ -10,7 +11,6 @@ import {
   NO_SE_GUARDO,
   parseBorradorMovil,
   parseMediaMovil,
-  requireMobile,
   resolverCuando,
 } from '@/lib/mobile-api'
 import { crearPostProgramado } from '@/lib/social/publish/crear'
@@ -25,7 +25,7 @@ const DIAS_ATRAS = 7
 const DIAS_ADELANTE = 30
 
 export async function GET(request: Request) {
-  if (!(await requireMobile(request))) {
+  if (!(await requireMobileUser(request))) {
     return new NextResponse('No autorizado', { status: 401 })
   }
 
@@ -87,7 +87,7 @@ export async function GET(request: Request) {
  * vuelta, y no vale la pena pagarlo si el post ya iba a rechazarse por otra razón).
  */
 export async function POST(request: Request) {
-  if (!(await requireMobile(request))) {
+  if (!(await requireMobileUser(request))) {
     return new NextResponse('No autorizado', { status: 401 })
   }
 
