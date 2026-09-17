@@ -86,7 +86,10 @@ export function Queue({
               >
                 Editar
               </Link>
-              {targets.some((t) => t.status === 'scheduled' || t.status === 'publishing') ? (
+              {/* También en las fallidas: la acción las devuelve a pendiente antes de publicar. */}
+              {targets.some(
+                (t) => t.status === 'scheduled' || t.status === 'publishing' || t.status === 'failed',
+              ) ? (
                 <button
                   type="button"
                   disabled={pending}

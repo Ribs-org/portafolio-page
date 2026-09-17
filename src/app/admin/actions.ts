@@ -952,6 +952,15 @@ export async function subirAhora(postId: string): Promise<{ error?: string; ok?:
     .set({ scheduledAt: ahora, updatedAt: ahora })
     .where(eq(scheduledPosts.id, post.id))
 
+  // Lo que falló vuelve a pendiente: pulsar «Subir ahora» sobre algo que no salió es justo
+  // cuando más se quiere reintentar, y mandar al dueño a reprogramar con fecha y hora sería
+  // un rodeo. Los intentos se reinician porque esto es una decisión suya, no un reintento
+  // automático más. Lo ya publicado no se toca: republicar no es lo que pidió.
+  await db
+    .update(scheduledPostTargets)
+    .set({ status: 'scheduled', attemptCount: 0, lastError: null, updatedAt: ahora })
+    .where(and(eq(scheduledPostTargets.postId, post.id), eq(scheduledPostTargets.status, 'failed')))
+
   const { publishDue } = await import('@/lib/social/publish/run')
   const report = await publishDue(ahora, post.id)
   revalidatePath('/admin/schedule')
