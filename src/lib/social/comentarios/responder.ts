@@ -113,7 +113,9 @@ async function privadoSiToca(
       .where(eq(postComments.id, fila.id))
     return
   }
-  const texto = (await leerAjuste(CLAVE_TEXTO_PRIVADO))?.trim() || TEXTO_PRIVADO_POR_DEFECTO
+  const texto = account.ownerId
+    ? (await leerAjuste(account.ownerId, CLAVE_TEXTO_PRIVADO))?.trim() || TEXTO_PRIVADO_POR_DEFECTO
+    : TEXTO_PRIVADO_POR_DEFECTO
   try {
     await mandarPrivado(account, token, fila.externalId, texto)
     await db

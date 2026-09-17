@@ -909,13 +909,13 @@ export async function guardarInstruccionesComentarios(
   _prev: FormState,
   formData: FormData,
 ): Promise<FormState> {
-  await requireUser()
+  const { id: ownerId } = await requireUser()
   const { CLAVE_INSTRUCCIONES, normalizarInstrucciones } = await import(
     '@/lib/social/comentarios/instrucciones'
   )
   const { guardarAjuste } = await import('@/lib/ajustes')
   const bruto = String(formData.get('instrucciones') ?? '')
-  await guardarAjuste(CLAVE_INSTRUCCIONES, normalizarInstrucciones(bruto))
+  await guardarAjuste(ownerId, CLAVE_INSTRUCCIONES, normalizarInstrucciones(bruto))
   revalidatePath('/admin/comments')
   return { ok: true }
 }
