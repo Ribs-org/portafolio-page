@@ -43,7 +43,14 @@ export async function POST(request: Request) {
   // Camino de transición: la app instalada manda la contraseña del panel y entra como el admin.
   if (typeof body.password === 'string') {
     if (!passwordMatches(body.password)) return NextResponse.json({ error: 'Contraseña incorrecta.' }, { status: 401 })
-    const admin = await asegurarAdmin()
+    let admin
+    try {
+      admin = await asegurarAdmin()
+    } catch {
+      // Sin ADMIN_EMAIL no hay a quién dejar entrar; decirlo es mejor que fingir que la
+      // contraseña está mal.
+      return NextResponse.json({ error: 'El servidor no tiene configurado el correo del dueño.' }, { status: 503 })
+    }
     return NextResponse.json({ token: await mintMobileToken({ sub: admin.id, sv: admin.sesionVersion }) })
   }
 

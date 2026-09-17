@@ -58,9 +58,9 @@ El primero es `AUTH_SECRET` (firma tu sesión del panel), el segundo `FINGERPRIN
 
 ### 2. Aprieta el botón
 
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2FRibs-org%2Fportafolio-page&env=ADMIN_EMAIL,ADMIN_PASSWORD,AUTH_SECRET,FINGERPRINT_SALT&envDescription=Tu%20correo%2C%20la%20contrase%C3%B1a%20de%20tu%20app%20y%20los%20dos%20secretos%20que%20generaste&envLink=https%3A%2F%2Fgithub.com%2FRibs-org%2Fportafolio-page%2Fblob%2Fmain%2F.env.example&project-name=portafolio&repository-name=portafolio)
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2FRibs-org%2Fportafolio-page&env=ADMIN_EMAIL,ADMIN_PASSWORD,AUTH_SECRET,FINGERPRINT_SALT,RESEND_API_KEY&envDescription=Tu%20correo%2C%20la%20contrase%C3%B1a%20de%20tu%20app%20y%20los%20dos%20secretos%20que%20generaste&envLink=https%3A%2F%2Fgithub.com%2FRibs-org%2Fportafolio-page%2Fblob%2Fmain%2F.env.example&project-name=portafolio&repository-name=portafolio)
 
-Vercel copia este repositorio a tu cuenta de GitHub y te pide cuatro variables:
+Vercel copia este repositorio a tu cuenta de GitHub y te pide cinco variables:
 
 | Variable | Qué pones |
 | --- | --- |
@@ -68,6 +68,7 @@ Vercel copia este repositorio a tu cuenta de GitHub y te pide cuatro variables:
 | `ADMIN_PASSWORD` | La contraseña con la que entra la app del teléfono. El panel web no la usa: que sea larga igual |
 | `AUTH_SECRET` | El primer valor del paso 1 |
 | `FINGERPRINT_SALT` | El segundo valor del paso 1 |
+| `RESEND_API_KEY` | La llave de Resend: sin ella no salen los códigos de ingreso. La provisiona la integración de Resend |
 
 El deploy va a terminar bien, pero al abrir el sitio verás **"No se pudo leer la base de
 datos"**. Es lo esperado: todavía no hay base de datos. Sigue.
@@ -149,6 +150,9 @@ npm run db:setup
 npm run dev
 npx vercel           # cuando quieras subirlo
 ```
+
+Sin `RESEND_API_KEY` en desarrollo, el código de ingreso no se manda por correo: aparece
+en la consola del servidor, y con eso basta para entrar en local.
 
 </details>
 
@@ -545,7 +549,7 @@ Vercel y bajan con `vercel env pull .env.local`.
 | `CRON_SECRET` | Autoriza las corridas programadas (sync diario y publicación cada 5 minutos) | No — la pone Vercel solo, al declarar el cron |
 | `MIGRAR_PREVIEWS` | Que los previews migren su rama de Neon | Solo cuando la integración de Neon crea una rama por preview |
 | `SCHEDULE_API_KEY` | Autoriza `POST /api/schedule/batch` (carga masiva), `GET /api/schedule/posts` (calendario) y `GET /api/metrics/posts` (métricas) | Sin ella los tres endpoints quedan cerrados; genérala igual que `CRON_SECRET` |
-| `RESEND_API_KEY` | Enviar el email de aviso cuando una publicación programada falla | La provisiona la integración de Resend del marketplace de Vercel |
+| `RESEND_API_KEY` | Manda los códigos de ingreso y el aviso de publicación fallida | Sí — sin ella nadie puede entrar al panel |
 | `PUBLISH_ALERT_TO` | A qué correo llega el aviso de fallo | Sin ella no se envía ningún email; el calendario sigue mostrando el fallo |
 | `PUBLISH_ALERT_FROM` | Remitente del aviso | Opcional; default `onboarding@resend.dev` |
 

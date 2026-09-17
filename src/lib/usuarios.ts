@@ -1,6 +1,6 @@
 import 'server-only'
 import { hkdfSync } from 'node:crypto'
-import { and, asc, desc, eq, gt, isNull } from 'drizzle-orm'
+import { and, asc, desc, eq, gt, isNull, sql } from 'drizzle-orm'
 import { codigosIngreso, getDb, users, type Usuario } from '@/db'
 import { enviarCorreo } from './correo'
 import { env } from './env'
@@ -88,15 +88,16 @@ export async function pedidosRecientes(userId: string, now: Date): Promise<Date[
 }
 
 /**
- * Manda un código nuevo al correo, si ese correo está invitado y no pasó el tope. No dice
- * nada de vuelta a propósito: quien llama responde lo mismo exista o no el usuario.
+ * Manda un código nuevo al correo, si ese correo está invitado y no pasó el tope. Devuelve
+ * si el correo salió; quien llama desde el camino público lo ignora a propósito, porque la
+ * respuesta al visitante es la misma exista o no el usuario.
  */
-export async function pedir(correo: string): Promise<void> {
+export async function pedir(correo: string): Promise<boolean> {
   await asegurarAdmin()
   const usuario = await buscarPorCorreo(correo)
-  if (!usuario) return
+  if (!usuario) return false
   const now = new Date()
-  if (!puedePedir(await pedidosRecientes(usuario.id, now), now)) return
+  if (!puedePedir(await pedidosRecientes(usuario.id, now), now)) return false
   const db = getDb()
   // Un código nuevo invalida los vivos: solo el último sirve.
   await db
@@ -104,17 +105,31 @@ export async function pedir(correo: string): Promise<void> {
     .set({ usadoEn: now })
     .where(and(eq(codigosIngreso.userId, usuario.id), isNull(codigosIngreso.usadoEn)))
   const codigo = generarCodigo()
-  await db.insert(codigosIngreso).values({
-    userId: usuario.id,
-    hash: hashCodigo(codigo, claveCodigos()),
-    expiraEn: new Date(now.getTime() + VIGENCIA_MS),
-  })
+  const [nueva] = await db
+    .insert(codigosIngreso)
+    .values({
+      userId: usuario.id,
+      hash: hashCodigo(codigo, claveCodigos()),
+      expiraEn: new Date(now.getTime() + VIGENCIA_MS),
+    })
+    .returning()
+  // En desarrollo no hay Resend: el código sale por la consola del servidor, que es la
+  // única forma de probar el ingreso en local. En producción esto no se ejecuta nunca.
+  if (process.env.NODE_ENV !== 'production') {
+    console.log(`[ingreso] código para ${usuario.correo}: ${codigo}`)
+  }
   const enviado = await enviarCorreo({
     to: usuario.correo,
     subject: `${codigo} es tu código para entrar a Parrilla`,
     text: `Tu código para entrar a Parrilla es ${codigo}. Vale diez minutos. Si no lo pediste, ignora este correo.`,
   })
-  if (!enviado) console.error('[ingreso] no se pudo mandar el código a', usuario.correo)
+  if (!enviado) {
+    console.error('[ingreso] no se pudo mandar el código a', usuario.correo)
+    // El cupo frena a quien martilla «reenviar», no a quien no recibió nada: si el correo no salió, la fila no cuenta.
+    await getDb().delete(codigosIngreso).where(eq(codigosIngreso.id, nueva!.id))
+    return false
+  }
+  return true
 }
 
 /**
@@ -139,8 +154,13 @@ export async function canjear(correo: string, codigo: string): Promise<{ usuario
   if (!vigente(fila, now)) return { error: CODIGO_INCORRECTO }
 
   if (!codigoCoincide(codigo, fila.hash, claveCodigos())) {
-    const intentos = fila.intentos + 1
-    await db.update(codigosIngreso).set({ intentos }).where(eq(codigosIngreso.id, fila.id))
+    // En SQL y no en memoria: dos intentos a la vez leerían el mismo número y el tope de cinco no se cumpliría.
+    const [actualizada] = await db
+      .update(codigosIngreso)
+      .set({ intentos: sql`${codigosIngreso.intentos} + 1` })
+      .where(eq(codigosIngreso.id, fila.id))
+      .returning({ intentos: codigosIngreso.intentos })
+    const intentos = actualizada?.intentos ?? fila.intentos + 1
     return { error: intentos >= MAX_INTENTOS ? DEMASIADOS_INTENTOS : CODIGO_INCORRECTO }
   }
 
@@ -150,4 +170,16 @@ export async function canjear(correo: string, codigo: string): Promise<{ usuario
     .set({ primerIngresoEn: usuario.primerIngresoEn ?? now, updatedAt: now })
     .where(eq(users.id, usuario.id))
   return { usuario }
+}
+
+/**
+ * Sube la versión de sesión: la cookie del panel y el token del teléfono de esa persona
+ * dejan de valer en su próxima petición. No toca a nadie más ni obliga a rotar
+ * AUTH_SECRET, que además cifra los tokens de Instagram, Facebook y YouTube.
+ */
+export async function cerrarSesiones(id: string): Promise<void> {
+  await getDb()
+    .update(users)
+    .set({ sesionVersion: sql`${users.sesionVersion} + 1`, updatedAt: new Date() })
+    .where(eq(users.id, id))
 }

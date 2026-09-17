@@ -1,4 +1,5 @@
 import { beforeAll, describe, expect, it } from 'vitest'
+import { SignJWT } from 'jose'
 import { firmarSesion, leerSesion } from './sesion-token'
 import { signOAuthState } from './social/oauth-state'
 
@@ -17,5 +18,14 @@ describe('sesión', () => {
     expect(await leerSesion('no.es.jwt')).toBeNull()
     // El state de OAuth viaja por la URL de instagram.com: jamás debe valer como sesión.
     expect(await leerSesion(await signOAuthState('instagram'))).toBeNull()
+  })
+
+  it('un token firmado con AUTH_SECRET pelado no vale: la llave se deriva', async () => {
+    const impostor = await new SignJWT({ purpose: 'session', rol: 'admin', sv: 3 })
+      .setSubject('u1')
+      .setProtectedHeader({ alg: 'HS256' })
+      .setIssuedAt()
+      .sign(new TextEncoder().encode(process.env.AUTH_SECRET!))
+    expect(await leerSesion(impostor)).toBeNull()
   })
 })

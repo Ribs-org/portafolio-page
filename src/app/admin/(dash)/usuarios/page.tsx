@@ -1,7 +1,7 @@
 import { Panel } from '@/components/charts/panel'
 import { requireAdmin } from '@/lib/auth'
 import { listarUsuarios } from '@/lib/usuarios'
-import { FormularioInvitar, BotonQuitar } from './formularios'
+import { FormularioInvitar, BotonQuitar, BotonCerrarSesiones } from './formularios'
 
 export const dynamic = 'force-dynamic'
 
@@ -26,6 +26,7 @@ export default async function UsuariosPage() {
               <span className="min-w-0 flex-1 truncate">{u.nombre ? `${u.nombre} · ` : ''}{u.correo}</span>
               <span className="text-xs text-fg-faint">{u.rol === 'admin' ? 'admin' : u.primerIngresoEn ? `entró ${FECHA.format(u.primerIngresoEn)}` : `invitado ${FECHA.format(u.invitadoEn)}`}</span>
               {u.rol !== 'admin' && !u.primerIngresoEn ? <BotonQuitar id={u.id} /> : null}
+              {u.rol !== 'admin' && u.primerIngresoEn ? <BotonCerrarSesiones id={u.id} /> : null}
             </li>
           ))}
         </ul>

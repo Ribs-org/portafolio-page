@@ -35,10 +35,10 @@ import { tiktokConnector } from '@/lib/social/tiktok'
 import { TIKTOK_SIN_CUENTA, consultarCreador, type CreadorTikTok } from '@/lib/social/publish/tiktok-creador'
 import { COOKIE_PENDIENTE, LOGIN_VENCIDO, elegidas, leerPendiente } from '@/lib/social/pendiente'
 import { networkLabel } from '@/lib/networks'
-import { invitar, pedir, quitar } from '@/lib/usuarios'
+import { cerrarSesiones, invitar, pedir, quitar } from '@/lib/usuarios'
 import { fromZonedInput, normalizeUrl, slugify } from '@/lib/utils'
 
-export type FormState = { error?: string; ok?: boolean }
+export type FormState = { error?: string; ok?: boolean; aviso?: string }
 
 export async function logout() {
   await destroySession()
@@ -923,8 +923,9 @@ export async function invitarUsuario(_prev: FormState, formData: FormData): Prom
   const resultado = await invitar(String(formData.get('correo') ?? ''), String(formData.get('nombre') ?? '') || null)
   if ('error' in resultado) return { error: resultado.error }
   // El primer código sale con la invitación: el invitado entra sin pedir nada.
-  await pedir(resultado.usuario.correo)
+  const enviado = await pedir(resultado.usuario.correo)
   revalidatePath('/admin/usuarios')
+  if (!enviado) return { ok: true, aviso: 'Invitado, pero el correo no salió: revisa Resend.' }
   return { ok: true }
 }
 
@@ -933,4 +934,11 @@ export async function quitarUsuario(id: string): Promise<{ error?: string }> {
   const resultado = await quitar(id)
   revalidatePath('/admin/usuarios')
   return 'error' in resultado ? { error: resultado.error } : {}
+}
+
+export async function cerrarSesionesUsuario(id: string): Promise<{ error?: string }> {
+  await requireAdmin()
+  await cerrarSesiones(id)
+  revalidatePath('/admin/usuarios')
+  return {}
 }

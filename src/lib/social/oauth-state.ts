@@ -4,11 +4,12 @@ import { env } from '../env'
 /**
  * The `state` that survives the round trip to instagram.com and tiktok.com.
  *
- * It is signed with `AUTH_SECRET`, the same key behind the admin session cookie, and
- * unlike the cookie it travels in a query string — through the network's servers, into
- * browser history, into their logs. So it carries a claim of its own, and the session
- * check in `lib/auth.ts` demands `role: 'admin'`: neither token verifies as the other,
- * in either direction, even though one key signs both.
+ * It is signed with the raw `AUTH_SECRET`, while the admin session cookie is signed with
+ * a key HKDF derives from that same secret for the session alone — and unlike the cookie
+ * this travels in a query string, through the network's servers, into browser history,
+ * into their logs. So it carries a claim of its own too: neither token verifies as the
+ * other, in either direction, since the keys themselves differ before the claims are
+ * even compared.
  *
  * Minting and checking live together on purpose. Split across the two routes, the claim
  * is one careless edit away from being written but never read, which is exactly the
