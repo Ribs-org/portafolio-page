@@ -17,9 +17,15 @@ export function failureEmail(
  * Best-effort by design: the calendar's 'failed' state is the source of truth, and a
  * mail provider outage must never turn into a crashed cron run. Hence the swallow.
  */
-export async function sendFailureAlert(caption: string, network: string, reason: string): Promise<void> {
+export async function sendFailureAlert(
+  para: string | undefined,
+  caption: string,
+  network: string,
+  reason: string,
+): Promise<void> {
   const apiKey = env('RESEND_API_KEY')
-  const to = env('PUBLISH_ALERT_TO')
+  // Al dueño del post, no al del despliegue: el fallo es de su publicación.
+  const to = para || env('PUBLISH_ALERT_TO')
   if (!apiKey || !to) return
 
   const { subject, text } = failureEmail(caption, network, reason)

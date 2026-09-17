@@ -56,6 +56,8 @@ export function keysReferenciadas(urls: Set<string>, base: string): Set<string> 
  * no está a propósito: esa URL es de la red social, no del almacén.
  */
 async function urlsReferenciadas(): Promise<Set<string>> {
+  // A propósito sin dueño: el bucket es uno solo, así que lo referenciado por cualquier
+  // usuario protege el archivo. Filtrar por dueño aquí borraría los archivos de los demás.
   const db = getDb()
   const [perfiles, enlaces, posts, media] = await Promise.all([
     db.select({ avatar: profiles.avatarUrl, og: profiles.ogImageUrl }).from(profiles),

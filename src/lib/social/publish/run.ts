@@ -5,6 +5,7 @@ import {
   scheduledPosts,
   scheduledPostTargets,
   socialAccounts,
+  users,
 } from '@/db'
 import { CONNECTORS } from '@/lib/social'
 import { PUBLISHERS } from './index'
@@ -92,11 +93,19 @@ export async function publishDue(now: Date = new Date()): Promise<Report> {
       else report.retried++
     } else {
       report.failed++
-      await sendFailureAlert(post.caption, target.network, patch.lastError ?? '')
+      // Al dueño del post, no al del despliegue: el fallo es de su publicación.
+      const correoDueno = post.ownerId ? await correoDelDueno(post.ownerId) : undefined
+      await sendFailureAlert(correoDueno, post.caption, target.network, patch.lastError ?? '')
     }
   }
 
   return report
+}
+
+/** El correo del dueño del post, para la alerta de fallo. Undefined si no tiene uno. */
+async function correoDelDueno(ownerId: string): Promise<string | undefined> {
+  const [fila] = await getDb().select({ correo: users.correo }).from(users).where(eq(users.id, ownerId)).limit(1)
+  return fila?.correo ?? undefined
 }
 
 /**
