@@ -342,6 +342,10 @@ export async function syncSocialNow(): Promise<{ ok?: boolean; error?: string }>
     return { error: 'Espera unos minutos antes de volver a sincronizar.' }
   }
   lastSyncStartedAtByOwner.set(ownerId, Date.now())
+  // Se poda al escribir: sin esto el mapa crece sin límite, un dueño nuevo por siempre.
+  for (const [id, at] of lastSyncStartedAtByOwner) {
+    if (Date.now() - at >= SYNC_COOLDOWN_MS) lastSyncStartedAtByOwner.delete(id)
+  }
 
   // Deferred: syncAll pulls in the three connectors and the token-crypto helpers behind
   // it, weight that the rest of this file's actions have no reason to carry.

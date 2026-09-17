@@ -229,6 +229,12 @@ export async function syncAll(ownerId?: string): Promise<SyncReport> {
   // contra Meta (ver run.ts), y cinco páginas de Facebook a la vez sería justo eso.
   const porRedResuelto = await Promise.all(
     [...porRed.entries()].map(async ([, cuentas]) => {
+      // `cuentas` ya viene filtrado por dueño cuando lo llama el botón del panel (arriba),
+      // así que `primaria` es la más antigua *de ese dueño*, no necesariamente la más
+      // antigua de la red entera. El cron llama a `syncAll()` sin ownerId y sí ve todas
+      // las cuentas, así que puede elegir otra primaria distinta para la misma red. No es
+      // un bug: solo significa que qué post nuevo hereda qué etiqueta de campaña depende
+      // de si lo sincronizó primero el panel de un dueño o el cron.
       const primaria = primariaDe(cuentas)
       const filas: SyncReport = []
       for (const cuenta of cuentas) {

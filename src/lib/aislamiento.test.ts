@@ -114,11 +114,28 @@ async function consultasEncadenadas(
   return capturas.slice()
 }
 
-/** owner_id como parámetro ligado de verdad, no solo como texto en el SQL: una columna
- * seleccionada también se llama "owner_id" y por sí sola no prueba ningún filtro. */
+/**
+ * owner_id como parámetro ligado de verdad, no solo como texto en el SQL: una columna
+ * seleccionada también se llama "owner_id" y por sí sola no prueba ningún filtro.
+ *
+ * Y el predicado tiene que caer en la cláusula WHERE, no en el ON de un leftJoin: un
+ * leftJoin con la condición en el ON no filtra nada, devuelve todas las filas con las
+ * columnas del padre en NULL (así falló `getTopLinks` una vez en esta rama). Por eso se
+ * corta el SQL en el último "where" y se busca el predicado solo en lo que queda:
+ * - Consulta simple, un único WHERE: lo que queda es esa cláusula entera. Acepta.
+ * - Subconsulta legítima dentro del WHERE (el patrón
+ *   `inArray(hija.padreId, select … where owner_id = $)`): el "where" de la
+ *   subconsulta es el más a la derecha del texto, así que lo que queda es justo su
+ *   condición — sigue siendo parte del WHERE exterior. Acepta.
+ * - Condición movida al ON de un leftJoin: el ON queda *antes* del "where" (o, si la
+ *   consulta no tiene ningún WHERE propio, no hay "where" que cortar). En ningún caso
+ *   aparece en lo que queda tras el corte. Rechaza.
+ */
 function esperarFiltradoPorDueno({ sql, params }: Captura) {
-  expect(sql).toMatch(/"owner_id"\s*=\s*\$/)
   expect(params).toContain(DUENO)
+  const partes = sql.split(/\bwhere\b/i)
+  expect(partes.length).toBeGreaterThan(1) // tiene que existir al menos un WHERE real.
+  expect(partes.pop()).toMatch(/"owner_id"\s*=\s*\$/)
 }
 
 describe('aislamiento por dueño (SQL generado, sin base)', () => {
@@ -133,36 +150,42 @@ describe('aislamiento por dueño (SQL generado, sin base)', () => {
         includeBots: true,
       }),
     )
+    expect(consultas).toHaveLength(1)
     for (const c of consultas) esperarFiltradoPorDueno(c)
   })
 
   it('posts: getCuentas filtra las cuentas por dueño', async () => {
     const { getCuentas } = await import('./posts')
     const consultas = await todasLasConsultas(() => getCuentas(DUENO))
+    expect(consultas).toHaveLength(1)
     for (const c of consultas) esperarFiltradoPorDueno(c)
   })
 
   it('profiles: getAllProfiles filtra los perfiles por dueño', async () => {
     const { getAllProfiles } = await import('./profiles')
     const consultas = await todasLasConsultas(() => getAllProfiles(DUENO))
+    expect(consultas).toHaveLength(1)
     for (const c of consultas) esperarFiltradoPorDueno(c)
   })
 
   it('comentarios-cola: getCola filtra por el dueño de la cuenta', async () => {
     const { getCola } = await import('./comentarios-cola')
     const consultas = await todasLasConsultas(() => getCola(DUENO, { estado: 'pendientes', red: null }))
+    expect(consultas).toHaveLength(1)
     for (const c of consultas) esperarFiltradoPorDueno(c)
   })
 
   it('social/cuentas: cuentasPrimarias filtra por dueño', async () => {
     const { cuentasPrimarias } = await import('./social/cuentas')
     const consultas = await todasLasConsultas(() => cuentasPrimarias(DUENO, ['instagram']))
+    expect(consultas).toHaveLength(1)
     for (const c of consultas) esperarFiltradoPorDueno(c)
   })
 
   it('ajustes: leerAjuste filtra por dueño', async () => {
     const { leerAjuste } = await import('./ajustes')
     const consultas = await todasLasConsultas(() => leerAjuste(DUENO, 'voz'))
+    expect(consultas).toHaveLength(1)
     for (const c of consultas) esperarFiltradoPorDueno(c)
   })
 
