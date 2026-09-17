@@ -1,6 +1,6 @@
 import 'server-only'
-import { and, desc, eq, gte, lte, sql, type AnyColumn, type SQL } from 'drizzle-orm'
-import { clicks, getDb, links, visits } from '@/db'
+import { and, desc, eq, gte, inArray, lte, sql, type AnyColumn, type SQL } from 'drizzle-orm'
+import { clicks, getDb, links, profiles, visits } from '@/db'
 import { env } from './env'
 
 /** Dashboard days are bucketed in this zone, not UTC. Override per deployment. */
@@ -24,6 +24,7 @@ export function localDay(date: Date): string {
 }
 
 export type Filters = {
+  ownerId: string
   profileId: string | null
   from: Date
   to: Date
@@ -33,14 +34,23 @@ export type Filters = {
 const int = (fragment: SQL) => sql<number>`${fragment}`.mapWith(Number)
 
 function visitWhere(f: Filters) {
-  const conds: SQL[] = [gte(visits.createdAt, f.from), lte(visits.createdAt, f.to)]
+  const conds: SQL[] = [
+    gte(visits.createdAt, f.from),
+    lte(visits.createdAt, f.to),
+    // La visita no tiene dueño propio: lo hereda del perfil que se estaba mirando.
+    inArray(visits.profileId, getDb().select({ id: profiles.id }).from(profiles).where(eq(profiles.ownerId, f.ownerId))),
+  ]
   if (f.profileId) conds.push(eq(visits.profileId, f.profileId))
   if (!f.includeBots) conds.push(eq(visits.isBot, false))
   return and(...conds)!
 }
 
 function clickWhere(f: Filters) {
-  const conds: SQL[] = [gte(clicks.createdAt, f.from), lte(clicks.createdAt, f.to)]
+  const conds: SQL[] = [
+    gte(clicks.createdAt, f.from),
+    lte(clicks.createdAt, f.to),
+    inArray(clicks.profileId, getDb().select({ id: profiles.id }).from(profiles).where(eq(profiles.ownerId, f.ownerId))),
+  ]
   if (f.profileId) conds.push(eq(clicks.profileId, f.profileId))
   if (!f.includeBots) conds.push(eq(clicks.isBot, false))
   return and(...conds)!
@@ -271,7 +281,10 @@ export async function getTopLinks(f: Filters, totalVisits: number): Promise<Link
       total: int(sql`count(*)`),
     })
     .from(clicks)
-    .leftJoin(links, eq(clicks.linkId, links.id))
+    .leftJoin(links, and(
+      eq(clicks.linkId, links.id),
+      inArray(links.profileId, getDb().select({ id: profiles.id }).from(profiles).where(eq(profiles.ownerId, f.ownerId))),
+    ))
     .where(clickWhere(f))
     .groupBy(clicks.linkId, links.label, links.url)
     .orderBy(desc(sql`4`))

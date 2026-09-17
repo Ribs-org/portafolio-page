@@ -5,6 +5,7 @@ import { env } from '@/lib/env'
 import { buildMetricPost, parseRango } from '@/lib/metrics-api'
 import { attributesFor } from '@/lib/post-attributes'
 import { getPostRows } from '@/lib/posts'
+import { adminId } from '@/lib/usuarios'
 
 export const dynamic = 'force-dynamic'
 
@@ -33,11 +34,13 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: `Red desconocida: ${red}.` }, { status: 400 })
   }
 
+  const ownerId = await adminId()
+
   // Mismo motor que el panel: acumulado + ganado en la ventana, visitas por ?s=. La
   // ventana viaja además como filtro de publicación, para que el tope acote lo pedido
   // y no las 200 filas más nuevas del catálogo entero.
   const all = await getPostRows(
-    { from: rango.from, to: rango.to, profileId: null, includeBots: false },
+    { ownerId, from: rango.from, to: rango.to, profileId: null, includeBots: false },
     false,
     { publishedFrom: rango.from, publishedTo: rango.to, limit: MAX_POSTS },
   )
@@ -45,7 +48,7 @@ export async function GET(request: Request) {
 
   // Los atributos del calendario, unidos por (red, externalId) en memoria: un post
   // orgánico simplemente no aparece aquí y sale con atributos null.
-  const atributosByKey = await attributesFor(rows)
+  const atributosByKey = await attributesFor(ownerId, rows)
 
   return NextResponse.json({
     truncado: all.length >= MAX_POSTS,

@@ -42,8 +42,11 @@ export type ComentarioFila = {
   reglaPalabra: string | null
 }
 
-export async function getCola(filtro: { estado: EstadoCola; red: string | null }): Promise<ComentarioFila[]> {
-  const condiciones = [inArray(postComments.state, POR_ESTADO[filtro.estado])]
+export async function getCola(
+  ownerId: string,
+  filtro: { estado: EstadoCola; red: string | null },
+): Promise<ComentarioFila[]> {
+  const condiciones = [inArray(postComments.state, POR_ESTADO[filtro.estado]), eq(socialAccounts.ownerId, ownerId)]
   if (filtro.red) condiciones.push(eq(postComments.network, filtro.red))
   if (filtro.estado === 'automaticas') condiciones.push(eq(postComments.automatico, true))
   const filas = await getDb()
@@ -85,8 +88,14 @@ export async function getCola(filtro: { estado: EstadoCola; red: string | null }
   return filas
 }
 
-export async function contarPendientes(red: string | null): Promise<number> {
-  const condiciones = [inArray(postComments.state, POR_ESTADO.pendientes)]
+export async function contarPendientes(ownerId: string, red: string | null): Promise<number> {
+  const condiciones = [
+    inArray(postComments.state, POR_ESTADO.pendientes),
+    inArray(
+      postComments.accountId,
+      getDb().select({ id: socialAccounts.id }).from(socialAccounts).where(eq(socialAccounts.ownerId, ownerId)),
+    ),
+  ]
   if (red) condiciones.push(eq(postComments.network, red))
   const [fila] = await getDb()
     .select({ total: int(sql`count(*)`) })

@@ -5,6 +5,7 @@ import { StatTile } from '@/components/charts/stat-tile'
 import { seriesColor } from '@/components/charts/theme'
 import { TrafficChart } from '@/components/charts/traffic-chart'
 import { FilterBar } from '@/components/filter-bar'
+import { requireUser } from '@/lib/auth'
 import { parseFilters } from '@/lib/filters'
 import { getPostRows, getPostSeries, postKpisFrom } from '@/lib/posts'
 import { networkLabel } from '@/lib/networks'
@@ -70,7 +71,8 @@ export default async function ContentPage({
   searchParams: Promise<Record<string, string | string[] | undefined>>
 }) {
   const params = await searchParams
-  const filters = parseFilters(params)
+  const { id: ownerId } = await requireUser()
+  const filters = parseFilters(params, ownerId)
   const includeArchived = params.archivados === '1'
   const onlyWithMetrics = params.metricas === '1'
   const redes = listParam(params.red)
@@ -80,7 +82,7 @@ export default async function ContentPage({
   const incluirAnteriores = params.anteriores === '1'
 
   const [profiles, rows, series] = await Promise.all([
-    getAllProfiles(),
+    getAllProfiles(ownerId),
     getPostRows(
       filters,
       includeArchived,

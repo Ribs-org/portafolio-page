@@ -1,6 +1,6 @@
 import 'server-only'
 import { and, desc, eq, inArray, isNull } from 'drizzle-orm'
-import { getDb, postComments, scheduledPostTargets, scheduledPosts, socialPosts } from '@/db'
+import { getDb, postComments, scheduledPostTargets, scheduledPosts, socialAccounts, socialPosts } from '@/db'
 import { leerAjuste } from '@/lib/ajustes'
 import { reglasPara } from './automatico'
 import { CLAVE_INSTRUCCIONES, normalizarInstrucciones } from './instrucciones'
@@ -108,7 +108,20 @@ export async function redactarPendientes(inicio: number): Promise<RedaccionRepor
     return !regla || !coincide(f.text, regla.palabra)
   })
 
-  const instrucciones = normalizarInstrucciones(await leerAjuste(CLAVE_INSTRUCCIONES))
+  const cuentas = await db
+    .select({ id: socialAccounts.id, ownerId: socialAccounts.ownerId })
+    .from(socialAccounts)
+    .where(inArray(socialAccounts.id, [...porCuenta.keys()]))
+  const ownerPorCuenta = new Map(cuentas.map((c) => [c.id, c.ownerId]))
+  const instruccionesPorOwner = new Map<string, string>()
+  const instruccionesDe = async (accountId: string): Promise<string> => {
+    const ownerId = ownerPorCuenta.get(accountId)
+    if (!ownerId) return normalizarInstrucciones(null)
+    if (!instruccionesPorOwner.has(ownerId)) {
+      instruccionesPorOwner.set(ownerId, normalizarInstrucciones(await leerAjuste(ownerId, CLAVE_INSTRUCCIONES)))
+    }
+    return instruccionesPorOwner.get(ownerId)!
+  }
 
   // La marca no se estampa en el momento del fallo: se junta acá y se decide al final.
   const fallidos: string[] = []
@@ -125,6 +138,7 @@ export async function redactarPendientes(inicio: number): Promise<RedaccionRepor
     // la fila queda pendiente y sin marca, y la pasada siguiente la vuelve a tomar.
     try {
       const caption = await captionDe(fila.accountId, fila.postExternalId)
+      const instrucciones = await instruccionesDe(fila.accountId)
 
       let borrador: string
       try {
@@ -178,16 +192,31 @@ export async function redactarPendientes(inicio: number): Promise<RedaccionRepor
 
 /**
  * El botón «Reintentar borrador» de la cola. A diferencia de la fase, acá el dueño está
- * mirando: se marca de inmediato, en cualquier dirección.
+ * mirando: se marca de inmediato, en cualquier dirección. La lectura va atada al dueño
+ * (mismo molde que `contarPendientes` en comentarios-cola.ts): un comentario de otro
+ * dueño no existe para esta llamada.
  */
-export async function redactarUno(id: string): Promise<{ ok: true } | { error: string }> {
+export async function redactarUno(ownerId: string, id: string): Promise<{ ok: true } | { error: string }> {
   const db = getDb()
-  const [fila] = await db.select().from(postComments).where(eq(postComments.id, id)).limit(1)
+  const [fila] = await db
+    .select()
+    .from(postComments)
+    .where(
+      and(
+        eq(postComments.id, id),
+        inArray(
+          postComments.accountId,
+          db.select({ id: socialAccounts.id }).from(socialAccounts).where(eq(socialAccounts.ownerId, ownerId)),
+        ),
+      ),
+    )
+    .limit(1)
   if (!fila || (fila.state !== 'pendiente' && fila.state !== 'fallido')) return { ok: true }
   const comentarista = comentaristaFor(fila.network)
   if (!comentarista) return { error: SIN_BORRADOR }
   if (!hayPasarela()) return { error: SIN_BORRADOR }
-  const instrucciones = normalizarInstrucciones(await leerAjuste(CLAVE_INSTRUCCIONES))
+  // La fila ya viene filtrada por `ownerId`: su cuenta es de este dueño, y sus instrucciones también.
+  const instrucciones = normalizarInstrucciones(await leerAjuste(ownerId, CLAVE_INSTRUCCIONES))
   const caption = await captionDe(fila.accountId, fila.postExternalId)
   try {
     const borrador = await redactarFila(fila, caption, instrucciones, comentarista.limiteTexto)

@@ -17,7 +17,7 @@ describe('sesión', () => {
     expect(await leerSesion('')).toBeNull()
     expect(await leerSesion('no.es.jwt')).toBeNull()
     // El state de OAuth viaja por la URL de instagram.com: jamás debe valer como sesión.
-    expect(await leerSesion(await signOAuthState('instagram'))).toBeNull()
+    expect(await leerSesion(await signOAuthState('instagram', 'u1'))).toBeNull()
   })
 
   it('un token firmado con AUTH_SECRET pelado no vale: la llave se deriva', async () => {

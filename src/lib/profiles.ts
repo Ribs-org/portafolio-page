@@ -1,5 +1,5 @@
 import 'server-only'
-import { and, asc, eq, isNull, or, gte, lte } from 'drizzle-orm'
+import { and, asc, eq, inArray, isNull, or, gte, lte } from 'drizzle-orm'
 import { getDb, links, profiles } from '@/db'
 import type { Link, Profile } from '@/db'
 
@@ -8,17 +8,21 @@ export async function getProfileBySlug(slug: string): Promise<Profile | null> {
   return row ?? null
 }
 
-export async function getDefaultProfile(): Promise<Profile | null> {
+export async function getDefaultProfile(ownerId: string): Promise<Profile | null> {
   const [row] = await getDb()
     .select()
     .from(profiles)
-    .where(eq(profiles.isDefault, true))
+    .where(and(eq(profiles.ownerId, ownerId), eq(profiles.isDefault, true)))
     .limit(1)
   return row ?? null
 }
 
-export async function getAllProfiles(): Promise<Profile[]> {
-  return getDb().select().from(profiles).orderBy(asc(profiles.createdAt))
+export async function getAllProfiles(ownerId: string): Promise<Profile[]> {
+  return getDb()
+    .select()
+    .from(profiles)
+    .where(eq(profiles.ownerId, ownerId))
+    .orderBy(asc(profiles.createdAt))
 }
 
 /** Only links that are active and inside their scheduling window, in display order. */
@@ -38,11 +42,16 @@ export async function getVisibleLinks(profileId: string): Promise<Link[]> {
     .orderBy(asc(links.position))
 }
 
-export async function getAllLinks(profileId: string): Promise<Link[]> {
+export async function getAllLinks(ownerId: string, profileId: string): Promise<Link[]> {
   return getDb()
     .select()
     .from(links)
-    .where(eq(links.profileId, profileId))
+    .where(
+      and(
+        eq(links.profileId, profileId),
+        inArray(links.profileId, getDb().select({ id: profiles.id }).from(profiles).where(eq(profiles.ownerId, ownerId))),
+      ),
+    )
     .orderBy(asc(links.position))
 }
 

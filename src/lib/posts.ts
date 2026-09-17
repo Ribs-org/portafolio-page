@@ -1,6 +1,6 @@
 import 'server-only'
 import { and, asc, desc, eq, gte, inArray, isNull, lte, sql, type SQL } from 'drizzle-orm'
-import { clicks, getDb, postMetrics, socialAccounts, socialPosts, visits } from '@/db'
+import { clicks, getDb, postMetrics, profiles, socialAccounts, socialPosts, visits } from '@/db'
 import type { Filters, Granularity } from './analytics'
 import { SITE_TIMEZONE, describe, granularityFor, localDay } from './analytics'
 import {
@@ -55,7 +55,7 @@ export async function getPostRows(
   const from = localDay(f.from)
   const to = localDay(f.to)
 
-  const postConds: SQL[] = []
+  const postConds: SQL[] = [eq(socialPosts.ownerId, f.ownerId)]
   if (!includeArchived) postConds.push(isNull(socialPosts.archivedAt))
   if (opts.publishedFrom) postConds.push(gte(socialPosts.publishedAt, opts.publishedFrom))
   if (opts.publishedTo) postConds.push(lte(socialPosts.publishedAt, opts.publishedTo))
@@ -63,7 +63,7 @@ export async function getPostRows(
   const posts = await db
     .select()
     .from(socialPosts)
-    .where(postConds.length > 0 ? and(...postConds) : undefined)
+    .where(and(...postConds))
     .orderBy(desc(socialPosts.publishedAt))
     .limit(opts.limit ?? 200)
 
@@ -90,6 +90,7 @@ export async function getPostRows(
     gte(visits.createdAt, f.from),
     lte(visits.createdAt, f.to),
     inArray(visits.campaign, campaigns),
+    inArray(visits.profileId, db.select({ id: profiles.id }).from(profiles).where(eq(profiles.ownerId, f.ownerId))),
   ]
   if (f.profileId) visitConds.push(eq(visits.profileId, f.profileId))
   if (!f.includeBots) visitConds.push(eq(visits.isBot, false))
@@ -108,6 +109,7 @@ export async function getPostRows(
     gte(clicks.createdAt, f.from),
     lte(clicks.createdAt, f.to),
     inArray(visits.campaign, campaigns),
+    inArray(clicks.profileId, db.select({ id: profiles.id }).from(profiles).where(eq(profiles.ownerId, f.ownerId))),
   ]
   if (f.profileId) clickConds.push(eq(clicks.profileId, f.profileId))
   if (!f.includeBots) clickConds.push(eq(clicks.isBot, false))
@@ -124,7 +126,12 @@ export async function getPostRows(
   const everSeen = await db
     .selectDistinct({ campaign: sql<string>`${visits.campaign}` })
     .from(visits)
-    .where(inArray(visits.campaign, campaigns))
+    .where(
+      and(
+        inArray(visits.campaign, campaigns),
+        inArray(visits.profileId, db.select({ id: profiles.id }).from(profiles).where(eq(profiles.ownerId, f.ownerId))),
+      ),
+    )
 
   const seen = new Set(everSeen.map((r) => r.campaign))
   const visitMap = new Map(visitRows.map((r) => [r.campaign, r]))
@@ -239,7 +246,7 @@ export async function getPostSeries(f: Filters): Promise<PostSeriesPoint[]> {
              greatest(0, m.views - lag(m.views) over (partition by m.post_id order by m.day)) as gained
       from ${postMetrics} m
       join ${socialPosts} p on p.id = m.post_id
-      where p.archived_at is null and m.views is not null and m.day <= ${to}
+      where p.archived_at is null and m.views is not null and m.day <= ${to} and p.owner_id = ${f.ownerId}
     ),
     g as (
       select date_trunc(${unit}, day::timestamp) as bucket, sum(gained)::int as total
@@ -249,7 +256,7 @@ export async function getPostSeries(f: Filters): Promise<PostSeriesPoint[]> {
       select date_trunc(${unit}, vi.created_at at time zone ${tz}) as bucket, count(*) as total
       from ${visits} vi
       join ${socialPosts} p on p.campaign = vi.campaign
-      where vi.created_at >= ${f.from} and vi.created_at <= ${f.to}
+      where vi.created_at >= ${f.from} and vi.created_at <= ${f.to} and p.owner_id = ${f.ownerId}
         ${f.profileId ? sql`and vi.profile_id = ${f.profileId}` : sql``}
         ${f.includeBots ? sql`` : sql`and vi.is_bot = false`}
       group by 1
@@ -279,10 +286,11 @@ export async function getPostSeries(f: Filters): Promise<PostSeriesPoint[]> {
 }
 
 /** Todas las cuentas, en el orden en que se conectaron; la pestaña Cuentas las agrupa por red. */
-export async function getCuentas(): Promise<CuentaRow[]> {
+export async function getCuentas(ownerId: string): Promise<CuentaRow[]> {
   const cuentas = await getDb()
     .select()
     .from(socialAccounts)
+    .where(eq(socialAccounts.ownerId, ownerId))
     .orderBy(asc(socialAccounts.network), asc(socialAccounts.createdAt))
   return cuentas.map((a) => ({
     id: a.id,
@@ -296,7 +304,10 @@ export async function getCuentas(): Promise<CuentaRow[]> {
 }
 
 /** Lets the analytics campaign table show a post's caption instead of a bare tag. */
-export async function getCampaignPosts(campaigns: string[]): Promise<Map<string, CampaignPost>> {
+export async function getCampaignPosts(
+  ownerId: string,
+  campaigns: string[],
+): Promise<Map<string, CampaignPost>> {
   if (campaigns.length === 0) return new Map()
 
   const rows = await getDb()
@@ -308,7 +319,7 @@ export async function getCampaignPosts(campaigns: string[]): Promise<Map<string,
       permalink: socialPosts.permalink,
     })
     .from(socialPosts)
-    .where(inArray(socialPosts.campaign, campaigns))
+    .where(and(eq(socialPosts.ownerId, ownerId), inArray(socialPosts.campaign, campaigns)))
 
   return new Map(rows.map((r) => [r.campaign, r]))
 }

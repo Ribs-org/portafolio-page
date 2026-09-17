@@ -247,7 +247,7 @@ export async function mediaToBlob(
  * hosting is how you meet rate limits. A failed row records its fixed sentence and
  * the loop keeps going — partial success is the contract, Buffer-style.
  */
-export async function scheduleBatch(items: BatchItem[]): Promise<BatchResult[]> {
+export async function scheduleBatch(ownerId: string, items: BatchItem[]): Promise<BatchResult[]> {
   const db = getDb()
   const now = new Date()
   const results: BatchResult[] = []
@@ -262,7 +262,7 @@ export async function scheduleBatch(items: BatchItem[]): Promise<BatchResult[]> 
     try {
       // Antes de subir nada: un destino sin cuenta se rechaza acá, no después de gastar
       // la subida de toda la media de la fila.
-      const cuentas = await exigirCuentas(item.redes)
+      const cuentas = await exigirCuentas(ownerId, item.redes)
 
       const uploaded: Array<{ url: string; mediaType: 'image' | 'video' }> = []
       let mediaFailed = false
@@ -329,7 +329,7 @@ export async function scheduleBatch(items: BatchItem[]): Promise<BatchResult[]> 
 
       const [post] = await db
         .insert(scheduledPosts)
-        .values({ caption: item.texto, scheduledAt, coverUrl, atributos })
+        .values({ ownerId, caption: item.texto, scheduledAt, coverUrl, atributos })
         .returning()
       if (uploaded.length > 0) {
         await db.insert(scheduledPostMedia).values(

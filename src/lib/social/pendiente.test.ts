@@ -16,6 +16,7 @@ const pendiente = {
     { externalId: '61550000000002', handle: null },
   ],
   emitidoEn: Date.now(),
+  sub: 'u1',
 }
 
 describe('serializarPendiente / leerPendiente', () => {

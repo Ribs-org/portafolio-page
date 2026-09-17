@@ -10,9 +10,11 @@ import { getPostRows } from '@/lib/posts'
 export const dynamic = 'force-dynamic'
 
 export async function GET(request: Request) {
-  if (!(await requireMobileUser(request))) {
+  const usuario = await requireMobileUser(request)
+  if (!usuario) {
     return new NextResponse('No autorizado', { status: 401 })
   }
+  const ownerId = usuario.id
 
   const url = new URL(request.url)
   const now = new Date()
@@ -24,13 +26,13 @@ export async function GET(request: Request) {
     .getAll('red')
     .filter((red) => (SOCIAL_NETWORKS as readonly string[]).includes(red))
 
-  const todas = await getPostRows({ from, to, profileId: null, includeBots: false }, false, {
-    publishedFrom: from,
-    publishedTo: to,
-    limit: MAX_POSTS,
-  })
+  const todas = await getPostRows(
+    { ownerId, from, to, profileId: null, includeBots: false },
+    false,
+    { publishedFrom: from, publishedTo: to, limit: MAX_POSTS },
+  )
   const rows = redes.length > 0 ? todas.filter((row) => redes.includes(row.network)) : todas
-  const atributos = await attributesFor(rows)
+  const atributos = await attributesFor(ownerId, rows)
 
   return NextResponse.json({
     desde: localDay(from),

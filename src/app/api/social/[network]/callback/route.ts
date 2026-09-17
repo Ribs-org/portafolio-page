@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { usuarioActual } from '@/lib/auth'
 import { env } from '@/lib/env'
 import { networkLabel } from '@/lib/networks'
-import { guardarCuenta } from '@/lib/social/conectar'
+import { CuentaDeOtro, guardarCuenta } from '@/lib/social/conectar'
 import {
   NO_FACEBOOK_PAGE,
   SIN_TOKEN_DE_PAGINA,
@@ -378,7 +378,8 @@ export async function GET(
   request: Request,
   { params }: { params: Promise<{ network: string }> },
 ) {
-  if (!(await usuarioActual())) return new NextResponse('No autorizado', { status: 401 })
+  const usuario = await usuarioActual()
+  if (!usuario) return new NextResponse('No autorizado', { status: 401 })
 
   const { network } = await params
   const url = new URL(request.url)
@@ -398,7 +399,7 @@ export async function GET(
   try {
     // Verifies, but as something other than a state we minted for this network — a
     // session cookie replayed here would land exactly there.
-    if (!(await oauthStateMatches(state, network))) {
+    if (!(await oauthStateMatches(state, network, usuario.id))) {
       return back('El estado no corresponde a esa red.')
     }
   } catch {
@@ -415,7 +416,7 @@ export async function GET(
 
     if (credential.candidatas.length === 1) {
       const [unica] = credential.candidatas
-      await guardarCuenta(network, {
+      await guardarCuenta(usuario.id, network, {
         externalId: unica.externalId,
         handle: unica.handle,
         // Facebook publica y lee con el token de la página, no con el del usuario; las
@@ -445,14 +446,17 @@ export async function GET(
         expiresAt: credential.expiresAt?.toISOString() ?? null,
         candidatas: credential.candidatas.map(({ externalId, handle }) => ({ externalId, handle })),
         emitidoEn: Date.now(),
+        sub: usuario.id,
       }),
       { httpOnly: true, secure: true, sameSite: 'lax', maxAge: PENDIENTE_MAX_AGE, path: '/admin/accounts' },
     )
     return response
   } catch (error) {
-    // Only our own OAuthError carries a message we wrote ourselves. Everything else —
-    // a non-JSON upstream body breaking `.json()`, a DB write failure — gets logged
-    // server-side and a fixed fallback, never its raw message, in the redirect.
+    // Only our own OAuthError (and CuentaDeOtro, same idea) carries a message we wrote
+    // ourselves. Everything else — a non-JSON upstream body breaking `.json()`, a DB
+    // write failure — gets logged server-side and a fixed fallback, never its raw
+    // message, in the redirect.
+    if (error instanceof CuentaDeOtro) return back(error.message)
     if (error instanceof OAuthError) return back(error.message)
     console.error('Error conectando red social:', error)
     return back('No se pudo conectar. Inténtalo de nuevo.')

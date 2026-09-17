@@ -2,6 +2,7 @@ import 'server-only'
 import { eq } from 'drizzle-orm'
 import { getDb, sourceAuthors, sourcePosts } from '@/db'
 import { guardarAjuste, leerAjuste } from '@/lib/ajustes'
+import { asegurarAdmin } from '@/lib/usuarios'
 import { fuenteFor } from './index'
 import { AUTOR_ILEGIBLE, MIN_LECTURAS } from './fuente'
 import {
@@ -43,9 +44,12 @@ export async function traerIdeas(now: Date = new Date()): Promise<TraidaReport> 
   const db = getDb()
   const reporte: TraidaReport = { autores: [], leidas: 0, topeAlcanzado: false, sinMirar: 0 }
 
+  // El cupo es de la llave de X, que es una para todo el despliegue: vive en el admin.
+  const { id: adminId } = await asegurarAdmin()
+
   const hoy = diaDe(now)
-  const tope = normalizarTope(await leerAjuste(CLAVE_TOPE))
-  let leidas = leidasHoy(await leerAjuste(CLAVE_CONTADOR), hoy)
+  const tope = normalizarTope(await leerAjuste(adminId, CLAVE_TOPE))
+  let leidas = leidasHoy(await leerAjuste(adminId, CLAVE_CONTADOR), hoy)
   if (leidas >= tope) {
     reporte.topeAlcanzado = true
     reporte.leidas = leidas
@@ -56,7 +60,7 @@ export async function traerIdeas(now: Date = new Date()): Promise<TraidaReport> 
   // olvidaría todo lo que ya pagó, y el tope dejaría de morder el resto del día.
   const guardarContador = async (): Promise<void> => {
     try {
-      await guardarAjuste(CLAVE_CONTADOR, serializarContador(hoy, leidas))
+      await guardarAjuste(adminId, CLAVE_CONTADOR, serializarContador(hoy, leidas))
     } catch (fallo) {
       console.error('[ideas] no se pudo guardar el contador:', String(fallo).slice(0, 300))
     }

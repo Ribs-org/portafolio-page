@@ -44,6 +44,17 @@ export async function asegurarAdmin(): Promise<Usuario> {
   return fila!
 }
 
+/**
+ * El id del admin para lo que solo necesita leer. Escribe únicamente la primera vez, que es
+ * la única en que la fila puede no existir: la raíz pública la pedía en cada visita.
+ */
+export async function adminId(): Promise<string> {
+  const correo = normalizarCorreo(env('ADMIN_EMAIL') ?? '')
+  if (!correo) throw new Error('ADMIN_EMAIL no está configurada o no es un correo')
+  const existente = await buscarPorCorreo(correo)
+  return existente ? existente.id : (await asegurarAdmin()).id
+}
+
 export async function buscarPorCorreo(correo: string): Promise<Usuario | null> {
   const [fila] = await getDb().select().from(users).where(eq(users.correo, correo)).limit(1)
   return fila ?? null

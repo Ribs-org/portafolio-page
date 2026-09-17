@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { failureEmail } from './alert'
+import { destinatario, failureEmail } from './alert'
 
 describe('failureEmail', () => {
   it('asunto y cuerpo con la red, el motivo fijo y el comienzo del caption', () => {
@@ -16,5 +16,25 @@ describe('failureEmail', () => {
 
   it('capitaliza la red aunque venga en minúscula', () => {
     expect(failureEmail('a', 'facebook', 'm').subject).toBe('No se pudo publicar en Facebook')
+  })
+})
+
+describe('destinatario', () => {
+  it('con correo del dueño devuelve ese', () => {
+    process.env.PUBLISH_ALERT_TO = 'despliegue@ejemplo.com'
+    expect(destinatario('dueno@ejemplo.com')).toBe('dueno@ejemplo.com')
+    delete process.env.PUBLISH_ALERT_TO
+  })
+
+  it('con undefined o con espacios devuelve el de PUBLISH_ALERT_TO', () => {
+    process.env.PUBLISH_ALERT_TO = 'despliegue@ejemplo.com'
+    expect(destinatario(undefined)).toBe('despliegue@ejemplo.com')
+    expect(destinatario('   ')).toBe('despliegue@ejemplo.com')
+    delete process.env.PUBLISH_ALERT_TO
+  })
+
+  it('sin ninguno de los dos devuelve undefined', () => {
+    delete process.env.PUBLISH_ALERT_TO
+    expect(destinatario(undefined)).toBeUndefined()
   })
 })

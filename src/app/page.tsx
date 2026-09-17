@@ -1,12 +1,15 @@
 import type { Metadata } from 'next'
 import { getDefaultProfile } from '@/lib/profiles'
 import { FirstRun, profileMetadata, renderProfile, type SearchParams } from '@/lib/serve-profile'
+import { adminId } from '@/lib/usuarios'
 
 export const dynamic = 'force-dynamic'
 
 async function load() {
   try {
-    return { profile: await getDefaultProfile(), failed: false }
+    // La raíz sirve el perfil del dueño del despliegue; la página por usuario es el subproyecto 3.
+    const id = await adminId()
+    return { profile: await getDefaultProfile(id), failed: false }
   } catch {
     return { profile: null, failed: true }
   }

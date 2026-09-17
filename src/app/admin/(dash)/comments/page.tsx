@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import { Panel } from '@/components/charts/panel'
+import { requireUser } from '@/lib/auth'
 import { leerAjuste } from '@/lib/ajustes'
 import { contarPendientes, ESTADOS_COLA, getCola, type EstadoCola } from '@/lib/comentarios-cola'
 import {
@@ -43,10 +44,11 @@ export default async function CommentsPage({
     : 'pendientes'
   const red = (REDES as readonly string[]).includes(String(params.red)) ? String(params.red) : null
 
+  const { id: ownerId } = await requireUser()
   const [filas, pendientes, instrucciones] = await Promise.all([
-    getCola({ estado, red }),
-    contarPendientes(red),
-    leerAjuste(CLAVE_INSTRUCCIONES),
+    getCola(ownerId, { estado, red }),
+    contarPendientes(ownerId, red),
+    leerAjuste(ownerId, CLAVE_INSTRUCCIONES),
   ])
 
   const chip = (activo: boolean) =>

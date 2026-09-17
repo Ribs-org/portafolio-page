@@ -12,24 +12,72 @@ import {
   uuid,
 } from 'drizzle-orm/pg-core'
 
-/** A public page. The default one is served at `/`, the rest at `/<slug>`. */
-export const profiles = pgTable('profiles', {
+export const ROLES = ['admin', 'usuario'] as const
+export type Rol = (typeof ROLES)[number]
+
+/**
+ * Quién usa Parrilla. Hasta el subproyecto de inquilinos todo el mundo ve todo; esta tabla
+ * existe para que la sesión diga quién eres y para invitar. `sesion_version` cierra las
+ * sesiones de una persona sin tocar a las demás ni rotar `AUTH_SECRET`, que además cifra
+ * los tokens sociales.
+ */
+export const users = pgTable('users', {
   id: uuid('id').primaryKey().defaultRandom(),
-  slug: text('slug').notNull().unique(),
-  displayName: text('display_name').notNull(),
-  headline: text('headline'),
-  bio: text('bio'),
-  avatarUrl: text('avatar_url'),
-  accentColor: text('accent_color').notNull().default('#8b7cff'),
-  backgroundStyle: text('background_style').notNull().default('aurora'),
-  ogImageUrl: text('og_image_url'),
-  isDefault: boolean('is_default').notNull().default(false),
-  isPublished: boolean('is_published').notNull().default(true),
-  /** Private profiles opt out of search engines and the sitemap. */
-  noindex: boolean('noindex').notNull().default(false),
+  correo: text('correo').notNull().unique(),
+  nombre: text('nombre'),
+  rol: text('rol').$type<Rol>().notNull().default('usuario'),
+  sesionVersion: integer('sesion_version').notNull().default(1),
+  invitadoEn: timestamp('invitado_en', { withTimezone: true }).notNull().defaultNow(),
+  primerIngresoEn: timestamp('primer_ingreso_en', { withTimezone: true }),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 })
+
+/** Un código de ingreso por correo: nunca el código, solo su hash. Diez minutos, un uso. */
+export const codigosIngreso = pgTable(
+  'codigos_ingreso',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    hash: text('hash').notNull(),
+    expiraEn: timestamp('expira_en', { withTimezone: true }).notNull(),
+    usadoEn: timestamp('usado_en', { withTimezone: true }),
+    intentos: integer('intentos').notNull().default(0),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index('codigos_ingreso_user_idx').on(t.userId, t.createdAt)],
+)
+
+/** A public page. The default one is served at `/`, the rest at `/<slug>`. */
+export const profiles = pgTable(
+  'profiles',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    /**
+     * Quién es dueño de esta fila. Nulable solo mientras dure la transición: el paso de
+     * migrado adopta a nombre del admin lo que venga de antes, y la entrega 3 lo pone
+     * NOT NULL. Las tablas hijas no la llevan: heredan por su clave foránea.
+     */
+    ownerId: uuid('owner_id').references(() => users.id, { onDelete: 'restrict' }),
+    slug: text('slug').notNull().unique(),
+    displayName: text('display_name').notNull(),
+    headline: text('headline'),
+    bio: text('bio'),
+    avatarUrl: text('avatar_url'),
+    accentColor: text('accent_color').notNull().default('#8b7cff'),
+    backgroundStyle: text('background_style').notNull().default('aurora'),
+    ogImageUrl: text('og_image_url'),
+    isDefault: boolean('is_default').notNull().default(false),
+    isPublished: boolean('is_published').notNull().default(true),
+    /** Private profiles opt out of search engines and the sitemap. */
+    noindex: boolean('noindex').notNull().default(false),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index('profiles_owner_idx').on(t.ownerId)],
+)
 
 /** `featured` renders as a large image card, `social` as an icon in the top row. */
 export const LINK_KINDS = ['featured', 'standard', 'social', 'booking'] as const
@@ -142,6 +190,7 @@ export const socialAccounts = pgTable(
   'social_accounts',
   {
     id: uuid('id').primaryKey().defaultRandom(),
+    ownerId: uuid('owner_id').references(() => users.id, { onDelete: 'restrict' }),
     network: text('network').notNull(),
     handle: text('handle'),
     externalId: text('external_id'),
@@ -152,7 +201,10 @@ export const socialAccounts = pgTable(
     lastSyncError: text('last_sync_error'),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
-  (t) => [unique('social_accounts_network_external_key').on(t.network, t.externalId)],
+  (t) => [
+    unique('social_accounts_network_external_key').on(t.network, t.externalId),
+    index('social_accounts_owner_idx').on(t.ownerId),
+  ],
 )
 
 /**
@@ -170,6 +222,7 @@ export const socialPosts = pgTable(
   'social_posts',
   {
     id: uuid('id').primaryKey().defaultRandom(),
+    ownerId: uuid('owner_id').references(() => users.id, { onDelete: 'restrict' }),
     network: text('network').notNull(),
     accountId: uuid('account_id')
       .notNull()
@@ -192,6 +245,7 @@ export const socialPosts = pgTable(
     unique('social_posts_account_external_key').on(t.externalId, t.accountId),
     index('social_posts_campaign_idx').on(t.campaign),
     index('social_posts_published_idx').on(t.publishedAt),
+    index('social_posts_owner_idx').on(t.ownerId),
   ],
 )
 
@@ -265,18 +319,23 @@ export type TargetStatus = (typeof TARGET_STATUSES)[number]
  * What the owner composes once. No status column of its own: the post's state is the
  * summary of its targets, and duplicating it here would let the two disagree.
  */
-export const scheduledPosts = pgTable('scheduled_posts', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  caption: text('caption').notNull(),
-  scheduledAt: timestamp('scheduled_at', { withTimezone: true }).notNull(),
-  // Diseñada, no un fotograma: la aplican los publishers que pueden (IG/FB/YT).
-  coverUrl: text('cover_url'),
-  // La taxonomía libre del editor-LLM ({"hook": "...", "tema": "..."}); el
-  // endpoint de métricas la devuelve junto a los números para cerrar su loop.
-  atributos: jsonb('atributos'),
-  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
-})
+export const scheduledPosts = pgTable(
+  'scheduled_posts',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    ownerId: uuid('owner_id').references(() => users.id, { onDelete: 'restrict' }),
+    caption: text('caption').notNull(),
+    scheduledAt: timestamp('scheduled_at', { withTimezone: true }).notNull(),
+    // Diseñada, no un fotograma: la aplican los publishers que pueden (IG/FB/YT).
+    coverUrl: text('cover_url'),
+    // La taxonomía libre del editor-LLM ({"hook": "...", "tema": "..."}); el
+    // endpoint de métricas la devuelve junto a los números para cerrar su loop.
+    atributos: jsonb('atributos'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index('scheduled_posts_owner_idx').on(t.ownerId)],
+)
 
 /**
  * One row per destination network, each living its own publish cycle: if Instagram
@@ -426,6 +485,7 @@ export const sourceAuthors = pgTable(
   'source_authors',
   {
     id: uuid('id').primaryKey().defaultRandom(),
+    ownerId: uuid('owner_id').references(() => users.id, { onDelete: 'restrict' }),
     network: text('network').notNull(),
     username: text('username').notNull(),
     // El id numérico de X. Se resuelve una sola vez: si el creador se cambia el nombre de
@@ -441,6 +501,7 @@ export const sourceAuthors = pgTable(
     // `network` se declara antes que `username`, y en una tabla nueva el orden de
     // declaración es el orden físico: drizzle-kit introspecta las uniques por ese orden.
     unique('source_authors_network_username_key').on(t.network, t.username),
+    index('source_authors_owner_idx').on(t.ownerId),
   ],
 )
 
@@ -488,48 +549,19 @@ export const sourcePosts = pgTable(
  * tabla porque esta es la primera de varias: lo que se guarda acá no tiene dueño natural
  * en ninguna entidad del dominio.
  */
-export const ajustes = pgTable('ajustes', {
-  clave: text('clave').primaryKey(),
-  valor: text('valor').notNull(),
-  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
-})
-
-export const ROLES = ['admin', 'usuario'] as const
-export type Rol = (typeof ROLES)[number]
-
-/**
- * Quién usa Parrilla. Hasta el subproyecto de inquilinos todo el mundo ve todo; esta tabla
- * existe para que la sesión diga quién eres y para invitar. `sesion_version` cierra las
- * sesiones de una persona sin tocar a las demás ni rotar `AUTH_SECRET`, que además cifra
- * los tokens sociales.
- */
-export const users = pgTable('users', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  correo: text('correo').notNull().unique(),
-  nombre: text('nombre'),
-  rol: text('rol').$type<Rol>().notNull().default('usuario'),
-  sesionVersion: integer('sesion_version').notNull().default(1),
-  invitadoEn: timestamp('invitado_en', { withTimezone: true }).notNull().defaultNow(),
-  primerIngresoEn: timestamp('primer_ingreso_en', { withTimezone: true }),
-  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
-})
-
-/** Un código de ingreso por correo: nunca el código, solo su hash. Diez minutos, un uso. */
-export const codigosIngreso = pgTable(
-  'codigos_ingreso',
+export const ajustes = pgTable(
+  'ajustes',
   {
     id: uuid('id').primaryKey().defaultRandom(),
-    userId: uuid('user_id')
-      .notNull()
-      .references(() => users.id, { onDelete: 'cascade' }),
-    hash: text('hash').notNull(),
-    expiraEn: timestamp('expira_en', { withTimezone: true }).notNull(),
-    usadoEn: timestamp('usado_en', { withTimezone: true }),
-    intentos: integer('intentos').notNull().default(0),
-    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    ownerId: uuid('owner_id').references(() => users.id, { onDelete: 'restrict' }),
+    clave: text('clave').notNull(),
+    valor: text('valor').notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
-  (t) => [index('codigos_ingreso_user_idx').on(t.userId, t.createdAt)],
+  // La única va sobre el par, no sobre la clave: cada dueño tiene su propia fila para la
+  // misma clave. `owner_id` sigue nulable hasta la entrega 3, y en Postgres dos NULL no
+  // chocan entre sí, cosa que el paso de adopción del despliegue resuelve enseguida.
+  (t) => [unique('ajustes_owner_clave_key').on(t.ownerId, t.clave), index('ajustes_owner_idx').on(t.ownerId)],
 )
 
 export type Profile = typeof profiles.$inferSelect

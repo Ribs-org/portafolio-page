@@ -12,6 +12,7 @@ export type ConexionPendiente = {
   candidatas: Candidata[]
   /** Cuándo se emitió, en ms. El maxAge de la cookie lo pone el navegador; esto lo verifica el servidor. */
   emitidoEn: number
+  sub: string
 }
 
 export const COOKIE_PENDIENTE = 'conexion-pendiente'
@@ -42,6 +43,7 @@ export function leerPendiente(raw: string | undefined): ConexionPendiente | null
     // el reloj del servidor es lo que de verdad vence un login a medias.
     if (typeof p.emitidoEn !== 'number' || !Number.isFinite(p.emitidoEn)) return null
     if (Date.now() - p.emitidoEn > PENDIENTE_MAX_AGE * 1000) return null
+    if (typeof p.sub !== 'string' || p.sub === '') return null
     return {
       network: p.network,
       accessToken: p.accessToken,
@@ -49,6 +51,7 @@ export function leerPendiente(raw: string | undefined): ConexionPendiente | null
       expiresAt: p.expiresAt,
       candidatas: p.candidatas,
       emitidoEn: p.emitidoEn,
+      sub: p.sub,
     }
   } catch {
     return null

@@ -22,6 +22,7 @@ export type ParsedFilters = Filters & { range: RangeKey }
 
 export function parseFilters(
   searchParams: Record<string, string | string[] | undefined>,
+  ownerId: string,
 ): ParsedFilters {
   const raw = typeof searchParams.range === 'string' ? searchParams.range : '30d'
   const range = (RANGES.find((r) => r.key === raw)?.key ?? '30d') as RangeKey
@@ -32,8 +33,13 @@ export function parseFilters(
 
   const profileParam = typeof searchParams.profile === 'string' ? searchParams.profile : ''
 
+  // El id del perfil llega de la URL sin comprobar que sea del dueño, y puede quedarse así
+  // mientras toda consulta que lo use lleve además el filtro por dueño: la intersección de
+  // «perfil ajeno» y «mis perfiles» es vacía. Una consulta futura que filtre solo por este
+  // id vería filas de otro.
   return {
     range,
+    ownerId,
     from,
     to,
     profileId: profileParam && profileParam !== 'all' ? profileParam : null,

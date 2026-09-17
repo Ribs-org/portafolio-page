@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { MAX_BATCH_ITEMS, scheduleBatch, type BatchItem } from '@/lib/social/publish/batch'
 import { env } from '@/lib/env'
+import { adminId } from '@/lib/usuarios'
 
 export const dynamic = 'force-dynamic'
 // Downloads ride inside this function; same budget as the publish cron.
@@ -46,7 +47,10 @@ export async function POST(request: Request) {
     )
   }
 
+  // La llave de API es del despliegue, no de una persona: lo que entra por ahí es del admin.
+  const ownerId = await adminId()
+
   // Rejected rows are data, not an endpoint failure — same rule as the cron report.
-  const resultados = await scheduleBatch(posts)
+  const resultados = await scheduleBatch(ownerId, posts)
   return NextResponse.json({ resultados })
 }

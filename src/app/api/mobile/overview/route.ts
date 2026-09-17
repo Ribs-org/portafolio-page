@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
-import { and, asc, eq, gt, lte } from 'drizzle-orm'
-import { accountMetrics, getDb, scheduledPosts, scheduledPostTargets } from '@/db'
+import { and, asc, eq, gt, inArray, lte } from 'drizzle-orm'
+import { accountMetrics, getDb, scheduledPosts, scheduledPostTargets, socialAccounts } from '@/db'
 import { SITE_TIMEZONE, getKpis, localDay } from '@/lib/analytics'
 import { isoInZone } from '@/lib/metrics-api'
 import { requireMobileUser } from '@/lib/mobile-guardia'
@@ -11,13 +11,15 @@ import { postKpisFrom } from '@/lib/posts-kpis'
 export const dynamic = 'force-dynamic'
 
 export async function GET(request: Request) {
-  if (!(await requireMobileUser(request))) {
+  const usuario = await requireMobileUser(request)
+  if (!usuario) {
     return new NextResponse('No autorizado', { status: 401 })
   }
+  const ownerId = usuario.id
 
   const now = new Date()
   const { from, to } = parseRango(new URL(request.url).searchParams.get('rango'), now)
-  const filters = { from, to, profileId: null, includeBots: false }
+  const filters = { ownerId, from, to, profileId: null, includeBots: false }
   const db = getDb()
 
   // Las mismas funciones del panel: nada se recalcula acá.
@@ -28,19 +30,31 @@ export async function GET(request: Request) {
     db
       .select({ network: accountMetrics.network, followers: accountMetrics.followers, day: accountMetrics.day })
       .from(accountMetrics)
+      .where(
+        inArray(
+          accountMetrics.accountId,
+          db.select({ id: socialAccounts.id }).from(socialAccounts).where(eq(socialAccounts.ownerId, ownerId)),
+        ),
+      )
       .orderBy(asc(accountMetrics.day)),
     db
       .select({ post: scheduledPosts, target: scheduledPostTargets })
       .from(scheduledPosts)
       .innerJoin(scheduledPostTargets, eq(scheduledPostTargets.postId, scheduledPosts.id))
       // La misma ventana que el rango «hoy», sin volver a escribir la regla.
-      .where(and(gt(scheduledPosts.scheduledAt, parseRango('hoy', now).from), lte(scheduledPosts.scheduledAt, now)))
+      .where(
+        and(
+          eq(scheduledPosts.ownerId, ownerId),
+          gt(scheduledPosts.scheduledAt, parseRango('hoy', now).from),
+          lte(scheduledPosts.scheduledAt, now),
+        ),
+      )
       .orderBy(asc(scheduledPosts.scheduledAt)),
     db
       .select({ post: scheduledPosts, target: scheduledPostTargets })
       .from(scheduledPosts)
       .innerJoin(scheduledPostTargets, eq(scheduledPostTargets.postId, scheduledPosts.id))
-      .where(gt(scheduledPosts.scheduledAt, now))
+      .where(and(eq(scheduledPosts.ownerId, ownerId), gt(scheduledPosts.scheduledAt, now)))
       .orderBy(asc(scheduledPosts.scheduledAt)),
   ])
 

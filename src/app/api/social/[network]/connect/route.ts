@@ -50,7 +50,8 @@ export async function GET(
   request: Request,
   { params }: { params: Promise<{ network: string }> },
 ) {
-  if (!(await usuarioActual())) return new NextResponse('No autorizado', { status: 401 })
+  const usuario = await usuarioActual()
+  if (!usuario) return new NextResponse('No autorizado', { status: 401 })
 
   const { network } = await params
   const scope = SCOPES[network]
@@ -61,7 +62,7 @@ export async function GET(
 
   // A signed, short-lived state is what stops a stranger's callback from writing
   // their tokens into this dashboard.
-  const state = await signOAuthState(network)
+  const state = await signOAuthState(network, usuario.id)
 
   if (network === 'instagram' || network === 'facebook') {
     const appId = env('INSTAGRAM_APP_ID')

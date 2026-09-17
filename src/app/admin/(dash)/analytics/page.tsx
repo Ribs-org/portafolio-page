@@ -1,8 +1,8 @@
 import { Suspense } from 'react'
-import { asc } from 'drizzle-orm'
+import { asc, eq, inArray } from 'drizzle-orm'
 import Link from 'next/link'
 import { AccountCards, AccountSeriesChart } from './accounts'
-import { accountMetrics, getDb } from '@/db'
+import { accountMetrics, getDb, socialAccounts } from '@/db'
 import { BarList } from '@/components/charts/bar-list'
 import { CampaignTable } from '@/components/charts/campaign-table'
 import { Donut } from '@/components/charts/donut'
@@ -14,6 +14,7 @@ import { seriesColor } from '@/components/charts/theme'
 import { TrafficChart } from '@/components/charts/traffic-chart'
 import { FilterBar } from '@/components/filter-bar'
 import { buildAccountCards, buildAccountSeries } from '@/lib/account-stats'
+import { requireUser } from '@/lib/auth'
 import {
   SITE_TIMEZONE,
   type Filters,
@@ -69,14 +70,15 @@ export default async function AnalyticsPage({
   searchParams: Promise<Record<string, string | string[] | undefined>>
 }) {
   const params = await searchParams
-  const filters = parseFilters(params)
+  const { id: ownerId } = await requireUser()
+  const filters = parseFilters(params, ownerId)
 
   // Solo lo que hace falta para pintar algo: la barra de filtros, las cuatro cifras y el
   // gráfico de tráfico. Los otros once paneles esperan abajo, cada grupo en su propio
   // `Suspense`, para que la consulta más lenta de la página no retenga a las tres más
   // rápidas.
   const [profiles, kpis, previous, series] = await Promise.all([
-    getAllProfiles(),
+    getAllProfiles(ownerId),
     getKpis(filters),
     getKpis(previousPeriod(filters)),
     getTimeSeries(filters),
@@ -167,11 +169,17 @@ async function PanelesDeOrigen({ filters, visits }: { filters: Filters; visits: 
         reach: accountMetrics.reach,
       })
       .from(accountMetrics)
+      .where(
+        inArray(
+          accountMetrics.accountId,
+          getDb().select({ id: socialAccounts.id }).from(socialAccounts).where(eq(socialAccounts.ownerId, filters.ownerId)),
+        ),
+      )
       .orderBy(asc(accountMetrics.day), asc(accountMetrics.network)),
   ])
 
   // Este sí depende del anterior: los posts se piden por las campañas que volvieron.
-  const campaignPosts = await getCampaignPosts(campaigns.map((c) => c.campaign))
+  const campaignPosts = await getCampaignPosts(filters.ownerId, campaigns.map((c) => c.campaign))
 
   const accountFrom = localDay(filters.from)
   const accountTo = localDay(filters.to)

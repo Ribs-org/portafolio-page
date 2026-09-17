@@ -1,5 +1,6 @@
 // Guardar una cuenta conectada, compartido por el callback (una candidata) y la
 // selección (varias). Sin `server-only`: lo importa una server action.
+import { and, eq } from 'drizzle-orm'
 import { getDb, socialAccounts } from '@/db'
 import { encryptToken } from './crypto'
 
@@ -11,8 +12,28 @@ export type CuentaAConectar = {
   expiresAt: Date | null
 }
 
+export const CUENTA_DE_OTRO = 'Esa cuenta ya está conectada por otra persona.'
+
+export class CuentaDeOtro extends Error {
+  constructor() {
+    super(CUENTA_DE_OTRO)
+  }
+}
+
 /** Upsert por (red, id externo): la misma cuenta renueva su token; un id nuevo es una fila nueva. */
-export async function guardarCuenta(network: string, cuenta: CuentaAConectar): Promise<void> {
+export async function guardarCuenta(ownerId: string, network: string, cuenta: CuentaAConectar): Promise<void> {
+  // Hasta que la entrega 3 cambie la única a (owner_id, network, external_id), dos dueños
+  // caen en la misma fila: avisar es la única salida honesta. Pisar el token dejaría al
+  // primero publicando con la credencial del segundo.
+  const [existente] = await getDb()
+    .select({ ownerId: socialAccounts.ownerId })
+    .from(socialAccounts)
+    .where(and(eq(socialAccounts.network, network), eq(socialAccounts.externalId, cuenta.externalId)))
+    .limit(1)
+  if (existente && existente.ownerId !== null && existente.ownerId !== ownerId) {
+    throw new CuentaDeOtro()
+  }
+
   const valores = {
     handle: cuenta.handle,
     accessToken: encryptToken(cuenta.accessToken),
@@ -22,7 +43,9 @@ export async function guardarCuenta(network: string, cuenta: CuentaAConectar): P
   }
   await getDb()
     .insert(socialAccounts)
-    .values({ network, externalId: cuenta.externalId, ...valores })
+    .values({ network, externalId: cuenta.externalId, ownerId, ...valores })
+    // El target sigue siendo (network, external_id) hasta la entrega 3: mientras tanto dos
+    // usuarios no pueden conectar la misma cuenta, y es preferible a que uno pise al otro.
     .onConflictDoUpdate({ target: [socialAccounts.network, socialAccounts.externalId], set: valores })
 }
 

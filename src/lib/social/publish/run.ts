@@ -5,6 +5,7 @@ import {
   scheduledPosts,
   scheduledPostTargets,
   socialAccounts,
+  users,
 } from '@/db'
 import { CONNECTORS } from '@/lib/social'
 import { PUBLISHERS } from './index'
@@ -31,6 +32,7 @@ type Report = { published: number; processing: number; retried: number; deferred
 export async function publishDue(now: Date = new Date()): Promise<Report> {
   const db = getDb()
   const report: Report = { published: 0, processing: 0, retried: 0, deferred: 0, failed: 0 }
+  const correoPorOwner = new Map<string, string | undefined>()
 
   const due = await db
     .select({ target: scheduledPostTargets, post: scheduledPosts })
@@ -92,11 +94,25 @@ export async function publishDue(now: Date = new Date()): Promise<Report> {
       else report.retried++
     } else {
       report.failed++
-      await sendFailureAlert(post.caption, target.network, patch.lastError ?? '')
+      // Al dueño del post, no al del despliegue: el fallo es de su publicación.
+      let correoDueno: string | undefined
+      if (post.ownerId) {
+        if (!correoPorOwner.has(post.ownerId)) {
+          correoPorOwner.set(post.ownerId, await correoDelDueno(post.ownerId))
+        }
+        correoDueno = correoPorOwner.get(post.ownerId)
+      }
+      await sendFailureAlert(correoDueno, post.caption, target.network, patch.lastError ?? '')
     }
   }
 
   return report
+}
+
+/** El correo del dueño del post, para la alerta de fallo. Undefined si no existe la fila del dueño (post sin adoptar). */
+async function correoDelDueno(ownerId: string): Promise<string | undefined> {
+  const [fila] = await getDb().select({ correo: users.correo }).from(users).where(eq(users.id, ownerId)).limit(1)
+  return fila?.correo ?? undefined
 }
 
 /**

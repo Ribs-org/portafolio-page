@@ -15,6 +15,20 @@
       "when": 1789595235415,
       "tag": "0001_far_arclight",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1789645258621,
+      "tag": "0002_brave_screwball",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1789647035840,
+      "tag": "0003_elite_saracen",
+      "breakpoints": true
     }
   ]
 }

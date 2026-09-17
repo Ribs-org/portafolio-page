@@ -5,6 +5,7 @@ import { accountMetrics, getDb, postMetrics, socialAccounts, socialPosts } from 
 import type { SocialAccount } from '@/db'
 import { localDay } from '../analytics'
 import { env } from '../env'
+import { adminId } from '../usuarios'
 import { postsToArchive } from './archive'
 import { campaignTagFor, type CuentaTag } from './campaign'
 import type { FetchedPost } from './connector'
@@ -21,9 +22,12 @@ async function ensureYouTubeAccount(): Promise<void> {
   const channelId = env('YOUTUBE_CHANNEL_ID')
   if (!channelId || !env('YOUTUBE_API_KEY')) return
 
+  // La cuenta que nace de YOUTUBE_CHANNEL_ID es del despliegue: la entrega 3 la ata mejor.
+  const ownerId = await adminId()
+
   await getDb()
     .insert(socialAccounts)
-    .values({ network: 'youtube', externalId: channelId, handle: channelId })
+    .values({ ownerId, network: 'youtube', externalId: channelId, handle: channelId })
     .onConflictDoUpdate({
       target: [socialAccounts.network, socialAccounts.externalId],
       set: { externalId: channelId },
@@ -63,6 +67,7 @@ async function insertOrUpdatePost(
   const [row] = await getDb()
     .insert(socialPosts)
     .values({
+      ownerId: account.ownerId,
       network: account.network,
       accountId: account.id,
       externalId: post.externalId,
@@ -198,8 +203,11 @@ export async function syncAccount(account: SocialAccount, primaria: boolean): Pr
  * never hits the same API concurrently. Every account runs on its own: one that throws
  * leaves its error on its own row and the others still finish and store their snapshot —
  * which is the whole reason it was defensible to take on several integrations at once.
+ *
+ * Sin dueño recorre todo el despliegue, que es lo que hace el cron; con dueño, solo sus
+ * cuentas, que es lo que pide el botón del panel: nadie gasta la cuota de API de otro.
  */
-export async function syncAll(): Promise<SyncReport> {
+export async function syncAll(ownerId?: string): Promise<SyncReport> {
   // Antes del resto y por su cuenta: una base inalcanzable acá no debe costarle el
   // snapshot del día a las demás, así que su fallo se registra y se sigue.
   try {
@@ -211,6 +219,7 @@ export async function syncAll(): Promise<SyncReport> {
   const cuentas = await getDb()
     .select()
     .from(socialAccounts)
+    .where(ownerId ? eq(socialAccounts.ownerId, ownerId) : undefined)
     .orderBy(asc(socialAccounts.createdAt))
   // Solo las redes con conector: una fila de threads o x se sincroniza el día que
   // exista su conector, no antes.
@@ -220,6 +229,12 @@ export async function syncAll(): Promise<SyncReport> {
   // contra Meta (ver run.ts), y cinco páginas de Facebook a la vez sería justo eso.
   const porRedResuelto = await Promise.all(
     [...porRed.entries()].map(async ([, cuentas]) => {
+      // `cuentas` ya viene filtrado por dueño cuando lo llama el botón del panel (arriba),
+      // así que `primaria` es la más antigua *de ese dueño*, no necesariamente la más
+      // antigua de la red entera. El cron llama a `syncAll()` sin ownerId y sí ve todas
+      // las cuentas, así que puede elegir otra primaria distinta para la misma red. No es
+      // un bug: solo significa que qué post nuevo hereda qué etiqueta de campaña depende
+      // de si lo sincronizó primero el panel de un dueño o el cron.
       const primaria = primariaDe(cuentas)
       const filas: SyncReport = []
       for (const cuenta of cuentas) {
