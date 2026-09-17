@@ -33,6 +33,10 @@ export function parseFilters(
 
   const profileParam = typeof searchParams.profile === 'string' ? searchParams.profile : ''
 
+  // El id del perfil llega de la URL sin comprobar que sea del dueño, y puede quedarse así
+  // mientras toda consulta que lo use lleve además el filtro por dueño: la intersección de
+  // «perfil ajeno» y «mis perfiles» es vacía. Una consulta futura que filtre solo por este
+  // id vería filas de otro.
   return {
     range,
     ownerId,

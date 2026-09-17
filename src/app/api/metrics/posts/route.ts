@@ -5,7 +5,7 @@ import { env } from '@/lib/env'
 import { buildMetricPost, parseRango } from '@/lib/metrics-api'
 import { attributesFor } from '@/lib/post-attributes'
 import { getPostRows } from '@/lib/posts'
-import { asegurarAdmin } from '@/lib/usuarios'
+import { adminId } from '@/lib/usuarios'
 
 export const dynamic = 'force-dynamic'
 
@@ -34,13 +34,12 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: `Red desconocida: ${red}.` }, { status: 400 })
   }
 
-  const { id: ownerId } = await asegurarAdmin()
+  const ownerId = await adminId()
 
   // Mismo motor que el panel: acumulado + ganado en la ventana, visitas por ?s=. La
   // ventana viaja además como filtro de publicación, para que el tope acote lo pedido
   // y no las 200 filas más nuevas del catálogo entero.
   const all = await getPostRows(
-    ownerId,
     { ownerId, from: rango.from, to: rango.to, profileId: null, includeBots: false },
     false,
     { publishedFrom: rango.from, publishedTo: rango.to, limit: MAX_POSTS },

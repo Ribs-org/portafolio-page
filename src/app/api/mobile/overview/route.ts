@@ -25,7 +25,7 @@ export async function GET(request: Request) {
   // Las mismas funciones del panel: nada se recalcula acá.
   const [kpis, rows, seguidores, hoy, proximos] = await Promise.all([
     getKpis(filters),
-    getPostRows(ownerId, filters, false, { publishedFrom: from, publishedTo: to, limit: MAX_POSTS }),
+    getPostRows(filters, false, { publishedFrom: from, publishedTo: to, limit: MAX_POSTS }),
     // Última lectura de seguidores por red, sumada: el total que el dueño reconoce.
     db
       .select({ network: accountMetrics.network, followers: accountMetrics.followers, day: accountMetrics.day })

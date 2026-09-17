@@ -281,7 +281,10 @@ export async function getTopLinks(f: Filters, totalVisits: number): Promise<Link
       total: int(sql`count(*)`),
     })
     .from(clicks)
-    .leftJoin(links, eq(clicks.linkId, links.id))
+    .leftJoin(links, and(
+      eq(clicks.linkId, links.id),
+      inArray(links.profileId, getDb().select({ id: profiles.id }).from(profiles).where(eq(profiles.ownerId, f.ownerId))),
+    ))
     .where(clickWhere(f))
     .groupBy(clicks.linkId, links.label, links.url)
     .orderBy(desc(sql`4`))

@@ -84,12 +84,11 @@ export default async function ContentPage({
   const [profiles, rows, series] = await Promise.all([
     getAllProfiles(ownerId),
     getPostRows(
-      ownerId,
       filters,
       includeArchived,
       incluirAnteriores ? {} : { publishedFrom: filters.from, publishedTo: filters.to },
     ),
-    getPostSeries(ownerId, filters),
+    getPostSeries(filters),
   ])
 
   // The metrics and platform filters are applied here, not in the query: the rows are

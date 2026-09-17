@@ -20,11 +20,7 @@ async function main() {
     const db = drizzle(sql)
     await migrate(db, { migrationsFolder: 'drizzle' })
     console.log('[migraciones] al día')
-    try {
-      await adoptarHuerfanas(sql)
-    } catch (error) {
-      console.error('[migraciones] no se pudo adoptar filas huérfanas:', error)
-    }
+    await adoptarHuerfanas(sql)
   }
 }
 
@@ -33,6 +29,9 @@ async function main() {
  * No puede vivir en el SQL de la migración porque ADMIN_EMAIL es una variable de entorno,
  * y no puede esperar a que alguien entre al panel: la entrega 3 pone la columna NOT NULL.
  * Idempotente: en un despliegue sin huérfanas no escribe nada.
+ *
+ * Si esto falla, el build cae a propósito: el código nuevo filtra por dueño, así que
+ * promoverlo con filas sin adoptar dejaría el panel en blanco, que parece pérdida de datos.
  */
 const CON_DUENO = ['profiles', 'social_accounts', 'scheduled_posts', 'source_authors', 'social_posts', 'ajustes']
 

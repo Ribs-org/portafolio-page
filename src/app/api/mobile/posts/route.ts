@@ -27,7 +27,6 @@ export async function GET(request: Request) {
     .filter((red) => (SOCIAL_NETWORKS as readonly string[]).includes(red))
 
   const todas = await getPostRows(
-    ownerId,
     { ownerId, from, to, profileId: null, includeBots: false },
     false,
     { publishedFrom: from, publishedTo: to, limit: MAX_POSTS },

@@ -47,7 +47,6 @@ const PUBLISHED = new Intl.DateTimeFormat('es', {
  * an older month comes back empty with no way to tell that from "nothing happened".
  */
 export async function getPostRows(
-  ownerId: string,
   f: Filters,
   includeArchived = false,
   opts: { publishedFrom?: Date; publishedTo?: Date; limit?: number } = {},
@@ -56,7 +55,7 @@ export async function getPostRows(
   const from = localDay(f.from)
   const to = localDay(f.to)
 
-  const postConds: SQL[] = [eq(socialPosts.ownerId, ownerId)]
+  const postConds: SQL[] = [eq(socialPosts.ownerId, f.ownerId)]
   if (!includeArchived) postConds.push(isNull(socialPosts.archivedAt))
   if (opts.publishedFrom) postConds.push(gte(socialPosts.publishedAt, opts.publishedFrom))
   if (opts.publishedTo) postConds.push(lte(socialPosts.publishedAt, opts.publishedTo))
@@ -91,7 +90,7 @@ export async function getPostRows(
     gte(visits.createdAt, f.from),
     lte(visits.createdAt, f.to),
     inArray(visits.campaign, campaigns),
-    inArray(visits.profileId, db.select({ id: profiles.id }).from(profiles).where(eq(profiles.ownerId, ownerId))),
+    inArray(visits.profileId, db.select({ id: profiles.id }).from(profiles).where(eq(profiles.ownerId, f.ownerId))),
   ]
   if (f.profileId) visitConds.push(eq(visits.profileId, f.profileId))
   if (!f.includeBots) visitConds.push(eq(visits.isBot, false))
@@ -110,7 +109,7 @@ export async function getPostRows(
     gte(clicks.createdAt, f.from),
     lte(clicks.createdAt, f.to),
     inArray(visits.campaign, campaigns),
-    inArray(clicks.profileId, db.select({ id: profiles.id }).from(profiles).where(eq(profiles.ownerId, ownerId))),
+    inArray(clicks.profileId, db.select({ id: profiles.id }).from(profiles).where(eq(profiles.ownerId, f.ownerId))),
   ]
   if (f.profileId) clickConds.push(eq(clicks.profileId, f.profileId))
   if (!f.includeBots) clickConds.push(eq(clicks.isBot, false))
@@ -127,7 +126,12 @@ export async function getPostRows(
   const everSeen = await db
     .selectDistinct({ campaign: sql<string>`${visits.campaign}` })
     .from(visits)
-    .where(inArray(visits.campaign, campaigns))
+    .where(
+      and(
+        inArray(visits.campaign, campaigns),
+        inArray(visits.profileId, db.select({ id: profiles.id }).from(profiles).where(eq(profiles.ownerId, f.ownerId))),
+      ),
+    )
 
   const seen = new Set(everSeen.map((r) => r.campaign))
   const visitMap = new Map(visitRows.map((r) => [r.campaign, r]))
@@ -222,7 +226,7 @@ function seriesGranularity(f: Filters): Granularity {
  * that grew and was then revised down inside the same week would come out understated,
  * or negative, because the `greatest(0, …)` would never see the individual days.
  */
-export async function getPostSeries(ownerId: string, f: Filters): Promise<PostSeriesPoint[]> {
+export async function getPostSeries(f: Filters): Promise<PostSeriesPoint[]> {
   const tz = SITE_TIMEZONE
   const unit = seriesGranularity(f)
   const interval = unit === 'day' ? '1 day' : '1 week'
@@ -242,7 +246,7 @@ export async function getPostSeries(ownerId: string, f: Filters): Promise<PostSe
              greatest(0, m.views - lag(m.views) over (partition by m.post_id order by m.day)) as gained
       from ${postMetrics} m
       join ${socialPosts} p on p.id = m.post_id
-      where p.archived_at is null and m.views is not null and m.day <= ${to} and p.owner_id = ${ownerId}
+      where p.archived_at is null and m.views is not null and m.day <= ${to} and p.owner_id = ${f.ownerId}
     ),
     g as (
       select date_trunc(${unit}, day::timestamp) as bucket, sum(gained)::int as total
@@ -252,7 +256,7 @@ export async function getPostSeries(ownerId: string, f: Filters): Promise<PostSe
       select date_trunc(${unit}, vi.created_at at time zone ${tz}) as bucket, count(*) as total
       from ${visits} vi
       join ${socialPosts} p on p.campaign = vi.campaign
-      where vi.created_at >= ${f.from} and vi.created_at <= ${f.to} and p.owner_id = ${ownerId}
+      where vi.created_at >= ${f.from} and vi.created_at <= ${f.to} and p.owner_id = ${f.ownerId}
         ${f.profileId ? sql`and vi.profile_id = ${f.profileId}` : sql``}
         ${f.includeBots ? sql`` : sql`and vi.is_bot = false`}
       group by 1
