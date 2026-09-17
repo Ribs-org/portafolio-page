@@ -58,13 +58,14 @@ El primero es `AUTH_SECRET` (firma tu sesión del panel), el segundo `FINGERPRIN
 
 ### 2. Aprieta el botón
 
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2FRibs-org%2Fportafolio-page&env=ADMIN_PASSWORD,AUTH_SECRET,FINGERPRINT_SALT&envDescription=La%20contrase%C3%B1a%20de%20tu%20panel%20y%20los%20dos%20secretos%20que%20generaste&envLink=https%3A%2F%2Fgithub.com%2FRibs-org%2Fportafolio-page%2Fblob%2Fmain%2F.env.example&project-name=portafolio&repository-name=portafolio)
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2FRibs-org%2Fportafolio-page&env=ADMIN_PASSWORD,ADMIN_EMAIL,AUTH_SECRET,FINGERPRINT_SALT&envDescription=Tu%20correo%2C%20la%20contrase%C3%B1a%20de%20tu%20app%20y%20los%20dos%20secretos%20que%20generaste&envLink=https%3A%2F%2Fgithub.com%2FRibs-org%2Fportafolio-page%2Fblob%2Fmain%2F.env.example&project-name=portafolio&repository-name=portafolio)
 
-Vercel copia este repositorio a tu cuenta de GitHub y te pide tres variables:
+Vercel copia este repositorio a tu cuenta de GitHub y te pide cuatro variables:
 
 | Variable | Qué pones |
 | --- | --- |
-| `ADMIN_PASSWORD` | La contraseña con la que entrarás a `/admin`. Es la única puerta: que sea larga |
+| `ADMIN_EMAIL` | Tu correo. Con él entras al panel en `/ingresar` |
+| `ADMIN_PASSWORD` | La contraseña con la que entra la app del teléfono. El panel web no la usa: que sea larga igual |
 | `AUTH_SECRET` | El primer valor del paso 1 |
 | `FINGERPRINT_SALT` | El segundo valor del paso 1 |
 
@@ -116,7 +117,10 @@ Abre el sitio: ahora se ve un perfil de ejemplo.
 
 ### 6. Hazlo tuyo
 
-Entra a `/admin` con tu `ADMIN_PASSWORD`. Ahí cambias foto, bio, colores, links y slugs.
+Entra en `/ingresar` con tu correo (el de `ADMIN_EMAIL`): te llega un código de seis
+dígitos que vale diez minutos. Solo entran los correos invitados; desde la pestaña
+**Usuarios** del panel, visible para el admin, invitas a más gente. Ya adentro cambias
+foto, bio, colores, links y slugs.
 Los dos perfiles de ejemplo están para que los edites, no para que los borres y empieces
 de cero.
 
@@ -138,7 +142,7 @@ npm install
 npm run setup        # crea .env.local con AUTH_SECRET y FINGERPRINT_SALT ya generados
 ```
 
-Llena `DATABASE_URL` y `ADMIN_PASSWORD` en el `.env.local`, y después:
+Llena `DATABASE_URL`, `ADMIN_EMAIL` y `ADMIN_PASSWORD` en el `.env.local`, y después:
 
 ```bash
 npm run db:setup
@@ -515,9 +519,11 @@ Vercel y bajan con `vercel env pull .env.local`.
 | Variable | Para qué | ¿Obligatoria? |
 | --- | --- | --- |
 | `DATABASE_URL` | Neon Postgres | Sí — la pone la integración |
-| `ADMIN_PASSWORD` | Contraseña del panel | Sí |
+| `ADMIN_EMAIL` | El correo del primer usuario | Sí |
+| `ADMIN_PASSWORD` | Contraseña de la app del teléfono | Sí |
 | `AUTH_SECRET` | Firma de la cookie de sesión | Sí |
 | `FINGERPRINT_SALT` | Sal del hash de visitante | Sí |
+| `INGRESO_FROM` | Remitente de los códigos de ingreso | No — sin ella se usa el remitente de prueba de Resend |
 | `R2_ACCOUNT_ID` | ID de tu cuenta de Cloudflare | No — sin ella no puedes subir media |
 | `R2_ACCESS_KEY_ID` | Llave de acceso para R2 | No — sin ella no puedes subir media |
 | `R2_SECRET_ACCESS_KEY` | Llave secreta para R2 | No — sin ella no puedes subir media |
@@ -543,7 +549,7 @@ Vercel y bajan con `vercel env pull .env.local`.
 | `PUBLISH_ALERT_TO` | A qué correo llega el aviso de fallo | Sin ella no se envía ningún email; el calendario sigue mostrando el fallo |
 | `PUBLISH_ALERT_FROM` | Remitente del aviso | Opcional; default `onboarding@resend.dev` |
 
-Para cambiar la contraseña:
+Para cambiar la contraseña de la app del teléfono (el panel web ya no la usa):
 
 ```bash
 vercel env rm ADMIN_PASSWORD production --yes
@@ -629,8 +635,9 @@ src/
     [slug]/                perfiles por slug
     icon.svg               favicon
     api/track/click/       endpoint del sendBeacon
+    ingresar/              entrada: correo y código
     admin/
-      login/               entrada
+      login/               redirige a /ingresar
       (dash)/              panel protegido
   components/
     profile-view.tsx       la página pública (también alimenta la vista previa del editor)
