@@ -5,7 +5,7 @@ import { useEffect, useState } from 'react'
 import { leerCreadorTikTok } from '@/app/admin/actions'
 import { Field, GroupLabel, Select, Toggle } from '@/components/ui'
 import { TIKTOK_CREADOR_ILEGIBLE, type CreadorTikTok } from '@/lib/social/publish/tiktok-creador'
-import { ETIQUETA_PRIVACIDAD, PRIVACIDADES_TIKTOK, type PrivacidadTikTok } from '@/lib/social/publish/opciones'
+import { ETIQUETA_PRIVACIDAD, type PrivacidadTikTok } from '@/lib/social/publish/opciones'
 
 const MUSIC_USAGE = 'https://www.tiktok.com/legal/page/global/music-usage-confirmation/en'
 const BRANDED_CONTENT = 'https://www.tiktok.com/legal/page/global/bc-policy/en'
@@ -53,9 +53,16 @@ export function TikTokOpciones({ soloFotos }: { soloFotos: boolean }) {
     }
   }, [])
 
-  // Sin creator_info se ofrecen las cuatro: el cron vuelve a consultar antes de subir y
-  // falla con frase propia si la elegida ya no está permitida.
-  const privacidades = creador?.privacidades ?? PRIVACIDADES_TIKTOK
+  /*
+   * Sin creator_info se ofrece solo «Solo yo», no las cuatro.
+   *
+   * Antes se ofrecían las cuatro confiando en que el cron volvería a consultar y fallaría
+   * con frase propia. Y falla — pero quince minutos después, por correo, tras gastar los
+   * tres intentos. Elegir aquí la única que TikTok acepta siempre cambia un fallo diferido
+   * y silencioso por una limitación visible en el momento. Cuando la app quede aprobada,
+   * creator_info responde y el selector se abre solo, sin tocar esto.
+   */
+  const privacidades = creador?.privacidades ?? (['SELF_ONLY'] as const)
   const patrocinado = comercial && tipoComercial === 'patrocinado'
   const patrocinadoPrivado = patrocinado && privacidad === 'SELF_ONLY'
 
@@ -70,6 +77,12 @@ export function TikTokOpciones({ soloFotos }: { soloFotos: boolean }) {
           <p className="text-sm">
             {creador ? `Se publicará en la cuenta ${creador.nombre}` : aviso ?? 'Leyendo tu cuenta…'}
           </p>
+          {!creador && aviso ? (
+            <p className="mt-1 text-[0.72rem] text-fg-faint">
+              No pudimos leer tus opciones de TikTok, así que solo queda «Solo yo», la única
+              que la red acepta siempre. Recarga si quieres reintentarlo.
+            </p>
+          ) : null}
         </div>
       </div>
 
