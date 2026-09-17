@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { isAuthenticated } from '@/lib/auth'
+import { usuarioActual } from '@/lib/auth'
 import { env } from '@/lib/env'
 import { networkLabel } from '@/lib/networks'
 import { guardarCuenta } from '@/lib/social/conectar'
@@ -378,7 +378,7 @@ export async function GET(
   request: Request,
   { params }: { params: Promise<{ network: string }> },
 ) {
-  if (!(await isAuthenticated())) return new NextResponse('No autorizado', { status: 401 })
+  if (!(await usuarioActual())) return new NextResponse('No autorizado', { status: 401 })
 
   const { network } = await params
   const url = new URL(request.url)

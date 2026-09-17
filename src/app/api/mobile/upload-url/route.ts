@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { NextResponse } from 'next/server'
-import { CUERPO_ILEGIBLE, prepararSubida, requireMobile } from '@/lib/mobile-api'
+import { requireMobileUser } from '@/lib/mobile-guardia'
+import { CUERPO_ILEGIBLE, prepararSubida } from '@/lib/mobile-api'
 import { SIN_ALMACEN, urlParaSubir } from '@/lib/storage'
 
 export const dynamic = 'force-dynamic'
@@ -11,7 +12,7 @@ export const dynamic = 'force-dynamic'
  * función. Lo que se suba y nunca llegue a un post lo borra el barrido diario.
  */
 export async function POST(request: Request) {
-  if (!(await requireMobile(request))) {
+  if (!(await requireMobileUser(request))) {
     return new NextResponse('No autorizado', { status: 401 })
   }
 

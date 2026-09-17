@@ -1,7 +1,9 @@
 import { NextResponse } from 'next/server'
 import { headers } from 'next/headers'
 import { passwordMatches } from '@/lib/auth'
+import { normalizarCorreo } from '@/lib/ingreso'
 import { mintMobileToken } from '@/lib/mobile-token'
+import { asegurarAdmin, canjear } from '@/lib/usuarios'
 
 export const dynamic = 'force-dynamic'
 
@@ -31,17 +33,32 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Demasiados intentos. Espera unos minutos.' }, { status: 429 })
   }
 
-  let password = ''
+  let body: { password?: unknown; correo?: unknown; codigo?: unknown } = {}
   try {
-    const body = await request.json()
-    password = typeof body.password === 'string' ? body.password : ''
+    body = await request.json()
   } catch {
-    return NextResponse.json({ error: 'Falta la contraseña.' }, { status: 400 })
+    return NextResponse.json({ error: 'Cuerpo inválido.' }, { status: 400 })
   }
 
-  if (!passwordMatches(password)) {
-    return NextResponse.json({ error: 'Contraseña incorrecta.' }, { status: 401 })
+  // Camino de transición: la app instalada manda la contraseña del panel y entra como el admin.
+  if (typeof body.password === 'string') {
+    if (!passwordMatches(body.password)) return NextResponse.json({ error: 'Contraseña incorrecta.' }, { status: 401 })
+    let admin
+    try {
+      admin = await asegurarAdmin()
+    } catch {
+      // Casi siempre es ADMIN_EMAIL sin configurar, y a veces la base que no responde. En
+      // ambos casos el 503 es más honesto que un 500, que la app traduce a «contraseña
+      // incorrecta» y manda al dueño a buscar una contraseña que nunca cambió.
+      return NextResponse.json({ error: 'El servidor no pudo preparar tu ingreso.' }, { status: 503 })
+    }
+    return NextResponse.json({ token: await mintMobileToken({ sub: admin.id, sv: admin.sesionVersion }) })
   }
 
-  return NextResponse.json({ token: await mintMobileToken() })
+  const correo = normalizarCorreo(typeof body.correo === 'string' ? body.correo : '')
+  const codigo = typeof body.codigo === 'string' ? body.codigo.replace(/\D/g, '') : ''
+  if (!correo || !codigo) return NextResponse.json({ error: 'Faltan el correo o el código.' }, { status: 400 })
+  const resultado = await canjear(correo, codigo)
+  if ('error' in resultado) return NextResponse.json({ error: resultado.error }, { status: 401 })
+  return NextResponse.json({ token: await mintMobileToken({ sub: resultado.usuario.id, sv: resultado.usuario.sesionVersion }) })
 }

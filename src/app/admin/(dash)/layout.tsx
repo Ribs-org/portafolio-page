@@ -1,5 +1,4 @@
-import { redirect } from 'next/navigation'
-import { isAuthenticated } from '@/lib/auth'
+import { requireUser } from '@/lib/auth'
 import { logout } from '../actions'
 import { AdminNav } from './nav'
 
@@ -7,7 +6,7 @@ export const metadata = { title: 'Panel', robots: { index: false, follow: false 
 export const dynamic = 'force-dynamic'
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
-  if (!(await isAuthenticated())) redirect('/admin/login')
+  const usuario = await requireUser()
 
   return (
     <div className="min-h-dvh">
@@ -18,7 +17,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
       <header className="sticky top-0 z-30 border-b border-white/[0.06] bg-ink-950/70 backdrop-blur-xl">
         <div className="mx-auto flex max-w-6xl items-center gap-4 px-4 py-3 sm:px-6">
           <span className="font-display text-sm font-semibold tracking-[-0.01em]">Panel</span>
-          <AdminNav />
+          <AdminNav esAdmin={usuario.rol === 'admin'} />
           <form action={logout} className="ml-auto">
             <button
               type="submit"

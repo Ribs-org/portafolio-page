@@ -3,13 +3,13 @@
 import { randomUUID } from 'node:crypto'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
-import { cookies, headers } from 'next/headers'
+import { cookies } from 'next/headers'
 import { guardar, SIN_ALMACEN } from '@/lib/storage'
 import { and, asc, eq, inArray, max, ne, sql } from 'drizzle-orm'
 import { getDb, links, profiles, socialAccounts, socialPosts, scheduledPosts, scheduledPostTargets, scheduledPostMedia, reglasClave } from '@/db'
 import { LINK_KINDS, type LinkKind } from '@/db/schema'
 import { SITE_TIMEZONE } from '@/lib/analytics'
-import { createSession, destroySession, isAuthenticated, passwordMatches } from '@/lib/auth'
+import { destroySession, requireAdmin, requireUser } from '@/lib/auth'
 import { normalizeCampaignTag } from '@/lib/social/campaign'
 import { validarRegla } from '@/lib/social/comentarios/reglas'
 import { csvToBatchItems } from '@/lib/social/publish/csv'
@@ -35,53 +35,14 @@ import { tiktokConnector } from '@/lib/social/tiktok'
 import { TIKTOK_SIN_CUENTA, consultarCreador, type CreadorTikTok } from '@/lib/social/publish/tiktok-creador'
 import { COOKIE_PENDIENTE, LOGIN_VENCIDO, elegidas, leerPendiente } from '@/lib/social/pendiente'
 import { networkLabel } from '@/lib/networks'
+import { cerrarSesiones, invitar, pedir, quitar } from '@/lib/usuarios'
 import { fromZonedInput, normalizeUrl, slugify } from '@/lib/utils'
 
-export type FormState = { error?: string; ok?: boolean }
-
-/**
- * Best effort only: serverless instances are ephemeral and there may be several, so
- * this slows down a brute force attempt rather than stopping it. The real defence is
- * a long password.
- */
-const attempts = new Map<string, { count: number; until: number }>()
-const MAX_ATTEMPTS = 8
-const WINDOW_MS = 10 * 60 * 1000
-
-async function rateLimited(): Promise<boolean> {
-  const ip = (await headers()).get('x-forwarded-for')?.split(',')[0]?.trim() ?? 'unknown'
-  const now = Date.now()
-  const entry = attempts.get(ip)
-
-  if (!entry || now > entry.until) {
-    attempts.set(ip, { count: 1, until: now + WINDOW_MS })
-    return false
-  }
-  entry.count += 1
-  return entry.count > MAX_ATTEMPTS
-}
-
-async function requireAuth() {
-  if (!(await isAuthenticated())) redirect('/admin/login')
-}
-
-export async function login(_prev: FormState, formData: FormData): Promise<FormState> {
-  const password = String(formData.get('password') ?? '')
-
-  if (await rateLimited()) {
-    return { error: 'Demasiados intentos. Espera unos minutos.' }
-  }
-  if (!passwordMatches(password)) {
-    return { error: 'Contraseña incorrecta.' }
-  }
-
-  await createSession()
-  redirect('/admin')
-}
+export type FormState = { error?: string; ok?: boolean; aviso?: string }
 
 export async function logout() {
   await destroySession()
-  redirect('/admin/login')
+  redirect('/ingresar')
 }
 
 /* ---------------------------------------------------------------- profiles -- */
@@ -105,7 +66,7 @@ function readProfileForm(formData: FormData) {
 }
 
 export async function createProfile(): Promise<never> {
-  await requireAuth()
+  await requireUser()
   const db = getDb()
   const suffix = randomUUID().slice(0, 6)
 
@@ -129,7 +90,7 @@ export async function updateProfile(
   _prev: FormState,
   formData: FormData,
 ): Promise<FormState> {
-  await requireAuth()
+  await requireUser()
   const values = readProfileForm(formData)
 
   if (!values.displayName) return { error: 'El nombre no puede quedar vacío.' }
@@ -152,7 +113,7 @@ export async function updateProfile(
 
 /** Exactly one profile is served at `/`, so promoting one demotes the rest. */
 export async function makeDefault(profileId: string) {
-  await requireAuth()
+  await requireUser()
   const db = getDb()
   await db.update(profiles).set({ isDefault: false }).where(ne(profiles.id, profileId))
   await db
@@ -165,7 +126,7 @@ export async function makeDefault(profileId: string) {
 }
 
 export async function deleteProfile(profileId: string) {
-  await requireAuth()
+  await requireUser()
   await getDb().delete(profiles).where(eq(profiles.id, profileId))
   revalidatePath('/admin/profiles')
   redirect('/admin/profiles')
@@ -173,7 +134,7 @@ export async function deleteProfile(profileId: string) {
 
 /** A fresh random suffix, for when a private URL has been shared too widely. */
 export async function rotateSlug(profileId: string) {
-  await requireAuth()
+  await requireUser()
   const [row] = await getDb().select({ slug: profiles.slug }).from(profiles).where(eq(profiles.id, profileId))
   const base = (row?.slug ?? 'perfil').replace(/-[0-9a-f]{8}$/, '')
 
@@ -211,7 +172,7 @@ export async function createLink(
   _prev: FormState,
   formData: FormData,
 ): Promise<FormState> {
-  await requireAuth()
+  await requireUser()
   const values = readLinkForm(formData)
 
   if (!values.label) return { error: 'Ponle un nombre al link.' }
@@ -236,7 +197,7 @@ export async function updateLink(
   _prev: FormState,
   formData: FormData,
 ): Promise<FormState> {
-  await requireAuth()
+  await requireUser()
   const values = readLinkForm(formData)
 
   if (!values.label) return { error: 'Ponle un nombre al link.' }
@@ -253,7 +214,7 @@ export async function updateLink(
 }
 
 export async function toggleLink(linkId: string, profileId: string) {
-  await requireAuth()
+  await requireUser()
   await getDb()
     .update(links)
     .set({ isActive: sql`not ${links.isActive}` })
@@ -264,7 +225,7 @@ export async function toggleLink(linkId: string, profileId: string) {
 }
 
 export async function deleteLink(linkId: string, profileId: string) {
-  await requireAuth()
+  await requireUser()
   await getDb().delete(links).where(and(eq(links.id, linkId), eq(links.profileId, profileId)))
 
   revalidatePath(`/admin/profiles/${profileId}`)
@@ -273,7 +234,7 @@ export async function deleteLink(linkId: string, profileId: string) {
 
 /** Persists the order produced by the drag-and-drop list. */
 export async function reorderLinks(profileId: string, orderedIds: string[]) {
-  await requireAuth()
+  await requireUser()
   const db = getDb()
 
   await Promise.all(
@@ -295,7 +256,7 @@ const MAX_UPLOAD_BYTES = 8 * 1024 * 1024
 const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/avif']
 
 export async function uploadImage(formData: FormData): Promise<{ url?: string; error?: string }> {
-  await requireAuth()
+  await requireUser()
 
   const file = formData.get('file')
   if (!(file instanceof File) || file.size === 0) return { error: 'No llegó ningún archivo.' }
@@ -326,7 +287,7 @@ let lastSyncStartedAt = 0
 const SYNC_COOLDOWN_MS = 5 * 60 * 1000
 
 export async function syncSocialNow(): Promise<{ ok?: boolean; error?: string }> {
-  await requireAuth()
+  await requireUser()
 
   if (Date.now() - lastSyncStartedAt < SYNC_COOLDOWN_MS) {
     return { error: 'Espera unos minutos antes de volver a sincronizar.' }
@@ -359,7 +320,7 @@ export async function syncSocialNow(): Promise<{ ok?: boolean; error?: string }>
 }
 
 export async function disconnectAccount(accountId: string): Promise<void> {
-  await requireAuth()
+  await requireUser()
   // Revoca credenciales, no identidad: la fila, sus posts y sus métricas se quedan.
   await getDb()
     .update(socialAccounts)
@@ -374,7 +335,7 @@ export async function disconnectAccount(accountId: string): Promise<void> {
  * decide es qué casillas marcó.
  */
 export async function conectarElegidas(formData: FormData): Promise<void> {
-  await requireAuth()
+  await requireUser()
   const jar = await cookies()
   const pendiente = leerPendiente(jar.get(COOKIE_PENDIENTE)?.value)
   if (!pendiente) redirect(`/admin/accounts?mensaje=${encodeURIComponent(LOGIN_VENCIDO)}`)
@@ -434,7 +395,7 @@ export async function updatePostCampaign(
   postId: string,
   campaign: string,
 ): Promise<{ ok?: boolean; campaign?: string; error?: string }> {
-  await requireAuth()
+  await requireUser()
 
   const clean = normalizeCampaignTag(campaign)
   if (!clean) return { error: 'La etiqueta no puede quedar vacía.' }
@@ -469,7 +430,7 @@ export async function updatePostCampaign(
  * la que `crearPostProgramado` va a apuntar el destino.
  */
 export async function leerCreadorTikTok(): Promise<{ creador: CreadorTikTok } | { error: string }> {
-  await requireAuth()
+  await requireUser()
   const cuentas = await cuentasPrimarias(['tiktok'])
   const id = cuentas.get('tiktok')
   if (!id) return { error: TIKTOK_SIN_CUENTA }
@@ -496,7 +457,7 @@ function reglaDesdeFormulario(formData: FormData): unknown {
 }
 
 export async function createScheduledPost(_prev: FormState, formData: FormData): Promise<FormState> {
-  await requireAuth()
+  await requireUser()
 
   const caption = String(formData.get('caption') ?? '').trim()
   const networks = formData.getAll('networks').map(String)
@@ -559,7 +520,7 @@ export async function updateScheduledPost(
   _prev: FormState,
   formData: FormData,
 ): Promise<FormState> {
-  await requireAuth()
+  await requireUser()
   const db = getDb()
 
   const [post] = await db.select().from(scheduledPosts).where(eq(scheduledPosts.id, postId))
@@ -839,7 +800,7 @@ export async function updateScheduledPost(
 }
 
 export async function rescheduleTarget(targetId: string, localDatetime: string): Promise<FormState> {
-  await requireAuth()
+  await requireUser()
 
   const scheduledAt = fromZonedInput(localDatetime, SITE_TIMEZONE)
   if (!scheduledAt || scheduledAt.getTime() <= Date.now()) {
@@ -865,7 +826,7 @@ export async function rescheduleTarget(targetId: string, localDatetime: string):
 }
 
 export async function deleteScheduledPost(postId: string): Promise<FormState> {
-  await requireAuth()
+  await requireUser()
 
   const db = getDb()
   const targets = await db
@@ -888,7 +849,7 @@ export type BatchRow = { fila: number; ok: boolean; detalle: string }
 export type BatchState = { error?: string; filas?: BatchRow[] }
 
 export async function uploadBatch(_prev: BatchState, formData: FormData): Promise<BatchState> {
-  await requireAuth()
+  await requireUser()
 
   const file = formData.get('archivo')
   if (!(file instanceof File) || file.size === 0) return { error: 'Adjunta un archivo CSV.' }
@@ -915,7 +876,7 @@ export async function uploadBatch(_prev: BatchState, formData: FormData): Promis
 /* -------------------------------------------------------- comentarios -- */
 
 export async function responderComentario(id: string, texto: string): Promise<FormState> {
-  await requireAuth()
+  await requireUser()
   // Diferido: el módulo carga los conectores de cada red solo cuando alguien de verdad
   // aprieta «Enviar».
   const { responderComentario: responder } = await import('@/lib/social/comentarios/responder')
@@ -925,7 +886,7 @@ export async function responderComentario(id: string, texto: string): Promise<Fo
 }
 
 export async function descartarComentario(id: string): Promise<FormState> {
-  await requireAuth()
+  await requireUser()
   const { descartarComentario: descartar } = await import('@/lib/social/comentarios/responder')
   await descartar(id)
   revalidatePath('/admin/comments')
@@ -933,7 +894,7 @@ export async function descartarComentario(id: string): Promise<FormState> {
 }
 
 export async function reintentarBorrador(id: string): Promise<FormState> {
-  await requireAuth()
+  await requireUser()
   const { redactarUno } = await import('@/lib/social/comentarios/redaccion')
   const resultado = await redactarUno(id)
   revalidatePath('/admin/comments')
@@ -944,7 +905,7 @@ export async function guardarInstruccionesComentarios(
   _prev: FormState,
   formData: FormData,
 ): Promise<FormState> {
-  await requireAuth()
+  await requireUser()
   const { CLAVE_INSTRUCCIONES, normalizarInstrucciones } = await import(
     '@/lib/social/comentarios/instrucciones'
   )
@@ -953,4 +914,31 @@ export async function guardarInstruccionesComentarios(
   await guardarAjuste(CLAVE_INSTRUCCIONES, normalizarInstrucciones(bruto))
   revalidatePath('/admin/comments')
   return { ok: true }
+}
+
+/* --- usuarios -- */
+
+export async function invitarUsuario(_prev: FormState, formData: FormData): Promise<FormState> {
+  await requireAdmin()
+  const resultado = await invitar(String(formData.get('correo') ?? ''), String(formData.get('nombre') ?? '') || null)
+  if ('error' in resultado) return { error: resultado.error }
+  // El primer código sale con la invitación: el invitado entra sin pedir nada.
+  const enviado = await pedir(resultado.usuario.correo)
+  revalidatePath('/admin/usuarios')
+  if (!enviado) return { ok: true, aviso: 'Invitado, pero el correo no salió: revisa Resend.' }
+  return { ok: true }
+}
+
+export async function quitarUsuario(id: string): Promise<{ error?: string }> {
+  await requireAdmin()
+  const resultado = await quitar(id)
+  revalidatePath('/admin/usuarios')
+  return 'error' in resultado ? { error: resultado.error } : {}
+}
+
+export async function cerrarSesionesUsuario(id: string): Promise<{ error?: string }> {
+  await requireAdmin()
+  await cerrarSesiones(id)
+  revalidatePath('/admin/usuarios')
+  return {}
 }

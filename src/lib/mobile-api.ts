@@ -1,4 +1,3 @@
-import { mobileTokenIsValid } from './mobile-token'
 import { PUBLISHABLE, typeFromContentType } from './social/publish/batch'
 
 // El teléfono todavía no tiene dónde pedir las opciones que TikTok exige por
@@ -24,13 +23,6 @@ export const MAX_POSTS = 2000
 export function parseRango(value: string | null, now: Date): { from: Date; to: Date } {
   const rango = (RANGOS as readonly string[]).includes(value ?? '') ? (value as Rango) : '7d'
   return { from: new Date(now.getTime() - DIAS[rango] * 864e5), to: now }
-}
-
-/** El molde del resto del repo: sin cabecera válida, nadie pasa. */
-export async function requireMobile(request: Request): Promise<boolean> {
-  const header = request.headers.get('authorization') ?? ''
-  if (!header.startsWith('Bearer ')) return false
-  return mobileTokenIsValid(header.slice('Bearer '.length))
 }
 
 /* ------------------------------------------------- publicar desde el teléfono -- */
