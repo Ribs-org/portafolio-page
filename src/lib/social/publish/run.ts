@@ -1,4 +1,4 @@
-import { and, asc, eq, lte, or } from 'drizzle-orm'
+import { and, asc, eq, inArray, lte, or } from 'drizzle-orm'
 import {
   getDb,
   scheduledPostMedia,
@@ -22,14 +22,19 @@ import {
 import { sendFailureAlert } from './alert'
 import type { OpcionesDestino } from './opciones'
 
-type Report = { published: number; processing: number; retried: number; deferred: number; failed: number }
+export type Report = { published: number; processing: number; retried: number; deferred: number; failed: number }
 
 /**
  * One cron run: advance every due target one step. Sequential on purpose — the volume
  * is one person's calendar, and the connectors already taught us that low concurrency
  * against Meta is the cheap way to never meet a 429.
+ *
+ * `soloPost` es el botón «Subir ahora» del calendario: restringe la corrida a los destinos
+ * de ese post y no mira la hora, para publicar antes de lo programado. Pasa por aquí y no
+ * por un camino propio a propósito — así hereda el reclamo de fila, los reintentos, el
+ * aviso al dueño y, sobre todo, las opciones guardadas de cada destino.
  */
-export async function publishDue(now: Date = new Date()): Promise<Report> {
+export async function publishDue(now: Date = new Date(), soloPost?: string): Promise<Report> {
   const db = getDb()
   const report: Report = { published: 0, processing: 0, retried: 0, deferred: 0, failed: 0 }
   const correoPorOwner = new Map<string, string | undefined>()
@@ -39,10 +44,15 @@ export async function publishDue(now: Date = new Date()): Promise<Report> {
     .from(scheduledPostTargets)
     .innerJoin(scheduledPosts, eq(scheduledPostTargets.postId, scheduledPosts.id))
     .where(
-      or(
-        and(eq(scheduledPostTargets.status, 'scheduled'), lte(scheduledPosts.scheduledAt, now)),
-        eq(scheduledPostTargets.status, 'publishing'),
-      ),
+      soloPost
+        ? and(
+            eq(scheduledPosts.id, soloPost),
+            inArray(scheduledPostTargets.status, ['scheduled', 'publishing']),
+          )
+        : or(
+            and(eq(scheduledPostTargets.status, 'scheduled'), lte(scheduledPosts.scheduledAt, now)),
+            eq(scheduledPostTargets.status, 'publishing'),
+          ),
     )
     .orderBy(asc(scheduledPosts.scheduledAt))
 

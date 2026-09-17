@@ -927,6 +927,54 @@ export async function deleteScheduledPost(postId: string): Promise<FormState> {
   return { ok: true }
 }
 
+/**
+ * «Subir ahora»: publica este post sin esperar la corrida del cron.
+ *
+ * Corre la misma función del cron acotada a este post en vez de un camino propio, y eso es
+ * lo importante: así respeta las opciones guardadas de cada destino —la privacidad de
+ * TikTok, las interacciones, el contenido comercial— y hereda el reclamo de fila que evita
+ * publicar dos veces si el cron entra a la vez.
+ */
+export async function subirAhora(postId: string): Promise<{ error?: string; ok?: string }> {
+  const { id: ownerId } = await requireUser()
+  const db = getDb()
+  const [post] = await db
+    .select({ id: scheduledPosts.id })
+    .from(scheduledPosts)
+    .where(and(eq(scheduledPosts.id, postId), eq(scheduledPosts.ownerId, ownerId)))
+  if (!post) return { error: 'El post ya no existe.' }
+
+  const ahora = new Date()
+  // La hora pasa a ahora: dejarla en el futuro mostraría una fecha que ya no describe nada,
+  // y un reintento posterior del cron no vería el destino como vencido.
+  await db
+    .update(scheduledPosts)
+    .set({ scheduledAt: ahora, updatedAt: ahora })
+    .where(eq(scheduledPosts.id, post.id))
+
+  const { publishDue } = await import('@/lib/social/publish/run')
+  const report = await publishDue(ahora, post.id)
+  revalidatePath('/admin/schedule')
+  return { ok: resumenDeSubida(report) }
+}
+
+/** Lo que el calendario dice tras «Subir ahora». Sin nada pendiente lo dice, en vez de callar. */
+function resumenDeSubida(report: {
+  published: number
+  processing: number
+  retried: number
+  deferred: number
+  failed: number
+}): string {
+  const partes: string[] = []
+  if (report.published > 0) partes.push(`${report.published} publicado${report.published === 1 ? '' : 's'}`)
+  if (report.processing > 0) partes.push(`${report.processing} en proceso`)
+  if (report.deferred > 0) partes.push(`${report.deferred} en espera de la red`)
+  if (report.retried > 0) partes.push(`${report.retried} para reintentar`)
+  if (report.failed > 0) partes.push(`${report.failed} con error`)
+  return partes.length === 0 ? 'Este post no tenía destinos pendientes.' : `${partes.join(', ')}.`
+}
+
 /* ---------------------------------------------------------- batch upload -- */
 
 export type BatchRow = { fila: number; ok: boolean; detalle: string }
