@@ -29,7 +29,7 @@ import { validateAtributos, ATRIBUTOS_ERROR, type Atributos } from '@/lib/social
 import { diffMedia, diffTargets } from '@/lib/social/publish/edit'
 import { crearPostProgramado } from '@/lib/social/publish/crear'
 import { SinCuenta, exigirCuentas, cuentasPrimarias } from '@/lib/social/cuentas'
-import { guardarCuenta, tokensDePaginas } from '@/lib/social/conectar'
+import { CUENTA_DE_OTRO, CuentaDeOtro, guardarCuenta, tokensDePaginas } from '@/lib/social/conectar'
 import { SIN_TOKEN_DE_PAGINA } from '@/lib/social/facebook'
 import { tiktokConnector } from '@/lib/social/tiktok'
 import { TIKTOK_SIN_CUENTA, consultarCreador, type CreadorTikTok } from '@/lib/social/publish/tiktok-creador'
@@ -377,8 +377,12 @@ export async function conectarElegidas(formData: FormData): Promise<void> {
       })
     }
   } catch (error) {
-    console.error('conectarElegidas:', String(error).slice(0, 300))
-    fallo = 'No se pudo guardar la cuenta. Inténtalo de nuevo.'
+    if (error instanceof CuentaDeOtro) {
+      fallo = CUENTA_DE_OTRO
+    } else {
+      console.error('conectarElegidas:', String(error).slice(0, 300))
+      fallo = 'No se pudo guardar la cuenta. Inténtalo de nuevo.'
+    }
   }
   // Fuera del try a propósito: redirect() lanza su propio error de navegación, y dentro
   // el catch lo tragaría como si fuera una falla de la base.

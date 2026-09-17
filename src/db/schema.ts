@@ -552,12 +552,16 @@ export const sourcePosts = pgTable(
 export const ajustes = pgTable(
   'ajustes',
   {
-    clave: text('clave').primaryKey(),
+    id: uuid('id').primaryKey().defaultRandom(),
     ownerId: uuid('owner_id').references(() => users.id, { onDelete: 'restrict' }),
+    clave: text('clave').notNull(),
     valor: text('valor').notNull(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
-  (t) => [index('ajustes_owner_idx').on(t.ownerId)],
+  // La única va sobre el par, no sobre la clave: cada dueño tiene su propia fila para la
+  // misma clave. `owner_id` sigue nulable hasta la entrega 3, y en Postgres dos NULL no
+  // chocan entre sí, cosa que el paso de adopción del despliegue resuelve enseguida.
+  (t) => [unique('ajustes_owner_clave_key').on(t.ownerId, t.clave), index('ajustes_owner_idx').on(t.ownerId)],
 )
 
 export type Profile = typeof profiles.$inferSelect

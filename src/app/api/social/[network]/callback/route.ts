@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { usuarioActual } from '@/lib/auth'
 import { env } from '@/lib/env'
 import { networkLabel } from '@/lib/networks'
-import { guardarCuenta } from '@/lib/social/conectar'
+import { CuentaDeOtro, guardarCuenta } from '@/lib/social/conectar'
 import {
   NO_FACEBOOK_PAGE,
   SIN_TOKEN_DE_PAGINA,
@@ -452,9 +452,11 @@ export async function GET(
     )
     return response
   } catch (error) {
-    // Only our own OAuthError carries a message we wrote ourselves. Everything else —
-    // a non-JSON upstream body breaking `.json()`, a DB write failure — gets logged
-    // server-side and a fixed fallback, never its raw message, in the redirect.
+    // Only our own OAuthError (and CuentaDeOtro, same idea) carries a message we wrote
+    // ourselves. Everything else — a non-JSON upstream body breaking `.json()`, a DB
+    // write failure — gets logged server-side and a fixed fallback, never its raw
+    // message, in the redirect.
+    if (error instanceof CuentaDeOtro) return back(error.message)
     if (error instanceof OAuthError) return back(error.message)
     console.error('Error conectando red social:', error)
     return back('No se pudo conectar. Inténtalo de nuevo.')

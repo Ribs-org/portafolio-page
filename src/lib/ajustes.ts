@@ -18,15 +18,13 @@ export async function leerAjuste(ownerId: string, clave: string): Promise<string
 }
 
 export async function guardarAjuste(ownerId: string, clave: string, valor: string): Promise<void> {
-  // La PK sigue siendo `clave` sola hasta la entrega 3 (owner_id, clave); el `setWhere` es lo
-  // que evita pisar la fila si ya es de otro dueño: esa escritura no hace nada en vez de robarle
-  // la fila a otro usuario.
+  // La única es del par (owner_id, clave): cada dueño tiene su propia fila para la misma
+  // clave, así que el upsert no necesita ningún rodeo.
   await getDb()
     .insert(ajustes)
     .values({ ownerId, clave, valor })
     .onConflictDoUpdate({
-      target: ajustes.clave,
+      target: [ajustes.ownerId, ajustes.clave],
       set: { valor, updatedAt: new Date() },
-      setWhere: eq(ajustes.ownerId, ownerId),
     })
 }
