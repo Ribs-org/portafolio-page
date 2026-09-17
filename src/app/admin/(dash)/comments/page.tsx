@@ -46,8 +46,8 @@ export default async function CommentsPage({
 
   const { id: ownerId } = await requireUser()
   const [filas, pendientes, instrucciones] = await Promise.all([
-    getCola({ estado, red }),
-    contarPendientes(red),
+    getCola(ownerId, { estado, red }),
+    contarPendientes(ownerId, red),
     leerAjuste(ownerId, CLAVE_INSTRUCCIONES),
   ])
 

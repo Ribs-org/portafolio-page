@@ -8,6 +8,7 @@ import type { Atributos } from '@/lib/social/publish/atributos'
  * Un post orgánico —subido a mano, fuera del calendario— simplemente no aparece.
  */
 export async function attributesFor(
+  ownerId: string,
   rows: Array<{ network: string; externalId: string }>,
 ): Promise<Map<string, Atributos | null>> {
   const mapa = new Map<string, Atributos | null>()
@@ -26,6 +27,7 @@ export async function attributesFor(
       and(
         isNotNull(scheduledPostTargets.externalId),
         inArray(scheduledPostTargets.externalId, externalIds),
+        eq(scheduledPosts.ownerId, ownerId),
       ),
     )
 

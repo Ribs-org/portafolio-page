@@ -1,10 +1,11 @@
 import { headers } from 'next/headers'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
-import { eq } from 'drizzle-orm'
+import { and, eq } from 'drizzle-orm'
 import { ArrowLeft, ExternalLink } from 'lucide-react'
 import { getDb, profiles } from '@/db'
 import { SITE_TIMEZONE } from '@/lib/analytics'
+import { requireUser } from '@/lib/auth'
 import { getAllLinks } from '@/lib/profiles'
 import { toZonedInput } from '@/lib/utils'
 import { ProfileEditor } from './editor'
@@ -14,11 +15,16 @@ export const dynamic = 'force-dynamic'
 
 export default async function EditProfilePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
+  const { id: ownerId } = await requireUser()
 
-  const [profile] = await getDb().select().from(profiles).where(eq(profiles.id, id)).limit(1)
+  const [profile] = await getDb()
+    .select()
+    .from(profiles)
+    .where(and(eq(profiles.id, id), eq(profiles.ownerId, ownerId)))
+    .limit(1)
   if (!profile) notFound()
 
-  const rows = await getAllLinks(profile.id)
+  const rows = await getAllLinks(ownerId, profile.id)
   const initialLinks: DraftLink[] = rows.map((link) => ({
     id: link.id,
     kind: link.kind,

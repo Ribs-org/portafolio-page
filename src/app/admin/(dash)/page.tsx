@@ -16,6 +16,7 @@ import {
   getTopLinks,
   previousPeriod,
 } from '@/lib/analytics'
+import { requireUser } from '@/lib/auth'
 import { parseFilters } from '@/lib/filters'
 import { getAllProfiles } from '@/lib/profiles'
 import { formatNumber, formatPercent } from '@/lib/utils'
@@ -28,8 +29,9 @@ export default async function OverviewPage({
   searchParams: Promise<Record<string, string | string[] | undefined>>
 }) {
   const params = await searchParams
-  const filters = parseFilters(params)
-  const profiles = await getAllProfiles()
+  const { id: ownerId } = await requireUser()
+  const filters = parseFilters(params, ownerId)
+  const profiles = await getAllProfiles(ownerId)
 
   const [kpis, previous, series, campaigns] = await Promise.all([
     getKpis(filters),

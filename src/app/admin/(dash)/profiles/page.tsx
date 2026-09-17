@@ -1,15 +1,17 @@
 import Link from 'next/link'
 import { ExternalLink, Plus, Star } from 'lucide-react'
 import { Submit } from '@/components/ui'
+import { requireUser } from '@/lib/auth'
 import { getAllLinks, getAllProfiles } from '@/lib/profiles'
 import { createProfile, makeDefault } from '../../actions'
 
 export const dynamic = 'force-dynamic'
 
 export default async function ProfilesPage() {
-  const profiles = await getAllProfiles()
+  const { id: ownerId } = await requireUser()
+  const profiles = await getAllProfiles(ownerId)
   const counts = await Promise.all(
-    profiles.map(async (profile) => (await getAllLinks(profile.id)).length),
+    profiles.map(async (profile) => (await getAllLinks(ownerId, profile.id)).length),
   )
 
   return (

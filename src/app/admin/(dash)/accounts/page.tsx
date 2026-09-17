@@ -1,3 +1,4 @@
+import { requireUser } from '@/lib/auth'
 import { getCuentas } from '@/lib/posts'
 import { Cuentas } from './cuentas'
 
@@ -11,7 +12,8 @@ export default async function AccountsPage({
   const params = await searchParams
   // El resultado del último login: una frase, una vez.
   const mensaje = typeof params.mensaje === 'string' ? params.mensaje.slice(0, 200) : null
-  const cuentas = await getCuentas()
+  const { id: ownerId } = await requireUser()
+  const cuentas = await getCuentas(ownerId)
   return (
     <>
       <header className="mb-6">

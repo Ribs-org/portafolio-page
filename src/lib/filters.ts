@@ -22,6 +22,7 @@ export type ParsedFilters = Filters & { range: RangeKey }
 
 export function parseFilters(
   searchParams: Record<string, string | string[] | undefined>,
+  ownerId: string,
 ): ParsedFilters {
   const raw = typeof searchParams.range === 'string' ? searchParams.range : '30d'
   const range = (RANGES.find((r) => r.key === raw)?.key ?? '30d') as RangeKey
@@ -34,6 +35,7 @@ export function parseFilters(
 
   return {
     range,
+    ownerId,
     from,
     to,
     profileId: profileParam && profileParam !== 'all' ? profileParam : null,
