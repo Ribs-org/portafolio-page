@@ -47,9 +47,10 @@ export async function POST(request: Request) {
     try {
       admin = await asegurarAdmin()
     } catch {
-      // Sin ADMIN_EMAIL no hay a quién dejar entrar; decirlo es mejor que fingir que la
-      // contraseña está mal.
-      return NextResponse.json({ error: 'El servidor no tiene configurado el correo del dueño.' }, { status: 503 })
+      // Casi siempre es ADMIN_EMAIL sin configurar, y a veces la base que no responde. En
+      // ambos casos el 503 es más honesto que un 500, que la app traduce a «contraseña
+      // incorrecta» y manda al dueño a buscar una contraseña que nunca cambió.
+      return NextResponse.json({ error: 'El servidor no pudo preparar tu ingreso.' }, { status: 503 })
     }
     return NextResponse.json({ token: await mintMobileToken({ sub: admin.id, sv: admin.sesionVersion }) })
   }

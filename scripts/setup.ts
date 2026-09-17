@@ -18,7 +18,11 @@ const TARGET = join(ROOT, '.env.local')
 /** Filled in automatically. Everything else has to come from a human or an integration. */
 const GENERATED = ['AUTH_SECRET', 'FINGERPRINT_SALT'] as const
 
-/** Required for the app to boot. SITE_TIMEZONE and the R2_* variables degrade gracefully. */
+/**
+ * Required for the app to boot. SITE_TIMEZONE and the R2_* variables degrade gracefully.
+ * RESEND_API_KEY is only strictly required in production: in development the sign-in code
+ * is printed to the server console.
+ */
 const REQUIRED = ['DATABASE_URL', 'ADMIN_PASSWORD', 'ADMIN_EMAIL', 'RESEND_API_KEY', 'AUTH_SECRET', 'FINGERPRINT_SALT'] as const
 
 const secret = () => randomBytes(32).toString('base64url')
