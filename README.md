@@ -125,6 +125,14 @@ foto, bio, colores, links y slugs.
 Los dos perfiles de ejemplo están para que los edites, no para que los borres y empieces
 de cero.
 
+Cada fila de cada tabla (perfiles, cuentas, posts, comentarios, ajustes) tiene dueño: el
+panel solo te muestra lo tuyo, nunca lo de otro usuario invitado. Los crons (sync,
+publicación, comentarios) siguen recorriendo *todo* el despliegue sin filtrar por
+dueño — un cron por inquilino es otro subproyecto, no esta entrega. La llave de API
+(`SCHEDULE_API_KEY`) y la raíz pública (`/`) siguen siendo del admin. Y hasta la entrega
+3, dos usuarios todavía no pueden conectar la misma cuenta de la misma red: quien llega
+segundo recibe un aviso, no la cuenta de otro.
+
 > El segundo perfil nace con un slug aleatorio (`circulo-a1b2c3d4`) y con `noindex`, para
 > que exista una versión que solo compartes a mano. Cámbialo por lo que quieras.
 

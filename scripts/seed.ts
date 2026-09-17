@@ -1,17 +1,23 @@
 import { randomUUID } from 'node:crypto'
 import { neon } from '@neondatabase/serverless'
 import { drizzle } from 'drizzle-orm/neon-http'
-import { links, profiles } from '../src/db/schema'
+import { links, profiles, users } from '../src/db/schema'
 
 /**
  * Creates the two starter profiles so the site is never empty on first load.
  * Everything here is meant to be replaced from the admin panel.
+ *
+ * An ownerless profile is a profile nobody sees: the panel only lists what a person owns.
+ * This script runs outside Next (its own `tsx`, its own drizzle client) so it can't import
+ * `src/lib/usuarios.ts` — that file carries `server-only`. It resolves the admin the same
+ * way `scripts/migrar.ts` does: a query of its own against `users` by `ADMIN_EMAIL`,
+ * creating the row if it isn't there yet.
  */
 async function main() {
   const url = process.env.DATABASE_URL
   if (!url) throw new Error('DATABASE_URL is not set')
 
-  const db = drizzle(neon(url), { schema: { profiles, links } })
+  const db = drizzle(neon(url), { schema: { profiles, links, users } })
 
   const existing = await db.select({ id: profiles.id }).from(profiles).limit(1)
   if (existing.length > 0) {
@@ -19,12 +25,24 @@ async function main() {
     return
   }
 
+  // Mismo criterio que `scripts/migrar.ts`: BOM y espacios fuera, minúsculas, y una fila
+  // por correo (crea al admin si todavía no existe).
+  const correo = process.env.ADMIN_EMAIL?.replace(/^﻿/, '').trim().toLowerCase()
+  if (!correo) throw new Error('ADMIN_EMAIL is not set')
+  const [admin] = await db
+    .insert(users)
+    .values({ correo, rol: 'admin' })
+    .onConflictDoUpdate({ target: users.correo, set: { rol: 'admin' } })
+    .returning({ id: users.id })
+  const ownerId = admin!.id
+
   const publicId = randomUUID()
   const privateId = randomUUID()
 
   await db.insert(profiles).values([
     {
       id: publicId,
+      ownerId,
       slug: 'publico',
       displayName: 'Tu nombre',
       headline: 'Creador · Builder',
@@ -36,6 +54,7 @@ async function main() {
     },
     {
       id: privateId,
+      ownerId,
       slug: `circulo-${randomUUID().slice(0, 8)}`,
       displayName: 'Tu nombre',
       headline: 'Círculo cercano',
