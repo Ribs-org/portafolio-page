@@ -16,10 +16,11 @@ const TABS = [
 
 export function AdminNav({ esAdmin }: { esAdmin?: boolean }) {
   const pathname = usePathname()
+  const tabs = esAdmin ? [...TABS, { href: '/admin/usuarios', label: 'Usuarios' }] : TABS
 
   return (
     <nav className="flex items-center gap-1 overflow-x-auto">
-      {TABS.map((tab) => {
+      {tabs.map((tab) => {
         const active = tab.href === '/admin' ? pathname === '/admin' : pathname.startsWith(tab.href)
         return (
           <Link

@@ -4,21 +4,8 @@ import { and, desc, eq, gt, isNull } from 'drizzle-orm'
 import { redirect } from 'next/navigation'
 import { codigosIngreso, getDb, users } from '@/db'
 import { createSession } from '@/lib/auth'
-import { enviarCorreo } from '@/lib/correo'
-import {
-  CODIGO_INCORRECTO,
-  CORREO_INVALIDO,
-  DEMASIADOS_INTENTOS,
-  MAX_INTENTOS,
-  VIGENCIA_MS,
-  codigoCoincide,
-  generarCodigo,
-  hashCodigo,
-  normalizarCorreo,
-  puedePedir,
-  vigente,
-} from '@/lib/ingreso'
-import { asegurarAdmin, buscarPorCorreo, claveCodigos, pedidosRecientes } from '@/lib/usuarios'
+import { CODIGO_INCORRECTO, CORREO_INVALIDO, DEMASIADOS_INTENTOS, MAX_INTENTOS, codigoCoincide, normalizarCorreo, vigente } from '@/lib/ingreso'
+import { buscarPorCorreo, claveCodigos, pedir } from '@/lib/usuarios'
 
 export type FormState = { error?: string; ok?: boolean; correo?: string }
 
@@ -30,31 +17,7 @@ export type FormState = { error?: string; ok?: boolean; correo?: string }
 export async function pedirCodigo(_prev: FormState, formData: FormData): Promise<FormState> {
   const correo = normalizarCorreo(String(formData.get('correo') ?? ''))
   if (!correo) return { error: CORREO_INVALIDO }
-  await asegurarAdmin()
-  const usuario = await buscarPorCorreo(correo)
-  if (usuario) {
-    const now = new Date()
-    if (puedePedir(await pedidosRecientes(usuario.id, now), now)) {
-      const db = getDb()
-      // Un código nuevo invalida los vivos: solo el último sirve.
-      await db
-        .update(codigosIngreso)
-        .set({ usadoEn: now })
-        .where(and(eq(codigosIngreso.userId, usuario.id), isNull(codigosIngreso.usadoEn)))
-      const codigo = generarCodigo()
-      await db.insert(codigosIngreso).values({
-        userId: usuario.id,
-        hash: hashCodigo(codigo, claveCodigos()),
-        expiraEn: new Date(now.getTime() + VIGENCIA_MS),
-      })
-      const enviado = await enviarCorreo({
-        to: usuario.correo,
-        subject: `${codigo} es tu código para entrar a Parrilla`,
-        text: `Tu código para entrar a Parrilla es ${codigo}. Vale diez minutos. Si no lo pediste, ignora este correo.`,
-      })
-      if (!enviado) console.error('[ingreso] no se pudo mandar el código a', usuario.correo)
-    }
-  }
+  await pedir(correo)
   redirect(`/ingresar/codigo?correo=${encodeURIComponent(correo)}`)
 }
 

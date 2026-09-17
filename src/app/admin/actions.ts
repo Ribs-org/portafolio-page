@@ -9,7 +9,7 @@ import { and, asc, eq, inArray, max, ne, sql } from 'drizzle-orm'
 import { getDb, links, profiles, socialAccounts, socialPosts, scheduledPosts, scheduledPostTargets, scheduledPostMedia, reglasClave } from '@/db'
 import { LINK_KINDS, type LinkKind } from '@/db/schema'
 import { SITE_TIMEZONE } from '@/lib/analytics'
-import { destroySession, requireUser } from '@/lib/auth'
+import { destroySession, requireAdmin, requireUser } from '@/lib/auth'
 import { normalizeCampaignTag } from '@/lib/social/campaign'
 import { validarRegla } from '@/lib/social/comentarios/reglas'
 import { csvToBatchItems } from '@/lib/social/publish/csv'
@@ -35,6 +35,7 @@ import { tiktokConnector } from '@/lib/social/tiktok'
 import { TIKTOK_SIN_CUENTA, consultarCreador, type CreadorTikTok } from '@/lib/social/publish/tiktok-creador'
 import { COOKIE_PENDIENTE, LOGIN_VENCIDO, elegidas, leerPendiente } from '@/lib/social/pendiente'
 import { networkLabel } from '@/lib/networks'
+import { invitar, pedir, quitar } from '@/lib/usuarios'
 import { fromZonedInput, normalizeUrl, slugify } from '@/lib/utils'
 
 export type FormState = { error?: string; ok?: boolean }
@@ -913,4 +914,23 @@ export async function guardarInstruccionesComentarios(
   await guardarAjuste(CLAVE_INSTRUCCIONES, normalizarInstrucciones(bruto))
   revalidatePath('/admin/comments')
   return { ok: true }
+}
+
+/* --- usuarios -- */
+
+export async function invitarUsuario(_prev: FormState, formData: FormData): Promise<FormState> {
+  await requireAdmin()
+  const resultado = await invitar(String(formData.get('correo') ?? ''), String(formData.get('nombre') ?? '') || null)
+  if ('error' in resultado) return { error: resultado.error }
+  // El primer código sale con la invitación: el invitado entra sin pedir nada.
+  await pedir(resultado.usuario.correo)
+  revalidatePath('/admin/usuarios')
+  return { ok: true }
+}
+
+export async function quitarUsuario(id: string): Promise<{ error?: string }> {
+  await requireAdmin()
+  const resultado = await quitar(id)
+  revalidatePath('/admin/usuarios')
+  return 'error' in resultado ? { error: resultado.error } : {}
 }

@@ -1,9 +1,20 @@
 import 'server-only'
 import { hkdfSync } from 'node:crypto'
-import { asc, desc, eq } from 'drizzle-orm'
+import { and, asc, desc, eq, isNull } from 'drizzle-orm'
 import { codigosIngreso, getDb, users, type Usuario } from '@/db'
+import { enviarCorreo } from './correo'
 import { env } from './env'
-import { USUARIO_CON_INGRESOS, USUARIO_YA_INVITADO, VENTANA_MS, normalizarCorreo, CORREO_INVALIDO } from './ingreso'
+import {
+  CORREO_INVALIDO,
+  USUARIO_CON_INGRESOS,
+  USUARIO_YA_INVITADO,
+  VENTANA_MS,
+  VIGENCIA_MS,
+  generarCodigo,
+  hashCodigo,
+  normalizarCorreo,
+  puedePedir,
+} from './ingreso'
 
 /** La clave con la que se hashean los códigos: derivada, para no reutilizar AUTH_SECRET. */
 export function claveCodigos(): string {
@@ -69,4 +80,34 @@ export async function pedidosRecientes(userId: string, now: Date): Promise<Date[
     .limit(10)
   const desde = now.getTime() - VENTANA_MS
   return filas.map((f) => f.createdAt).filter((d) => d.getTime() > desde)
+}
+
+/**
+ * Manda un código nuevo al correo, si ese correo está invitado y no pasó el tope. No dice
+ * nada de vuelta a propósito: quien llama responde lo mismo exista o no el usuario.
+ */
+export async function pedir(correo: string): Promise<void> {
+  await asegurarAdmin()
+  const usuario = await buscarPorCorreo(correo)
+  if (!usuario) return
+  const now = new Date()
+  if (!puedePedir(await pedidosRecientes(usuario.id, now), now)) return
+  const db = getDb()
+  // Un código nuevo invalida los vivos: solo el último sirve.
+  await db
+    .update(codigosIngreso)
+    .set({ usadoEn: now })
+    .where(and(eq(codigosIngreso.userId, usuario.id), isNull(codigosIngreso.usadoEn)))
+  const codigo = generarCodigo()
+  await db.insert(codigosIngreso).values({
+    userId: usuario.id,
+    hash: hashCodigo(codigo, claveCodigos()),
+    expiraEn: new Date(now.getTime() + VIGENCIA_MS),
+  })
+  const enviado = await enviarCorreo({
+    to: usuario.correo,
+    subject: `${codigo} es tu código para entrar a Parrilla`,
+    text: `Tu código para entrar a Parrilla es ${codigo}. Vale diez minutos. Si no lo pediste, ignora este correo.`,
+  })
+  if (!enviado) console.error('[ingreso] no se pudo mandar el código a', usuario.correo)
 }
