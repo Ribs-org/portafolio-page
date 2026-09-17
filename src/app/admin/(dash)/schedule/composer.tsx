@@ -2,10 +2,10 @@
 
 import { useActionState, useId, useState } from 'react'
 import { createScheduledPost } from '@/app/admin/actions'
-import { Field, GroupLabel, Input, Submit, Textarea } from '@/components/ui'
+import { Button, Field, GroupLabel, Input, Submit, Textarea } from '@/components/ui'
 import { SOCIAL_NETWORKS } from '@/db/schema'
 import { networkLabel } from '@/lib/networks'
-import { cn } from '@/lib/utils'
+import { cn, toZonedInput } from '@/lib/utils'
 import { ReglaClave } from './regla-clave'
 import { TikTokOpciones } from './tiktok-opciones'
 
@@ -14,11 +14,12 @@ import { TikTokOpciones } from './tiktok-opciones'
 // its options, so that destination is created here or in the batch only.
 const ENABLED = new Set(['instagram', 'facebook', 'youtube', 'threads', 'x', 'tiktok'])
 
-export function Composer() {
+export function Composer({ zona }: { zona: string }) {
   const [state, action] = useActionState(createScheduledPost, {})
   const captionId = useId()
   const [tiktok, setTiktok] = useState(false)
   const [soloFotos, setSoloFotos] = useState(false)
+  const [cuando, setCuando] = useState('')
 
   return (
     <details
@@ -81,7 +82,23 @@ export function Composer() {
         <ReglaClave />
 
         <Field label="Fecha y hora">
-          <Input type="datetime-local" name="scheduledAt" required className="max-w-[16rem]" />
+          <div className="flex flex-wrap items-center gap-2">
+            <Input
+              type="datetime-local"
+              name="scheduledAt"
+              required
+              className="max-w-[16rem]"
+              value={cuando}
+              onChange={(event) => setCuando(event.target.value)}
+            />
+            {/*
+              Un minuto y no «ahora»: el cron publica lo vencido, así que una hora ya pasada
+              sale igual de rápido, pero deja el calendario mostrando un futuro que nunca fue.
+            */}
+            <Button type="button" onClick={() => setCuando(toZonedInput(new Date(Date.now() + 60_000), zona))}>
+              En un minuto
+            </Button>
+          </div>
         </Field>
 
         {state.error && <p className="text-sm text-negative">{state.error}</p>}
