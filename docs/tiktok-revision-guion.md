@@ -7,20 +7,36 @@ revisión tiene que decirlo: el revisor va a ver una pantalla de ingreso por cor
 
 ## Antes de apretar grabar
 
-Nada de esto depende del código; si falta algo, el video se cae solo.
+Nada de esto depende del código; si falta algo, el video se cae solo. Lo marcado ya quedó
+resuelto el 2026-09-17.
 
-- [ ] **Sandbox activo** con tu cuenta como *target user*, y sus credenciales en el
-      despliegue donde vas a grabar. La revisión exige que la demo corra en sandbox.
-- [ ] **Icono** subido en Basic Info, el mismo que se ve en la pestaña del navegador.
-- [ ] **URL properties verificadas**: el dominio del sitio y el subdominio de R2 del que
-      TikTok descarga la media. Sin eso, `PULL_FROM_URL` falla a mitad del video.
-- [ ] **TikTok reconectado en Cuentas**. El token viejo no tiene `video.upload` ni
-      `video.publish`; hasta que reconectes, el compositor te lo dice.
+- [x] **Sandbox activo** con tu cuenta como *target user*, y sus credenciales en el
+      despliegue donde grabas. La revisión exige que la demo corra en sandbox.
+- [x] **El sandbox se llama `Tu Parrilla`.** Su nombre y su icono son los que aparecen en la
+      pantalla de permisos, o sea en cámara. TikTok le agrega «(Sandbox)» y eso está bien:
+      demuestra justo lo que el revisor exige.
+- [x] **URL properties verificadas en las dos apps**: `tu-parrilla.cl` y
+      `media-bucket.vicente-pareja.cl`, de donde TikTok descarga la media. Sin la segunda,
+      `PULL_FROM_URL` falla a mitad del video. Cada app emite su propio token y el diálogo
+      genera uno nuevo cada vez que se abre: hay que copiarlo, crear el TXT **sin cerrar la
+      ventana**, y verificar ahí mismo.
+- [x] **`https://tu-parrilla.cl/api/social/tiktok/callback`** en los redirects del sandbox,
+      guardado con «Apply changes». El sandbox es una app aparte: lo que agregas en
+      producción no llega ahí.
+- [ ] **Icono** subido en Basic Info de las dos apps, el mismo de la pestaña del navegador.
 - [ ] **Un ensayo completo sin grabar**: un video directo, un carrusel de tres fotos y un
       borrador. Si algo falla, falla ahí y no delante de la cámara.
+- [ ] **Revocar la app desde TikTok** justo antes de rodar: Perfil → Ajustes y privacidad →
+      Seguridad y permisos → Aplicaciones conectadas. Sin esto, la pantalla de permisos solo
+      pide lo que aún no concediste y saldrían dos permisos en vez de cuatro.
+- [ ] **TikTok desconectado en Cuentas**, para que la escena del Login Kit tenga algo que
+      mostrar.
 - [ ] Media lista: un video vertical corto y tres fotos JPG o WebP.
 - [ ] Ventana limpia: sin pestañas de más, sin notificaciones, sin datos de otra persona
       en pantalla.
+
+Todo se graba entrando por **`tu-parrilla.cl`**: el código arma la URL de retorno con el
+dominio que navegas, y TikTok exige que coincida con la Web URL declarada en el formulario.
 
 ## Texto de revisión (inglés)
 
@@ -58,8 +74,10 @@ Esto es nuevo respecto del video anterior y conviene que se vea: explica de una 
 qué no hay registro abierto y por qué nadie ve lo de otro.
 
 **3. Login Kit — `user.info.basic`.** Ve a Cuentas. TikTok aparece sin conectar. Pulsa
-Conectar. En la pantalla de permisos, **detente** y deja leer los cuatro permisos. Autoriza.
-Vuelve y muestra la tarjeta con el nombre de la cuenta.
+Conectar. En la pantalla de permisos, **detente tres segundos** y deja leer los cuatro:
+perfil, ver tus videos públicos, publicar, y cargar borrador. Si solo salen dos, es que no
+revocaste la app desde TikTok: corta y empieza de nuevo, porque ahí se demuestran los cuatro
+scopes de una sola vez. Autoriza. Vuelve y muestra la tarjeta con el nombre de la cuenta.
 *[user.info.basic: we keep open_id and display_name to label the account. Tokens are
 encrypted at rest.]*
 
