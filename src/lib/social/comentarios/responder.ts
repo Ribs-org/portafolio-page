@@ -1,5 +1,5 @@
 import 'server-only'
-import { eq } from 'drizzle-orm'
+import { and, eq, inArray } from 'drizzle-orm'
 import { getDb, postComments, socialAccounts } from '@/db'
 import { leerAjuste } from '@/lib/ajustes'
 import { COMENTARIO_AUSENTE, PRIVADO_RECHAZADO, RED_RECHAZO, SIN_CREDENCIAL } from './comentarista'
@@ -13,10 +13,24 @@ type Resultado = { ok: true } | { error: string }
 /**
  * Manda la respuesta de un comentario. Relee la fila antes de nada: dos toques, o el panel
  * y el teléfono a la vez, tienen que dar un solo envío. Solo `pendiente` y `fallido` salen.
+ * La lectura va atada al dueño (mismo molde que `contarPendientes` en comentarios-cola.ts):
+ * un comentario de otro dueño no existe para esta llamada, ni distinto de uno borrado.
  */
-export async function responderComentario(id: string, texto: string): Promise<Resultado> {
+export async function responderComentario(ownerId: string, id: string, texto: string): Promise<Resultado> {
   const db = getDb()
-  const [fila] = await db.select().from(postComments).where(eq(postComments.id, id)).limit(1)
+  const [fila] = await db
+    .select()
+    .from(postComments)
+    .where(
+      and(
+        eq(postComments.id, id),
+        inArray(
+          postComments.accountId,
+          db.select({ id: socialAccounts.id }).from(socialAccounts).where(eq(socialAccounts.ownerId, ownerId)),
+        ),
+      ),
+    )
+    .limit(1)
   if (!fila) return { error: COMENTARIO_AUSENTE }
   // Ya salió, o ya se descartó, o es del propio dueño: no hay nada que mandar y no es un
   // error, es la segunda tecla de un mismo toque.
@@ -78,9 +92,21 @@ export async function responderComentario(id: string, texto: string): Promise<Re
 }
 
 /** Descartar es una decisión: la fila se queda para que el sondeo no la vuelva a traer. */
-export async function descartarComentario(id: string): Promise<void> {
+export async function descartarComentario(ownerId: string, id: string): Promise<void> {
   const db = getDb()
-  const [fila] = await db.select().from(postComments).where(eq(postComments.id, id)).limit(1)
+  const [fila] = await db
+    .select()
+    .from(postComments)
+    .where(
+      and(
+        eq(postComments.id, id),
+        inArray(
+          postComments.accountId,
+          db.select({ id: socialAccounts.id }).from(socialAccounts).where(eq(socialAccounts.ownerId, ownerId)),
+        ),
+      ),
+    )
+    .limit(1)
   if (!fila || (fila.state !== 'pendiente' && fila.state !== 'fallido')) return
   await marcar(id, 'descartado', null)
 }

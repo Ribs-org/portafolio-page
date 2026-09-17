@@ -329,18 +329,19 @@ export async function uploadImage(formData: FormData): Promise<{ url?: string; e
 /**
  * Best effort only: serverless instances are ephemeral and there may be several, so
  * this slows down repeated presses of the sync button from one instance rather than
- * enforcing any real limit.
+ * enforcing any real limit. Por dueño: el botón de uno no debe bloquear el de otro.
  */
-let lastSyncStartedAt = 0
+const lastSyncStartedAtByOwner = new Map<string, number>()
 const SYNC_COOLDOWN_MS = 5 * 60 * 1000
 
 export async function syncSocialNow(): Promise<{ ok?: boolean; error?: string }> {
-  await requireUser()
+  const { id: ownerId } = await requireUser()
 
+  const lastSyncStartedAt = lastSyncStartedAtByOwner.get(ownerId) ?? 0
   if (Date.now() - lastSyncStartedAt < SYNC_COOLDOWN_MS) {
     return { error: 'Espera unos minutos antes de volver a sincronizar.' }
   }
-  lastSyncStartedAt = Date.now()
+  lastSyncStartedAtByOwner.set(ownerId, Date.now())
 
   // Deferred: syncAll pulls in the three connectors and the token-crypto helpers behind
   // it, weight that the rest of this file's actions have no reason to carry.
@@ -348,7 +349,7 @@ export async function syncSocialNow(): Promise<{ ok?: boolean; error?: string }>
 
   let report
   try {
-    report = await syncAll()
+    report = await syncAll(ownerId)
   } catch (error) {
     // syncAll settles every network on its own, so a throw here is the orchestrator
     // itself failing. Letting it propagate would reach the button as an opaque digest
@@ -955,27 +956,27 @@ export async function uploadBatch(_prev: BatchState, formData: FormData): Promis
 /* -------------------------------------------------------- comentarios -- */
 
 export async function responderComentario(id: string, texto: string): Promise<FormState> {
-  await requireUser()
+  const { id: ownerId } = await requireUser()
   // Diferido: el módulo carga los conectores de cada red solo cuando alguien de verdad
   // aprieta «Enviar».
   const { responderComentario: responder } = await import('@/lib/social/comentarios/responder')
-  const resultado = await responder(id, texto)
+  const resultado = await responder(ownerId, id, texto)
   revalidatePath('/admin/comments')
   return 'error' in resultado ? { error: resultado.error } : { ok: true }
 }
 
 export async function descartarComentario(id: string): Promise<FormState> {
-  await requireUser()
+  const { id: ownerId } = await requireUser()
   const { descartarComentario: descartar } = await import('@/lib/social/comentarios/responder')
-  await descartar(id)
+  await descartar(ownerId, id)
   revalidatePath('/admin/comments')
   return { ok: true }
 }
 
 export async function reintentarBorrador(id: string): Promise<FormState> {
-  await requireUser()
+  const { id: ownerId } = await requireUser()
   const { redactarUno } = await import('@/lib/social/comentarios/redaccion')
-  const resultado = await redactarUno(id)
+  const resultado = await redactarUno(ownerId, id)
   revalidatePath('/admin/comments')
   return 'error' in resultado ? { error: resultado.error } : { ok: true }
 }

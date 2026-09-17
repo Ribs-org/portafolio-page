@@ -4,6 +4,7 @@
 import { neon, type NeonQueryFunction } from '@neondatabase/serverless'
 import { drizzle } from 'drizzle-orm/neon-http'
 import { migrate } from 'drizzle-orm/neon-http/migrator'
+import { normalizarCorreo } from '../src/lib/ingreso'
 import { decidirMigracion } from '../src/lib/migraciones'
 
 async function main() {
@@ -37,9 +38,11 @@ async function main() {
 const CON_DUENO = ['profiles', 'social_accounts', 'scheduled_posts', 'source_authors', 'social_posts', 'ajustes']
 
 async function adoptarHuerfanas(sql: NeonQueryFunction<false, false>): Promise<void> {
-  const correo = process.env.ADMIN_EMAIL?.replace(/^﻿/, '').trim().toLowerCase()
+  // Misma normalización que usa la app (lib/ingreso.ts), no una a mano: un ADMIN_EMAIL mal
+  // formado no debe adoptar filas a nombre de un correo que la app luego rechaza al entrar.
+  const correo = normalizarCorreo(process.env.ADMIN_EMAIL ?? '')
   if (!correo) {
-    throw new Error('ADMIN_EMAIL no está configurada: no se pueden adoptar las filas sin dueño')
+    throw new Error('ADMIN_EMAIL no está configurada o no es un correo válido: no se pueden adoptar las filas sin dueño')
   }
   const filas = await sql`
     insert into users (correo, rol) values (${correo}, 'admin')

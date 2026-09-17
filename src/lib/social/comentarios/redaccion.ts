@@ -192,23 +192,31 @@ export async function redactarPendientes(inicio: number): Promise<RedaccionRepor
 
 /**
  * El botón «Reintentar borrador» de la cola. A diferencia de la fase, acá el dueño está
- * mirando: se marca de inmediato, en cualquier dirección.
+ * mirando: se marca de inmediato, en cualquier dirección. La lectura va atada al dueño
+ * (mismo molde que `contarPendientes` en comentarios-cola.ts): un comentario de otro
+ * dueño no existe para esta llamada.
  */
-export async function redactarUno(id: string): Promise<{ ok: true } | { error: string }> {
+export async function redactarUno(ownerId: string, id: string): Promise<{ ok: true } | { error: string }> {
   const db = getDb()
-  const [fila] = await db.select().from(postComments).where(eq(postComments.id, id)).limit(1)
+  const [fila] = await db
+    .select()
+    .from(postComments)
+    .where(
+      and(
+        eq(postComments.id, id),
+        inArray(
+          postComments.accountId,
+          db.select({ id: socialAccounts.id }).from(socialAccounts).where(eq(socialAccounts.ownerId, ownerId)),
+        ),
+      ),
+    )
+    .limit(1)
   if (!fila || (fila.state !== 'pendiente' && fila.state !== 'fallido')) return { ok: true }
   const comentarista = comentaristaFor(fila.network)
   if (!comentarista) return { error: SIN_BORRADOR }
   if (!hayPasarela()) return { error: SIN_BORRADOR }
-  const [cuenta] = await db
-    .select({ ownerId: socialAccounts.ownerId })
-    .from(socialAccounts)
-    .where(eq(socialAccounts.id, fila.accountId))
-    .limit(1)
-  const instrucciones = normalizarInstrucciones(
-    cuenta?.ownerId ? await leerAjuste(cuenta.ownerId, CLAVE_INSTRUCCIONES) : null,
-  )
+  // La fila ya viene filtrada por `ownerId`: su cuenta es de este dueño, y sus instrucciones también.
+  const instrucciones = normalizarInstrucciones(await leerAjuste(ownerId, CLAVE_INSTRUCCIONES))
   const caption = await captionDe(fila.accountId, fila.postExternalId)
   try {
     const borrador = await redactarFila(fila, caption, instrucciones, comentarista.limiteTexto)

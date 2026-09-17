@@ -203,8 +203,11 @@ export async function syncAccount(account: SocialAccount, primaria: boolean): Pr
  * never hits the same API concurrently. Every account runs on its own: one that throws
  * leaves its error on its own row and the others still finish and store their snapshot —
  * which is the whole reason it was defensible to take on several integrations at once.
+ *
+ * Sin dueño recorre todo el despliegue, que es lo que hace el cron; con dueño, solo sus
+ * cuentas, que es lo que pide el botón del panel: nadie gasta la cuota de API de otro.
  */
-export async function syncAll(): Promise<SyncReport> {
+export async function syncAll(ownerId?: string): Promise<SyncReport> {
   // Antes del resto y por su cuenta: una base inalcanzable acá no debe costarle el
   // snapshot del día a las demás, así que su fallo se registra y se sigue.
   try {
@@ -216,6 +219,7 @@ export async function syncAll(): Promise<SyncReport> {
   const cuentas = await getDb()
     .select()
     .from(socialAccounts)
+    .where(ownerId ? eq(socialAccounts.ownerId, ownerId) : undefined)
     .orderBy(asc(socialAccounts.createdAt))
   // Solo las redes con conector: una fila de threads o x se sincroniza el día que
   // exista su conector, no antes.
