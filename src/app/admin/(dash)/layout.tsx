@@ -9,25 +9,23 @@ export default async function DashboardLayout({ children }: { children: React.Re
   const usuario = await requireUser()
 
   return (
-    <div className="min-h-dvh">
-      <div className="aurora opacity-40" aria-hidden>
-        <span />
-      </div>
-
-      <header className="sticky top-0 z-30 border-b border-white/[0.06] bg-ink-950/70 backdrop-blur-xl">
+    <div className="min-h-dvh bg-acero-950">
+      <header className="sticky top-0 z-30 border-b border-acero-700 bg-acero-950/80 backdrop-blur-xl">
         <div className="mx-auto flex max-w-6xl items-center gap-4 px-4 py-3 sm:px-6">
-          <span className="font-display text-sm font-semibold tracking-[-0.01em]">Panel</span>
+          <span className="font-titulo text-sm font-semibold uppercase tracking-[0.1em]">Panel</span>
           <AdminNav esAdmin={usuario.rol === 'admin'} />
           <form action={logout} className="ml-auto">
             <button
               type="submit"
-              className="rounded-lg px-3 py-1.5 text-xs text-fg-faint transition-colors hover:text-fg"
+              className="rounded-lg px-3 py-1.5 text-xs font-titulo uppercase tracking-[0.1em] text-fg-faint transition-colors hover:text-fg"
             >
               Salir
             </button>
           </form>
         </div>
       </header>
+
+      <div className="reja mx-auto max-w-6xl" aria-hidden />
 
       <main className="mx-auto max-w-6xl px-4 py-8 sm:px-6">{children}</main>
     </div>

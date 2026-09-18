@@ -29,7 +29,7 @@ export default function PanelError({
   }, [error])
 
   return (
-    <section className="surface mx-auto mt-10 max-w-md rounded-2xl p-6 text-center">
+    <section className="chapa mx-auto mt-10 max-w-md rounded-2xl p-6 text-center">
       <h1 className="font-display text-lg font-semibold tracking-[-0.01em]">Algo se rompió</h1>
       <p className="mt-2 text-sm leading-relaxed text-fg-muted">
         No fue nada que hicieras: una consulta no respondió. Vuelve a intentarlo; el detalle

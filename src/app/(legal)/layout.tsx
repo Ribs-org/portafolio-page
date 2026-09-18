@@ -7,11 +7,7 @@ import Link from 'next/link'
  */
 export default function LegalLayout({ children }: { children: React.ReactNode }) {
   return (
-    <div className="min-h-dvh">
-      <div className="aurora opacity-30" aria-hidden>
-        <span />
-      </div>
-
+    <div className="min-h-dvh bg-acero-950">
       <main className="mx-auto max-w-2xl px-5 py-16 sm:px-6 sm:py-24">
         {children}
 

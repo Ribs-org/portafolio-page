@@ -18,17 +18,19 @@ export default function IngresarError({
   }, [error])
 
   return (
-    <section className="surface mx-auto mt-10 max-w-md rounded-2xl p-6 text-center">
-      <h1 className="font-display text-lg font-semibold tracking-[-0.01em]">Algo se rompió</h1>
-      <p className="mt-2 text-sm leading-relaxed text-fg-muted">
-        No fue nada que hicieras: no pudimos preparar tu ingreso. Vuelve a intentarlo; el detalle
-        quedó en la consola del navegador.
-      </p>
-      <div className="mt-5 flex flex-wrap items-center justify-center gap-3">
-        <Button type="button" variant="primary" onClick={() => retry()}>
-          Reintentar
-        </Button>
-      </div>
-    </section>
+    <main className="grid min-h-dvh place-items-center bg-acero-950 px-6">
+      <section className="chapa mx-auto max-w-md rounded-2xl p-6 text-center">
+        <h1 className="font-display text-lg font-semibold tracking-[-0.01em]">Algo se rompió</h1>
+        <p className="mt-2 text-sm leading-relaxed text-fg-muted">
+          No fue nada que hicieras: no pudimos preparar tu ingreso. Vuelve a intentarlo; el detalle
+          quedó en la consola del navegador.
+        </p>
+        <div className="mt-5 flex flex-wrap items-center justify-center gap-3">
+          <Button type="button" variant="primary" onClick={() => retry()}>
+            Reintentar
+          </Button>
+        </div>
+      </section>
+    </main>
   )
 }

@@ -28,19 +28,10 @@ export function AdminNav({ esAdmin }: { esAdmin?: boolean }) {
             href={tab.href}
             className={cn(
               'relative rounded-lg px-3 py-1.5 text-sm whitespace-nowrap transition-colors',
-              active ? 'bg-white/[0.08] text-fg' : 'text-fg-muted hover:text-fg',
+              active ? 'bg-brasa text-acero-950' : 'text-fg-muted hover:text-fg',
             )}
           >
             {tab.label}
-            {/* El fondo al 8 % sobre el vidrio de la barra casi no se ve; la línea de
-                acento es lo que de verdad dice en qué pestaña estás. */}
-            {active ? (
-              <span
-                className="absolute inset-x-2.5 bottom-0 h-0.5 rounded-full"
-                style={{ background: 'rgb(var(--accent))' }}
-                aria-hidden
-              />
-            ) : null}
           </Link>
         )
       })}
