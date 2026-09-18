@@ -9,6 +9,8 @@
  * Ver `docs/superpowers/specs/2026-09-18-parrilla-de-verdad-design.md`.
  */
 
+import type { TargetStatus } from '@/db/schema'
+
 export type Coccion = 'cruda' | 'sellada' | 'punto' | 'quemada'
 export type Calor = 'apagada' | 'prendida' | 'llena'
 
@@ -30,7 +32,10 @@ export const COCCION: Record<Coccion, { claro: string; oscuro: string }> = {
   quemada: { claro: '#3a2a26', oscuro: '#241a17' },
 }
 
-/** El veteado de la grasa y las marcas de red sobre el corte. */
+/**
+ * El veteado de la grasa del corte. `globals.css` lo consume como `--color-grasa` y le
+ * aplica la opacidad ahí; acá vive el color pleno, que es lo que se puede comprobar.
+ */
 export const GRASA = '#e8d7b8'
 
 /** De claro a oscuro. El test de luminosidad recorre este orden. */
@@ -57,8 +62,12 @@ export function calorDelDia(cortes: number): Calor {
  *
  * Un post sin destinos queda crudo y no «a punto»: `every` sobre una lista vacía devuelve
  * `true`, así que sin el largo explícito un post sin destinos se vería como publicado.
+ *
+ * Toma `TargetStatus` y no `string` a propósito: así, el día que alguien agregue un quinto
+ * estado al enum, este archivo queda enlazado a ese cambio. Con `string` el estado nuevo
+ * caería en `'cruda'` sin que nada se queje.
  */
-export function coccionDe(estados: readonly string[]): Coccion {
+export function coccionDe(estados: readonly TargetStatus[]): Coccion {
   if (estados.some((estado) => estado === 'failed')) return 'quemada'
   if (estados.length > 0 && estados.every((estado) => estado === 'published')) return 'punto'
   if (estados.some((estado) => estado === 'publishing')) return 'sellada'

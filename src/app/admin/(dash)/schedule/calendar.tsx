@@ -1,7 +1,7 @@
 import Image from 'next/image'
 import Link from 'next/link'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
-import type { ScheduledPost, ScheduledPostTarget } from '@/db/schema'
+import type { ScheduledPost, ScheduledPostTarget, TargetStatus } from '@/db/schema'
 import { dayLabel, dayKey, groupByDay, hourLabel, weekDays, weekLabel } from '@/lib/schedule-week'
 import { calorDelDia, coccionDe, type Coccion } from '@/lib/parrilla'
 import { cn } from '@/lib/utils'
@@ -36,6 +36,13 @@ const NOMBRE_COCCION: Record<Coccion, string> = {
   sellada: 'Saliendo ahora',
   punto: 'Publicada',
   quemada: 'Falló',
+}
+
+const NOMBRE_ESTADO: Record<TargetStatus, string> = {
+  scheduled: 'programada',
+  publishing: 'saliendo',
+  published: 'publicada',
+  failed: 'falló',
 }
 
 export function WeekCalendar({
@@ -99,9 +106,12 @@ export function WeekCalendar({
                     {dayLabel(day, index)}
                   </p>
                   <span
+                    // `text-fg-muted` y no `text-fg-faint`: a 0.55rem el tenue da 3.56:1
+                    // sobre el panel y este rótulo es copy nuevo, así que entra al
+                    // mínimo de 4.5:1 que el spec puso para esta entrega.
                     className={cn(
                       'font-titulo text-[0.55rem] uppercase tracking-[0.12em]',
-                      calor === 'llena' ? 'text-brasa' : 'text-fg-faint',
+                      calor === 'llena' ? 'text-brasa' : 'text-fg-muted',
                     )}
                   >
                     {ROTULO_CALOR[calor]}
@@ -120,7 +130,7 @@ export function WeekCalendar({
                   )}
                 >
                   {cortes.length === 0 ? (
-                    <p className="text-center text-[0.72rem] italic text-fg-faint">
+                    <p className="text-center text-[0.72rem] italic text-fg-muted">
                       No hay nada puesto. Prendela.
                     </p>
                   ) : (
@@ -133,54 +143,77 @@ export function WeekCalendar({
                         <Link
                           key={post.id}
                           href={`/admin/schedule/${post.id}?volver=${encodeURIComponent(volver)}`}
-                          title={`${hourLabel(post.scheduledAt, zone)} — ${NOMBRE_COCCION[coccion]}`}
+                          // El detalle por red, que antes vivía en el `title` de cada
+                          // punto de color. La cocción dice que algo falló; esto dice
+                          // cuál, sin tener que entrar al editor.
+                          title={targets
+                            .map((t) => `${t.network}: ${NOMBRE_ESTADO[t.status]}`)
+                            .join(' · ')}
                           className={cn(
                             'corte block p-2 transition-transform hover:-translate-y-0.5',
                             CLASE_COCCION[coccion],
                           )}
                         >
-                          <p className="font-titulo text-[0.6rem] tracking-[0.12em] text-fg/70">
+                          {/*
+                            A opacidad plena y no al 70%: sobre la cruda, que es la
+                            cocción más clara, un 70% cae a 3.12:1 y no llega al mínimo.
+                            La jerarquía la hace el tamaño, no el desteñido.
+                          */}
+                          <p className="font-titulo text-[0.6rem] tracking-[0.12em] text-fg">
                             {hourLabel(post.scheduledAt, zone)}
                             {coccion === 'sellada' ? (
-                              <span className="humo ml-1.5 inline-block text-brasa">≈ saliendo</span>
+                              // En `text-fg` y no en brasa: la brasa sobre la carne
+                              // sellada da 2.15:1. Lo que llama la atención acá es el
+                              // humo, no el color.
+                              <span className="humo ml-1.5 inline-block">saliendo</span>
                             ) : null}
                           </p>
                           {media[0] ? (
-                            media[0].mediaType === 'image' ? (
-                              <Image
-                                src={media[0].blobUrl}
-                                alt=""
-                                width={120}
-                                height={64}
-                                unoptimized
-                                className="mt-1 h-16 w-full rounded object-cover"
-                              />
-                            ) : post.coverUrl ? (
-                              // The designed cover IS the video's preview when there is one.
-                              <Image
-                                src={post.coverUrl}
-                                alt=""
-                                width={120}
-                                height={64}
-                                unoptimized
-                                className="mt-1 h-16 w-full rounded object-cover"
-                              />
-                            ) : (
-                              // No controls (the whole card is a link); preload="metadata"
-                              // paints the first frame without pulling the file.
-                              <video
-                                src={media[0].blobUrl}
-                                preload="metadata"
-                                muted
-                                playsInline
-                                className="mt-1 h-16 w-full rounded bg-black object-cover"
-                              />
-                            )
+                            <span className="corte-media mt-1 block">
+                              {media[0].mediaType === 'image' ? (
+                                <Image
+                                  src={media[0].blobUrl}
+                                  alt=""
+                                  width={120}
+                                  height={64}
+                                  unoptimized
+                                  className="h-16 w-full rounded object-cover"
+                                />
+                              ) : post.coverUrl ? (
+                                // The designed cover IS the video's preview when there is one.
+                                <Image
+                                  src={post.coverUrl}
+                                  alt=""
+                                  width={120}
+                                  height={64}
+                                  unoptimized
+                                  className="h-16 w-full rounded object-cover"
+                                />
+                              ) : (
+                                // No controls (the whole card is a link); preload="metadata"
+                                // paints the first frame without pulling the file.
+                                <video
+                                  src={media[0].blobUrl}
+                                  preload="metadata"
+                                  muted
+                                  playsInline
+                                  className="h-16 w-full rounded bg-black object-cover"
+                                />
+                              )}
+                            </span>
                           ) : null}
                           <p className="mt-1 line-clamp-2 text-[0.75rem] leading-snug text-fg">
                             {post.caption || '(sin texto)'}
                           </p>
-                          <span className="sr-only">{NOMBRE_COCCION[coccion]}</span>
+                          {/*
+                            El estado en palabras, una sola vez. El `title` no sirve para
+                            esto: sobre un enlace con contenido es descripción y no
+                            nombre, así que un lector de pantalla puede no leerlo.
+                          */}
+                          <span className="sr-only">
+                            {NOMBRE_COCCION[coccion]} en{' '}
+                            {targets.map((t) => t.network).join(', ') || 'ninguna red'}
+                          </span>
                         </Link>
                       )
                     })
