@@ -14,10 +14,10 @@ export function Panel({
   children: React.ReactNode
 }) {
   return (
-    <section className={cn('surface rounded-2xl p-5', className)}>
+    <section className={cn('chapa rounded-xl p-5', className)}>
       <header className="mb-4 flex items-start gap-3">
         <div className="min-w-0">
-          <h2 className="font-display text-[0.95rem] font-semibold tracking-[-0.01em]">{title}</h2>
+          <h2 className="font-titulo text-[0.95rem] font-semibold uppercase tracking-[0.08em]">{title}</h2>
           {hint ? <p className="mt-0.5 text-[0.78rem] text-fg-faint">{hint}</p> : null}
         </div>
         {action ? <div className="ml-auto shrink-0">{action}</div> : null}
@@ -32,7 +32,7 @@ export function Empty({ children }: { children: React.ReactNode }) {
 }
 
 /**
- * El hueco que deja un `Panel` mientras sus consultas viajan. Misma `.surface` y
+ * El hueco que deja un `Panel` mientras sus consultas viajan. Misma `.chapa` y
  * mismas medidas que el de verdad, para que nada salte cuando llega el contenido.
  *
  * `animate-pulse` no necesita guardia propia: la regla de `prefers-reduced-motion`
@@ -40,7 +40,7 @@ export function Empty({ children }: { children: React.ReactNode }) {
  */
 export function PanelSkeleton({ className }: { className?: string }) {
   return (
-    <div className={cn('surface animate-pulse rounded-2xl p-5', className)} aria-hidden>
+    <div className={cn('chapa animate-pulse rounded-xl p-5', className)} aria-hidden>
       <div className="mb-4">
         <div className="h-[1.4rem] w-40 max-w-[60%] rounded bg-white/[0.06]" />
         <div className="mt-0.5 h-[1.15rem] w-72 max-w-full rounded bg-white/[0.035]" />

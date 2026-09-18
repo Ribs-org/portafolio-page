@@ -67,7 +67,7 @@ export function Editor({
   return (
     <div className="max-w-2xl">
       <div className="mb-4 flex items-center justify-between">
-        <h1 className="font-display text-xl font-semibold tracking-[-0.02em]">Editar post</h1>
+        <h1 className="font-titulo text-xl font-semibold uppercase tracking-[0.03em]">Editar post</h1>
         <Link
           href={volver}
           className="inline-flex items-center gap-1 text-sm text-fg-faint transition-colors hover:text-fg"

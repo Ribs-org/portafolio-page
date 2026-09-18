@@ -18,7 +18,7 @@ export default async function ProfilesPage() {
     <>
       <header className="mb-6 flex items-end gap-4">
         <div>
-          <h1 className="font-display text-2xl font-semibold tracking-[-0.02em]">Perfiles</h1>
+          <h1 className="font-titulo text-2xl font-semibold uppercase tracking-[0.03em]">Perfiles</h1>
           <p className="mt-1 text-sm text-fg-muted">
             El perfil principal se sirve en <code className="font-mono">/</code>. El resto vive en
             su propia URL.
@@ -33,7 +33,7 @@ export default async function ProfilesPage() {
 
       <ul className="grid gap-3 sm:grid-cols-2">
         {profiles.map((profile, i) => (
-          <li key={profile.id} className="surface surface-hover rounded-2xl p-4">
+          <li key={profile.id} className="chapa chapa-hover rounded-2xl p-4">
             <div className="flex items-start gap-3">
               <span
                 className="mt-1 h-10 w-1 shrink-0 rounded-full"
@@ -42,7 +42,7 @@ export default async function ProfilesPage() {
               />
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2">
-                  <h2 className="truncate font-display font-semibold tracking-[-0.01em]">
+                  <h2 className="truncate font-titulo font-semibold uppercase tracking-[0.03em]">
                     {profile.displayName}
                   </h2>
                   {profile.isDefault ? (

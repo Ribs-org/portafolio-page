@@ -34,7 +34,7 @@ function TooltipCard({
   const point = payload[0]?.payload
 
   return (
-    <div className="rounded-xl border border-white/10 bg-ink-900/95 px-3 py-2 shadow-xl backdrop-blur">
+    <div className="rounded-xl border border-white/10 bg-acero-900/95 px-3 py-2 shadow-xl backdrop-blur">
       <p className="font-mono text-[0.65rem] uppercase tracking-wider text-fg-faint">
         {point?.fullLabel}
       </p>

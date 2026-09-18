@@ -62,7 +62,7 @@ export function LinkRow({
       ref={setNodeRef}
       style={{ transform: CSS.Transform.toString(transform), transition }}
       className={cn(
-        'surface rounded-2xl',
+        'chapa rounded-xl',
         isDragging && 'z-10 opacity-90 shadow-2xl',
         !link.isActive && 'opacity-55',
       )}
