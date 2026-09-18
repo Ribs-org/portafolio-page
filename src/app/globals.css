@@ -68,8 +68,13 @@
     background: rgb(var(--accent) / 0.32);
   }
 
+  /*
+   * El anillo de foco se queda con el acento del perfil: esta regla es global y la hereda
+   * la página pública de cada creador, donde `--accent` es el color que él eligió. El
+   * acero lo sobreescribe con la brasa dentro de `.acerado`.
+   */
   :focus-visible {
-    outline: 2px solid var(--color-brasa);
+    outline: 2px solid rgb(var(--accent) / 0.9);
     outline-offset: 3px;
     border-radius: 4px;
   }
@@ -238,6 +243,19 @@
     --color-fg: #f2ebe2;
     --color-fg-muted: #948a80;
     --color-fg-faint: #6b7076;
+
+    /*
+     * `color` hay que declararlo aquí y no basta con redefinir la variable: `body` ya
+     * resolvió `color: var(--color-fg)` al blanco frío antes de llegar a este contenedor,
+     * y un valor heredado no se recalcula. Sin esta línea, todo el texto que no lleve una
+     * utilidad `text-fg` explícita —los títulos de las pestañas, entre otros— se queda en
+     * el blanco viejo sobre acero, y los dos blancos se distinguen a simple vista.
+     */
+    color: var(--color-fg);
+  }
+
+  .acerado :focus-visible {
+    outline-color: var(--color-brasa);
   }
 
   /* La brasa en vez del violeta de `--accent`, solo dentro del acero. */

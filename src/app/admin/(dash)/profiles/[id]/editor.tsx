@@ -210,7 +210,7 @@ export function ProfileEditor({ profile, initialLinks, origin }: Props) {
                     aria-label={`Usar ${color}`}
                     onClick={() => setDraft((d) => ({ ...d, accentColor: color }))}
                     className={cn(
-                      'h-7 w-7 rounded-full ring-offset-2 ring-offset-ink-950 transition-all',
+                      'h-7 w-7 rounded-full ring-offset-2 ring-offset-acero-900 transition-all',
                       draft.accentColor.toLowerCase() === color && 'ring-2 ring-white/60',
                     )}
                     style={{ background: color }}
