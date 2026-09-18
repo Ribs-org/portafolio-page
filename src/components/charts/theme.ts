@@ -2,13 +2,14 @@
  * Chart tokens. The categorical order is fixed and never cycled — a ninth series
  * folds into "Otro" rather than inventing a hue.
  *
- * Validated against the dashboard surface (#17151f) in dark mode: lightness band,
- * chroma floor, adjacent CVD separation (worst ΔE 8.4), normal-vision floor (19.3)
- * and contrast (all ≥ 3:1) all pass.
+ * La validación (piso de croma, separación para daltonismo, contraste ≥ 3:1) ya no
+ * se afirma aquí de palabra: se mide en `color.test.ts` contra la superficie de
+ * referencia, que es la de la chapa (`CHART.surface`) porque los gráficos viven
+ * dentro de un `Panel`, no sobre el fondo de la página.
  */
 export const SERIES = [
   '#3987e5', // blue
-  '#d95926', // orange
+  '#1f9aa8', // cian, no naranja: el naranja es la brasa de la marca y se confundía con lo accionable
   '#199e70', // aqua
   '#c98500', // yellow
   '#d55181', // magenta
@@ -18,12 +19,12 @@ export const SERIES = [
 ] as const
 
 export const CHART = {
-  surface: '#17151f',
-  grid: '#2c2c2a',
-  axis: '#383835',
-  muted: '#898781',
-  text: '#edeaf2',
-  secondary: '#9c96ad',
+  surface: '#1d2124',
+  grid: '#242a2f',
+  axis: '#2a2e33',
+  muted: '#6b7076',
+  text: '#f2ebe2',
+  secondary: '#948a80',
 } as const
 
 /** Sequential blue, low → high. On a dark surface, near-zero recedes to the plane. */
