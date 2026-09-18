@@ -7,6 +7,7 @@ import { SOCIAL_NETWORKS } from '@/db/schema'
 import { networkLabel } from '@/lib/networks'
 import { cn } from '@/lib/utils'
 import { ReglaClave } from './regla-clave'
+import { RevisionMedia } from './revision-media'
 import { TikTokOpciones } from './tiktok-opciones'
 
 // Twin of PUBLISHABLE (publish/batch.ts). NETWORKS in the editor
@@ -19,6 +20,7 @@ export function Composer() {
   const captionId = useId()
   const [tiktok, setTiktok] = useState(false)
   const [soloFotos, setSoloFotos] = useState(false)
+  const [archivos, setArchivos] = useState<File[]>([])
   const [cuando, setCuando] = useState('')
   // «Ahora» deja el campo de fecha fuera de juego: la hora la decide el servidor.
   const [ahora, setAhora] = useState(false)
@@ -48,10 +50,13 @@ export function Composer() {
             accept="image/*,video/*"
             onChange={(e) => {
               const files = Array.from(e.target.files ?? [])
+              setArchivos(files)
               setSoloFotos(files.length > 0 && files.every((f) => f.type.startsWith('image/')))
             }}
           />
         </Field>
+
+        <RevisionMedia files={archivos} activo={tiktok} />
 
         <div>
           <GroupLabel>Redes</GroupLabel>
