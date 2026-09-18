@@ -39,6 +39,25 @@
   --color-brasa: #e8621f;
 
   --font-titulo: var(--font-oswald), 'Arial Narrow', sans-serif;
+
+  /*
+   * La carne. Cada cocción con su extremo claro y su extremo hondo, que son los dos
+   * topes del degradado del corte. Ordenadas de clara a oscura: ese orden es la
+   * información, y es lo que hace que la escala se siga leyendo con daltonismo.
+   *
+   * Los mismos valores viven en `src/lib/parrilla.ts` y un test compara los dos lados.
+   */
+  --color-carne-cruda: #a84c46;
+  --color-carne-cruda-honda: #8f453f;
+  --color-carne-sellada: #8c3f36;
+  --color-carne-sellada-honda: #73342c;
+  --color-carne-punto: #6e3128;
+  --color-carne-punto-honda: #4e231c;
+  --color-carne-quemada: #3a2a26;
+  --color-carne-quemada-honda: #241a17;
+
+  /* El veteado del corte y las marcas de red encima. */
+  --color-grasa: #e8d7b8;
 }
 
 @layer base {
@@ -262,6 +281,211 @@
   .acerado ::selection {
     background: rgb(232 98 31 / 0.32);
   }
+
+  /*
+   * ================= La parrilla =================
+   * Ver docs/superpowers/specs/2026-09-18-parrilla-de-verdad-design.md
+   */
+
+  /*
+   * Un día. El fuego es un degradado que sube de casi nada arriba a brasa abajo, y los
+   * fierros son bandas negras dibujadas encima del fuego y debajo de los cortes. Ese
+   * orden importa: con los fierros por encima de los cortes, las bandas de la grilla se
+   * mezclan con las marcas del corte y el conjunto se ensucia.
+   */
+  .grilla {
+    position: relative;
+    border: 1px solid var(--color-acero-700);
+    border-radius: 3px;
+    overflow: hidden;
+  }
+
+  .grilla::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: repeating-linear-gradient(to bottom, rgb(0 0 0 / 0.44) 0 3px, transparent 3px 13px);
+    pointer-events: none;
+  }
+
+  /* Los hijos se levantan sobre los fierros. */
+  .grilla > * {
+    position: relative;
+  }
+
+  /* `acero-900` y no un gris nuevo: es la superficie de panel que ya usa `.chapa`. */
+  .grilla-apagada {
+    background: var(--color-acero-900);
+    border-style: dashed;
+    border-color: var(--color-acero-700);
+  }
+
+  /* Sin fierros: una parrilla apagada no tiene nada encima que mirar. */
+  .grilla-apagada::before {
+    content: none;
+  }
+
+  .grilla-prendida {
+    background: linear-gradient(
+      to bottom,
+      rgb(196 52 26 / 0.04),
+      rgb(232 98 31 / 0.13) 62%,
+      rgb(255 138 61 / 0.22)
+    );
+  }
+
+  .grilla-llena {
+    background: linear-gradient(
+      to bottom,
+      rgb(196 52 26 / 0.1),
+      rgb(232 98 31 / 0.28) 58%,
+      rgb(255 138 61 / 0.46)
+    );
+    border-color: rgb(232 98 31 / 0.4);
+  }
+
+  /*
+   * Un corte. Las cuatro esquinas con radios distintos para que no se lea como una
+   * pastilla redondeada más.
+   */
+  .corte {
+    position: relative;
+    /*
+     * `isolation` crea el contexto de apilamiento del corte. Sin él, los z-index 1/2/3
+     * de aquí adentro se resuelven en el contexto raíz y compiten con el resto del
+     * panel, y el `multiply` de las marcas compone contra el grupo raíz en vez de
+     * contra el corte. Hoy no se nota porque `overflow: hidden` recorta el pintado y la
+     * cabecera pegajosa lleva `z-30`; se rompería con el primer menú o tooltip sin
+     * z-index explícito, que se vería por debajo del texto de los cortes.
+     */
+    isolation: isolate;
+    border-radius: 13px 5px 14px 6px;
+    border: 1px solid rgb(0 0 0 / 0.35);
+    box-shadow:
+      0 5px 12px rgb(0 0 0 / 0.5),
+      inset 0 1px 0 rgb(255 255 255 / 0.1);
+    overflow: hidden;
+  }
+
+  /*
+   * El veteado de la grasa: tres elipses difusas. Va debajo de las marcas del fierro.
+   *
+   * Sale de `--color-grasa` con `color-mix` y no de un `rgb()` escrito a mano, porque
+   * el hex ya vive en dos lados (el token y `src/lib/parrilla.ts`) y una tercera copia
+   * acá dejaría el guardia contra la deriva mirando valores que nadie usa.
+   */
+  .corte::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background:
+      radial-gradient(
+        ellipse 22px 4px at 28% 34%,
+        color-mix(in srgb, var(--color-grasa) 30%, transparent),
+        transparent 70%
+      ),
+      radial-gradient(
+        ellipse 16px 3px at 66% 62%,
+        color-mix(in srgb, var(--color-grasa) 24%, transparent),
+        transparent 72%
+      ),
+      radial-gradient(
+        ellipse 12px 3px at 44% 76%,
+        color-mix(in srgb, var(--color-grasa) 18%, transparent),
+        transparent 74%
+      );
+    pointer-events: none;
+    z-index: 1;
+  }
+
+  /*
+   * Las marcas del fierro, quemadas sobre todo el corte incluida la miniatura. El 34%
+   * es el tope del spec: por encima de eso la foto deja de reconocerse, y reconocer el
+   * post de un vistazo es justamente para lo que está la miniatura.
+   */
+  .corte::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: repeating-linear-gradient(to bottom, rgb(0 0 0 / 0.34) 0 3px, transparent 3px 14px);
+    mix-blend-mode: multiply;
+    pointer-events: none;
+    z-index: 2;
+  }
+
+  /* El contenido por encima del veteado y de las marcas. */
+  .corte > * {
+    position: relative;
+    z-index: 3;
+  }
+
+  /*
+   * La miniatura lleva sus propias marcas.
+   *
+   * `.corte::after` no le llega: la imagen es hija directa del corte, así que cae en la
+   * regla de arriba y se pinta en z-index 3, por encima de las marcas que están en 2.
+   * Sin este envoltorio la foto sale limpia sobre un rectángulo rayado — exactamente lo
+   * que el spec quería evitar, una foto pegada encima de un dibujo de carne en vez de
+   * algo puesto sobre la parrilla.
+   */
+  .corte-media {
+    position: relative;
+    display: block;
+  }
+
+  .corte-media::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: 0.25rem;
+    background: repeating-linear-gradient(to bottom, rgb(0 0 0 / 0.34) 0 3px, transparent 3px 14px);
+    mix-blend-mode: multiply;
+    pointer-events: none;
+  }
+
+  .corte-cruda {
+    background: linear-gradient(145deg, var(--color-carne-cruda), var(--color-carne-cruda-honda));
+  }
+
+  /* La cruda casi no toca el fierro todavía: las marcas se insinúan. */
+  .corte-cruda::after,
+  .corte-cruda .corte-media::after {
+    opacity: 0.25;
+  }
+
+  .corte-sellada {
+    background: linear-gradient(
+      145deg,
+      var(--color-carne-sellada),
+      var(--color-carne-sellada-honda)
+    );
+  }
+
+  .corte-punto {
+    background: linear-gradient(145deg, var(--color-carne-punto), var(--color-carne-punto-honda));
+  }
+
+  .corte-quemada {
+    background: linear-gradient(
+      145deg,
+      var(--color-carne-quemada),
+      var(--color-carne-quemada-honda)
+    );
+  }
+
+  .corte-quemada::after,
+  .corte-quemada .corte-media::after {
+    opacity: 0.9;
+  }
+
+  /*
+   * El humo del corte sellado. Es la única animación de la entrega y es informativa:
+   * dice que algo está saliendo en este momento. El bloque de `prefers-reduced-motion`
+   * al final del archivo la apaga.
+   */
+  .humo {
+    animation: humo 2.8s ease-in-out infinite;
+  }
 }
 
 @keyframes drift-a {
@@ -299,6 +523,18 @@
   to {
     opacity: 1;
     transform: translateY(0);
+  }
+}
+
+@keyframes humo {
+  0%,
+  100% {
+    opacity: 0.55;
+    transform: translateY(0);
+  }
+  50% {
+    opacity: 1;
+    transform: translateY(-2px);
   }
 }
 
