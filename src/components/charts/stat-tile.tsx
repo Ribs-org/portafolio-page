@@ -17,9 +17,9 @@ export function StatTile({ label, value, delta, hint }: Props) {
   const color = flat ? undefined : up ? POSITIVE : NEGATIVE
 
   return (
-    <div className="surface rounded-2xl p-4">
+    <div className="chapa rounded-xl p-4">
       <p className="font-mono text-[0.65rem] uppercase tracking-[0.16em] text-fg-faint">{label}</p>
-      <p className="mt-2 font-display text-[1.75rem] font-semibold leading-none tracking-[-0.03em]">
+      <p className="mt-2 font-display text-[1.75rem] font-semibold leading-none tracking-[-0.03em] text-fg">
         {value}
       </p>
       <div className="mt-2 flex items-center gap-1.5 text-[0.75rem]">
@@ -42,7 +42,7 @@ export function StatTile({ label, value, delta, hint }: Props) {
 /** El hueco de un `StatTile`: las tres líneas de la cifra, sin la cifra. */
 export function StatTileSkeleton() {
   return (
-    <div className="surface animate-pulse rounded-2xl p-4" aria-hidden>
+    <div className="chapa animate-pulse rounded-xl p-4" aria-hidden>
       <div className="h-4 w-20 rounded bg-white/[0.06]" />
       <div className="mt-2 h-7 w-24 rounded bg-white/[0.07]" />
       <div className="mt-2 h-4 w-28 rounded bg-white/[0.035]" />

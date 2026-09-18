@@ -60,7 +60,7 @@ export function Cuentas({ rows }: { rows: CuentaRow[] }) {
         return (
           <div key={network}>
             <div className="mb-2 flex items-center gap-3">
-              <h2 className="font-display text-sm font-semibold">{networkLabel(network)}</h2>
+              <h2 className="font-titulo text-sm font-semibold uppercase tracking-[0.03em]">{networkLabel(network)}</h2>
               <a
                 href={`/api/social/${network}/connect`}
                 className="text-[0.75rem] text-fg-muted transition-colors hover:text-fg"
@@ -86,7 +86,7 @@ export function Cuentas({ rows }: { rows: CuentaRow[] }) {
           type="button"
           onClick={sync}
           disabled={pending}
-          className="surface flex items-center gap-1.5 rounded-xl px-3 py-2 text-xs text-fg-muted transition-colors hover:text-fg disabled:opacity-50"
+          className="chapa flex items-center gap-1.5 rounded-xl px-3 py-2 text-xs text-fg-muted transition-colors hover:text-fg disabled:opacity-50"
         >
           <RefreshCw className={cn('h-3.5 w-3.5', pending && 'animate-spin')} aria-hidden />
           Sincronizar ahora
@@ -128,7 +128,7 @@ function Tarjeta({ row, network }: { row: CuentaRow; network: string }) {
   }
 
   return (
-    <div className="surface rounded-2xl p-4">
+    <div className="chapa rounded-xl p-4">
       <div className="flex items-center gap-2">
         <span className="truncate text-sm">{nombre}</span>
         {row.lastSyncError ? (

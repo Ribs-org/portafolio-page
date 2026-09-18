@@ -35,7 +35,7 @@ export function FilterBar({ profiles }: { profiles: ProfileOption[] }) {
         pending && 'opacity-60',
       )}
     >
-      <div className="surface flex items-center gap-0.5 rounded-xl p-1">
+      <div className="chapa flex items-center gap-0.5 rounded-xl p-1">
         {RANGES.map((option) => (
           <button
             key={option.key}
@@ -43,7 +43,7 @@ export function FilterBar({ profiles }: { profiles: ProfileOption[] }) {
             onClick={() => update('range', option.key)}
             className={cn(
               'rounded-lg px-2.5 py-1.5 text-xs whitespace-nowrap transition-colors',
-              range === option.key ? 'bg-white/[0.1] text-fg' : 'text-fg-muted hover:text-fg',
+              range === option.key ? 'bg-brasa text-acero-950' : 'text-fg-muted hover:text-fg',
             )}
           >
             {option.label}
@@ -55,7 +55,7 @@ export function FilterBar({ profiles }: { profiles: ProfileOption[] }) {
         <select
           value={profile}
           onChange={(event) => update('profile', event.target.value)}
-          className="surface rounded-xl px-3 py-2 text-xs text-fg-muted outline-none"
+          className="chapa rounded-xl px-3 py-2 text-xs text-fg-muted outline-none"
         >
           <option value="all">Todos los perfiles</option>
           {profiles.map((option) => (
@@ -71,8 +71,8 @@ export function FilterBar({ profiles }: { profiles: ProfileOption[] }) {
         onClick={() => update('bots', bots ? null : '1')}
         title="Los bots se excluyen salvo que actives esto"
         className={cn(
-          'surface flex items-center gap-1.5 rounded-xl px-3 py-2 text-xs transition-colors',
-          bots ? 'text-fg' : 'text-fg-faint hover:text-fg-muted',
+          'chapa flex items-center gap-1.5 rounded-xl px-3 py-2 text-xs transition-colors',
+          bots ? 'border-brasa text-brasa' : 'text-fg-muted hover:text-fg',
         )}
       >
         <Bot className="h-3.5 w-3.5" aria-hidden />

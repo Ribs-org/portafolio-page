@@ -1,5 +1,6 @@
 import { formatNumber } from '@/lib/utils'
 import { Empty } from './panel'
+import { seriesColor } from './theme'
 
 export type BarItem = {
   key: string
@@ -17,7 +18,7 @@ export type BarItem = {
  */
 export function BarList({
   items,
-  color = '#3987e5',
+  color = seriesColor(0),
   emptyLabel = 'Sin datos todavía.',
 }: {
   items: BarItem[]

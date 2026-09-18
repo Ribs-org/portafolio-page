@@ -14,7 +14,7 @@ export default function PrivacidadPage() {
   return (
     <article className="space-y-8">
       <header>
-        <h1 className="font-display text-3xl font-semibold tracking-[-0.02em]">Privacidad</h1>
+        <h1 className="font-titulo text-3xl font-semibold uppercase tracking-[0.03em]">Privacidad</h1>
         <p className="mt-2 text-sm text-fg-muted">Actualizado el {ACTUALIZADO}.</p>
       </header>
 
@@ -25,7 +25,7 @@ export default function PrivacidadPage() {
       </p>
 
       <section className="space-y-3">
-        <h2 className="font-display text-lg font-semibold tracking-[-0.01em]">
+        <h2 className="font-titulo text-lg font-semibold uppercase tracking-[0.03em]">
           Qué se guarda de cada visita
         </h2>
         <ul className="space-y-2 leading-relaxed text-fg-muted">
@@ -65,7 +65,7 @@ export default function PrivacidadPage() {
       </section>
 
       <section className="space-y-3">
-        <h2 className="font-display text-lg font-semibold tracking-[-0.01em]">Sin cookies</h2>
+        <h2 className="font-titulo text-lg font-semibold uppercase tracking-[0.03em]">Sin cookies</h2>
         <p className="leading-relaxed text-fg-muted">
           No se instala ninguna cookie para medir tráfico. La única cookie que este sitio puede
           poner es la sesión del panel de administración, y solo aparece si el dueño inicia
@@ -79,7 +79,7 @@ export default function PrivacidadPage() {
       </section>
 
       <section className="space-y-3">
-        <h2 className="font-display text-lg font-semibold tracking-[-0.01em]">
+        <h2 className="font-titulo text-lg font-semibold uppercase tracking-[0.03em]">
           Cuentas de redes sociales conectadas
         </h2>
         <p className="leading-relaxed text-fg-muted">
@@ -117,7 +117,7 @@ export default function PrivacidadPage() {
       </section>
 
       <section className="space-y-3">
-        <h2 className="font-display text-lg font-semibold tracking-[-0.01em]">Dónde vive todo</h2>
+        <h2 className="font-titulo text-lg font-semibold uppercase tracking-[0.03em]">Dónde vive todo</h2>
         <p className="leading-relaxed text-fg-muted">
           El sitio está alojado en Vercel y los datos en una base de datos Postgres gestionada por
           Neon. Las imágenes que el dueño sube se almacenan en Vercel Blob. Ninguno de esos
@@ -126,7 +126,7 @@ export default function PrivacidadPage() {
       </section>
 
       <section className="space-y-3">
-        <h2 className="font-display text-lg font-semibold tracking-[-0.01em]">Contacto</h2>
+        <h2 className="font-titulo text-lg font-semibold uppercase tracking-[0.03em]">Contacto</h2>
         <p className="leading-relaxed text-fg-muted">
           Si quieres saber qué hay asociado a ti, o pedir que se borre, escribe a{' '}
           <a

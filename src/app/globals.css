@@ -12,14 +12,33 @@
   --color-ink-700: #2a2637;
   --color-ink-600: #3a3550;
 
+  /*
+   * Estos tres vuelven a sus valores de siempre: `body` y la página pública de cada
+   * creador los usan directamente, y esa página no cambia con «Fierro y humo». Los
+   * valores de acero viven solo en `.acerado`, más abajo, acotados al panel y la puerta.
+   */
   --color-fg: #edeaf2;
   --color-fg-muted: #9c96ad;
   --color-fg-faint: #6b6580;
 
-  --color-positive: #4ade80;
-  --color-negative: #fb7185;
+  --color-positive: #74bf6a;
+  --color-negative: #f0614f;
   /* Ni bien ni mal: algo está en curso o pide atención sin haber fallado. */
-  --color-caution: #fbbf24;
+  --color-caution: #e5a52a;
+
+  /*
+   * «Fierro y humo»: acero frío para el panel y la puerta. Los `ink-*` de arriba no se
+   * tocan porque los usa la página pública de cada creador, que tiene su propia identidad.
+   */
+  --color-acero-950: #16181a;
+  --color-acero-900: #1d2124;
+  --color-acero-800: #242a2f;
+  --color-acero-700: #2a2e33;
+
+  /* La brasa: solo lo caliente o lo accionable. Nunca decorativa. */
+  --color-brasa: #e8621f;
+
+  --font-titulo: var(--font-oswald), 'Arial Narrow', sans-serif;
 }
 
 @layer base {
@@ -49,6 +68,11 @@
     background: rgb(var(--accent) / 0.32);
   }
 
+  /*
+   * El anillo de foco se queda con el acento del perfil: esta regla es global y la hereda
+   * la página pública de cada creador, donde `--accent` es el color que él eligió. El
+   * acero lo sobreescribe con la brasa dentro de `.acerado`.
+   */
   :focus-visible {
     outline: 2px solid rgb(var(--accent) / 0.9);
     outline-offset: 3px;
@@ -172,6 +196,71 @@
       max-height: 1.5rem;
       opacity: 0.55;
     }
+  }
+
+  /*
+   * La reja: las barras de una parrilla. Separa bloques mayores dentro de una pantalla,
+   * una sola vez por pantalla. No es textura de fondo — repetida deja de significar nada.
+   */
+  .reja {
+    height: 10px;
+    border-radius: 2px;
+    background: repeating-linear-gradient(90deg, var(--color-acero-700) 0 3px, transparent 3px 13px);
+  }
+
+  /*
+   * Chapa: la superficie del panel. Acero mate, sin el desenfoque de `.surface`, que se
+   * queda para la página pública. Sin blur además rinde mejor en listas largas.
+   */
+  .chapa {
+    background: var(--color-acero-900);
+    border: 1px solid var(--color-acero-700);
+  }
+
+  .chapa-hover {
+    transition:
+      border-color 180ms ease,
+      background-color 180ms ease;
+  }
+
+  @media (hover: hover) {
+    .chapa-hover:hover {
+      background: var(--color-acero-800);
+      border-color: var(--color-brasa);
+    }
+  }
+
+  /*
+   * «Acerado»: redefine el texto secundario para el panel y la puerta sin tocar
+   * `--color-fg*` a nivel global — esos los lee `body`, y de ahí la página pública de
+   * cada creador, que conserva su identidad. Una variable CSS cascada a cualquier
+   * descendiente que use `var(--color-fg)` (incluidas las utilidades `text-fg*` de
+   * Tailwind) sin tener que tocar cada clase una por una. Se pone en los contenedores
+   * que ya pintan el fondo de acero: el layout de `(dash)`, los `main` de `ingresar` y
+   * sus errores, y el layout de `(legal)`.
+   */
+  .acerado {
+    --color-fg: #f2ebe2;
+    --color-fg-muted: #948a80;
+    --color-fg-faint: #6b7076;
+
+    /*
+     * `color` hay que declararlo aquí y no basta con redefinir la variable: `body` ya
+     * resolvió `color: var(--color-fg)` al blanco frío antes de llegar a este contenedor,
+     * y un valor heredado no se recalcula. Sin esta línea, todo el texto que no lleve una
+     * utilidad `text-fg` explícita —los títulos de las pestañas, entre otros— se queda en
+     * el blanco viejo sobre acero, y los dos blancos se distinguen a simple vista.
+     */
+    color: var(--color-fg);
+  }
+
+  .acerado :focus-visible {
+    outline-color: var(--color-brasa);
+  }
+
+  /* La brasa en vez del violeta de `--accent`, solo dentro del acero. */
+  .acerado ::selection {
+    background: rgb(232 98 31 / 0.32);
   }
 }
 

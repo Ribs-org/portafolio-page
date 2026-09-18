@@ -48,7 +48,7 @@ export default async function OverviewPage({
   return (
     <>
       <header className="mb-6">
-        <h1 className="font-display text-2xl font-semibold tracking-[-0.02em]">Resumen</h1>
+        <h1 className="font-titulo text-2xl font-semibold uppercase tracking-[0.03em]">Resumen</h1>
         <p className="mt-1 text-sm text-fg-muted">Lo esencial de un vistazo.</p>
       </header>
 

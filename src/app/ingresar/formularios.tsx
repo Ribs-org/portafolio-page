@@ -7,7 +7,7 @@ import { CODIGO_ENVIADO } from '@/lib/ingreso'
 import { canjearCodigo, pedirCodigo, type FormState } from './acciones'
 
 const CAMPO =
-  'w-full rounded-xl border border-white/10 bg-white/[0.04] px-4 py-2.5 text-sm outline-none placeholder:text-fg-faint focus:border-white/20'
+  'w-full rounded-xl border border-acero-700 bg-acero-800 px-4 py-2.5 text-sm outline-none placeholder:text-fg-faint focus:border-brasa'
 
 export function FormularioCorreo() {
   const [state, action] = useActionState<FormState, FormData>(pedirCodigo, {})
@@ -16,11 +16,9 @@ export function FormularioCorreo() {
       <label htmlFor="correo" className="sr-only">Correo</label>
       <input id="correo" name="correo" type="email" autoFocus autoComplete="email" inputMode="email" placeholder="tu@correo.cl" className={CAMPO} />
       {state.error ? <p role="alert" className="text-sm text-negative">{state.error}</p> : null}
-      {/* El acento del login no es un `variant` del panel: lo pinta el mismo `--accent` del perfil, y por eso viaja en `style` y no en clases. */}
       <Submit
         pendingLabel="Enviando…"
-        className="surface surface-hover w-full px-4 py-2.5"
-        style={{ background: 'rgb(var(--accent) / 0.18)', borderColor: 'rgb(var(--accent) / 0.4)' }}
+        className="w-full px-4 py-2.5"
       >
         Mandarme un código
       </Submit>
@@ -39,8 +37,7 @@ export function FormularioCodigo({ correo }: { correo: string }) {
       {state.error ? <p role="alert" className="text-sm text-negative">{state.error}</p> : null}
       <Submit
         pendingLabel="Entrando…"
-        className="surface surface-hover w-full px-4 py-2.5"
-        style={{ background: 'rgb(var(--accent) / 0.18)', borderColor: 'rgb(var(--accent) / 0.4)' }}
+        className="w-full px-4 py-2.5"
       >
         Entrar
       </Submit>

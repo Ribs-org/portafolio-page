@@ -13,7 +13,7 @@ export default async function UsuariosPage() {
   return (
     <>
       <header className="mb-6">
-        <h1 className="font-display text-2xl font-semibold tracking-[-0.02em]">Usuarios</h1>
+        <h1 className="font-titulo text-2xl font-semibold uppercase tracking-[0.03em]">Usuarios</h1>
         <p className="mt-1 text-sm text-fg-muted">Quién puede entrar a Parrilla. Invitar manda el primer código al correo.</p>
       </header>
       <Panel title="Invitar" className="mb-6">
