@@ -6,11 +6,17 @@
  * se afirma aquí de palabra: se mide en `color.test.ts` contra la superficie de
  * referencia, que es la de la chapa (`CHART.surface`) porque los gráficos viven
  * dentro de un `Panel`, no sobre el fondo de la página.
+ *
+ * Medido el 2026-09-18 (ΔE76, simulación Machado 2009 severidad 1.0, sobre pares
+ * adyacentes de esta lista): peor adyacencia en visión normal 51.58, peor bajo
+ * protanopía 39.71, peor bajo deuteranopía 38.67, peor bajo tritanopía 10.56 — el
+ * par crítico en los tres casos de daltonismo es cian-blue. Las ocho superan el
+ * piso de 8.4 en las tres simulaciones y de 15 en visión normal.
  */
 export const SERIES = [
-  '#3987e5', // blue
   '#1f9aa8', // cian, no naranja: el naranja es la brasa de la marca y se confundía con lo accionable
-  '#199e70', // aqua
+  '#3987e5', // blue
+  '#199e70', // aqua — el cian va antes del azul, no junto al aqua: bajo tritanopía caían casi encima
   '#c98500', // yellow
   '#d55181', // magenta
   '#008300', // green

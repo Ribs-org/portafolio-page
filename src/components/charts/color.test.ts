@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import { contraste, distancia } from './color'
+import { contraste, distancia, simular } from './color'
 import { CHART, SERIES } from './theme'
+
+const TIPOS = ['protan', 'deutan', 'tritan'] as const
 
 describe('matemática de color', () => {
   it('el contraste conocido de blanco sobre negro es 21', () => {
@@ -36,6 +38,19 @@ describe('la paleta de series sobre la superficie del panel', () => {
     // Si una serie se parece al acento, el lector no distingue dato de control.
     for (const color of SERIES) {
       expect(distancia(color, '#e8621f'), `${color} contra la brasa`).toBeGreaterThan(20)
+    }
+  })
+
+  it('ninguna vecina se confunde con la siguiente bajo daltonismo', () => {
+    // Piso histórico documentado en theme.ts: por debajo de 8.4, dos series adyacentes
+    // se vuelven indistinguibles bajo alguna dicromacia, aunque en visión normal se lean bien.
+    for (let i = 1; i < SERIES.length; i++) {
+      const previa = SERIES[i - 1]!
+      const actual = SERIES[i]!
+      for (const tipo of TIPOS) {
+        const distanciaSimulada = distancia(simular(previa, tipo), simular(actual, tipo))
+        expect(distanciaSimulada, `${previa} junto a ${actual} bajo ${tipo}`).toBeGreaterThan(8.4)
+      }
     }
   })
 })
