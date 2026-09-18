@@ -48,7 +48,7 @@ export function Donut({ slices }: { slices: Slice[] }) {
                 const item = payload[0]!
                 const value = Number(item.value ?? 0)
                 return (
-                  <div className="rounded-xl border border-white/10 bg-ink-900/95 px-3 py-2 text-[0.8rem] shadow-xl backdrop-blur">
+                  <div className="rounded-xl border border-white/10 bg-acero-900/95 px-3 py-2 text-[0.8rem] shadow-xl backdrop-blur">
                     <span className="text-fg-muted">{item.name}</span>
                     <span className="ml-3 font-mono tabular-nums text-fg">
                       {formatNumber(value)} · {((value / total) * 100).toFixed(1)}%

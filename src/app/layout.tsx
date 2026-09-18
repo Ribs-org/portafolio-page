@@ -1,10 +1,17 @@
 import type { Metadata, Viewport } from 'next'
-import { Bricolage_Grotesque, Instrument_Sans, JetBrains_Mono } from 'next/font/google'
+import { Bricolage_Grotesque, Instrument_Sans, JetBrains_Mono, Oswald } from 'next/font/google'
 import './globals.css'
 
 const bricolage = Bricolage_Grotesque({
   subsets: ['latin'],
   variable: '--font-bricolage',
+  display: 'swap',
+})
+
+const oswald = Oswald({
+  subsets: ['latin'],
+  weight: ['400', '600', '700'],
+  variable: '--font-oswald',
   display: 'swap',
 })
 
@@ -33,7 +40,10 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="es" className={`${bricolage.variable} ${instrument.variable} ${jetbrains.variable}`}>
+    <html
+      lang="es"
+      className={`${bricolage.variable} ${instrument.variable} ${jetbrains.variable} ${oswald.variable}`}
+    >
       <body>{children}</body>
     </html>
   )

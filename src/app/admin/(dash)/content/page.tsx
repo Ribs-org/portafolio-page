@@ -148,7 +148,7 @@ export default async function ContentPage({
   return (
     <>
       <header className="mb-6">
-        <h1 className="font-display text-2xl font-semibold tracking-[-0.02em]">Contenido</h1>
+        <h1 className="font-titulo text-2xl font-semibold uppercase tracking-[0.03em]">Contenido</h1>
         <p className="mt-1 text-sm text-fg-muted">
           Cada post con lo que hizo en la red y lo que trajo a tu página.
         </p>
@@ -176,7 +176,7 @@ export default async function ContentPage({
       </div>
 
       {unpasted > 0 || withoutMetrics > 0 ? (
-        <div className="surface mt-4 space-y-1 rounded-2xl px-4 py-3 text-[0.82rem] leading-relaxed text-fg-muted">
+        <div className="chapa mt-4 space-y-1 rounded-xl px-4 py-3 text-[0.82rem] leading-relaxed text-fg-muted">
           {unpasted > 0 ? <p>{unpastedNotice}</p> : null}
           {withoutMetrics > 0 ? <p>{metricsNotice}</p> : null}
         </div>

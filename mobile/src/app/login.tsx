@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { KeyboardAvoidingView, Text, TextInput, View } from 'react-native'
 import { useRouter } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import { Boton, COLORES } from '../components/ui'
+import { Boton, COLORES, Titulo } from '../components/ui'
 import { login } from '../lib/session'
 
 export default function Login() {
@@ -38,7 +38,7 @@ export default function Login() {
       }}
     >
       <View style={{ flex: 1, justifyContent: 'center', padding: 24, gap: 12 }}>
-        <Text style={{ color: COLORES.texto, fontSize: 22, fontWeight: '600' }}>Tus números</Text>
+        <Titulo>Tus números</Titulo>
         <Text style={{ color: COLORES.suave }}>Escribe tu contraseña una vez.</Text>
         <TextInput
           value={password}

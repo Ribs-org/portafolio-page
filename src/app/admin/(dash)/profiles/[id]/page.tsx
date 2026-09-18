@@ -53,7 +53,7 @@ export default async function EditProfilePage({ params }: { params: Promise<{ id
         >
           <ArrowLeft className="h-4 w-4" aria-hidden />
         </Link>
-        <h1 className="font-display text-2xl font-semibold tracking-[-0.02em]">
+        <h1 className="font-titulo text-2xl font-semibold uppercase tracking-[0.03em]">
           {profile.displayName}
         </h1>
         <a

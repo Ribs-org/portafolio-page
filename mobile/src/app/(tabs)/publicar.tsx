@@ -280,9 +280,11 @@ export default function Publicar() {
         {aviso ? <Text style={{ color: COLORES.rojo }}>{aviso}</Text> : null}
         {error ? <Text style={{ color: COLORES.rojo }}>{error}</Text> : null}
         {etiqueta ? <Text style={{ color: COLORES.suave }}>{etiqueta}</Text> : null}
+        {/* La barra se llena en brasa y no en verde: el verde es el «publicado» del semáforo
+            y acá todavía no se publicó nada — recién se está subiendo el archivo. */}
         {envio.paso === 'subiendo' ? (
           <View style={{ height: 4, backgroundColor: '#ffffff10', borderRadius: 2 }}>
-            <View style={{ height: 4, width: `${Math.round(envio.progreso * 100)}%`, backgroundColor: COLORES.verde, borderRadius: 2 }} />
+            <View style={{ height: 4, width: `${Math.round(envio.progreso * 100)}%`, backgroundColor: COLORES.brasa, borderRadius: 2 }} />
           </View>
         ) : null}
 

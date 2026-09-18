@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Linking, Pressable, ScrollView, Text, View } from 'react-native'
 import { useLocalSearchParams, useRouter } from 'expo-router'
-import { Boton, COLORES, Cargando, Tarjeta } from '../../components/ui'
+import { Boton, COLORES, Cargando, Etiqueta, Tarjeta } from '../../components/ui'
 import { readCache } from '../../lib/cache'
 import { capitalizar, num, pct, shortDate } from '../../lib/format'
 import { NOMBRE_RED, RANGOS, type PostMetrica, type Posts } from '../../lib/tipos'
@@ -93,9 +93,7 @@ export default function DetallePost() {
 
       {post.atributos ? (
         <Tarjeta>
-          <Text style={{ color: COLORES.tenue, fontSize: 11, textTransform: 'uppercase' }}>
-            Atributos
-          </Text>
+          <Etiqueta>Atributos</Etiqueta>
           {Object.entries(post.atributos).map(([clave, valor]) => (
             <View key={clave} style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
               <Text style={{ color: COLORES.suave, fontSize: 13 }}>{capitalizar(clave)}</Text>
@@ -108,7 +106,9 @@ export default function DetallePost() {
       {post.permalink ? (
         <Pressable onPress={() => Linking.openURL(post.permalink!)}>
           <Tarjeta>
-            <Text style={{ color: COLORES.verde }}>Abrir en {NOMBRE_RED[post.red] ?? post.red} ↗</Text>
+            {/* En brasa como el resto de las acciones: el verde de esta app dice
+                «publicado», y acá no informa un estado, invita a tocar. */}
+            <Text style={{ color: COLORES.brasa }}>Abrir en {NOMBRE_RED[post.red] ?? post.red} ↗</Text>
           </Tarjeta>
         </Pressable>
       ) : null}

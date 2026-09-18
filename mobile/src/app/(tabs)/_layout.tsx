@@ -1,14 +1,21 @@
 import { Tabs } from 'expo-router'
-import { COLORES } from '../../components/ui'
+import { COLORES, TIPO_TITULO } from '../../components/ui'
 
 export default function TabsLayout() {
   return (
     <Tabs
       screenOptions={{
         headerStyle: { backgroundColor: COLORES.fondo },
-        headerTitleStyle: { color: COLORES.texto },
+        // El título de cada pestaña es el título de la pantalla: va en la voz de los títulos.
+        headerTitleStyle: {
+          color: COLORES.texto,
+          fontFamily: TIPO_TITULO,
+          letterSpacing: 1,
+          textTransform: 'uppercase',
+        },
         tabBarStyle: { backgroundColor: COLORES.tarjeta, borderTopColor: '#00000000' },
-        tabBarActiveTintColor: COLORES.texto,
+        // La pestaña activa en brasa: antes se distinguía solo por blanco contra gris.
+        tabBarActiveTintColor: COLORES.brasa,
         tabBarInactiveTintColor: COLORES.tenue,
       }}
     >
