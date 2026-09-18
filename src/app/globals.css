@@ -39,6 +39,25 @@
   --color-brasa: #e8621f;
 
   --font-titulo: var(--font-oswald), 'Arial Narrow', sans-serif;
+
+  /*
+   * La carne. Cada cocción con su extremo claro y su extremo hondo, que son los dos
+   * topes del degradado del corte. Ordenadas de clara a oscura: ese orden es la
+   * información, y es lo que hace que la escala se siga leyendo con daltonismo.
+   *
+   * Los mismos valores viven en `src/lib/parrilla.ts` y un test compara los dos lados.
+   */
+  --color-carne-cruda: #a84c46;
+  --color-carne-cruda-honda: #8f453f;
+  --color-carne-sellada: #8c3f36;
+  --color-carne-sellada-honda: #73342c;
+  --color-carne-punto: #6e3128;
+  --color-carne-punto-honda: #4e231c;
+  --color-carne-quemada: #3a2a26;
+  --color-carne-quemada-honda: #241a17;
+
+  /* El veteado del corte y las marcas de red encima. */
+  --color-grasa: #e8d7b8;
 }
 
 @layer base {
