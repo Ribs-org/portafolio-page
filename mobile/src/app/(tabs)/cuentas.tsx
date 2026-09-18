@@ -5,6 +5,7 @@ import {
   COLORES,
   Cargando,
   ErrorConReintento,
+  Etiqueta,
   Pantalla,
   Sello,
   Tarjeta,
@@ -52,9 +53,7 @@ export default function Cuentas() {
       ) : (
         data.cuentas.map((cuenta) => (
           <Tarjeta key={cuenta.red}>
-            <Text style={{ color: COLORES.tenue, fontSize: 11, textTransform: 'uppercase' }}>
-              {NOMBRE_RED[cuenta.red] ?? cuenta.red}
-            </Text>
+            <Etiqueta>{NOMBRE_RED[cuenta.red] ?? cuenta.red}</Etiqueta>
             <Text style={{ color: COLORES.texto, fontSize: 24, fontWeight: '600' }}>
               {num(cuenta.seguidores)}
             </Text>
@@ -81,9 +80,7 @@ export default function Cuentas() {
 
       {data.serie.length > 1 ? (
         <Tarjeta>
-          <Text style={{ color: COLORES.tenue, fontSize: 11, textTransform: 'uppercase' }}>
-            Visitas al perfil por día
-          </Text>
+          <Etiqueta>Visitas al perfil por día</Etiqueta>
           {/* Barras de vistas planas: una librería de gráficos sería una dependencia
               nativa más que puede romper el build, y esto se lee igual de bien. */}
           <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 3, height: 80, marginTop: 8 }}>
