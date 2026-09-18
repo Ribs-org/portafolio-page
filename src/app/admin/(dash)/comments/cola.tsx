@@ -123,7 +123,7 @@ function Tarjeta({ fila, mostrarPrivado }: { fila: ComentarioFila; mostrarPrivad
   }
 
   return (
-    <article className="surface rounded-2xl p-4">
+    <article className="chapa rounded-xl p-4">
       <p className="text-[0.78rem] text-fg-faint">
         <span className="text-fg">{fila.author ?? 'Alguien'}</span> · {hace(fila.publishedAt)}
       </p>

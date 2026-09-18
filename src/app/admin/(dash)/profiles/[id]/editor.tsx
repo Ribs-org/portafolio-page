@@ -404,11 +404,11 @@ export function ProfileEditor({ profile, initialLinks, origin }: Props) {
       </aside>
 
       {showPreview ? (
-        <div className="fixed inset-0 z-50 grid place-items-center bg-ink-950/80 p-4 backdrop-blur lg:hidden">
+        <div className="fixed inset-0 z-50 grid place-items-center bg-acero-950/80 p-4 backdrop-blur lg:hidden">
           <button
             type="button"
             onClick={() => setShowPreview(false)}
-            className="absolute right-4 top-4 rounded-full border border-white/10 bg-ink-900 p-2"
+            className="absolute right-4 top-4 rounded-full border border-white/10 bg-acero-900 p-2"
             aria-label="Cerrar vista previa"
           >
             <X className="h-4 w-4" aria-hidden />

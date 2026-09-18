@@ -15,7 +15,7 @@ export default function TerminosPage() {
   return (
     <article className="space-y-8">
       <header>
-        <h1 className="font-display text-3xl font-semibold tracking-[-0.02em]">Términos</h1>
+        <h1 className="font-titulo text-3xl font-semibold uppercase tracking-[0.03em]">Términos</h1>
         <p className="mt-2 text-sm text-fg-muted">Actualizado el {ACTUALIZADO}.</p>
       </header>
 
@@ -26,7 +26,7 @@ export default function TerminosPage() {
       </p>
 
       <section className="space-y-3">
-        <h2 className="font-display text-lg font-semibold tracking-[-0.01em]">Qué ofrece</h2>
+        <h2 className="font-titulo text-lg font-semibold uppercase tracking-[0.03em]">Qué ofrece</h2>
         <p className="leading-relaxed text-fg-muted">
           Una página con enlaces. El contenido —textos, imágenes y la selección de enlaces— es del
           dueño del sitio, que puede cambiarlo, reorganizarlo o retirarlo cuando quiera, sin
@@ -35,7 +35,7 @@ export default function TerminosPage() {
       </section>
 
       <section className="space-y-3">
-        <h2 className="font-display text-lg font-semibold tracking-[-0.01em]">Enlaces a terceros</h2>
+        <h2 className="font-titulo text-lg font-semibold uppercase tracking-[0.03em]">Enlaces a terceros</h2>
         <p className="leading-relaxed text-fg-muted">
           Casi todo lo que hay acá lleva a otro sitio: redes sociales, tiendas, plataformas de
           video. Esos sitios no son de este dueño y se rigen por sus propios términos y sus
@@ -44,7 +44,7 @@ export default function TerminosPage() {
       </section>
 
       <section className="space-y-3">
-        <h2 className="font-display text-lg font-semibold tracking-[-0.01em]">Sin garantías</h2>
+        <h2 className="font-titulo text-lg font-semibold uppercase tracking-[0.03em]">Sin garantías</h2>
         <p className="leading-relaxed text-fg-muted">
           El sitio se ofrece tal como está. Puede quedar fuera de servicio, un enlace puede
           apuntar a algo que ya no existe, y la información puede quedar desactualizada. No se
@@ -53,7 +53,7 @@ export default function TerminosPage() {
       </section>
 
       <section className="space-y-3">
-        <h2 className="font-display text-lg font-semibold tracking-[-0.01em]">El panel privado</h2>
+        <h2 className="font-titulo text-lg font-semibold uppercase tracking-[0.03em]">El panel privado</h2>
         <p className="leading-relaxed text-fg-muted">
           La sección de administración es de uso exclusivo del dueño y está protegida con
           contraseña. Intentar acceder a ella sin autorización no está permitido.
@@ -61,7 +61,7 @@ export default function TerminosPage() {
       </section>
 
       <section className="space-y-3">
-        <h2 className="font-display text-lg font-semibold tracking-[-0.01em]">Datos</h2>
+        <h2 className="font-titulo text-lg font-semibold uppercase tracking-[0.03em]">Datos</h2>
         <p className="leading-relaxed text-fg-muted">
           Qué se mide y qué no está descrito en la{' '}
           <Link
@@ -75,7 +75,7 @@ export default function TerminosPage() {
       </section>
 
       <section className="space-y-3">
-        <h2 className="font-display text-lg font-semibold tracking-[-0.01em]">Cambios y contacto</h2>
+        <h2 className="font-titulo text-lg font-semibold uppercase tracking-[0.03em]">Cambios y contacto</h2>
         <p className="leading-relaxed text-fg-muted">
           Estos términos pueden cambiar; la fecha de arriba indica la última versión. Para
           cualquier consulta:{' '}

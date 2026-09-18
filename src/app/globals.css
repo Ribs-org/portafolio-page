@@ -12,9 +12,14 @@
   --color-ink-700: #2a2637;
   --color-ink-600: #3a3550;
 
-  --color-fg: #f2ebe2;
-  --color-fg-muted: #948a80;
-  --color-fg-faint: #6b7076;
+  /*
+   * Estos tres vuelven a sus valores de siempre: `body` y la página pública de cada
+   * creador los usan directamente, y esa página no cambia con «Fierro y humo». Los
+   * valores de acero viven solo en `.acerado`, más abajo, acotados al panel y la puerta.
+   */
+  --color-fg: #edeaf2;
+  --color-fg-muted: #9c96ad;
+  --color-fg-faint: #6b6580;
 
   --color-positive: #74bf6a;
   --color-negative: #f0614f;
@@ -218,6 +223,26 @@
       background: var(--color-acero-800);
       border-color: var(--color-brasa);
     }
+  }
+
+  /*
+   * «Acerado»: redefine el texto secundario para el panel y la puerta sin tocar
+   * `--color-fg*` a nivel global — esos los lee `body`, y de ahí la página pública de
+   * cada creador, que conserva su identidad. Una variable CSS cascada a cualquier
+   * descendiente que use `var(--color-fg)` (incluidas las utilidades `text-fg*` de
+   * Tailwind) sin tener que tocar cada clase una por una. Se pone en los contenedores
+   * que ya pintan el fondo de acero: el layout de `(dash)`, los `main` de `ingresar` y
+   * sus errores, y el layout de `(legal)`.
+   */
+  .acerado {
+    --color-fg: #f2ebe2;
+    --color-fg-muted: #948a80;
+    --color-fg-faint: #6b7076;
+  }
+
+  /* La brasa en vez del violeta de `--accent`, solo dentro del acero. */
+  .acerado ::selection {
+    background: rgb(232 98 31 / 0.32);
   }
 }
 

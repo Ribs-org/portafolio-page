@@ -27,7 +27,7 @@ export default async function Elegir({
 
   if (!pendiente) {
     return (
-      <section className="surface rounded-2xl p-6">
+      <section className="chapa rounded-xl p-6">
         <p className="text-sm">{LOGIN_VENCIDO}</p>
         <Link href="/admin/accounts" className="mt-3 inline-block text-sm text-fg-muted hover:text-fg">
           ← Volver a Cuentas
@@ -55,8 +55,8 @@ export default async function Elegir({
   )
 
   return (
-    <section className="surface rounded-2xl p-6">
-      <h1 className="font-display text-lg font-semibold">
+    <section className="chapa rounded-xl p-6">
+      <h1 className="font-titulo text-lg font-semibold uppercase tracking-[0.03em]">
         ¿Qué cuentas de {networkLabel(pendiente.network)} conectar?
       </h1>
       <p className="mt-1 text-sm text-fg-muted">

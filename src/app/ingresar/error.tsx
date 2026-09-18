@@ -18,9 +18,9 @@ export default function IngresarError({
   }, [error])
 
   return (
-    <main className="grid min-h-dvh place-items-center bg-acero-950 px-6">
+    <main className="acerado grid min-h-dvh place-items-center bg-acero-950 px-6">
       <section className="chapa mx-auto max-w-md rounded-2xl p-6 text-center">
-        <h1 className="font-display text-lg font-semibold tracking-[-0.01em]">Algo se rompió</h1>
+        <h1 className="font-titulo text-lg font-semibold uppercase tracking-[0.03em]">Algo se rompió</h1>
         <p className="mt-2 text-sm leading-relaxed text-fg-muted">
           No fue nada que hicieras: no pudimos preparar tu ingreso. Vuelve a intentarlo; el detalle
           quedó en la consola del navegador.
