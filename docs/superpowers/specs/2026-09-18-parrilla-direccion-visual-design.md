@@ -109,8 +109,20 @@ El motivo estructural: barras verticales paralelas hechas con
 10 px de alto. Separa bloques mayores dentro de una pantalla, **una sola vez por pantalla**, y
 nunca como textura de fondo.
 
-Reemplaza a `.aurora`, que es lo más violeta que queda del diseño viejo. Se borran las clases
-`.aurora` y `.aurora-contained` de `globals.css` y sus usos.
+Reemplaza a `.aurora` **en el panel y en la puerta**, pero **`.aurora` no se borra**: la usa la
+página pública de cada creador, que está fuera de alcance, y `aurora` es además uno de los
+valores que `profiles.background_style` guarda en la base. Borrarla rompería páginas de
+creadores y datos existentes.
+
+Lo mismo vale para `.surface`: la comparten el panel y la página pública. El panel deja de
+usarla y pasa a **`.chapa`**, una superficie nueva de acero sin desenfoque; `.surface` se queda
+intacta para la página pública.
+
+De ahí se sigue una regla para toda la entrega 1: **el cambio es aditivo**. Los tokens
+`ink-*` y las clases `.aurora`, `.aurora-contained` y `.surface` quedan donde están; lo nuevo
+convive. Y como `body` pinta hoy `--color-ink-950` para todo el sitio, **el panel, la puerta y
+las legales pintan su propio fondo** en sus layouts en vez de heredarlo, para que la página
+pública quede byte a byte igual.
 
 ## 2. Estructura y vocabulario
 
@@ -185,11 +197,12 @@ La base cambia en cinco archivos y se propaga sola:
 
 | Archivo | Qué cambia |
 |---|---|
-| `src/app/globals.css` | tokens `acero-*`, la reja, fuera las auroras |
-| `src/app/layout.tsx` | entra Oswald, sale Bricolage |
+| `src/app/globals.css` | tokens `acero-*`, `.reja` y `.chapa` nuevas; nada se borra |
+| `src/app/layout.tsx` | entra Oswald; Bricolage se queda mientras la página pública lo use |
 | `src/components/ui.tsx` | los nueve controles sobre los tokens nuevos |
 | `src/components/charts/theme.ts` | el cian por el naranja, neutros de acero |
-| `src/components/charts/panel.tsx` | superficie y borde nuevos |
+| `src/components/charts/panel.tsx` | `.chapa` en vez de `.surface` |
+| `src/app/admin/(dash)/layout.tsx` | pinta su propio fondo de acero; fuera la aurora |
 
 Los otros siete gráficos (`bar-list`, `campaign-table`, `donut`, `funnel`, `heatmap`,
 `stat-tile`, `traffic-chart`) heredan del tema; se revisan pero no se reescriben.
@@ -214,15 +227,21 @@ creador, y la app Android (subproyecto 5).
 
 ## 5. Las entregas
 
-Cuatro, cada una desplegable sola, con su propio plan y su propio PR, en este orden:
+Tres, cada una desplegable sola, con su propio plan y su propio PR, en este orden:
 
-1. **La base.** Tokens, fuentes, la reja, el tema de gráficos, los controles. Al terminar,
-   todo el panel se ve «Fierro y humo» y se sigue llamando igual. Ninguna estructura cambia.
+1. **La base.** Tokens, fuentes, la reja, el tema de gráficos, los controles, y el cromado
+   del panel **y de la puerta**: `/ingresar`, la pantalla de código, las legales y las
+   pantallas de error. Al terminar, todo se ve «Fierro y humo» y se sigue llamando igual.
+   Ninguna estructura cambia.
 2. **El vocabulario.** Navegación, títulos, subtítulos en llano, botones, estados y vacíos.
    El módulo de presentación con el mapa de nombres.
 3. **El Fuego.** La pantalla nueva, el cálculo de días cargados y el traslado de la analítica
    a Los Números.
-4. **La puerta.** `/ingresar`, la pantalla de código, las legales y la pantalla de error.
+
+**Por qué la puerta va en la base y no aparte**, que era el plan inicial: `src/components/ui.tsx`
+lo comparten el panel y la puerta. Vestir los controles y dejar la puerta para después la
+dejaría con campos de acero sobre fondo violeta con auroras, y cada entrega tiene que poder
+desplegarse sin verse a medio hacer.
 
 ## 6. Cómo se comprueba
 
