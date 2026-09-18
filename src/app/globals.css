@@ -12,14 +12,28 @@
   --color-ink-700: #2a2637;
   --color-ink-600: #3a3550;
 
-  --color-fg: #edeaf2;
-  --color-fg-muted: #9c96ad;
-  --color-fg-faint: #6b6580;
+  --color-fg: #f2ebe2;
+  --color-fg-muted: #948a80;
+  --color-fg-faint: #6b7076;
 
-  --color-positive: #4ade80;
-  --color-negative: #fb7185;
+  --color-positive: #74bf6a;
+  --color-negative: #f0614f;
   /* Ni bien ni mal: algo está en curso o pide atención sin haber fallado. */
-  --color-caution: #fbbf24;
+  --color-caution: #e5a52a;
+
+  /*
+   * «Fierro y humo»: acero frío para el panel y la puerta. Los `ink-*` de arriba no se
+   * tocan porque los usa la página pública de cada creador, que tiene su propia identidad.
+   */
+  --color-acero-950: #16181a;
+  --color-acero-900: #1d2124;
+  --color-acero-800: #242a2f;
+  --color-acero-700: #2a2e33;
+
+  /* La brasa: solo lo caliente o lo accionable. Nunca decorativa. */
+  --color-brasa: #e8621f;
+
+  --font-titulo: var(--font-oswald), 'Arial Narrow', sans-serif;
 }
 
 @layer base {
@@ -50,7 +64,7 @@
   }
 
   :focus-visible {
-    outline: 2px solid rgb(var(--accent) / 0.9);
+    outline: 2px solid var(--color-brasa);
     outline-offset: 3px;
     border-radius: 4px;
   }
@@ -171,6 +185,38 @@
     .destination {
       max-height: 1.5rem;
       opacity: 0.55;
+    }
+  }
+
+  /*
+   * La reja: las barras de una parrilla. Separa bloques mayores dentro de una pantalla,
+   * una sola vez por pantalla. No es textura de fondo — repetida deja de significar nada.
+   */
+  .reja {
+    height: 10px;
+    border-radius: 2px;
+    background: repeating-linear-gradient(90deg, var(--color-acero-700) 0 3px, transparent 3px 13px);
+  }
+
+  /*
+   * Chapa: la superficie del panel. Acero mate, sin el desenfoque de `.surface`, que se
+   * queda para la página pública. Sin blur además rinde mejor en listas largas.
+   */
+  .chapa {
+    background: var(--color-acero-900);
+    border: 1px solid var(--color-acero-700);
+  }
+
+  .chapa-hover {
+    transition:
+      border-color 180ms ease,
+      background-color 180ms ease;
+  }
+
+  @media (hover: hover) {
+    .chapa-hover:hover {
+      background: var(--color-acero-800);
+      border-color: var(--color-brasa);
     }
   }
 }
