@@ -8,7 +8,7 @@ import { cn } from '@/lib/utils'
 // un `<select>` y el calendario de un `datetime-local`. Sin él salen con fondo claro y
 // heredan el texto claro del panel, así que se leen blanco sobre blanco.
 const CONTROL =
-  'w-full rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2 text-sm outline-none transition-colors [color-scheme:dark] placeholder:text-fg-faint focus:border-white/25'
+  'w-full rounded-lg border border-acero-700 bg-acero-800 px-3 py-2 text-sm outline-none transition-colors [color-scheme:dark] placeholder:text-fg-faint focus:border-brasa'
 
 /**
  * Encabezado de un grupo de controles. `Field` rotula uno solo: su `<label>` alrededor
@@ -16,7 +16,7 @@ const CONTROL =
  */
 export function GroupLabel({ children }: { children: React.ReactNode }) {
   return (
-    <span className="mb-1.5 block font-mono text-[0.62rem] uppercase tracking-[0.16em] text-fg-faint">
+    <span className="mb-2 block font-titulo text-[0.7rem] font-semibold uppercase tracking-[0.14em] text-fg-faint">
       {children}
     </span>
   )
@@ -63,10 +63,10 @@ export function Button({
     <button
       {...props}
       className={cn(
-        'inline-flex items-center justify-center gap-1.5 rounded-xl px-3.5 py-2 text-sm font-medium transition-colors disabled:opacity-50',
-        variant === 'primary' && 'bg-white/[0.12] text-fg hover:bg-white/[0.18]',
-        variant === 'ghost' && 'border border-white/10 text-fg-muted hover:bg-white/[0.05] hover:text-fg',
-        variant === 'danger' && 'border border-negative/30 text-negative hover:bg-negative/10',
+        'inline-flex items-center justify-center gap-1.5 rounded-lg px-3.5 py-2 text-sm font-medium transition-colors disabled:opacity-50',
+        variant === 'primary' && 'bg-brasa text-acero-950 hover:brightness-110',
+        variant === 'ghost' && 'border border-acero-700 text-fg-muted hover:bg-acero-800 hover:text-fg',
+        variant === 'danger' && 'border border-negative/40 text-negative hover:bg-negative/10',
         className,
       )}
     />
@@ -155,7 +155,7 @@ export function Switch({
       onClick={() => onChange(!checked)}
       className={cn(
         'relative h-5 w-9 shrink-0 rounded-full transition-colors',
-        checked ? 'bg-white/40' : 'bg-white/10',
+        checked ? 'bg-brasa/70' : 'bg-acero-700',
         className,
       )}
     >
