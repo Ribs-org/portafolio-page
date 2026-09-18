@@ -1,6 +1,10 @@
 import { useCallback, useEffect, useState } from 'react'
 import { DarkTheme, Stack, ThemeProvider, useRouter, type Theme } from 'expo-router'
-import { Oswald_600SemiBold, useFonts } from '@expo-google-fonts/oswald'
+// Del subcamino y no del paquete: el índice reexporta los seis grosores de Oswald y
+// Metro se lleva los seis al paquete — 528 KB de tipografía para usar 88. `useFonts`
+// sale de `expo-font`, que ya es dependencia directa.
+import { Oswald_600SemiBold } from '@expo-google-fonts/oswald/600SemiBold'
+import { useFonts } from 'expo-font'
 import * as LocalAuthentication from 'expo-local-authentication'
 import { StatusBar } from 'expo-status-bar'
 import { COLORES, Cargando, TIPO_TITULO } from '../components/ui'
