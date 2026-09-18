@@ -27,7 +27,7 @@ export function AdminNav({ esAdmin }: { esAdmin?: boolean }) {
             key={tab.href}
             href={tab.href}
             className={cn(
-              'relative rounded-lg px-3 py-1.5 text-sm whitespace-nowrap transition-colors',
+              'rounded-lg px-3 py-1.5 text-sm whitespace-nowrap transition-colors',
               active ? 'bg-brasa text-acero-950' : 'text-fg-muted hover:text-fg',
             )}
           >

@@ -18,7 +18,7 @@ export function FormularioCorreo() {
       {state.error ? <p role="alert" className="text-sm text-negative">{state.error}</p> : null}
       <Submit
         pendingLabel="Enviando…"
-        className="surface surface-hover w-full px-4 py-2.5"
+        className="w-full px-4 py-2.5"
       >
         Mandarme un código
       </Submit>
@@ -37,7 +37,7 @@ export function FormularioCodigo({ correo }: { correo: string }) {
       {state.error ? <p role="alert" className="text-sm text-negative">{state.error}</p> : null}
       <Submit
         pendingLabel="Entrando…"
-        className="surface surface-hover w-full px-4 py-2.5"
+        className="w-full px-4 py-2.5"
       >
         Entrar
       </Submit>
