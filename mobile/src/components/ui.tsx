@@ -2,21 +2,33 @@ import { ActivityIndicator, Pressable, RefreshControl, ScrollView, Text, View } 
 import type { ReactNode } from 'react'
 import { Image } from 'expo-image'
 
+/**
+ * «Fierro y humo», los mismos valores que el panel web (ver
+ * `docs/superpowers/specs/2026-09-18-parrilla-direccion-visual-design.md`).
+ *
+ * `brasa` es el acento y no existía: antes el verde hacía dos trabajos, el estado
+ * «publicado» y el fondo del botón destacado, así que el mismo color informaba y pedía
+ * que lo tocaras. Ahora el verde es solo estado y la brasa solo acción.
+ */
 export const COLORES = {
-  fondo: '#0b0b0f',
-  tarjeta: '#16161d',
-  texto: '#f2f2f5',
-  suave: '#a1a1ad',
-  tenue: '#6b6b78',
-  verde: '#34d399',
-  gris: '#6b6b78',
-  rojo: '#f87171',
-  ambar: '#fbbf24',
+  fondo: '#16181a',
+  tarjeta: '#1d2124',
+  texto: '#f2ebe2',
+  suave: '#948a80',
+  tenue: '#6b7076',
+  brasa: '#e8621f',
+  verde: '#74bf6a',
+  gris: '#6b7076',
+  rojo: '#f0614f',
+  ambar: '#e5a52a',
 }
+
+/** Oswald para títulos y etiquetas, en mayúsculas. Las cifras se quedan en la del sistema. */
+export const TIPO_TITULO = 'Oswald_600SemiBold'
 
 // El destello de Android al tocar: el mismo blanco del texto, casi transparente.
 const RIPPLE = { color: COLORES.texto + '22' }
-// Sobre `destacado` (verde claro) el blanco casi no se nota: mismo nivel de opacidad, pero negro.
+// Sobre la brasa el blanco casi no se nota: mismo nivel de opacidad, pero negro.
 const RIPPLE_DESTACADO = { color: '#00000022' }
 
 export function Pantalla({
@@ -49,12 +61,55 @@ export function Tarjeta({ children }: { children: ReactNode }) {
   )
 }
 
+/**
+ * El rótulo chico en mayúsculas que encabeza un bloque: el nombre de una cifra, el día
+ * de un grupo del calendario, «Qué viene». Antes era el mismo estilo escrito a mano en
+ * seis pantallas, así que Oswald habría entrado solo donde alguien se acordara y la
+ * mitad de los rótulos se leería en la fuente del sistema.
+ *
+ * `margenArriba` es para los que separan secciones de una lista que viene arriba; los
+ * que van pegados al techo de una tarjeta no lo llevan.
+ */
+export function Etiqueta({ children, margenArriba }: { children: string; margenArriba?: boolean }) {
+  return (
+    <Text
+      style={{
+        color: COLORES.tenue,
+        fontSize: 11,
+        textTransform: 'uppercase',
+        fontFamily: TIPO_TITULO,
+        letterSpacing: 1.2,
+        marginTop: margenArriba ? 8 : 0,
+      }}
+    >
+      {children}
+    </Text>
+  )
+}
+
+/** Un título de pantalla, en la voz de los títulos. */
+export function Titulo({ children }: { children: string }) {
+  return (
+    <Text
+      style={{
+        color: COLORES.texto,
+        fontSize: 22,
+        fontFamily: TIPO_TITULO,
+        textTransform: 'uppercase',
+        letterSpacing: 1,
+      }}
+    >
+      {children}
+    </Text>
+  )
+}
+
 export function Cifra({ etiqueta, valor }: { etiqueta: string; valor: string }) {
   return (
     <View style={{ flex: 1, backgroundColor: COLORES.tarjeta, borderRadius: 16, padding: 14 }}>
-      <Text style={{ color: COLORES.tenue, fontSize: 11, textTransform: 'uppercase' }}>
-        {etiqueta}
-      </Text>
+      <Etiqueta>{etiqueta}</Etiqueta>
+      {/* La cifra en sí se queda en la fuente del sistema: Oswald es condensada y los
+          números salen apretados justo donde hay que leerlos de una pasada. */}
       <Text style={{ color: COLORES.texto, fontSize: 24, fontWeight: '600', marginTop: 4 }}>
         {valor}
       </Text>
@@ -143,7 +198,7 @@ export function Chip({
       onPress={onPress}
       disabled={deshabilitado}
       hitSlop={4}
-      android_ripple={deshabilitado ? undefined : RIPPLE}
+      android_ripple={deshabilitado ? undefined : activo ? RIPPLE_DESTACADO : RIPPLE}
       style={({ pressed }) => ({
         paddingHorizontal: 12,
         paddingVertical: 10,
@@ -152,11 +207,11 @@ export function Chip({
         borderRadius: 999,
         // Sin esto el ripple se dibuja rectangular, por fuera de las esquinas redondas.
         overflow: 'hidden',
-        backgroundColor: activo ? COLORES.tarjeta : 'transparent',
+        backgroundColor: activo ? COLORES.brasa : 'transparent',
         opacity: deshabilitado ? 0.5 : pressed ? 0.7 : 1,
       })}
     >
-      <Text style={{ color: activo ? COLORES.texto : COLORES.tenue, fontSize: 12 }}>{texto}</Text>
+      <Text style={{ color: activo ? COLORES.fondo : COLORES.tenue, fontSize: 12, fontWeight: activo ? '600' : '400' }}>{texto}</Text>
     </Pressable>
   )
 }
@@ -234,7 +289,7 @@ export function Boton({
       android_ripple={deshabilitado ? undefined : destacado ? RIPPLE_DESTACADO : RIPPLE}
       style={({ pressed }) => ({
         flex: 1,
-        backgroundColor: destacado ? COLORES.verde : COLORES.tarjeta,
+        backgroundColor: destacado ? COLORES.brasa : COLORES.tarjeta,
         borderRadius: 12,
         // Sin esto el ripple se dibuja rectangular, por fuera de las esquinas redondas.
         overflow: 'hidden',

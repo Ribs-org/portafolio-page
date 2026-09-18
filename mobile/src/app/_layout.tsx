@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useState } from 'react'
 import { DarkTheme, Stack, ThemeProvider, useRouter, type Theme } from 'expo-router'
+import { Oswald_600SemiBold, useFonts } from '@expo-google-fonts/oswald'
 import * as LocalAuthentication from 'expo-local-authentication'
 import { StatusBar } from 'expo-status-bar'
-import { COLORES, Cargando } from '../components/ui'
+import { COLORES, Cargando, TIPO_TITULO } from '../components/ui'
 import { readToken } from '../lib/session'
 
 // Sin esto el navegador pinta su tema claro debajo de todo: el fondo de escena y
@@ -15,6 +16,14 @@ const TEMA: Theme = {
 export default function RootLayout() {
   const [listo, setListo] = useState(false)
   const router = useRouter()
+  /*
+   * Oswald en tiempo de ejecución y no por el plugin de `expo-font`: el plugin es más
+   * eficiente pero exige `prebuild`, o sea tocar la tubería nativa, y esto es un cambio
+   * de piel. La espera cae dentro de la compuerta de carga que esta pantalla ya tenía.
+   * Si la fuente no carga, se entra igual con la del sistema: quedarse en la pantalla de
+   * inicio por una tipografía sería peor que verse distinto.
+   */
+  const [fuentesListas, errorFuentes] = useFonts({ Oswald_600SemiBold })
 
   const arrancar = useCallback(async () => {
     const token = await readToken()
@@ -57,7 +66,7 @@ export default function RootLayout() {
   return (
     <ThemeProvider value={TEMA}>
       <StatusBar style="light" />
-      {listo ? (
+      {listo && (fuentesListas || errorFuentes) ? (
         <Stack
           screenOptions={{ headerShown: false, contentStyle: { backgroundColor: COLORES.fondo } }}
         >
@@ -72,6 +81,8 @@ export default function RootLayout() {
             options={{
               headerShown: true,
               title: 'Detalle',
+              headerTitleStyle: { color: COLORES.texto, fontFamily: TIPO_TITULO },
+              headerTintColor: COLORES.brasa,
               headerStyle: { backgroundColor: COLORES.tarjeta },
               contentStyle: { backgroundColor: COLORES.fondo },
             }}

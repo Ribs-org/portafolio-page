@@ -5,6 +5,7 @@ import {
   COLORES,
   Cargando,
   ErrorConReintento,
+  Etiqueta,
   Pantalla,
   PuntoEstado,
   Sello,
@@ -56,9 +57,7 @@ export default function Calendario() {
       ) : (
         grupos.map((grupo) => (
           <View key={grupo.dia} style={{ gap: 8 }}>
-            <Text style={{ color: COLORES.tenue, fontSize: 11, textTransform: 'uppercase', marginTop: 8 }}>
-              {shortDate(`${grupo.dia}T00:00`).split(',')[0]}
-            </Text>
+            <Etiqueta margenArriba>{shortDate(`${grupo.dia}T00:00`).split(',')[0]}</Etiqueta>
             {grupo.posts.map((post) => (
               <Tarjeta key={post.id}>
                 <Text style={{ color: COLORES.tenue, fontSize: 11 }}>

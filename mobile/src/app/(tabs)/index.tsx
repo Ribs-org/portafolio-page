@@ -7,6 +7,7 @@ import {
   Chip,
   Cifra,
   ErrorConReintento,
+  Etiqueta,
   Pantalla,
   PuntoEstado,
   Sello,
@@ -74,18 +75,14 @@ export default function Resumen() {
         <Cifra etiqueta="Seguidores" valor={num(data.kpis.seguidores)} />
       </View>
 
-      <Text style={{ color: COLORES.tenue, fontSize: 11, textTransform: 'uppercase', marginTop: 8 }}>
-        Qué salió hoy
-      </Text>
+      <Etiqueta margenArriba>Qué salió hoy</Etiqueta>
       {data.hoy.length === 0 ? (
         <Vacio texto="Nada salió en las últimas 24 horas." />
       ) : (
         data.hoy.map((post) => <FilaProgramada key={post.id} post={post} />)
       )}
 
-      <Text style={{ color: COLORES.tenue, fontSize: 11, textTransform: 'uppercase', marginTop: 8 }}>
-        Qué viene
-      </Text>
+      <Etiqueta margenArriba>Qué viene</Etiqueta>
       {data.proximos.length === 0 ? (
         <Vacio texto="No queda nada programado. Carga el próximo lote cuando quieras." />
       ) : (
