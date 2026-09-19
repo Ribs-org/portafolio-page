@@ -1,7 +1,14 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { contraste, simular } from '../components/charts/color'
-import { COCCION, GRASA, ORDEN_COCCION, calorDelDia, coccionDe } from './parrilla'
+import {
+  COCCION,
+  GRASA,
+  ORDEN_COCCION,
+  calorDelDia,
+  coccionDe,
+  estadoDelFierro,
+} from './parrilla'
 
 describe('calorDelDia', () => {
   it('sin cortes la parrilla está apagada', () => {
@@ -49,6 +56,49 @@ describe('coccionDe', () => {
     expect(coccionDe(['published', 'failed'])).toBe('quemada')
     expect(coccionDe(['publishing', 'failed'])).toBe('quemada')
     expect(coccionDe(['failed', 'published', 'publishing'])).toBe('quemada')
+  })
+})
+
+describe('estadoDelFierro', () => {
+  const AHORA = new Date('2026-09-18T12:00:00Z')
+  const en = (dias: number) =>
+    new Date(AHORA.getTime() + dias * 86_400_000).toISOString()
+  const sano = { connected: true, expiraEn: null, ultimoError: null }
+
+  it('sin credencial el fierro está frío', () => {
+    expect(estadoDelFierro({ ...sano, connected: false }, AHORA)).toBe('frio')
+  })
+
+  it('una cuenta conectada y sin caducidad está al rojo', () => {
+    expect(estadoDelFierro(sano, AHORA)).toBe('al-rojo')
+  })
+
+  it('un token con meses por delante está al rojo', () => {
+    expect(estadoDelFierro({ ...sano, expiraEn: en(60) }, AHORA)).toBe('al-rojo')
+  })
+
+  it('un token que vence dentro de la semana se está enfriando', () => {
+    expect(estadoDelFierro({ ...sano, expiraEn: en(3) }, AHORA)).toBe('enfriandose')
+  })
+
+  // Los dos bordes explícitos: mover el aviso es una decisión, no un ajuste.
+  it('el aviso empieza justo en el día siete', () => {
+    expect(estadoDelFierro({ ...sano, expiraEn: en(7) }, AHORA)).toBe('enfriandose')
+    expect(estadoDelFierro({ ...sano, expiraEn: en(7.01) }, AHORA)).toBe('al-rojo')
+  })
+
+  it('un token vencido deja el fierro frío', () => {
+    expect(estadoDelFierro({ ...sano, expiraEn: en(-1) }, AHORA)).toBe('frio')
+  })
+
+  /*
+   * La credencial puede seguir vigente y la conexión estar rota igual —permisos
+   * revocados desde la red, por ejemplo—. Para el caso da lo mismo: hay que reconectar.
+   */
+  it('un error de sincronización enfría el fierro aunque el token siga vivo', () => {
+    expect(
+      estadoDelFierro({ connected: true, expiraEn: en(60), ultimoError: 'OAuthException' }, AHORA),
+    ).toBe('frio')
   })
 })
 

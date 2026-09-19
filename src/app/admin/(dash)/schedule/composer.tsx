@@ -5,6 +5,7 @@ import { createScheduledPost } from '@/app/admin/actions'
 import { Button, Field, GroupLabel, Input, Submit, Textarea } from '@/components/ui'
 import { SOCIAL_NETWORKS } from '@/db/schema'
 import { networkLabel } from '@/lib/networks'
+import { calorDelDia, type Calor } from '@/lib/parrilla'
 import { cn } from '@/lib/utils'
 import { ReglaClave } from './regla-clave'
 import { RevisionMedia } from './revision-media'
@@ -15,7 +16,41 @@ import { TikTokOpciones } from './tiktok-opciones'
 // its options, so that destination is created here or in the batch only.
 const ENABLED = new Set(['instagram', 'facebook', 'youtube', 'threads', 'x', 'tiktok'])
 
-export function Composer() {
+/**
+ * Cómo está la parrilla del día que se eligió.
+ *
+ * Es la única de las tres piezas de esta tanda que habla antes de que pase algo: el
+ * termómetro y el fierro describen, esta aconseja. Y aconseja lo que el producto
+ * promete —repartir el volumen— en el único momento en que se puede hacer algo al
+ * respecto, que es mientras se elige la hora.
+ */
+function CargaDelDia({ carga, cuando }: { carga: Record<string, number>; cuando: string }) {
+  // El campo viene «YYYY-MM-DDTHH:MM» en hora del sitio, o vacío, o a medio escribir.
+  const dia = cuando.slice(0, 10)
+  if (dia.length !== 10) return null
+
+  const cortes = carga[dia] ?? 0
+  const calor = calorDelDia(cortes)
+
+  return (
+    <p className="mt-1.5 flex items-center gap-2 text-[0.72rem] text-fg-muted">
+      <span className={cn('grilla h-3 w-6 shrink-0', CLASE_CALOR[calor])} aria-hidden />
+      {calor === 'apagada'
+        ? 'Ese día está apagado. Buen lugar para este.'
+        : calor === 'llena'
+          ? `Ese día ya va lleno, con ${cortes}. Mira si te sirve uno más flojo.`
+          : `Ese día ya tiene ${cortes === 1 ? 'un corte' : `${cortes} cortes`}.`}
+    </p>
+  )
+}
+
+const CLASE_CALOR: Record<Calor, string> = {
+  apagada: 'grilla-apagada',
+  prendida: 'grilla-prendida',
+  llena: 'grilla-llena',
+}
+
+export function Composer({ carga }: { carga: Record<string, number> }) {
   const [state, action] = useActionState(createScheduledPost, {})
   const captionId = useId()
   const [tiktok, setTiktok] = useState(false)
@@ -109,6 +144,8 @@ export function Composer() {
             </Button>
             {ahora ? <input type="hidden" name="cuandoAhora" value="on" /> : null}
           </div>
+          {/* Con «Ahora» no hay día que mirar: la hora la pone el servidor al enviar. */}
+          {ahora ? null : <CargaDelDia carga={carga} cuando={cuando} />}
         </Field>
 
         {state.error && <p className="text-sm text-negative">{state.error}</p>}

@@ -73,3 +73,41 @@ export function coccionDe(estados: readonly TargetStatus[]): Coccion {
   if (estados.some((estado) => estado === 'publishing')) return 'sellada'
   return 'cruda'
 }
+
+/** Cómo está el fierro de una cuenta: al rojo, enfriándose o frío. */
+export type Fierro = 'al-rojo' | 'enfriandose' | 'frio'
+
+/**
+ * Cuántos días antes de que el token muera empieza el aviso.
+ *
+ * Siete porque los tokens largos de Meta duran sesenta días y el de refresco de TikTok
+ * un año: una semana alcanza de sobra para reconectar sin que el aviso viva encendido
+ * la mitad del tiempo y se vuelva paisaje.
+ */
+export const DIAS_AVISO_FIERRO = 7
+
+/**
+ * El estado de una conexión, leído como temperatura.
+ *
+ * Existe porque `expires_at` está en la base desde siempre y **no se mostraba en ninguna
+ * parte**: el dueño se enteraba de que un token había muerto cuando le fallaba una
+ * publicación, o sea tarde. La temperatura convierte una fecha que hay que calcular en
+ * algo que se ve.
+ *
+ * Un error de sincronización deja el fierro frío aunque el token siga vigente: la
+ * credencial puede estar viva y la conexión rota igual —permisos revocados desde la red,
+ * por ejemplo— y para el caso da lo mismo, hay que reconectar.
+ */
+export function estadoDelFierro(
+  cuenta: { connected: boolean; expiraEn: string | null; ultimoError: string | null },
+  ahora: Date,
+): Fierro {
+  if (!cuenta.connected) return 'frio'
+  if (cuenta.ultimoError) return 'frio'
+  if (!cuenta.expiraEn) return 'al-rojo'
+
+  const faltan = new Date(cuenta.expiraEn).getTime() - ahora.getTime()
+  if (faltan <= 0) return 'frio'
+  if (faltan <= DIAS_AVISO_FIERRO * 86_400_000) return 'enfriandose'
+  return 'al-rojo'
+}

@@ -7,6 +7,7 @@ import { Panel } from '@/components/charts/panel'
 import { StatTile, delta } from '@/components/charts/stat-tile'
 import { seriesColor } from '@/components/charts/theme'
 import { TrafficChart } from '@/components/charts/traffic-chart'
+import { Termometro } from './termometro'
 import { FilterBar } from '@/components/filter-bar'
 import {
   getCampaigns,
@@ -14,10 +15,12 @@ import {
   getKpis,
   getTimeSeries,
   getTopLinks,
+  SITE_TIMEZONE,
   previousPeriod,
 } from '@/lib/analytics'
 import { requireUser } from '@/lib/auth'
 import { parseFilters } from '@/lib/filters'
+import { cargaPorDia } from '@/lib/posts'
 import { getAllProfiles } from '@/lib/profiles'
 import { formatNumber, formatPercent } from '@/lib/utils'
 
@@ -40,9 +43,12 @@ export default async function OverviewPage({
     getCampaigns(filters, 8),
   ])
 
-  const [topLinks, funnel] = await Promise.all([
+  const [topLinks, funnel, carga] = await Promise.all([
     getTopLinks(filters, kpis.visits),
     getFunnel(filters, kpis),
+    // Sin filtro de fechas a propósito: el termómetro mira lo que viene, y los filtros
+    // de esta pantalla acotan lo que ya pasó.
+    cargaPorDia(ownerId, SITE_TIMEZONE, new Date()),
   ])
 
   return (
@@ -53,6 +59,12 @@ export default async function OverviewPage({
       </header>
 
       <FilterBar profiles={profiles} />
+
+      {/* Antes que los números: lo primero que el dueño puede accionar hoy es llenar
+          un día apagado, y los KPI de tráfico son lectura de lo que ya ocurrió. */}
+      <div className="mb-4">
+        <Termometro carga={carga} zone={SITE_TIMEZONE} />
+      </div>
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <StatTile label="Visitas" value={formatNumber(kpis.visits)} delta={delta(kpis.visits, previous.visits)} />

@@ -161,6 +161,15 @@ describe('aislamiento por dueño (SQL generado, sin base)', () => {
     for (const c of consultas) esperarFiltradoPorDueno(c)
   })
 
+  it('posts: cargaPorDia filtra la agenda por dueño', async () => {
+    const { cargaPorDia } = await import('./posts')
+    const consultas = await todasLasConsultas(() =>
+      cargaPorDia(DUENO, 'America/Santiago', new Date('2026-01-01')),
+    )
+    expect(consultas).toHaveLength(1)
+    for (const c of consultas) esperarFiltradoPorDueno(c)
+  })
+
   it('profiles: getAllProfiles filtra los perfiles por dueño', async () => {
     const { getAllProfiles } = await import('./profiles')
     const consultas = await todasLasConsultas(() => getAllProfiles(DUENO))
