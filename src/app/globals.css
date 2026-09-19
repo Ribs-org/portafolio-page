@@ -515,6 +515,54 @@
   .fierro-frio {
     background: var(--color-acero-700);
   }
+
+  /*
+   * La miniatura de Contenido con forma de corte.
+   *
+   * Contenido es una tabla densa y meterle tarjetas la arruinaría, así que la parrilla
+   * entra por la miniatura, que es lo único con superficie: las cuatro esquinas con
+   * radios distintos y el rayado del fierro encima. Es la rima con el calendario sin
+   * tocar la densidad.
+   */
+  .corte-mini {
+    position: relative;
+    isolation: isolate;
+    border-radius: 9px 3px 10px 4px;
+    overflow: hidden;
+  }
+
+  .corte-mini::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    /* Más apretado que en el corte grande: a 36 px, el paso de 14 dejaría dos rayas. */
+    background: repeating-linear-gradient(to bottom, rgb(0 0 0 / 0.3) 0 2px, transparent 2px 8px);
+    mix-blend-mode: multiply;
+    pointer-events: none;
+  }
+
+  /*
+   * El calor de la barra de vistas: cuánto corrió ese post comparado con la mediana
+   * del período. La barra ya existía, pero iba siempre del mismo color, así que decía
+   * el tamaño y no si era mucho o poco para este dueño.
+   */
+  .corrio-se-paso {
+    background: var(--color-brasa);
+    opacity: 0.38;
+  }
+
+  .corrio-bien {
+    background: var(--color-brasa);
+    opacity: 0.18;
+  }
+
+  /*
+   * Un lavado neutro: corrió menos que la mitad de tus posts. No es un castigo, es el
+   * fondo contra el que se nota la brasa de los otros dos.
+   */
+  .corrio-normal {
+    background: rgb(255 255 255 / 0.09);
+  }
 }
 
 @keyframes drift-a {

@@ -213,7 +213,50 @@ function Marcas({ coccion }: { coccion: Coccion }) {
 }
 
 /**
- * La miniatura del post, con sus propias marcas encima.
+ * La miniatura de una fila de Contenido, con forma de corte.
+ *
+ * Contenido es una lista que se lee de corrido y volverla tarjetas la engordaría, así
+ * que la parrilla entra por lo único que tiene superficie: las cuatro esquinas con
+ * radios distintos y el rayado del fierro encima. El paso del rayado es más apretado
+ * que en el corte grande porque a 48 px el de 14 dejaría tres rayas y media.
+ */
+export function MiniCorte({ children }: { children: ReactNode }) {
+  return (
+    <View
+      style={{
+        position: 'relative',
+        borderTopLeftRadius: 11,
+        borderTopRightRadius: 4,
+        borderBottomRightRadius: 12,
+        borderBottomLeftRadius: 5,
+        overflow: 'hidden',
+      }}
+    >
+      {children}
+      <View
+        style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
+        pointerEvents="none"
+      >
+        {Array.from({ length: 6 }, (_, i) => (
+          <View
+            key={i}
+            style={{
+              position: 'absolute',
+              left: 0,
+              right: 0,
+              top: i * 9,
+              height: 2,
+              backgroundColor: 'rgba(0,0,0,0.3)',
+            }}
+          />
+        ))}
+      </View>
+    </View>
+  )
+}
+
+/**
+ * La miniatura del post dentro de un corte del calendario, con sus propias marcas.
  *
  * Sin esto la foto sale limpia sobre una carne rayada, que es una foto pegada encima de
  * un dibujo y no algo puesto sobre la parrilla. Es el mismo error que el panel tuvo en

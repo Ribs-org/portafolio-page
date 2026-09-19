@@ -9,10 +9,13 @@ import {
   ErrorConReintento,
   Pantalla,
   Sello,
+  TIPO_TITULO,
   Tarjeta,
   Vacio,
 } from '../../components/ui'
+import { MiniCorte } from '../../components/parrilla'
 import { num, pct, shortDate } from '../../lib/format'
+import { comoSalio, medianaDe } from '../../lib/parrilla'
 import { clearToken } from '../../lib/session'
 import { useScreenData } from '../../lib/useScreenData'
 import { useToken } from '../../lib/useToken'
@@ -55,6 +58,20 @@ export default function Contenido() {
 
   const visibles =
     redes.length === 0 ? data.posts : data.posts.filter((p) => redes.includes(p.red))
+  /*
+   * La vara contra la que se mide cada post. Mediana y no promedio: con un viral en la
+   * lista, el promedio dejaría a todo lo demás por debajo y ningún post se marcaría.
+   *
+   * Se calcula sobre lo visible y no sobre todo, a diferencia del panel: acá el filtro
+   * de redes es parte de la pregunta —«cómo me va en TikTok»— y la vara tiene que ser
+   * la de esa red, no la de todas mezcladas.
+   */
+  const mediana = medianaDe(
+    visibles
+      .map((p) => p.metricas.viewsGanadas)
+      .filter((v): v is number => v !== null && v !== undefined),
+  )
+
   // Lo que de verdad compara: lo ganado en la ventana, no el acumulado de por vida.
   const ordenados = [...visibles].sort(
     (a, b) => (b.metricas.viewsGanadas ?? 0) - (a.metricas.viewsGanadas ?? 0),
@@ -95,21 +112,43 @@ export default function Contenido() {
           >
             <Tarjeta>
               <View style={{ flexDirection: 'row', gap: 10 }}>
-                {post.miniatura ? (
-                  <Image
-                    source={{ uri: post.miniatura }}
-                    style={{ width: 48, height: 48, borderRadius: 8 }}
-                  />
-                ) : (
-                  <View style={{ width: 48, height: 48, borderRadius: 8, backgroundColor: '#ffffff10' }} />
-                )}
+                {/* La miniatura con forma de corte: es lo único de la fila con
+                    superficie, así que es por donde entra la parrilla sin engordar
+                    una lista que se lee de corrido. */}
+                <MiniCorte>
+                  {post.miniatura ? (
+                    <Image source={{ uri: post.miniatura }} style={{ width: 48, height: 48 }} />
+                  ) : (
+                    <View style={{ width: 48, height: 48, backgroundColor: '#ffffff10' }} />
+                  )}
+                </MiniCorte>
                 <View style={{ flex: 1 }}>
                   <Text style={{ color: COLORES.texto, fontSize: 14 }} numberOfLines={2}>
                     {post.texto || '(sin texto)'}
                   </Text>
-                  <Text style={{ color: COLORES.tenue, fontSize: 11, marginTop: 2 }}>
-                    {NOMBRE_RED[post.red] ?? post.red} · {shortDate(post.publicadoEl)}
-                  </Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 2 }}>
+                    <Text style={{ color: COLORES.tenue, fontSize: 11 }}>
+                      {NOMBRE_RED[post.red] ?? post.red} · {shortDate(post.publicadoEl)}
+                    </Text>
+                    {/*
+                      El sello de los que corrieron el doble de la mediana. Es lo que se
+                      viene a buscar en esta pantalla —cuáles se fueron de las manos— y
+                      antes había que deducirlo comparando números a ojo.
+                    */}
+                    {comoSalio(post.metricas.viewsGanadas, mediana) === 'se-paso' ? (
+                      <Text
+                        style={{
+                          color: COLORES.brasa,
+                          fontSize: 10,
+                          fontFamily: TIPO_TITULO,
+                          textTransform: 'uppercase',
+                          letterSpacing: 1,
+                        }}
+                      >
+                        Se pasó
+                      </Text>
+                    ) : null}
+                  </View>
                 </View>
               </View>
               <View style={{ flexDirection: 'row', gap: 16, marginTop: 6 }}>

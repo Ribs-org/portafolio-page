@@ -7,7 +7,9 @@ import {
   ORDEN_COCCION,
   calorDelDia,
   coccionDe,
+  comoSalio,
   estadoDelFierro,
+  medianaDe,
 } from './parrilla'
 
 describe('calorDelDia', () => {
@@ -56,6 +58,61 @@ describe('coccionDe', () => {
     expect(coccionDe(['published', 'failed'])).toBe('quemada')
     expect(coccionDe(['publishing', 'failed'])).toBe('quemada')
     expect(coccionDe(['failed', 'published', 'publishing'])).toBe('quemada')
+  })
+})
+
+describe('medianaDe', () => {
+  it('sin valores no hay mediana', () => {
+    expect(medianaDe([])).toBeNull()
+  })
+
+  it('con impares toma el del medio', () => {
+    expect(medianaDe([5, 1, 3])).toBe(3)
+  })
+
+  it('con pares promedia los dos del medio', () => {
+    expect(medianaDe([1, 3, 5, 7])).toBe(4)
+  })
+
+  /*
+   * La razón de que sea mediana y no promedio. A un creador con un post viral el
+   * promedio se le va arriba y todo lo demás le aparece frío, que es el mensaje
+   * contrario al que el producto quiere dar.
+   */
+  it('un solo viral no la arrastra', () => {
+    expect(medianaDe([100, 110, 120, 130, 50_000])).toBe(120)
+  })
+})
+
+describe('comoSalio', () => {
+  it('sin vistas ganadas no se puede comparar', () => {
+    expect(comoSalio(null, 100)).toBe('sin-datos')
+  })
+
+  it('sin mediana tampoco', () => {
+    expect(comoSalio(500, null)).toBe('sin-datos')
+  })
+
+  /*
+   * En una semana sin movimiento, cualquier post con una sola vista sería «se pasó».
+   * Eso es ruido, no información.
+   */
+  it('con la mediana en cero no se compara nada', () => {
+    expect(comoSalio(1, 0)).toBe('sin-datos')
+  })
+
+  it('por debajo de la mediana es normal', () => {
+    expect(comoSalio(99, 100)).toBe('normal')
+  })
+
+  it('en la mediana ya salió bien', () => {
+    expect(comoSalio(100, 100)).toBe('salio-bien')
+  })
+
+  // Los dos bordes explícitos: el doble es una decisión, no un ajuste.
+  it('el doble de la mediana es pasarse', () => {
+    expect(comoSalio(199, 100)).toBe('salio-bien')
+    expect(comoSalio(200, 100)).toBe('se-paso')
   })
 })
 
@@ -290,5 +347,14 @@ describe('el teléfono no se separó del panel', () => {
    */
   it('el umbral de parrilla llena es el mismo en el teléfono', () => {
     expect(sinComentarios).toContain('if (cortes < 3) return \'prendida\'')
+  })
+
+  /*
+   * Y el de «se pasó». Si el panel marca un post como destacado y el teléfono no, el
+   * dueño no tiene forma de saber cuál de las dos pantallas le está mintiendo.
+   */
+  it('el umbral de «se pasó» es el mismo en el teléfono', () => {
+    expect(sinComentarios).toContain("if (ganadas >= mediana * 2) return 'se-paso'")
+    expect(sinComentarios).toContain("if (ganadas >= mediana) return 'salio-bien'")
   })
 })

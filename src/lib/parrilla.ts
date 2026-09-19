@@ -74,6 +74,45 @@ export function coccionDe(estados: readonly TargetStatus[]): Coccion {
   return 'cruda'
 }
 
+/** Cómo salió un corte comparado con los demás del período. */
+export type Marca = 'se-paso' | 'salio-bien' | 'normal' | 'sin-datos'
+
+/**
+ * La mediana de un conjunto de números, o `null` si no hay ninguno.
+ *
+ * Mediana y no promedio, y esa elección es el corazón de la comparación: a un creador
+ * con un post viral el promedio se le va arriba y entonces todo lo demás le aparece
+ * frío, que es justo el mensaje contrario al que el producto quiere dar. La mediana
+ * aguanta el outlier sin moverse.
+ */
+export function medianaDe(valores: readonly number[]): number | null {
+  if (valores.length === 0) return null
+  const orden = [...valores].sort((a, b) => a - b)
+  const medio = Math.floor(orden.length / 2)
+  return orden.length % 2 === 0 ? (orden[medio - 1]! + orden[medio]!) / 2 : orden[medio]!
+}
+
+/**
+ * Cómo salió un corte, comparado con la mediana del período.
+ *
+ * La tabla de Contenido ya dice cuántas vistas tiene cada post, pero no dice lo único
+ * que el dueño realmente pregunta: si eso es mucho **para él**. Un número grande puede
+ * ser nada más un post viejo que lleva meses acumulando.
+ *
+ * Por eso se compara contra vistas **ganadas en el período** y no contra el acumulado:
+ * el acumulado premia la antigüedad y haría que los posts nuevos, que son los que hay
+ * que evaluar, salgan siempre fríos.
+ *
+ * Con la mediana en cero o negativa no se compara nada: en una semana sin movimiento,
+ * cualquier post con una sola vista sería «se pasó», y eso es ruido, no información.
+ */
+export function comoSalio(ganadas: number | null, mediana: number | null): Marca {
+  if (ganadas === null || mediana === null || mediana <= 0) return 'sin-datos'
+  if (ganadas >= mediana * 2) return 'se-paso'
+  if (ganadas >= mediana) return 'salio-bien'
+  return 'normal'
+}
+
 /** Cómo está el fierro de una cuenta: al rojo, enfriándose o frío. */
 export type Fierro = 'al-rojo' | 'enfriandose' | 'frio'
 
