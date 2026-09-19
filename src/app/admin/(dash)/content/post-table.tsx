@@ -4,7 +4,7 @@ import Image from 'next/image'
 import { useRef, useState, useTransition } from 'react'
 import { ArrowDown, ArrowUp, Check, Copy } from 'lucide-react'
 import { updatePostCampaign } from '@/app/admin/actions'
-import { SERIES } from '@/components/charts/theme'
+import { comoSalio, medianaDe, type Marca } from '@/lib/parrilla'
 import { useSortedRows } from '@/components/charts/use-sorted-rows'
 import { networkLabel } from '@/lib/networks'
 import { hasNoPlatformMetrics, type PostRow } from '@/lib/posts-kpis'
@@ -30,6 +30,15 @@ function num(value: number | null): string {
 
 function pct(value: number | null, digits = 1): string {
   return value === null ? '—' : `${value.toFixed(digits)}%`
+}
+
+const CLASE_CORRIO: Record<Marca, string> = {
+  'se-paso': 'corrio-se-paso',
+  'salio-bien': 'corrio-bien',
+  normal: 'corrio-normal',
+  // Sin barra: no hay con qué comparar, y una barra gris diría «le fue mal», que es
+  // una afirmación distinta de «no sé».
+  'sin-datos': '',
 }
 
 // The default cut: enough to read the leaders of the current sort without scrolling
@@ -59,6 +68,18 @@ export function PostTable({ rows }: { rows: PostRow[] }) {
   // with no reading are skipped rather than counted as zero, and the guard keeps a
   // catalogue that is all-null (or genuinely all-zero) from dividing by nothing.
   const maxViews = rows.reduce((best, r) => (r.views !== null && r.views > best ? r.views : best), 0)
+
+  /*
+   * La vara contra la que se mide cada post. Son las vistas **ganadas en el período** y
+   * no el acumulado: el acumulado premia la antigüedad, así que un post de hace un año
+   * ganaría siempre y los nuevos —que son los que hay que evaluar— saldrían fríos.
+   *
+   * Se calcula sobre `rows` y no sobre lo visible: la vara no puede moverse porque el
+   * dueño haya expandido la tabla o cambiado el orden.
+   */
+  const mediana = medianaDe(
+    rows.map((r) => r.viewsChange).filter((v): v is number => v !== null),
+  )
 
   return (
     <div className="-mx-1 overflow-x-auto px-1">
@@ -114,17 +135,22 @@ export function PostTable({ rows }: { rows: PostRow[] }) {
             >
               <td className="py-2 pr-3">
                 <div className="flex items-center gap-2.5">
+                  {/* La miniatura con forma de corte: es lo único de esta tabla con
+                      superficie, así que es por donde entra la parrilla sin tocar la
+                      densidad de las filas. */}
                   {row.thumbnailUrl ? (
-                    <Image
-                      src={row.thumbnailUrl}
-                      alt=""
-                      width={36}
-                      height={36}
-                      unoptimized
-                      className="h-9 w-9 shrink-0 rounded-md object-cover"
-                    />
+                    <span className="corte-mini h-9 w-9 shrink-0">
+                      <Image
+                        src={row.thumbnailUrl}
+                        alt=""
+                        width={36}
+                        height={36}
+                        unoptimized
+                        className="h-9 w-9 object-cover"
+                      />
+                    </span>
                   ) : (
-                    <span className="h-9 w-9 shrink-0 rounded-md bg-white/[0.06]" aria-hidden />
+                    <span className="corte-mini h-9 w-9 shrink-0 bg-white/[0.06]" aria-hidden />
                   )}
                   <div className="min-w-0">
                     {row.permalink ? (
@@ -145,21 +171,39 @@ export function PostTable({ rows }: { rows: PostRow[] }) {
                       {networkLabel(row.network)} · {row.publishedLabel}
                       {row.isNew ? ' · nuevo' : ''}
                     </span>
+                    {/*
+                      El sello de los que corrieron el doble de la mediana. Es lo que el
+                      dueño viene a buscar cuando abre esta tabla —cuáles se le fueron
+                      de las manos— y antes había que deducirlo comparando números a ojo.
+                    */}
+                    {comoSalio(row.viewsChange, mediana) === 'se-paso' ? (
+                      <span
+                        className="ml-1.5 font-titulo text-[0.6rem] uppercase tracking-[0.12em] text-brasa"
+                        title="Más del doble de vistas ganadas que la mitad de tus posts del período"
+                      >
+                        Se pasó
+                      </span>
+                    ) : null}
                     <CampaignCell postId={row.id} campaign={row.campaign} />
                   </div>
                 </div>
               </td>
 
               <td className="relative py-2 text-right font-mono tabular-nums">
+                {/*
+                  La barra ya existía y era siempre del mismo color: decía el tamaño,
+                  no si era mucho o poco para este dueño. Ahora se pinta según cómo
+                  corrió contra la mediana del período, que es la comparación que
+                  ninguna columna hace.
+                */}
                 {row.views !== null && maxViews > 0 ? (
                   <span
                     aria-hidden
-                    className="absolute inset-y-1 left-0 -z-10 rounded"
-                    style={{
-                      width: `${(row.views / maxViews) * 100}%`,
-                      background: SERIES[0],
-                      opacity: 0.14,
-                    }}
+                    className={cn(
+                      'absolute inset-y-1 left-0 -z-10 rounded',
+                      CLASE_CORRIO[comoSalio(row.viewsChange, mediana)],
+                    )}
+                    style={{ width: `${(row.views / maxViews) * 100}%` }}
                   />
                 ) : null}
                 {num(row.views)}
