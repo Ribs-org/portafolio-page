@@ -260,3 +260,35 @@ describe('los tokens del CSS no se separaron de TypeScript', () => {
     expect(css).toMatch(new RegExp(`\\.acerado\\s*\\{[^}]*--color-fg:\\s*${TEXTO};`))
   })
 })
+
+/*
+ * La app del teléfono repite estas reglas en `mobile/src/lib/parrilla.ts`. Están
+ * copiadas y no importadas porque `mobile/` es un paquete aparte con su propio
+ * empaquetador: Metro no sale de esa carpeta. Montar un paquete común para cuatro
+ * colores y dos funciones cuesta más de lo que ahorra, pero una copia sin guardia se
+ * separa sola — y separada significa que la misma publicación se ve cruda en el panel y
+ * quemada en el teléfono.
+ */
+describe('el teléfono no se separó del panel', () => {
+  const movil = readFileSync(new URL('../../mobile/src/lib/parrilla.ts', import.meta.url), 'utf8')
+  const sinComentarios = movil.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '')
+
+  it.each(ORDEN_COCCION)('%s tiene los mismos dos extremos en el teléfono', (nombre) => {
+    expect(sinComentarios).toContain(
+      `${nombre}: { claro: '${COCCION[nombre].claro}', oscuro: '${COCCION[nombre].oscuro}' }`,
+    )
+  })
+
+  it('la grasa es la misma en el teléfono', () => {
+    expect(sinComentarios).toContain(`export const GRASA = '${GRASA}'`)
+  })
+
+  /*
+   * El umbral de «parrilla llena» también: si el panel dice que un día está lleno con
+   * tres y el teléfono con cinco, el mismo día se ve distinto en cada pantalla y no hay
+   * forma de saber cuál miente.
+   */
+  it('el umbral de parrilla llena es el mismo en el teléfono', () => {
+    expect(sinComentarios).toContain('if (cortes < 3) return \'prendida\'')
+  })
+})
