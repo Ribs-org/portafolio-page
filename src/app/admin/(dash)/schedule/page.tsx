@@ -3,7 +3,7 @@ import { asc, eq, inArray } from 'drizzle-orm'
 import { getDb, scheduledPosts, scheduledPostTargets, scheduledPostMedia } from '@/db'
 import { SITE_TIMEZONE } from '@/lib/analytics'
 import { requireUser } from '@/lib/auth'
-import { addDays, normalizeWeekParam } from '@/lib/schedule-week'
+import { addDays, contarPorDia, normalizeWeekParam } from '@/lib/schedule-week'
 import { cn } from '@/lib/utils'
 import { Composer } from './composer'
 import { BatchUpload } from './batch-upload'
@@ -88,6 +88,15 @@ export default async function SchedulePage({
   // `volver` carries the exact view to return to after editing — list or a given week.
   const volver = scheduleHref(params, {})
 
+  // Lo que el compositor usa para decir cómo está el día que elegiste. Sale de estas
+  // mismas filas y no de otra consulta, así el aviso y el calendario nunca se
+  // contradicen. Solo lo que viene: no se puede programar en el pasado.
+  const ahora = new Date()
+  const carga = contarPorDia(
+    items.map(({ post }) => post).filter((post) => post.scheduledAt >= ahora),
+    SITE_TIMEZONE,
+  )
+
   return (
     <>
       <header className="mb-6">
@@ -98,7 +107,7 @@ export default async function SchedulePage({
       </header>
 
       <div className="space-y-6">
-        <Composer />
+        <Composer carga={carga} />
         <BatchUpload />
         <div>
           <div className="mb-3 flex items-center gap-1.5">

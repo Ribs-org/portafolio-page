@@ -486,6 +486,35 @@
   .humo {
     animation: humo 2.8s ease-in-out infinite;
   }
+
+  /*
+   * El fierro de una cuenta: una barra corta que dice la temperatura de la conexión.
+   *
+   * El resplandor es `box-shadow` y no un degradado porque tiene que leerse a 4 px de
+   * alto: a ese tamaño un degradado interior no se distingue de un color plano, y lo
+   * que separa «al rojo» de «frío» de un vistazo es que uno irradia y el otro no.
+   */
+  .fierro {
+    height: 4px;
+    border-radius: 2px;
+    background: var(--color-acero-700);
+  }
+
+  .fierro-al-rojo {
+    background: var(--color-brasa);
+    box-shadow: 0 0 10px 1px rgb(232 98 31 / 0.55);
+  }
+
+  /* Ámbar y sin brillo: el mismo color con el que el panel dice «esto pide atención». */
+  .fierro-enfriandose {
+    background: var(--color-caution);
+    box-shadow: 0 0 8px 1px rgb(229 165 42 / 0.3);
+  }
+
+  /* Acero pelado, sin nada de luz. Un fierro frío no irradia: esa es toda la señal. */
+  .fierro-frio {
+    background: var(--color-acero-700);
+  }
 }
 
 @keyframes drift-a {

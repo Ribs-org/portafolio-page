@@ -7,6 +7,7 @@ import { NEGATIVE, POSITIVE } from '@/components/charts/theme'
 import { SOCIAL_NETWORKS } from '@/db/schema'
 import type { CuentaRow } from '@/lib/posts-kpis'
 import { networkLabel } from '@/lib/networks'
+import { estadoDelFierro, type Fierro } from '@/lib/parrilla'
 import { cn } from '@/lib/utils'
 
 const RELATIVE = new Intl.RelativeTimeFormat('es', { numeric: 'auto' })
@@ -20,6 +21,19 @@ const AVISO_MS = 2000
  * queda en el `title` para quien lo necesite.
  */
 const FALLO_DE_SYNC = 'La conexión falló; reconecta la cuenta.'
+
+const CLASE_FIERRO: Record<Fierro, string> = {
+  'al-rojo': 'fierro-al-rojo',
+  enfriandose: 'fierro-enfriandose',
+  frio: 'fierro-frio',
+}
+
+/** «en 3 días», «mañana». La cuenta regresiva que antes había que sacar de la nada. */
+function venceEn(iso: string): string {
+  const dias = Math.round((new Date(iso).getTime() - Date.now()) / 86.4e6)
+  if (dias <= 0) return 'hoy'
+  return RELATIVE.format(dias, 'day')
+}
 
 function syncedAgo(iso: string | null): string {
   if (!iso) return 'nunca'
@@ -127,8 +141,19 @@ function Tarjeta({ row, network }: { row: CuentaRow; network: string }) {
     })
   }
 
+  const fierro = estadoDelFierro(
+    { connected: row.connected, expiraEn: row.expiresAt, ultimoError: row.lastSyncError },
+    new Date(),
+  )
+
   return (
     <div className="chapa rounded-xl p-4">
+      {/*
+        El fierro, arriba de todo. Dice la temperatura de la conexión antes de que la
+        leas: al rojo irradia, frío no. La frase de abajo la explica en palabras, porque
+        el color nunca es la única señal.
+      */}
+      <div className={cn('fierro mb-3', CLASE_FIERRO[fierro])} aria-hidden />
       <div className="flex items-center gap-2">
         <span className="truncate text-sm">{nombre}</span>
         {row.lastSyncError ? (
@@ -147,6 +172,18 @@ function Tarjeta({ row, network }: { row: CuentaRow; network: string }) {
           API key): la tarjeta no debe decir lo contrario. */}
       {!row.connected ? (
         <p className="mt-0.5 font-mono text-[0.68rem] text-fg-faint">Sin credencial</p>
+      ) : null}
+      {/*
+        El aviso de caducidad. Solo aparece cuando falta poco: un fierro al rojo no
+        necesita decir que está al rojo, y un cartel encendido la mitad del tiempo se
+        vuelve paisaje. El error de sincronización ya tiene su propia frase más abajo,
+        así que acá no se repite.
+      */}
+      {fierro === 'enfriandose' && row.expiresAt ? (
+        <p className="mt-2 text-[0.72rem] text-caution">
+          Este fierro se está enfriando: la conexión vence {venceEn(row.expiresAt)}.
+          Reconéctala antes de que se apague.
+        </p>
       ) : null}
       {row.lastSyncError ? (
         <p

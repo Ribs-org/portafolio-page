@@ -12,6 +12,12 @@ export type CuentaRow = {
   connected: boolean
   lastSyncedAt: string | null
   lastSyncError: string | null
+  /**
+   * Cuándo muere el token. Estaba en la base desde siempre y no salía a ninguna pantalla,
+   * así que un token vencido se descubría cuando fallaba una publicación. Nulo cuando la
+   * red no da caducidad.
+   */
+  expiresAt: string | null
 }
 
 export type PostRow = {

@@ -1,6 +1,15 @@
 import 'server-only'
 import { and, asc, desc, eq, gte, inArray, isNull, lte, sql, type SQL } from 'drizzle-orm'
-import { clicks, getDb, postMetrics, profiles, socialAccounts, socialPosts, visits } from '@/db'
+import {
+  clicks,
+  getDb,
+  postMetrics,
+  profiles,
+  scheduledPosts,
+  socialAccounts,
+  socialPosts,
+  visits,
+} from '@/db'
 import type { Filters, Granularity } from './analytics'
 import { SITE_TIMEZONE, describe, granularityFor, localDay } from './analytics'
 import {
@@ -9,6 +18,7 @@ import {
   type PostKpis,
   type PostRow,
 } from './posts-kpis'
+import { contarPorDia } from './schedule-week'
 import { periodChange, type Snapshot } from './social/delta'
 
 // Re-exported so server call sites only need one import line; the types and the pure
@@ -300,7 +310,35 @@ export async function getCuentas(ownerId: string): Promise<CuentaRow[]> {
     connected: Boolean(a.accessToken),
     lastSyncedAt: a.lastSyncedAt?.toISOString() ?? null,
     lastSyncError: a.lastSyncError,
+    expiresAt: a.expiresAt?.toISOString() ?? null,
   }))
+}
+
+/**
+ * Cuántas publicaciones tiene agendadas cada día, en la zona del sitio.
+ *
+ * Alimenta el termómetro de la semana en el Resumen y el aviso de carga del compositor:
+ * los dos preguntan lo mismo —¿qué tan llena está la parrilla ese día?— y una sola
+ * consulta les sirve a ambos.
+ *
+ * Agrupa en JavaScript y no en SQL con `AT TIME ZONE` para reusar `dayKey`, que es la
+ * misma función con la que el calendario reparte los posts en columnas y ya está
+ * probada. Dos maneras distintas de decidir a qué día pertenece una hora es exactamente
+ * como se llega a que el termómetro y el calendario se contradigan.
+ *
+ * Solo mira hacia adelante: la carga pasada no ayuda a decidir dónde poner lo próximo.
+ */
+export async function cargaPorDia(
+  ownerId: string,
+  zone: string,
+  desde: Date,
+): Promise<Record<string, number>> {
+  const filas = await getDb()
+    .select({ scheduledAt: scheduledPosts.scheduledAt })
+    .from(scheduledPosts)
+    .where(and(eq(scheduledPosts.ownerId, ownerId), gte(scheduledPosts.scheduledAt, desde)))
+
+  return contarPorDia(filas, zone)
 }
 
 /** Lets the analytics campaign table show a post's caption instead of a bare tag. */

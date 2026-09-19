@@ -75,6 +75,44 @@ export function dayLabel(key: string, index: number): string {
   return `${DOW[index]} ${Number(key.slice(8))}`
 }
 
+/**
+ * Los próximos `cuantos` días a partir de hoy, con su rótulo.
+ *
+ * El calendario reparte lunes a domingo; el termómetro del Resumen mira hacia adelante
+ * desde hoy, que es lo que sirve para decidir dónde poner lo próximo. Por eso el día de
+ * la semana no puede venir de la posición en el arreglo como en `dayLabel`, y se saca
+ * de la clave: es una fecha de calendario, así que leerla en UTC no la corre de día.
+ */
+export function proximosDias(
+  desde: Date,
+  zone: string,
+  cuantos: number,
+): Array<{ clave: string; dia: string; numero: number }> {
+  const hoy = dayKey(desde, zone)
+  return Array.from({ length: cuantos }, (_, i) => {
+    const clave = addDays(hoy, i)
+    const dow = new Date(`${clave}T00:00:00Z`).getUTCDay() // 0 = domingo
+    return { clave, dia: DOW[(dow + 6) % 7]!, numero: Number(clave.slice(8)) }
+  })
+}
+
+/**
+ * Cuántos hay por día. El mismo reparto que `groupByDay`, solo que contando.
+ *
+ * Es una función y no dos líneas repetidas en cada pantalla porque la usan el
+ * termómetro del Resumen, el aviso del compositor y el calendario, y tres maneras de
+ * decidir a qué día pertenece una hora es como se llega a que se contradigan entre
+ * ellas.
+ */
+export function contarPorDia<T extends { scheduledAt: Date }>(
+  items: T[],
+  zone: string,
+): Record<string, number> {
+  const carga: Record<string, number> = {}
+  for (const [dia, lista] of groupByDay(items, zone)) carga[dia] = lista.length
+  return carga
+}
+
 export function groupByDay<T extends { scheduledAt: Date }>(
   items: T[],
   zone: string,
