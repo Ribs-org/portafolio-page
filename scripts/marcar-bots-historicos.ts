@@ -25,11 +25,11 @@
  * para poder revertir: UPDATE visits SET is_bot = false WHERE id IN (...).
  */
 import { writeFileSync } from 'node:fs'
-import { neon } from '@neondatabase/serverless'
+import postgres from 'postgres'
 
 const url = process.env.DATABASE_URL
 if (!url) throw new Error('Falta DATABASE_URL (usa: dotenv -e .env.local -- npx tsx ...)')
-const sql = neon(url)
+const sql = postgres(url)
 
 const aplicar = process.argv.includes('--aplicar')
 
@@ -83,7 +83,10 @@ async function main() {
   console.log('Marcadas. Los gráficos las excluyen desde ahora.')
 }
 
-main().catch((error) => {
-  console.error(error)
-  process.exit(1)
-})
+main()
+  .catch((error) => {
+    console.error(error)
+    process.exitCode = 1
+  })
+  // `postgres-js` deja el socket abierto: sin este cierre el script no termina nunca.
+  .finally(() => sql.end())

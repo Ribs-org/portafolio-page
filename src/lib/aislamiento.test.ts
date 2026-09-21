@@ -49,17 +49,46 @@ const capturas: Captura[] = []
  */
 const colaRespuestas: unknown[] = []
 
-vi.mock('@neondatabase/serverless', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('@neondatabase/serverless')>()
+/**
+ * El cliente falso. `drizzle-orm/postgres-js` le pide dos cosas al construirse y una al
+ * consultar:
+ *
+ *  - `options.parsers` y `options.serializers`, donde escribe sus conversores de fecha
+ *    apenas se construye — si no existen, `drizzle()` revienta antes del primer test.
+ *  - `unsafe(sql, params)`, que devuelve algo que se puede esperar *y* que además tiene
+ *    `.values()`: Drizzle usa la primera forma cuando no mapea columnas y la segunda
+ *    cuando sí. Las dos entregan la misma respuesta de la cola, una sola vez.
+ *
+ * La captura ocurre al construir la consulta, no al esperarla, que es lo que permite ver
+ * todas las que una función alcanza a armar antes de que la primera sin respuesta la frene.
+ */
+function respuesta() {
+  const entregar = () =>
+    colaRespuestas.length > 0
+      ? Promise.resolve(colaRespuestas.shift())
+      : Promise.reject(new Error('aislamiento.test: sin red, a propósito'))
   return {
-    ...actual,
-    neon: () => (sqlText: string, params: unknown[]) => {
-      capturas.push({ sql: sqlText, params })
-      if (colaRespuestas.length > 0) return Promise.resolve(colaRespuestas.shift())
-      return Promise.reject(new Error('aislamiento.test: sin red, a propósito'))
-    },
+    then: (ok?: never, err?: never) => entregar().then(ok, err),
+    catch: (err?: never) => entregar().catch(err),
+    finally: (fin?: never) => entregar().finally(fin),
+    values: () => entregar(),
   }
-})
+}
+
+vi.mock('postgres', () => ({
+  default: () => {
+    const cliente = () => {
+      throw new Error('aislamiento.test: este test no usa el tagged template, solo unsafe()')
+    }
+    cliente.unsafe = (sqlText: string, params: unknown[] = []) => {
+      capturas.push({ sql: sqlText, params })
+      return respuesta()
+    }
+    cliente.options = { parsers: {}, serializers: {} }
+    cliente.end = async () => {}
+    return cliente
+  },
+}))
 
 process.env.DATABASE_URL = 'postgres://usuario:clave@host/base'
 
@@ -241,7 +270,7 @@ describe('aislamiento por dueño (SQL generado, sin base)', () => {
           to: new Date('2026-01-31'),
           includeBots: true,
         }),
-      [{ rows: [filaPost] }, { rows: [] }, { rows: [] }, { rows: [] }, { rows: [] }],
+      [[filaPost], [], [], [], []],
     )
     expect(consultas).toHaveLength(5)
     const [posts, metricas, visitas, clics, vistos] = consultas as [Captura, Captura, Captura, Captura, Captura]
@@ -260,8 +289,8 @@ describe('aislamiento por dueño, escrituras (SQL generado, sin base)', () => {
   it('admin/actions: makeDefault ata sus tres consultas (leer, degradar, promover) al dueño', async () => {
     const { makeDefault } = await import('@/app/admin/actions')
     const consultas = await consultasEncadenadas(() => makeDefault(PERFIL), [
-      { rows: [[PERFIL]] }, // la fila existe y es del dueño: sigue.
-      { rows: [] }, // degradar a las demás: sigue.
+      [[PERFIL]], // la fila existe y es del dueño: sigue.
+      [], // degradar a las demás: sigue.
     ])
     expect(consultas).toHaveLength(3)
     for (const c of consultas) esperarFiltradoPorDueno(c)
@@ -279,7 +308,7 @@ describe('aislamiento por dueño, escrituras (SQL generado, sin base)', () => {
   it('admin/actions: deleteScheduledPost ata su lectura y su DELETE al dueño', async () => {
     const { deleteScheduledPost } = await import('@/app/admin/actions')
     const consultas = await consultasEncadenadas(() => deleteScheduledPost('post-x'), [
-      { rows: [] }, // sin targets publicados: sigue al DELETE.
+      [], // sin targets publicados: sigue al DELETE.
     ])
     expect(consultas).toHaveLength(2)
     for (const c of consultas) esperarFiltradoPorDueno(c)

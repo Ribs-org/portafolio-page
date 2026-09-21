@@ -185,7 +185,9 @@ export async function getTimeSeries(f: Filters): Promise<SeriesPoint[]> {
   `
 
   const result = await getDb().execute(query)
-  const rows = (Array.isArray(result) ? result : result.rows) as Array<{
+  // `postgres-js` devuelve un `Result` que extiende `Array`: las filas vienen directas,
+  // sin el envoltorio `{ rows }` que ponía el driver HTTP de Neon.
+  const rows = result as unknown as Array<{
     bucket: string
     visits: number
     clicks: number

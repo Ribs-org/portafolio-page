@@ -1,0 +1,53 @@
+# El plan gratis de Supabase no trae respaldos de ninguna clase: si la base se corrompe o
+# alguien borra de más, no hay nada a lo que volver. Esto los hace acá, gratis.
+#
+# De paso cuenta como actividad contra la pausa por 7 días de inactividad del plan gratis,
+# que es una segunda red además del pinger de cron-job.org — y el pinger ya se cayó en
+# silencio una vez.
+name: Respaldo de la base
+
+on:
+  schedule:
+    # 06:40 UTC ≈ 03:40 en Chile: la base está tranquila y el volcado no compite con nadie.
+    - cron: '40 6 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: respaldo
+  cancel-in-progress: false
+
+jobs:
+  volcar:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Volcar la base a un archivo
+        env:
+          # El "session pooler" (puerto 5432), no la conexión directa: la directa del plan
+          # gratis es solo IPv6 y los runners de GitHub son IPv4 — ni siquiera resuelven
+          # el host. Ver .env.example.
+          URL: ${{ secrets.DATABASE_URL_UNPOOLED }}
+        run: |
+          if [ -z "$URL" ]; then
+            echo "Falta el secreto DATABASE_URL_UNPOOLED en el repositorio."
+            exit 1
+          fi
+          mkdir -p respaldo
+          # `pg_dump` va en contenedor en vez del que trae el runner: el cliente tiene que
+          # ser de una versión igual o mayor que el servidor, y la del runner va por detrás.
+          # La URL viaja como variable de entorno y no como argumento para que no quede
+          # escrita en la línea de comandos del proceso.
+          docker run --rm -e PGURL="$URL" -v "$PWD/respaldo:/salida" postgres:17 \
+            sh -c 'pg_dump "$PGURL" --format=custom --no-owner --no-privileges --file=/salida/parrilla.dump'
+          ls -lh respaldo/parrilla.dump
+
+      - name: Guardar el respaldo
+        uses: actions/upload-artifact@v4
+        with:
+          name: respaldo-${{ github.run_id }}
+          path: respaldo/parrilla.dump
+          # El tope del plan gratis. Deja unos noventa respaldos diarios vivos a la vez.
+          retention-days: 90
+          if-no-files-found: error
