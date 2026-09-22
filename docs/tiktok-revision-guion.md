@@ -46,7 +46,7 @@ de arriba hay que replicarlo acá, o el video y la ficha se contradicen.
       prefix* del dominio viejo; es inofensivo pero se puede borrar.
 - [x] **Texto de revisión** cargado, 991/1000. Dice desde la primera línea que el panel es
       por invitación, que es lo que el revisor va a ver en la escena 2.
-- [ ] **Icono** subido también acá.
+- [x] **Icono** subido también acá (confirmado 2026-09-22).
 - [ ] **Limpiar los Redirect URIs.** Deben quedar solo los de `tu-parrilla.cl`: el
       formulario pide que el dominio del video coincida con el Web URL declarado, y tener
       `www.vicente-pareja.cl` o una URL de preview de Vercel en la lista lo contradice.
