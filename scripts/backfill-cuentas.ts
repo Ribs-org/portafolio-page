@@ -36,7 +36,7 @@ async function main() {
       (select count(*) from account_metrics where account_id is null) as metricas,
       (select count(*) from scheduled_post_targets where account_id is null) as destinos`,
   )
-  const fila = conteo.rows[0] as { posts?: string | number; metricas?: string | number; destinos?: string | number } | undefined
+  const fila = conteo[0] as { posts?: string | number; metricas?: string | number; destinos?: string | number } | undefined
   const posts = Number(fila?.posts ?? 0)
   const metricas = Number(fila?.metricas ?? 0)
   const destinos = Number(fila?.destinos ?? 0)

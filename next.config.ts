@@ -22,6 +22,10 @@ function hostR2(): string | null {
 const hostnameR2 = hostR2()
 
 const nextConfig: NextConfig = {
+  // `postgres` abre sockets con `node:net`/`node:tls`. No está en la lista que Next
+  // excluye sola (ahí figura `pg`, que es otro paquete), así que se declara acá para que
+  // el compilador de Server Components no lo empaquete y lo cargue con `require` nativo.
+  serverExternalPackages: ['postgres'],
   images: {
     remotePatterns: [
       // El host sale de R2_PUBLIC_BASE en vez de ir literal: así ambos no pueden

@@ -20,12 +20,12 @@
  */
 import { createDecipheriv, hkdfSync } from 'node:crypto'
 import { writeFileSync } from 'node:fs'
-import { neon } from '@neondatabase/serverless'
+import postgres from 'postgres'
 
 const dbUrl = process.env.DATABASE_URL
 const secret = process.env.AUTH_SECRET
 if (!dbUrl || !secret) throw new Error('Faltan DATABASE_URL y AUTH_SECRET')
-const sql = neon(dbUrl)
+const sql = postgres(dbUrl)
 const aplicar = process.argv.includes('--aplicar')
 
 /** Mismo esquema que `@/lib/social/crypto`: AES-256-GCM con clave derivada por HKDF. */
@@ -107,7 +107,10 @@ async function main() {
   console.log('Reparados.')
 }
 
-main().catch((error) => {
-  console.error(error)
-  process.exit(1)
-})
+main()
+  .catch((error) => {
+    console.error(error)
+    process.exitCode = 1
+  })
+  // `postgres-js` deja el socket abierto: sin este cierre el script no termina nunca.
+  .finally(() => sql.end())

@@ -1,9 +1,9 @@
 // Migra la base antes de construir: lo llama el buildCommand de Vercel y `db:migrate:local`.
 // Un fallo lanza y el build cae, que es lo deseado: el código nuevo no se promueve sin su
 // esquema.
-import { neon, type NeonQueryFunction } from '@neondatabase/serverless'
-import { drizzle } from 'drizzle-orm/neon-http'
-import { migrate } from 'drizzle-orm/neon-http/migrator'
+import { drizzle } from 'drizzle-orm/postgres-js'
+import { migrate } from 'drizzle-orm/postgres-js/migrator'
+import postgres from 'postgres'
 import { env } from '../src/lib/env'
 import { normalizarCorreo } from '../src/lib/ingreso'
 import { decidirMigracion } from '../src/lib/migraciones'
@@ -18,11 +18,21 @@ async function main() {
   if (decision.accion === 'saltar') {
     console.log(`[migraciones] se salta: ${decision.motivo}`)
   } else {
-    const sql = neon(process.env.DATABASE_URL!)
-    const db = drizzle(sql)
-    await migrate(db, { migrationsFolder: 'drizzle' })
-    console.log('[migraciones] al día')
-    await adoptarHuerfanas(sql)
+    // Directa y de una sola conexión, no la del pooler: el modo transacción no sostiene el
+    // lock que toma el migrador ni acepta el DDL encadenado, y `max: 1` impide que dos
+    // conexiones se peleen ese lock. `env()` de paso le saca el BOM que deja PowerShell.
+    const sql = postgres(env('DATABASE_URL_UNPOOLED') ?? process.env.DATABASE_URL!, { max: 1 })
+    try {
+      const db = drizzle(sql)
+      await migrate(db, { migrationsFolder: 'drizzle' })
+      console.log('[migraciones] al día')
+      await adoptarHuerfanas(sql)
+    } finally {
+      // `postgres-js` abre un socket de verdad, a diferencia del HTTP sin estado de antes:
+      // sin este cierre el proceso nunca termina y el build de Vercel queda colgado
+      // esperando a un script que ya hizo todo su trabajo.
+      await sql.end()
+    }
   }
 }
 
@@ -38,7 +48,7 @@ async function main() {
  */
 const CON_DUENO = ['profiles', 'social_accounts', 'scheduled_posts', 'source_authors', 'social_posts', 'ajustes']
 
-async function adoptarHuerfanas(sql: NeonQueryFunction<false, false>): Promise<void> {
+async function adoptarHuerfanas(sql: postgres.Sql): Promise<void> {
   // Misma normalización que usa la app (lib/ingreso.ts), no una a mano: un ADMIN_EMAIL mal
   // formado no debe adoptar filas a nombre de un correo que la app luego rechaza al entrar.
   const correo = normalizarCorreo(env('ADMIN_EMAIL') ?? '')
@@ -52,7 +62,7 @@ async function adoptarHuerfanas(sql: NeonQueryFunction<false, false>): Promise<v
   const adminId = (filas[0] as { id: string }).id
   for (const tabla of CON_DUENO) {
     // El nombre de la tabla sale de esta lista literal, nunca de una entrada; el id va como parámetro.
-    await sql.query(`update ${tabla} set owner_id = $1 where owner_id is null`, [adminId])
+    await sql.unsafe(`update ${tabla} set owner_id = $1 where owner_id is null`, [adminId])
   }
   console.log('[migraciones] filas sin dueño adoptadas por', correo)
 }

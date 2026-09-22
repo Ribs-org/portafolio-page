@@ -50,3 +50,6 @@ scripts/fb-ids-*.json
 # app Expo
 mobile/node_modules
 mobile/.expo
+
+# Los volcados de la mudanza traen datos reales (correos, tokens cifrados): nunca a git.
+/respaldo/

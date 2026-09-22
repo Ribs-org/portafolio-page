@@ -1,5 +1,5 @@
-import { neon } from '@neondatabase/serverless'
-import { drizzle } from 'drizzle-orm/neon-http'
+import postgres from 'postgres'
+import { drizzle } from 'drizzle-orm/postgres-js'
 import { inArray, like } from 'drizzle-orm'
 import { clicks, links, profiles, visits } from '../src/db/schema'
 
@@ -83,10 +83,15 @@ function weighted<T>(options: Array<[T, number]>): T {
   return options[0]![0]
 }
 
+// Un solo cliente para todo el script: `postgres-js` abre un socket por cliente, y el
+// cierre de abajo solo puede cerrar el que conoce.
+let cliente: postgres.Sql | null = null
+
 function db() {
   const url = process.env.DATABASE_URL
   if (!url) throw new Error('DATABASE_URL is not set')
-  return drizzle(neon(url), { schema: { profiles, links, visits, clicks } })
+  cliente ??= postgres(url)
+  return drizzle(cliente, { schema: { profiles, links, visits, clicks } })
 }
 
 async function clear() {
@@ -205,7 +210,9 @@ async function seed() {
 
 const mode = process.argv[2]
 const run = mode === 'clear' ? clear : seed
-run().catch((error) => {
-  console.error(error)
-  process.exit(1)
-})
+run()
+  .catch((error) => {
+    console.error(error)
+    process.exitCode = 1
+  })
+  .finally(() => cliente?.end())

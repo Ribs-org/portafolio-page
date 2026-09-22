@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
-import { neon } from '@neondatabase/serverless'
-import { drizzle } from 'drizzle-orm/neon-http'
+import postgres from 'postgres'
+import { drizzle } from 'drizzle-orm/postgres-js'
 import { links, profiles, users } from '../src/db/schema'
 
 /**
@@ -13,11 +13,16 @@ import { links, profiles, users } from '../src/db/schema'
  * way `scripts/migrar.ts` does: a query of its own against `users` by `ADMIN_EMAIL`,
  * creating the row if it isn't there yet.
  */
+// Un solo cliente, cerrado abajo: `postgres-js` abre un socket real y este script, que
+// antes salía solo con el HTTP sin estado, ya no terminaría por su cuenta.
+let cliente: postgres.Sql | null = null
+
 async function main() {
   const url = process.env.DATABASE_URL
   if (!url) throw new Error('DATABASE_URL is not set')
 
-  const db = drizzle(neon(url), { schema: { profiles, links, users } })
+  cliente = postgres(url)
+  const db = drizzle(cliente, { schema: { profiles, links, users } })
 
   const existing = await db.select({ id: profiles.id }).from(profiles).limit(1)
   if (existing.length > 0) {
@@ -107,7 +112,9 @@ async function main() {
   console.log('Perfiles creados: /  y  /circulo-…')
 }
 
-main().catch((error) => {
-  console.error(error)
-  process.exit(1)
-})
+main()
+  .catch((error) => {
+    console.error(error)
+    process.exitCode = 1
+  })
+  .finally(() => cliente?.end())

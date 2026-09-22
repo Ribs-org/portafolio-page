@@ -281,7 +281,8 @@ export async function getPostSeries(f: Filters): Promise<PostSeriesPoint[]> {
   `
 
   const result = await getDb().execute(query)
-  const rows = (Array.isArray(result) ? result : result.rows) as Array<{
+  // Filas directas, sin el envoltorio `{ rows }` del driver HTTP de Neon.
+  const rows = result as unknown as Array<{
     bucket: string
     views: number
     visits: number
