@@ -34,6 +34,39 @@ resuelto: lo de 2026-09-17 en su momento, y lo de 2026-09-22 verificado uno por 
       genera uno nuevo cada vez que se abre: hay que copiarlo, crear el TXT **sin cerrar la
       ventana**, y verificar ahí mismo.
 
+### En la app de producción (la que TikTok revisa de verdad)
+
+El sandbox solo sirve para que la demo corra aislada. **El revisor mira la app de
+producción** —su nombre, descripción, URLs y permisos— y la contrasta con el video. Todo lo
+de arriba hay que replicarlo acá, o el video y la ficha se contradicen.
+
+- [x] **Las tres URLs en `tu-parrilla.cl`** y los cuatro scopes.
+- [x] **URL properties verificadas** (2026-09-22): `tu-parrilla.cl` y
+      `media-bucket.vicente-pareja.cl`. Queda un `https://www.vicente-pareja.cl/` como *URL
+      prefix* del dominio viejo; es inofensivo pero se puede borrar.
+- [x] **Texto de revisión** cargado, 991/1000. Dice desde la primera línea que el panel es
+      por invitación, que es lo que el revisor va a ver en la escena 2.
+- [ ] **Icono** subido también acá.
+- [ ] **Limpiar los Redirect URIs.** Deben quedar solo los de `tu-parrilla.cl`: el
+      formulario pide que el dominio del video coincida con el Web URL declarado, y tener
+      `www.vicente-pareja.cl` o una URL de preview de Vercel en la lista lo contradice.
+- [ ] **Misma descripción que el sandbox**, en inglés en las dos.
+- [ ] **Borrar el video viejo.** Al 2026-09-22 seguía cargado
+      `qir-mvfv-qfx (2026-08-26 ...).mp4`, que es **el que TikTok rechazó**. Si se envía así,
+      el revisor vuelve a ver el video rechazado.
+
+### Qué credenciales están desplegadas
+
+El código usa **un solo par** (`TIKTOK_CLIENT_KEY` / `TIKTOK_CLIENT_SECRET`) y no distingue
+sandbox de producción: la app que se abre al conectar es la dueña de esa llave. Para que la
+demo corra en sandbox, el despliegue tiene que tener las **del sandbox**.
+
+Como en Vercel son «Secret» y no se pueden releer, se comprueba así: pulsar **Conectar** en
+Cuentas y leer el `client_key` de la barra de direcciones —el código lo pone en la URL de
+autorización— y compararlo con el Client key del sandbox en el portal. Si cambias las
+variables, hay que **redesplegar**: un cambio de variable no afecta a los despliegues ya
+hechos.
+
 ### El ensayo, entero y sin grabar
 
 Desde la mudanza a Supabase (2026-09-22) el camino de **escritura** al publicar no se ha
