@@ -1,6 +1,6 @@
 # TikTok: qué grabar y qué escribir en la revisión
 
-Fecha: 2026-09-17. Reemplaza al guion de
+Fecha: 2026-09-17, revisado el 2026-09-22 (mudanza a Supabase y dominios del portal). Reemplaza al guion de
 `docs/superpowers/specs/2026-09-15-publicar-en-tiktok-design.md`, escrito cuando Parrilla
 era el panel de una sola persona. Ahora es multiusuario por invitación, y el texto de
 revisión tiene que decirlo: el revisor va a ver una pantalla de ingreso por correo.
@@ -8,29 +8,51 @@ revisión tiene que decirlo: el revisor va a ver una pantalla de ingreso por cor
 ## Antes de apretar grabar
 
 Nada de esto depende del código; si falta algo, el video se cae solo. Lo marcado ya quedó
-resuelto el 2026-09-17.
+resuelto: lo de 2026-09-17 en su momento, y lo de 2026-09-22 verificado uno por uno.
 
-- [x] **Sandbox activo** con tu cuenta como *target user*, y sus credenciales en el
-      despliegue donde grabas. La revisión exige que la demo corra en sandbox.
+### En el portal de TikTok
+
+- [x] **Sandbox activo** (`portafolio-demo`) con tu cuenta como *target user*. La revisión
+      exige que la demo corra en sandbox.
 - [x] **El sandbox se llama `Tu Parrilla`.** Su nombre y su icono son los que aparecen en la
-      pantalla de permisos, o sea en cámara. TikTok le agrega «(Sandbox)» y eso está bien:
-      demuestra justo lo que el revisor exige.
-- [x] **URL properties verificadas en las dos apps**: `tu-parrilla.cl` y
+      pantalla de permisos, o sea en cámara. TikTok le agrega «(Sandbox)» y eso está bien.
+- [x] **Icono** subido en Basic Info de las dos apps, el mismo de la pestaña del navegador.
+- [x] **Las tres URLs declaradas apuntan a `tu-parrilla.cl`** —Web/Desktop, Terms y
+      Privacy—, el mismo dominio donde se graba. Declararlas en otro dominio es la clase de
+      contradicción que ya costó un rechazo.
+
+      Ojo con el `www`: `www.vicente-pareja.cl` existe, **`www.tu-parrilla.cl` no**. Tres
+      veces seguidas se coló ese prefijo el 2026-09-22 y deja los links rotos, que es
+      rechazo automático sin que el revisor llegue a ver el video.
+- [x] **`https://tu-parrilla.cl/api/social/tiktok/callback`** en los redirects del sandbox,
+      guardado con «Apply changes». El sandbox es una app aparte: lo que agregas en
+      producción no llega ahí. El código arma la URL de retorno con `new URL(request.url).origin`,
+      o sea con el dominio que navegas, así que tiene que ser exactamente ese.
+- [ ] **URL properties verificadas en esta app**: `tu-parrilla.cl` y
       `media-bucket.vicente-pareja.cl`, de donde TikTok descarga la media. Sin la segunda,
       `PULL_FROM_URL` falla a mitad del video. Cada app emite su propio token y el diálogo
       genera uno nuevo cada vez que se abre: hay que copiarlo, crear el TXT **sin cerrar la
       ventana**, y verificar ahí mismo.
-- [x] **`https://tu-parrilla.cl/api/social/tiktok/callback`** en los redirects del sandbox,
-      guardado con «Apply changes». El sandbox es una app aparte: lo que agregas en
-      producción no llega ahí.
-- [ ] **Icono** subido en Basic Info de las dos apps, el mismo de la pestaña del navegador.
-- [ ] **Un ensayo completo sin grabar**: un video directo, un carrusel de tres fotos y un
-      borrador. Si algo falla, falla ahí y no delante de la cámara.
-- [ ] **Revocar la app desde TikTok** justo antes de rodar: Perfil → Ajustes y privacidad →
-      Seguridad y permisos → Aplicaciones conectadas. Sin esto, la pantalla de permisos solo
-      pide lo que aún no concediste y saldrían dos permisos en vez de cuatro.
-- [ ] **TikTok desconectado en Cuentas**, para que la escena del Login Kit tenga algo que
-      mostrar.
+
+### El ensayo, entero y sin grabar
+
+Desde la mudanza a Supabase (2026-09-22) el camino de **escritura** al publicar no se ha
+ejercitado: marcar el destino como publicando, guardar el `external_id`, pasar a publicado.
+Lo que sí está verificado es la lectura, el `jsonb` de las opciones y la transición de
+estado a nivel de base. El ensayo dejó de ser opcional.
+
+- [ ] **Revocar la app desde TikTok** (Perfil → Ajustes y privacidad → Seguridad y permisos
+      → Aplicaciones conectadas) **y desconectar TikTok en Cuentas**. Sin esto, la pantalla
+      de permisos solo pide lo que aún no concediste y saldrían dos permisos en vez de cuatro.
+- [ ] **Reconectar** y comprobar que la pantalla muestra los cuatro permisos.
+- [ ] **Sincronizar** y ver los videos con contadores en Contenido.
+- [ ] **Un video directo «Solo yo»**, un **carrusel de tres fotos** y un **borrador**.
+- [ ] **Desconectar** y ver que la tarjeta desaparece.
+- [ ] Borrar los posts de prueba de la parrilla.
+
+### Justo antes de rodar
+
+- [ ] **Revocar y desconectar otra vez**: el ensayo te dejó conectado.
 - [ ] Media lista: un video vertical corto y tres fotos JPG o WebP.
 - [ ] Ventana limpia: sin pestañas de más, sin notificaciones, sin datos de otra persona
       en pantalla.
@@ -93,6 +115,11 @@ bloquea. Elige «Solo yo». Programa para dentro de un minuto. Espera la corrida
 pasa a publicando y luego a publicado. Abre TikTok y muestra el video en tu perfil, privado.
 *[creator_info first. The privacy level is chosen by the creator, never defaulted. We poll
 the publish status until it completes.]*
+
+> **El pinger corre cada 5 minutos, no cada uno.** «Programa para dentro de un minuto» puede
+> ser hasta cinco minutos de cámara esperando, en un video que dura cuatro o cinco. Programa
+> este video y **haz la escena 6 mientras se publica**; cuando vuelvas, ya salió. La espera
+> se llena con contenido en vez de con silencio, y la toma sigue siendo una sola.
 
 **6. `video.publish`, fotos.** Lo mismo con tres fotos, más rápido, hasta verlas en el
 perfil.
