@@ -243,11 +243,16 @@ export async function getPostSeries(f: Filters): Promise<PostSeriesPoint[]> {
   const from = localDay(f.from)
   const to = localDay(f.to)
 
+  // Toda fecha va con `.toISOString()`: el driver de `postgres-js` instala serializadores
+  // transparentes para los tipos de fecha, o sea que NO convierte, y un `Date` interpolado
+  // en SQL crudo revienta con ERR_INVALID_ARG_TYPE. Acá aplica también a las comparaciones
+  // de `v`, que van contra el alias `vi.created_at` escrito a mano y no contra el objeto
+  // columna: sin tipo declarado, Drizzle no tiene con qué mapearlas.
   const query = sql`
     with span as (
       select generate_series(
-        date_trunc(${unit}, ${f.from}::timestamptz at time zone ${tz}),
-        date_trunc(${unit}, ${f.to}::timestamptz at time zone ${tz}),
+        date_trunc(${unit}, ${f.from.toISOString()}::timestamptz at time zone ${tz}),
+        date_trunc(${unit}, ${f.to.toISOString()}::timestamptz at time zone ${tz}),
         ${interval}::interval
       ) as bucket
     ),
@@ -266,7 +271,7 @@ export async function getPostSeries(f: Filters): Promise<PostSeriesPoint[]> {
       select date_trunc(${unit}, vi.created_at at time zone ${tz}) as bucket, count(*) as total
       from ${visits} vi
       join ${socialPosts} p on p.campaign = vi.campaign
-      where vi.created_at >= ${f.from} and vi.created_at <= ${f.to} and p.owner_id = ${f.ownerId}
+      where vi.created_at >= ${f.from.toISOString()} and vi.created_at <= ${f.to.toISOString()} and p.owner_id = ${f.ownerId}
         ${f.profileId ? sql`and vi.profile_id = ${f.profileId}` : sql``}
         ${f.includeBots ? sql`` : sql`and vi.is_bot = false`}
       group by 1
