@@ -159,11 +159,15 @@ export async function getTimeSeries(f: Filters): Promise<SeriesPoint[]> {
   const pattern = unit === 'hour' ? 'YYYY-MM-DD"T"HH24' : 'YYYY-MM-DD'
   const tz = SITE_TIMEZONE
 
+  // `.toISOString()` y no el `Date` pelado: el driver de `postgres-js` instala
+  // serializadores transparentes para los tipos de fecha, así que un `Date` suelto en SQL
+  // crudo llega sin convertir y revienta con ERR_INVALID_ARG_TYPE. Las comparaciones de
+  // más abajo sí pueden pasar `Date`, porque ahí Drizzle conoce el tipo de la columna.
   const query = sql`
     with span as (
       select generate_series(
-        date_trunc(${unit}, ${f.from}::timestamptz at time zone ${tz}),
-        date_trunc(${unit}, ${f.to}::timestamptz at time zone ${tz}),
+        date_trunc(${unit}, ${f.from.toISOString()}::timestamptz at time zone ${tz}),
+        date_trunc(${unit}, ${f.to.toISOString()}::timestamptz at time zone ${tz}),
         ${interval}::interval
       ) as bucket
     ),
