@@ -28,7 +28,7 @@ resuelto: lo de 2026-09-17 en su momento, y lo de 2026-09-22 verificado uno por 
       guardado con «Apply changes». El sandbox es una app aparte: lo que agregas en
       producción no llega ahí. El código arma la URL de retorno con `new URL(request.url).origin`,
       o sea con el dominio que navegas, así que tiene que ser exactamente ese.
-- [ ] **URL properties verificadas en esta app**: `tu-parrilla.cl` y
+- [x] **URL properties verificadas en esta app** (confirmado 2026-09-22: las dos figuran en «Verified properties»): `tu-parrilla.cl` y
       `media-bucket.vicente-pareja.cl`, de donde TikTok descarga la media. Sin la segunda,
       `PULL_FROM_URL` falla a mitad del video. Cada app emite su propio token y el diálogo
       genera uno nuevo cada vez que se abre: hay que copiarlo, crear el TXT **sin cerrar la
