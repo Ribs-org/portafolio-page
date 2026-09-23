@@ -24,6 +24,13 @@ síntoma es un `413` en el `POST`, y en pantalla la frase genérica del boundary
 se verifican con `keyDesdeUrl` (que sean del bucket, bajo `scheduled/`) y con `existe`
 (que el archivo esté de verdad). Ver `lib/subida-directa.ts`.
 
+Y una pieza que no es código: **el bucket necesita una política CORS**. La spec de
+2026-09-09 decía «nada que tocar en Cloudflare», y era cierto mientras el único que subía
+directo era el teléfono — `fetch` nativo no aplica la política de mismo origen. Con el
+navegador subiendo, sin CORS el PUT muere en la verificación previa y se ve como «Failed
+to fetch», sin rastro en los logs del servidor porque nunca llega. Aplicada en producción
+el 2026-09-23; la receta quedó en `.env.example`.
+
 **Falta en dos lugares**, los dos con el mismo patrón y la misma solución:
 
 | Dónde | Qué sube |
