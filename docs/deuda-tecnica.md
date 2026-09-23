@@ -4,37 +4,36 @@ Lo que se dejó a medias a propósito, con el porqué y lo que costaría termina
 lista de deseos: cada entrada nació de un problema real que se parcheó para seguir.
 
 ---
+## El editor y los avatares todavía suben a través de la función
 
-## El panel sube los archivos a través de la función
+**Abierto desde 2026-09-22.** El compositor ya no: se arregló el 2026-09-23.
 
-**Abierto desde 2026-09-22.**
+Vercel corta los cuerpos de petición en **~4,5 MB**. Está medido contra producción, con
+cuerpos de tamaño conocido, no supuesto:
 
-Al programar una publicación con video, el compositor manda el archivo dentro del
-`FormData` de la acción de servidor (`crearPublicacion` en `src/app/admin/actions.ts`). El
-archivo cruza la función de Vercel entera antes de llegar a R2.
+```
+ 1 MB → 204      4 MB → 204      5 MB → 413
+```
 
-Eso choca con el tope de cuerpo de las acciones de servidor, que Next fija en **1 MB** por
-defecto. El síntoma es un `413 Content Too Large` en el `POST /admin/schedule`, y en
-pantalla la frase genérica «una consulta no respondió», que no dice nada del tamaño.
+Ese número manda sobre cualquier configuración: `serverActions.bodySizeLimit` en
+`next.config.ts` no sirve de nada, porque la plataforma rechaza antes de que Next mire. El
+síntoma es un `413` en el `POST`, y en pantalla la frase genérica del boundary.
 
-**El parche:** `serverActions.bodySizeLimit: '50mb'` en `next.config.ts`. Destraba el
-ensayo del video de TikTok, pero el archivo se sigue cargando entero en memoria de la
-función, y el techo pasa a ser el de la plataforma.
+**Resuelto en el compositor:** el navegador pide una URL firmada a
+`api/admin/upload-url`, hace el PUT él mismo, y a la acción solo le llegan las URLs, que
+se verifican con `keyDesdeUrl` (que sean del bucket, bajo `scheduled/`) y con `existe`
+(que el archivo esté de verdad). Ver `lib/subida-directa.ts`.
 
-**El arreglo de fondo:** que el panel suba directo a R2 con una URL firmada, exactamente
-como ya hace la app del teléfono. Casi todo está construido y probado:
+**Falta en dos lugares**, los dos con el mismo patrón y la misma solución:
 
-| Pieza | Dónde |
+| Dónde | Qué sube |
 |---|---|
-| Ruta que firma el PUT | `src/app/api/mobile/upload-url/route.ts` |
-| Validación de nombre, tipo y tamaño | `prepararSubida` en `src/lib/mobile-api.ts` |
-| Firma contra R2 | `urlParaSubir` en `src/lib/storage.ts` |
-| Barrido de lo subido que nunca se usó | el cron diario |
+| `admin/(dash)/schedule/[id]/editor.tsx` | media al editar un post |
+| `components/image-field.tsx` → `uploadImage` | avatares y portadas |
 
-Falta una ruta equivalente para la sesión web —la del teléfono se guarda con
-`requireMobileUser`, que espera un token Bearer—, que el compositor suba cada archivo antes
-de enviar el formulario, y que la acción reciba `media: [{ url, mediaType }]` en vez de
-archivos. Con eso el límite desaparece y ningún byte cruza la función.
+El editor es más enredado porque teje los archivos con `keptMedia` y con `mediaUrls`, así
+que merece su propio rato. `uploadImage` además **miente**: declara un máximo de 8 MB que
+la plataforma nunca deja llegar.
 
 ## El boundary del panel esconde el error real
 

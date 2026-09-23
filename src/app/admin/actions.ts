@@ -4,7 +4,7 @@ import { randomUUID } from 'node:crypto'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { cookies } from 'next/headers'
-import { guardar, SIN_ALMACEN } from '@/lib/storage'
+import { basePublica, existe, guardar, keyDesdeUrl, SIN_ALMACEN } from '@/lib/storage'
 import { and, asc, eq, inArray, max, ne, sql } from 'drizzle-orm'
 import { getDb, links, profiles, socialAccounts, socialPosts, scheduledPosts, scheduledPostTargets, scheduledPostMedia, reglasClave } from '@/db'
 import { LINK_KINDS, type LinkKind } from '@/db/schema'
@@ -35,6 +35,7 @@ import { tiktokConnector } from '@/lib/social/tiktok'
 import { TIKTOK_SIN_CUENTA, consultarCreador, type CreadorTikTok } from '@/lib/social/publish/tiktok-creador'
 import { COOKIE_PENDIENTE, LOGIN_VENCIDO, elegidas, leerPendiente } from '@/lib/social/pendiente'
 import { networkLabel } from '@/lib/networks'
+import { ARCHIVO_AJENO, ARCHIVO_FALTANTE, CUERPO_ILEGIBLE, parseMediaMovil, type MediaMovil } from '@/lib/mobile-api'
 import { cerrarSesiones, invitar, pedir, quitar } from '@/lib/usuarios'
 import { fromZonedInput, normalizeUrl, slugify } from '@/lib/utils'
 
@@ -521,6 +522,43 @@ function reglaDesdeFormulario(formData: FormData): unknown {
   }
 }
 
+/**
+ * La media que el navegador ya subió a R2, comprobada.
+ *
+ * Llega como JSON y no como archivos porque Vercel corta los cuerpos de petición en
+ * ~4,5 MB —medido contra producción el 2026-09-23— y un video de tamaño real devolvía
+ * `413` sin llegar nunca a esta función. El compositor pide una URL firmada, sube él
+ * mismo, y acá solo se verifica. Ver `docs/deuda-tecnica.md`.
+ *
+ * Se comprueban dos cosas distintas y las dos hacen falta: que la URL sea de nuestro
+ * bucket y bajo `scheduled/` —si no, cualquiera podría hacer que un post apunte a donde
+ * quiera— y que el objeto exista, porque una URL bien formada no prueba que el PUT del
+ * navegador haya terminado.
+ */
+async function mediaYaSubida(
+  crudo: FormDataEntryValue | null,
+): Promise<{ lista: MediaMovil[] } | { error: string }> {
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(String(crudo ?? '[]'))
+  } catch {
+    return { error: CUERPO_ILEGIBLE }
+  }
+
+  const lista = parseMediaMovil({ media: parsed })
+  if ('error' in lista) return { error: lista.error }
+
+  const base = basePublica()
+  for (const m of lista) {
+    const key = base ? keyDesdeUrl(base, m.url) : null
+    if (!key || !key.startsWith('scheduled/')) return { error: ARCHIVO_AJENO }
+  }
+  for (const m of lista) {
+    if (!(await existe(m.url))) return { error: ARCHIVO_FALTANTE }
+  }
+  return { lista }
+}
+
 export async function createScheduledPost(_prev: FormState, formData: FormData): Promise<FormState> {
   const { id: ownerId } = await requireUser()
 
@@ -533,40 +571,34 @@ export async function createScheduledPost(_prev: FormState, formData: FormData):
     formData.get('cuandoAhora') === 'on'
       ? new Date(Date.now() + 60_000)
       : fromZonedInput(String(formData.get('scheduledAt') ?? ''), SITE_TIMEZONE)
-  const files = formData.getAll('media').filter((f): f is File => f instanceof File && f.size > 0)
+  const subida = await mediaYaSubida(formData.get('mediaSubida'))
+  if ('error' in subida) return { error: subida.error }
+  const uploaded = subida.lista
 
-  // f.type viene vacío para algunos .mov del navegador: tipoArchivo cae a la extensión
-  // en ese caso, así un MOV válido no se cuenta como foto (y TikTok lo rechazaría por
-  // mezcla) ni se guarda con mediaType 'image'.
-  const esVideo = (f: File) => tipoArchivo(f).startsWith('video/')
-  const videoCount = files.filter(esVideo).length
+  const videoCount = uploaded.filter((m) => m.mediaType === 'video').length
   const error = validateScheduleDraft(
     {
       caption,
-      imageCount: files.length - videoCount,
+      imageCount: uploaded.length - videoCount,
       videoCount,
       networks,
       scheduledAt,
-      formats: files.map((f) => extensionDe(f.name)),
+      // `extensionDe` acepta nombre o URL, y la clave termina con el nombre original.
+      formats: uploaded.map((m) => extensionDe(m.url)),
     },
     new Date(),
   )
   if (error) return { error }
 
-  // Lo que la red exige por destino, antes de subir nada: una privacidad sin elegir no
-  // debe costar la subida de un video.
+  // Lo que la red exige por destino. Ya no protege la subida —el navegador subió antes de
+  // enviar—, pero sigue evitando que se cree un post que ninguna red aceptaría. Lo que
+  // quede huérfano en el bucket lo borra el barrido diario.
   const opcionesCheck = validarOpcionesPorRed(networks, opcionesDesdeFormulario(formData, networks))
   if ('error' in opcionesCheck) return { error: opcionesCheck.error }
 
   const reglaCheck = validarRegla(reglaDesdeFormulario(formData))
   if ('error' in reglaCheck) return { error: reglaCheck.error }
 
-  const uploaded: Array<{ url: string; mediaType: 'image' | 'video' }> = []
-  for (const file of files) {
-    // Público a propósito: la Graph API de Instagram descarga la media desde esta URL.
-    const url = await guardar(`scheduled/${randomUUID()}-${file.name}`, file, tipoArchivo(file))
-    uploaded.push({ url, mediaType: esVideo(file) ? 'video' : 'image' })
-  }
 
   try {
     await crearPostProgramado(ownerId, {
