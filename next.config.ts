@@ -26,6 +26,20 @@ const nextConfig: NextConfig = {
   // excluye sola (ahí figura `pg`, que es otro paquete), así que se declara acá para que
   // el compilador de Server Components no lo empaquete y lo cargue con `require` nativo.
   serverExternalPackages: ['postgres'],
+
+  /**
+   * El compositor manda los archivos dentro del formulario, así que el video cruza la
+   * función y queda bajo el tope de cuerpo de las acciones de servidor, que por defecto
+   * es de 1 MB. Con ese default, programar una publicación con un video real devuelve
+   * `413 Content Too Large` y el panel muestra la pantalla de error genérica.
+   *
+   * Esto es un parche: el archivo sigue cargándose entero en memoria de la función. El
+   * arreglo de fondo es que el panel suba directo a R2 con una URL firmada, como ya hace
+   * la app del teléfono en `api/mobile/upload-url`. Ver `docs/deuda-tecnica.md`.
+   */
+  experimental: {
+    serverActions: { bodySizeLimit: '50mb' },
+  },
   images: {
     remotePatterns: [
       // El host sale de R2_PUBLIC_BASE en vez de ir literal: así ambos no pueden
