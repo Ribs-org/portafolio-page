@@ -126,12 +126,19 @@ export function typeFromContentType(
  * uno. Reutiliza las extensiones que este módulo ya reconoce en vez de mantener una
  * segunda lista.
  */
-export function tipoArchivo(file: File): string {
-  if (file.type) return file.type
-  const extension = extensionFromUrl(file.name)
+export function tipoDesdeNombre(nombre: string): string {
+  const extension = extensionFromUrl(nombre)
   if (IMAGE_EXTENSIONS.has(extension)) return `image/${SUBTYPE_BY_EXTENSION[extension] ?? extension}`
   if (VIDEO_EXTENSIONS.has(extension)) return `video/${SUBTYPE_BY_EXTENSION[extension] ?? extension}`
   return ''
+}
+
+/**
+ * Igual, pero para un `File`. La ruta que firma las subidas recibe nombre y tipo sueltos,
+ * no un `File`, así que la regla vive arriba y acá solo se aplica.
+ */
+export function tipoArchivo(file: File): string {
+  return file.type || tipoDesdeNombre(file.name)
 }
 
 /** Las opciones de la fila ya limpias, o la frase. Un valor que no es objeto se rechaza entero. */

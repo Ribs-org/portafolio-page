@@ -1,11 +1,12 @@
 'use client'
 
 import { useActionState, useId, useState } from 'react'
-import { createScheduledPost } from '@/app/admin/actions'
+import { createScheduledPost, type FormState } from '@/app/admin/actions'
 import { Button, Field, GroupLabel, Input, Submit, Textarea } from '@/components/ui'
 import { SOCIAL_NETWORKS } from '@/db/schema'
 import { networkLabel } from '@/lib/networks'
 import { calorDelDia, type Calor } from '@/lib/parrilla'
+import { subirArchivos } from '@/lib/subida-directa'
 import { cn } from '@/lib/utils'
 import { ReglaClave } from './regla-clave'
 import { RevisionMedia } from './revision-media'
@@ -51,7 +52,6 @@ const CLASE_CALOR: Record<Calor, string> = {
 }
 
 export function Composer({ carga }: { carga: Record<string, number> }) {
-  const [state, action] = useActionState(createScheduledPost, {})
   const captionId = useId()
   const [tiktok, setTiktok] = useState(false)
   const [soloFotos, setSoloFotos] = useState(false)
@@ -59,6 +59,35 @@ export function Composer({ carga }: { carga: Record<string, number> }) {
   const [cuando, setCuando] = useState('')
   // «Ahora» deja el campo de fecha fuera de juego: la hora la decide el servidor.
   const [ahora, setAhora] = useState(false)
+  // Lo que se muestra mientras el navegador sube, que con un video puede tardar.
+  const [subiendo, setSubiendo] = useState('')
+
+  /**
+   * Sube los archivos a R2 antes de llamar a la acción, y le manda solo las URLs.
+   *
+   * Mandarlos dentro del formulario devolvía `413`: Vercel corta los cuerpos de petición
+   * en ~4,5 MB y un video no entra. Ver `lib/subida-directa` y `docs/deuda-tecnica.md`.
+   *
+   * Al ser una función del cliente, este formulario deja de andar sin JavaScript. Para el
+   * panel es aceptable; para la página pública no lo sería.
+   */
+  const [state, action] = useActionState(
+    async (prev: FormState, formData: FormData): Promise<FormState> => {
+      let media: Awaited<ReturnType<typeof subirArchivos>>
+      try {
+        media = await subirArchivos(archivos, (hechos, total) =>
+          setSubiendo(total > 1 ? `Subiendo ${hechos} de ${total}…` : 'Subiendo…'),
+        )
+      } catch (error) {
+        return { error: error instanceof Error ? error.message : 'No se pudo subir el archivo.' }
+      } finally {
+        setSubiendo('')
+      }
+      formData.set('mediaSubida', JSON.stringify(media))
+      return createScheduledPost(prev, formData)
+    },
+    {},
+  )
 
   return (
     <details
@@ -80,7 +109,6 @@ export function Composer({ carga }: { carga: Record<string, number> }) {
         <Field label="Archivos" hint="Imágenes o video, opcional">
           <Input
             type="file"
-            name="media"
             multiple
             accept="image/*,video/*"
             onChange={(e) => {
@@ -148,6 +176,7 @@ export function Composer({ carga }: { carga: Record<string, number> }) {
           {ahora ? null : <CargaDelDia carga={carga} cuando={cuando} />}
         </Field>
 
+        {subiendo ? <p className="text-sm text-fg-muted">{subiendo}</p> : null}
         {state.error && <p className="text-sm text-negative">{state.error}</p>}
         {state.ok && <p className="text-sm text-positive">Programado.</p>}
 
