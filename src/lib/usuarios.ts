@@ -163,12 +163,30 @@ export async function invitar(correoBruto: string, nombre: string | null): Promi
   return { usuario: usuario! }
 }
 
-/** En esta entrega solo se quita a quien nunca entró; el chequeo «sin datos» llega con el dueño en las tablas. */
+/**
+ * En esta entrega solo se quita a quien nunca entró; el chequeo «sin datos» llega con el
+ * dueño en las tablas.
+ *
+ * Y ese conjunto —quien nunca entró— es exactamente el que ahora siempre tiene página:
+ * `profiles.owner_id` referencia a `users.id` con ON DELETE restrict, y todo usuario nace
+ * con su perfil (`crearPaginaDe`). Borrar la fila de `users` sin borrar antes su perfil
+ * violaría esa restricción siempre, no en un caso raro. Por eso el perfil se borra primero,
+ * dentro de la misma transacción que el usuario: todo o nada, para no dejar nunca a alguien
+ * a medio quitar —ni, al revés, un usuario sin su página.
+ */
 export async function quitar(id: string): Promise<{ ok: true } | { error: string }> {
   const usuario = await buscarPorId(id)
   if (!usuario) return { ok: true }
   if (usuario.rol === 'admin' || usuario.primerIngresoEn) return { error: USUARIO_CON_INGRESOS }
-  await getDb().delete(users).where(eq(users.id, id))
+  try {
+    await getDb().transaction(async (tx) => {
+      await tx.delete(profiles).where(eq(profiles.ownerId, id))
+      await tx.delete(users).where(eq(users.id, id))
+    })
+  } catch (error) {
+    console.error('quitar: no se pudo borrar al usuario', error)
+    return { error: 'No se pudo quitar al usuario. Intenta de nuevo.' }
+  }
   return { ok: true }
 }
 

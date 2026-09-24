@@ -18,6 +18,11 @@ const db = vi.hoisted(() => ({
   insertProfile: async (slug: string): Promise<void> => void slug,
   slugsIntentados: [] as string[],
   borrados: [] as unknown[],
+  // Para `quitar()`: las tablas que la transacción alcanzó a borrar, en el orden en que
+  // las borró, y un error opcional para probar que uno de sus pasos se atrapa en vez de
+  // llegar crudo a quien llama.
+  transaccionBorrados: [] as unknown[],
+  transaccionError: null as unknown,
 }))
 
 vi.mock('@/db', async (importOriginal) => {
@@ -36,6 +41,20 @@ vi.mock('@/db', async (importOriginal) => {
         },
       }),
       delete: (tabla: unknown) => ({ where: async () => void db.borrados.push(tabla) }),
+      // No intenta parecerse a una transacción real (no hay rollback): solo corre el
+      // callback con un `tx` que anota, en orden, qué tabla borró cada `delete`, y que
+      // puede fallar a mitad de camino si el test dejó cargado `transaccionError`.
+      transaction: async (fn: (tx: unknown) => Promise<void>) => {
+        const tx = {
+          delete: (tabla: unknown) => ({
+            where: async () => {
+              if (db.transaccionError) throw db.transaccionError
+              db.transaccionBorrados.push(tabla)
+            },
+          }),
+        }
+        return fn(tx)
+      },
     }),
   }
 })
@@ -52,9 +71,10 @@ vi.mock('drizzle-orm', async (importOriginal) => {
 // de cada `it` sí importa —cada uno paga otra vez la transformación de `usuarios.ts` y de
 // lo que arrastra (drizzle-orm, postgres, …), y en esta máquina eso solo alcanza a tiempo
 // la primera vez que corre.
-const { esChoqueDeUnicidad, invitar } = await import('./usuarios')
+const { esChoqueDeUnicidad, invitar, quitar } = await import('./usuarios')
 const { users, profiles } = await import('@/db')
 const { eq } = await import('drizzle-orm')
+const { USUARIO_CON_INGRESOS } = await import('./ingreso')
 
 // La forma real de un error de unicidad del driver de este proyecto (`postgres`, no
 // `node-postgres`): mapea el campo a `constraint_name`, no a `constraint` — ver
@@ -146,5 +166,55 @@ describe('invitar', () => {
     expect(eq).toHaveBeenCalledWith(users.id, usuarioCreado.id)
     // Y no con la del perfil: lo que se borra es la invitación, no la página a medias.
     expect(eq).not.toHaveBeenCalledWith(profiles.id, expect.anything())
+  })
+})
+
+describe('quitar', () => {
+  const usuarioSinIngresos = {
+    id: 'id-a-quitar',
+    correo: 'nuevo@example.com',
+    nombre: null,
+    rol: 'usuario' as const,
+    primerIngresoEn: null,
+  }
+
+  beforeEach(() => {
+    db.buscar = []
+    db.transaccionBorrados = []
+    db.transaccionError = null
+  })
+
+  // La razón de este archivo: desde que todo usuario nace con su página, `profiles.owner_id`
+  // (que referencia a `users.id` con ON DELETE restrict) siempre tiene una fila apuntando al
+  // usuario que se quiere quitar. Borrar `users` sin borrar antes su perfil violaría esa
+  // restricción siempre, así que la página se borra primero y dentro de la misma transacción:
+  // todo o nada, para no dejar nunca un usuario sin ella.
+  it('camino feliz: borra el perfil del usuario y al usuario, en ese orden, dentro de una transacción', async () => {
+    db.buscar = [usuarioSinIngresos]
+    const resultado = await quitar(usuarioSinIngresos.id)
+    expect(resultado).toEqual({ ok: true })
+    expect(db.transaccionBorrados).toEqual([profiles, users])
+  })
+
+  it('si la transacción falla (p.ej. la restricción de clave foránea), devuelve un error en vez de lanzarlo crudo', async () => {
+    db.buscar = [usuarioSinIngresos]
+    db.transaccionError = Object.assign(new Error('violación de clave foránea'), { code: '23503' })
+    const resultado = await quitar(usuarioSinIngresos.id)
+    expect('error' in resultado).toBe(true)
+    if ('error' in resultado) expect(resultado.error.length).toBeGreaterThan(0)
+  })
+
+  it('un usuario con ingresos sigue sin poder quitarse, sin tocar la transacción', async () => {
+    db.buscar = [{ ...usuarioSinIngresos, primerIngresoEn: new Date('2026-01-01') }]
+    const resultado = await quitar(usuarioSinIngresos.id)
+    expect(resultado).toEqual({ error: USUARIO_CON_INGRESOS })
+    expect(db.transaccionBorrados).toEqual([])
+  })
+
+  it('un id que no existe no es un error: no hay nada que quitar', async () => {
+    db.buscar = []
+    const resultado = await quitar('no-existe')
+    expect(resultado).toEqual({ ok: true })
+    expect(db.transaccionBorrados).toEqual([])
   })
 })
