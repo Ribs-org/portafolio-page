@@ -92,6 +92,20 @@ vi.mock('postgres', () => ({
 
 process.env.DATABASE_URL = 'postgres://usuario:clave@host/base'
 
+// Import estático, después de los `vi.mock`: Vitest los sube al principio del archivo al
+// transformarlo, así que el orden de las líneas no importa, pero un import dinámico dentro
+// de cada `it` sí importa —cada uno paga otra vez la transformación de todo lo que carga
+// (drizzle-orm, postgres, …), y bajo carga esa primera transformación puede no alcanzar a
+// terminar antes de `testTimeout`. Mismo motivo que en `usuarios.test.ts` (ver el
+// comentario de sus líneas 50-54).
+const { getRecentVisits } = await import('./analytics')
+const { getCuentas, cargaPorDia, getPostRows } = await import('./posts')
+const { getAllProfiles, getProfileBySlug } = await import('./profiles')
+const { getCola } = await import('./comentarios-cola')
+const { cuentasPrimarias } = await import('./social/cuentas')
+const { leerAjuste } = await import('./ajustes')
+const { makeDefault, updateProfile, deleteScheduledPost } = await import('@/app/admin/actions')
+
 beforeEach(() => {
   capturas.length = 0
   colaRespuestas.length = 0
@@ -169,7 +183,6 @@ function esperarFiltradoPorDueno({ sql, params }: Captura) {
 
 describe('aislamiento por dueño (SQL generado, sin base)', () => {
   it('analytics: getRecentVisits filtra las visitas por el dueño del perfil', async () => {
-    const { getRecentVisits } = await import('./analytics')
     const consultas = await todasLasConsultas(() =>
       getRecentVisits({
         ownerId: DUENO,
@@ -184,14 +197,12 @@ describe('aislamiento por dueño (SQL generado, sin base)', () => {
   })
 
   it('posts: getCuentas filtra las cuentas por dueño', async () => {
-    const { getCuentas } = await import('./posts')
     const consultas = await todasLasConsultas(() => getCuentas(DUENO))
     expect(consultas).toHaveLength(1)
     for (const c of consultas) esperarFiltradoPorDueno(c)
   })
 
   it('posts: cargaPorDia filtra la agenda por dueño', async () => {
-    const { cargaPorDia } = await import('./posts')
     const consultas = await todasLasConsultas(() =>
       cargaPorDia(DUENO, 'America/Santiago', new Date('2026-01-01')),
     )
@@ -200,7 +211,6 @@ describe('aislamiento por dueño (SQL generado, sin base)', () => {
   })
 
   it('profiles: getAllProfiles filtra los perfiles por dueño', async () => {
-    const { getAllProfiles } = await import('./profiles')
     const consultas = await todasLasConsultas(() => getAllProfiles(DUENO))
     expect(consultas).toHaveLength(1)
     for (const c of consultas) esperarFiltradoPorDueno(c)
@@ -213,7 +223,6 @@ describe('aislamiento por dueño (SQL generado, sin base)', () => {
    * contrario que `esperarFiltradoPorDueno`, que exige el filtro.
    */
   it('profiles: getProfileBySlug sin ownerId no filtra por dueño (el círculo cercano sigue andando)', async () => {
-    const { getProfileBySlug } = await import('./profiles')
     const consultas = await todasLasConsultas(() => getProfileBySlug('la-direccion-secreta'))
     expect(consultas).toHaveLength(1)
     const [{ sql, params }] = consultas as [Captura]
@@ -224,7 +233,6 @@ describe('aislamiento por dueño (SQL generado, sin base)', () => {
   })
 
   it('profiles: getProfileBySlug con ownerId solo devuelve la fila si es de ese dueño', async () => {
-    const { getProfileBySlug } = await import('./profiles')
     const consultas = await todasLasConsultas(() => getProfileBySlug('juanito', DUENO))
     expect(consultas).toHaveLength(1)
     for (const c of consultas) esperarFiltradoPorDueno(c)
@@ -239,7 +247,6 @@ describe('aislamiento por dueño (SQL generado, sin base)', () => {
    * línea exacta de la que depende todo el aislamiento de esta tarea.
    */
   it('profiles: getProfileBySlug con ownerId "" también filtra (presencia, no verdad)', async () => {
-    const { getProfileBySlug } = await import('./profiles')
     const consultas = await todasLasConsultas(() => getProfileBySlug('juanito', ''))
     expect(consultas).toHaveLength(1)
     const [{ sql, params }] = consultas as [Captura]
@@ -248,21 +255,18 @@ describe('aislamiento por dueño (SQL generado, sin base)', () => {
   })
 
   it('comentarios-cola: getCola filtra por el dueño de la cuenta', async () => {
-    const { getCola } = await import('./comentarios-cola')
     const consultas = await todasLasConsultas(() => getCola(DUENO, { estado: 'pendientes', red: null }))
     expect(consultas).toHaveLength(1)
     for (const c of consultas) esperarFiltradoPorDueno(c)
   })
 
   it('social/cuentas: cuentasPrimarias filtra por dueño', async () => {
-    const { cuentasPrimarias } = await import('./social/cuentas')
     const consultas = await todasLasConsultas(() => cuentasPrimarias(DUENO, ['instagram']))
     expect(consultas).toHaveLength(1)
     for (const c of consultas) esperarFiltradoPorDueno(c)
   })
 
   it('ajustes: leerAjuste filtra por dueño', async () => {
-    const { leerAjuste } = await import('./ajustes')
     const consultas = await todasLasConsultas(() => leerAjuste(DUENO, 'voz'))
     expect(consultas).toHaveLength(1)
     for (const c of consultas) esperarFiltradoPorDueno(c)
@@ -282,7 +286,6 @@ describe('aislamiento por dueño (SQL generado, sin base)', () => {
    * que ese id ya no aparecería entre sus parámetros y la aserción fallaría.
    */
   it('posts: getPostRows filtra sus cinco consultas por dueño, directo o por el id que ya filtró la primera', async () => {
-    const { getPostRows } = await import('./posts')
     // select() de social_posts trae todas sus columnas, en el orden declarado en el
     // esquema: id, owner_id, network, account_id, external_id, permalink, caption,
     // thumbnail_url, media_type, published_at, campaign, archived_at, created_at, updated_at.
@@ -328,7 +331,6 @@ describe('aislamiento por dueño, escrituras (SQL generado, sin base)', () => {
   const PERFIL = 'profile-1'
 
   it('admin/actions: makeDefault ata sus tres consultas (leer, degradar, promover) al dueño', async () => {
-    const { makeDefault } = await import('@/app/admin/actions')
     const consultas = await consultasEncadenadas(() => makeDefault(PERFIL), [
       [[PERFIL]], // la fila existe y es del dueño: sigue.
       [], // degradar a las demás: sigue.
@@ -338,7 +340,6 @@ describe('aislamiento por dueño, escrituras (SQL generado, sin base)', () => {
   })
 
   it('admin/actions: updateProfile ata su UPDATE al dueño', async () => {
-    const { updateProfile } = await import('@/app/admin/actions')
     const formData = new FormData()
     formData.set('displayName', 'Nombre de prueba')
     const consultas = await consultasEncadenadas(() => updateProfile(PERFIL, {}, formData))
@@ -347,7 +348,6 @@ describe('aislamiento por dueño, escrituras (SQL generado, sin base)', () => {
   })
 
   it('admin/actions: deleteScheduledPost ata su lectura y su DELETE al dueño', async () => {
-    const { deleteScheduledPost } = await import('@/app/admin/actions')
     const consultas = await consultasEncadenadas(() => deleteScheduledPost('post-x'), [
       [], // sin targets publicados: sigue al DELETE.
     ])
