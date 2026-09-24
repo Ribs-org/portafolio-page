@@ -130,3 +130,28 @@ reparte entre procesos.
 
 Mientras no se identifique, **una corrida roja en CI no se puede dar por buena sin mirar qué
 falló**: puede ser esto o puede ser real, y la diferencia importa.
+
+## Dos guardias de choque de unicidad, idénticos, en dos archivos
+
+**Abierto desde 2026-09-24.**
+
+`esChoqueDeUnicidad` (`src/lib/usuarios.ts`) e `isCampaignUniqueViolation`
+(`src/lib/social/sync.ts`) son la misma función con otro nombre de restricción: una
+comentada en español y otra en inglés, con dos suites de tests que prueban lo mismo. El bug
+del `constraint_name` vivió en las dos copias **justamente por eso**, y se arregló dos veces.
+
+Un `esViolacionDeUnicidad(error, nombreRestriccion)` compartido cierra la puerta. Si aparece
+un tercer guardia de este tipo antes de que eso pase, la deuda ya costó más de lo que ahorró.
+
+## La prueba que «no envejece» solo mira directorios
+
+**Abierto desde 2026-09-24.**
+
+`src/lib/slugs.test.ts` lee `src/app` y `public/` del disco para exigir que toda ruta real
+esté en `RESERVADOS`, y esa es su gracia: agregar una ruta y olvidar la lista rompe el test
+en vez de romperle la página a un usuario.
+
+Pero solo lee **directorios**. Una ruta de convención por archivo —`sitemap.ts`,
+`manifest.ts`, `opengraph-image.tsx`— no la vería. `robots.ts` ya existe y está cubierto
+solo porque alguien lo escribió a mano en la lista, que es exactamente lo que este test
+existe para no depender. Hoy no falta ninguna; la garantía es más chica que su promesa.

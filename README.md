@@ -8,7 +8,7 @@ quede con tus números.
 
 | URL | Qué es |
 | --- | --- |
-| `/` | El perfil marcado como principal |
+| `/` | La página principal del dueño del dominio. Cada usuario tiene una principal, pero solo la del admin se sirve en la raíz |
 | `/<slug>` | La página de un usuario. Cada dominio sirve solo las de su dueño; el del producto las sirve todas |
 | `/admin` | Tu panel: resumen, analítica y editor |
 
