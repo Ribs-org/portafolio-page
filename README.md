@@ -130,7 +130,11 @@ de su correo —`juanito@gmail.com` da `/juanito`—, y si esa ya está tomada s
 (`/juanito-2`). No hace falta que entre para que su página exista, y no hay ningún momento
 en que un usuario esté creado sin ella. Las direcciones que la app ya usa para otra cosa
 —`admin`, `api`, `ingresar`— están reservadas: nadie recibe una página que quede tapada por
-una ruta real.
+una ruta real, y tampoco puede tomarlas después editando su URL.
+
+Esa página no se le puede quitar: el panel no ofrece borrar la última que le queda a un
+usuario, y el servidor se niega aunque se lo pidan por otro camino. Quitar a un usuario sí
+borra su página, y las dos cosas pasan juntas o no pasa ninguna.
 Los dos perfiles de ejemplo están para que los edites, no para que los borres y empieces
 de cero.
 

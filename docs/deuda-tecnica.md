@@ -155,3 +155,29 @@ Pero solo lee **directorios**. Una ruta de convención por archivo —`sitemap.t
 `manifest.ts`, `opengraph-image.tsx`— no la vería. `robots.ts` ya existe y está cubierto
 solo porque alguien lo escribió a mano en la lista, que es exactamente lo que este test
 existe para no depender. Hoy no falta ninguna; la garantía es más chica que su promesa.
+
+## El tercer detector de choque de unicidad, y por qué se cuentan tres
+
+**Anotado el 2026-09-24.** Los tres están arreglados; queda escrito el patrón.
+
+`updateProfile` detectaba el choque con `String(error).includes('profiles_slug_unique')`.
+Nunca podía casar: drizzle envuelve la consulta fallida en un `DrizzleQueryError` cuyo
+mensaje es solo `Failed query: <sql>`, y deja el error del driver en `cause`. Venía desde el
+primer commit del repositorio.
+
+Con este van **tres** detectores muertos del mismo choque, escritos en tres formas
+distintas, en tres archivos, a lo largo de meses. Ninguno falló ruidosamente: cada uno
+degradó en silencio —una sincronización que revienta en vez de reintentar, un reintento de
+dirección que nunca ocurre, un mensaje que no dice qué pasó—. El arreglo de los tres cabe en
+una función.
+
+La lección operativa, para la próxima vez que haya que reconocer un error de Postgres:
+
+- **El código va en `cause`**, no en el error que se atrapa. Drizzle envuelve siempre.
+- **El campo es `constraint_name`**, que es lo que expone `postgres-js`. `constraint` es de
+  `node-postgres`, que no es el driver de este proyecto.
+- **Comparar contra el texto del mensaje no funciona** y, peor, no falla: devuelve `false` y
+  el camino alternativo simplemente no ocurre.
+- **Escribe el test con la forma real del driver envuelta por drizzle.** Un test que arma un
+  objeto plano `{ code, constraint }` pasa con la función rota; los tres detectores
+  sobrevivieron justamente porque nadie los probó, o los probó contra una ficción.
