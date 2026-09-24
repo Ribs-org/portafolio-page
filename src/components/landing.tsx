@@ -1,3 +1,4 @@
+import type { Metadata } from 'next'
 import Link from 'next/link'
 
 /**
@@ -153,4 +154,29 @@ export function Landing() {
       </div>
     </main>
   )
+}
+
+const TITULO = 'Tu Parrilla'
+const DESCRIPCION =
+  'Programa la semana en tus redes y mira cuánta gente llegó a tu página por cada publicación.'
+
+/**
+ * La metadata de la landing, compartida por sus dos direcciones.
+ *
+ * La misma página se sirve en la raíz del dominio del producto y en `/landing`, y las dos
+ * tienen que compartirse igual. Vive acá, al lado de la página, para que no se
+ * desincronicen: son lo mismo y se editan juntas.
+ *
+ * La imagen se pide con URL absoluta porque las etiquetas de compartir no admiten rutas
+ * relativas —quien las lee es un servidor ajeno, que no sabe de qué sitio vinieron—, y el
+ * host sale de la petición para que funcione igual en producción y en un preview.
+ */
+export function metadataLanding(host: string | null): Metadata {
+  const imagen = host ? `https://${host}/api/og` : undefined
+  return {
+    title: TITULO,
+    description: DESCRIPCION,
+    openGraph: { title: TITULO, description: DESCRIPCION, images: imagen, type: 'website' },
+    twitter: { card: 'summary_large_image', title: TITULO, description: DESCRIPCION, images: imagen },
+  }
 }
