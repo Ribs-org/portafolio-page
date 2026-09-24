@@ -49,6 +49,30 @@ describe('esDominioDelProducto', () => {
     expect(esDominioDelProducto('vicente-pareja.cl', conf)).toBe(false)
   })
 
+  /**
+   * Un campo que se llama «dominio» invita a pegar la URL entera, con esquema y barra. El
+   * 2026-09-24 pasó exactamente eso y la landing no apareció, sin ningún error que lo
+   * explicara: la variable estaba puesta y el despliegue era nuevo, pero el valor no
+   * coincidía. Aceptar lo que una persona escribiría es parte del trabajo.
+   */
+  it('acepta la URL entera, que es lo que uno pega', () => {
+    for (const valor of [
+      'https://tu-parrilla.cl',
+      'https://tu-parrilla.cl/',
+      'http://tu-parrilla.cl',
+      'tu-parrilla.cl/',
+      'https://www.tu-parrilla.cl/',
+      '  https://TU-PARRILLA.CL/  ',
+    ]) {
+      expect(esDominioDelProducto('tu-parrilla.cl', valor), valor).toBe(true)
+    }
+  })
+
+  it('no confunde un dominio con otro que lo contenga', () => {
+    expect(esDominioDelProducto('otra-tu-parrilla.cl', 'tu-parrilla.cl')).toBe(false)
+    expect(esDominioDelProducto('tu-parrilla.cl.evil.com', 'tu-parrilla.cl')).toBe(false)
+  })
+
   it('un host ausente nunca es el del producto', () => {
     expect(esDominioDelProducto(null, 'tu-parrilla.cl')).toBe(false)
     expect(esDominioDelProducto('', 'tu-parrilla.cl')).toBe(false)

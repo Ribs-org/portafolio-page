@@ -13,10 +13,21 @@
  * Acepta varios hosts separados por coma: producción usa uno, pero local y los previews
  * necesitan el suyo para poder ver la landing.
  */
-function normalizar(host: string): string {
-  return host
+/**
+ * Deja un host comparable, venga como venga.
+ *
+ * El valor de la variable lo escribe una persona en un campo que se llama «dominio», y lo
+ * más natural es pegar la URL entera. La primera versión solo aceptaba el dominio pelado:
+ * el 2026-09-24 se configuró `https://tu-parrilla.cl/` y la landing no apareció, sin
+ * ningún error que lo explicara. Aceptar lo que alguien razonablemente escribiría es parte
+ * del trabajo de esta función, no un lujo.
+ */
+function normalizar(valor: string): string {
+  return valor
     .trim()
     .toLowerCase()
+    .replace(/^[a-z][a-z0-9+.-]*:\/\//, '') // el esquema, si vino la URL entera
+    .replace(/[/?#].*$/, '') // la barra y lo que la siga
     .replace(/:\d+$/, '') // el puerto, que en local viene pegado
     .replace(/^www\./, '') // www y ápice son el mismo sitio
 }
