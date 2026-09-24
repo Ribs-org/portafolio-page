@@ -206,6 +206,47 @@ describe('aislamiento por dueño (SQL generado, sin base)', () => {
     for (const c of consultas) esperarFiltradoPorDueno(c)
   })
 
+  /**
+   * Sin `ownerId`, `getProfileBySlug` tiene que seguir sirviendo el perfil de «círculo
+   * cercano» del dueño, compartido por dirección secreta desde su propio dominio: ese
+   * camino no puede quedar acotado a nadie. Por eso este caso comprueba justo lo
+   * contrario que `esperarFiltradoPorDueno`, que exige el filtro.
+   */
+  it('profiles: getProfileBySlug sin ownerId no filtra por dueño (el círculo cercano sigue andando)', async () => {
+    const { getProfileBySlug } = await import('./profiles')
+    const consultas = await todasLasConsultas(() => getProfileBySlug('la-direccion-secreta'))
+    expect(consultas).toHaveLength(1)
+    const [{ sql, params }] = consultas as [Captura]
+    expect(params).not.toContain(DUENO)
+    // Solo el WHERE importa acá: las columnas seleccionadas incluyen "owner_id" igual,
+    // así que el filtro de verdad se busca donde vive, no en la lista de columnas.
+    expect(sql.split(/\bwhere\b/i).pop()).not.toMatch(/"owner_id"/)
+  })
+
+  it('profiles: getProfileBySlug con ownerId solo devuelve la fila si es de ese dueño', async () => {
+    const { getProfileBySlug } = await import('./profiles')
+    const consultas = await todasLasConsultas(() => getProfileBySlug('juanito', DUENO))
+    expect(consultas).toHaveLength(1)
+    for (const c of consultas) esperarFiltradoPorDueno(c)
+  })
+
+  /**
+   * `ownerId` es un `string | undefined`: una cadena vacía es un valor válido de ese tipo,
+   * no la ausencia del argumento. El filtro tiene que reaccionar a que el llamador haya
+   * pasado algo, no a si ese algo es "verdadero" — `ownerId ? … : …` trataría `''` igual
+   * que "no lo pasaron" y dejaría la consulta sin acotar. Hoy `adminId()` nunca devuelve
+   * `''` (da un uuid o lanza), así que este caso es inalcanzable en producción, pero es la
+   * línea exacta de la que depende todo el aislamiento de esta tarea.
+   */
+  it('profiles: getProfileBySlug con ownerId "" también filtra (presencia, no verdad)', async () => {
+    const { getProfileBySlug } = await import('./profiles')
+    const consultas = await todasLasConsultas(() => getProfileBySlug('juanito', ''))
+    expect(consultas).toHaveLength(1)
+    const [{ sql, params }] = consultas as [Captura]
+    expect(params).toContain('')
+    expect(sql.split(/\bwhere\b/i).pop()).toMatch(/"owner_id"\s*=\s*\$/)
+  })
+
   it('comentarios-cola: getCola filtra por el dueño de la cuenta', async () => {
     const { getCola } = await import('./comentarios-cola')
     const consultas = await todasLasConsultas(() => getCola(DUENO, { estado: 'pendientes', red: null }))
