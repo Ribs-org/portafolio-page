@@ -22,7 +22,8 @@ import { requireUser } from '@/lib/auth'
 import { parseFilters } from '@/lib/filters'
 import { cargaPorDia } from '@/lib/posts'
 import { getAllProfiles } from '@/lib/profiles'
-import { formatNumber, formatPercent } from '@/lib/utils'
+import { adminId } from '@/lib/usuarios'
+import { formatNumber, formatPercent, rutaPublicaDe } from '@/lib/utils'
 
 export const dynamic = 'force-dynamic'
 
@@ -33,6 +34,9 @@ export default async function OverviewPage({
 }) {
   const params = await searchParams
   const { id: ownerId } = await requireUser()
+  // Para saber si un perfil de la lista de abajo vive en `/`: solo el principal del admin
+  // del despliegue, no el principal de cualquier usuario. Ver el comentario de `rutaPublicaDe`.
+  const admin = await adminId()
   const filters = parseFilters(params, ownerId)
   const profiles = await getAllProfiles(ownerId)
 
@@ -127,7 +131,7 @@ export default async function OverviewPage({
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-medium">{profile.displayName}</p>
                   <p className="truncate font-mono text-[0.7rem] text-fg-faint">
-                    /{profile.isDefault ? '' : profile.slug}
+                    {rutaPublicaDe(profile, admin)}
                     {profile.isDefault ? ' (principal)' : ''}
                     {profile.isPublished ? '' : ' · borrador'}
                   </p>
@@ -140,7 +144,7 @@ export default async function OverviewPage({
                   <Pencil className="h-4 w-4" aria-hidden />
                 </Link>
                 <a
-                  href={profile.isDefault ? '/' : `/${profile.slug}`}
+                  href={rutaPublicaDe(profile, admin)}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="rounded-lg p-1.5 text-fg-faint transition-colors hover:text-fg"

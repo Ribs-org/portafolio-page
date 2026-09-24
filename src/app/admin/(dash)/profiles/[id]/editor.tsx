@@ -40,9 +40,13 @@ type Props = {
   profile: Profile
   initialLinks: DraftLink[]
   origin: string
+  /** Si este perfil vive en `/` (el principal del admin del despliegue) en vez de en
+   *  `/<slug>`. Lo decide el servidor con `rutaPublicaDe` —que necesita el id del admin,
+   *  algo que este componente de cliente no tiene por qué conocer— y llega ya resuelto. */
+  enRaiz: boolean
 }
 
-export function ProfileEditor({ profile, initialLinks, origin }: Props) {
+export function ProfileEditor({ profile, initialLinks, origin, enRaiz }: Props) {
   const router = useRouter()
   const [links, setLinks] = useState(initialLinks)
   const [draft, setDraft] = useState({
@@ -88,7 +92,11 @@ export function ProfileEditor({ profile, initialLinks, origin }: Props) {
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   )
 
-  const publicPath = profile.isDefault ? '/' : `/${draft.slug}`
+  // `draft.slug` y no `profile.slug`: cuando el campo está habilitado (perfil no
+  // principal) la vista previa de la URL debe seguir lo que se está escribiendo, no lo
+  // último guardado. `enRaiz` no cambia en el cliente —lo decidió el servidor— así que da
+  // igual que la ruta salga de `draft.slug` y no de `profile.slug`.
+  const publicPath = enRaiz ? '/' : `/${draft.slug}`
   const publicUrl = `${origin}${publicPath}`
 
   const previewLinks = useMemo(
@@ -184,7 +192,7 @@ export function ProfileEditor({ profile, initialLinks, origin }: Props) {
 
             <Field
               label="URL"
-              hint={profile.isDefault ? 'Este perfil se sirve en la raíz del sitio.' : undefined}
+              hint={enRaiz ? 'Este perfil se sirve en la raíz del sitio.' : undefined}
             >
               <div className="flex items-center gap-2">
                 <span className="font-mono text-sm text-fg-faint">/</span>

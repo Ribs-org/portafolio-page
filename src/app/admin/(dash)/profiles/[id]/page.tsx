@@ -7,7 +7,8 @@ import { getDb, profiles } from '@/db'
 import { SITE_TIMEZONE } from '@/lib/analytics'
 import { requireUser } from '@/lib/auth'
 import { getAllLinks } from '@/lib/profiles'
-import { toZonedInput } from '@/lib/utils'
+import { adminId } from '@/lib/usuarios'
+import { rutaPublicaDe, toZonedInput } from '@/lib/utils'
 import { ProfileEditor } from './editor'
 import type { DraftLink } from './link-row'
 
@@ -23,6 +24,12 @@ export default async function EditProfilePage({ params }: { params: Promise<{ id
     .where(and(eq(profiles.id, id), eq(profiles.ownerId, ownerId)))
     .limit(1)
   if (!profile) notFound()
+
+  // Solo el principal del admin del despliegue vive en `/`. El editor necesita saberlo
+  // también para su propia vista previa de la URL, pero como componente de cliente no
+  // tiene por qué conocer el id del admin: se resuelve acá y se le pasa ya el booleano.
+  const ruta = rutaPublicaDe(profile, await adminId())
+  const enRaiz = ruta === '/'
 
   const rows = await getAllLinks(ownerId, profile.id)
   const initialLinks: DraftLink[] = rows.map((link) => ({
@@ -57,7 +64,7 @@ export default async function EditProfilePage({ params }: { params: Promise<{ id
           {profile.displayName}
         </h1>
         <a
-          href={profile.isDefault ? '/' : `/${profile.slug}`}
+          href={ruta}
           target="_blank"
           rel="noopener noreferrer"
           className="ml-auto inline-flex items-center gap-1.5 rounded-xl border border-white/10 px-3 py-1.5 text-xs text-fg-muted transition-colors hover:text-fg"
@@ -66,7 +73,7 @@ export default async function EditProfilePage({ params }: { params: Promise<{ id
         </a>
       </header>
 
-      <ProfileEditor profile={profile} initialLinks={initialLinks} origin={origin} />
+      <ProfileEditor profile={profile} initialLinks={initialLinks} origin={origin} enRaiz={enRaiz} />
     </>
   )
 }

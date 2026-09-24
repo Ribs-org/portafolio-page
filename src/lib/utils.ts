@@ -193,3 +193,24 @@ export function slugify(raw: string): string {
     .replace(/^-+|-+$/g, '')
     .slice(0, 60)
 }
+
+/**
+ * La dirección pública de un perfil.
+ *
+ * `isDefault` significa dos cosas que no hay que confundir. En `crearPaginaDe`
+ * (`lib/usuarios.ts`) es «la página principal de ESTE usuario»: todos la tienen, admin e
+ * invitados por igual. Pero la raíz del sitio (`/`) sirve una sola página: la del admin
+ * del despliegue —`src/app/page.tsx` la resuelve con `adminId()`—. Tratar `isDefault` como
+ * si dijera «vive en /» manda al invitado a la página de otro: la suya, principal y todo,
+ * vive en `/<slug>` igual que cualquier perfil secundario.
+ *
+ * Pura a propósito: no resuelve quién es el admin, lo recibe. Así la puede llamar tanto un
+ * componente de servidor (que ya tiene `adminId()`) como el editor de perfil, que corre en
+ * el cliente y no puede pedirlo.
+ */
+export function rutaPublicaDe(
+  perfil: { isDefault: boolean; slug: string; ownerId: string | null },
+  adminId: string,
+): string {
+  return perfil.isDefault && perfil.ownerId === adminId ? '/' : `/${perfil.slug}`
+}
