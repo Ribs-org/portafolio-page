@@ -1,9 +1,10 @@
 import 'server-only'
 import { hkdfSync } from 'node:crypto'
 import { and, asc, desc, eq, gt, isNull, sql } from 'drizzle-orm'
-import { codigosIngreso, getDb, users, type Usuario } from '@/db'
+import { codigosIngreso, getDb, profiles, users, type Usuario } from '@/db'
 import { enviarCorreo } from './correo'
 import { env } from './env'
+import { direccionBase, primeraDireccionLibre } from './slugs'
 import {
   CODIGO_INCORRECTO,
   CORREO_INVALIDO,
@@ -28,6 +29,65 @@ export function claveCodigos(): string {
   return Buffer.from(hkdfSync('sha256', secret, 'parrilla-codigos-v1', 'codigos', 32)).toString('hex')
 }
 
+// El nombre real de la restricción de unicidad de `profiles.slug`, confirmado en
+// `drizzle/0000_fuzzy_pet_avengers.sql` (no adivinado). Comprobarlo, y no solo el código
+// 23505, es lo que evita confundir este choque con una violación de unicidad ajena —de
+// otra columna o tabla— que debería propagarse en vez de reintentarse como si el slug
+// elegido ya estuviera ocupado. Mismo criterio que `isCampaignUniqueViolation` en
+// `src/lib/social/sync.ts`.
+const PROFILES_SLUG_UNIQUE_CONSTRAINT = 'profiles_slug_unique'
+
+/**
+ * Un choque con la restricción de unicidad de `profiles.slug`, que Postgres reporta como
+ * 23505.
+ *
+ * Drizzle envuelve el error del driver y deja el original en `cause`, así que se mira en
+ * los dos lugares: sin esto, un choque se confundiría con una falla real y la invitación
+ * moriría en vez de probar el número siguiente.
+ */
+export function esChoqueDeUnicidad(error: unknown): boolean {
+  const coincide = (candidato: unknown): boolean => {
+    // El driver de este proyecto es `postgres` (postgres-js), no `node-postgres`: mapea el
+    // campo del error a `constraint_name`, no a `constraint` (ver
+    // `node_modules/postgres/src/connection.js:46`). Se comprueban los dos nombres por si
+    // alguna capa lo normaliza, pero el que realmente llega es `constraint_name`.
+    const { code, constraint_name, constraint } =
+      (candidato as { code?: string; constraint_name?: string; constraint?: string }) ?? {}
+    return code === '23505' && (constraint_name ?? constraint) === PROFILES_SLUG_UNIQUE_CONSTRAINT
+  }
+  return coincide(error) || coincide((error as { cause?: unknown })?.cause)
+}
+
+/**
+ * La página que acompaña a cada usuario desde que existe.
+ *
+ * Nace publicada y sin `noindex`: una página que nadie puede ver no le sirve a nadie. Y
+ * nace acá y no en el primer ingreso para que el invariante sea simple: todo usuario tiene
+ * exactamente una página, siempre, y ningún código aguas abajo tiene que resolver qué
+ * hacer con un usuario sin ella.
+ */
+async function crearPaginaDe(usuario: Usuario): Promise<void> {
+  const base = direccionBase(usuario.correo)
+  const nombre = usuario.nombre?.trim() || base
+
+  await primeraDireccionLibre(base, async (slug) => {
+    try {
+      await getDb().insert(profiles).values({
+        ownerId: usuario.id,
+        slug,
+        displayName: nombre,
+        isDefault: true,
+        isPublished: true,
+        noindex: false,
+      })
+      return true
+    } catch (error) {
+      if (esChoqueDeUnicidad(error)) return false
+      throw error
+    }
+  })
+}
+
 /**
  * El primer usuario nace de ADMIN_EMAIL en el primer uso, no en la migración (el SQL no
  * puede leer variables). Idempotente: si ya existe, solo garantiza el rol.
@@ -41,6 +101,13 @@ export async function asegurarAdmin(): Promise<Usuario> {
     .values({ correo, rol: 'admin' })
     .onConflictDoUpdate({ target: users.correo, set: { rol: 'admin', updatedAt: new Date() } })
     .returning()
+
+  // Solo la primera vez. Esta función corre en cada build, y el dueño ya tiene sus
+  // páginas: crear otra en cada despliegue sería una fila nueva por despliegue. Si falla,
+  // no hay invitación que quede a medias: la próxima llamada lo reintenta desde cero.
+  const [tiene] = await db.select({ id: profiles.id }).from(profiles).where(eq(profiles.ownerId, fila!.id)).limit(1)
+  if (!tiene) await crearPaginaDe(fila!)
+
   return fila!
 }
 
@@ -74,6 +141,25 @@ export async function invitar(correoBruto: string, nombre: string | null): Promi
   if (!correo) return { error: CORREO_INVALIDO }
   if (await buscarPorCorreo(correo)) return { error: USUARIO_YA_INVITADO }
   const [usuario] = await getDb().insert(users).values({ correo, nombre: nombre?.trim() || null }).returning()
+  try {
+    await crearPaginaDe(usuario!)
+  } catch (error) {
+    // Si la página no se pudo crear, no puede quedar un usuario sin ella: se borra la fila
+    // recién creada —acotada por su id— y el error sale tal cual. Sin esto se rompería el
+    // invariante que justifica crear la página acá: todo usuario tiene exactamente una
+    // página, siempre.
+    //
+    // El borrado tiene su propio `catch`: si la base ya venía fallando —la causa más
+    // probable de que `crearPaginaDe` reviente— el borrado también puede fallar, y su
+    // error no debe tapar al original. Se registra y se deja pasar; el que sale siempre es
+    // el de `crearPaginaDe`.
+    try {
+      await getDb().delete(users).where(eq(users.id, usuario!.id))
+    } catch (errorAlBorrar) {
+      console.error('invitar: no se pudo compensar creando el usuario a medias', errorAlBorrar)
+    }
+    throw error
+  }
   return { usuario: usuario! }
 }
 

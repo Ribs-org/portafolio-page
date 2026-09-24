@@ -1099,7 +1099,17 @@ export async function guardarInstruccionesComentarios(
 
 export async function invitarUsuario(_prev: FormState, formData: FormData): Promise<FormState> {
   await requireAdmin()
-  const resultado = await invitar(String(formData.get('correo') ?? ''), String(formData.get('nombre') ?? '') || null)
+  let resultado: Awaited<ReturnType<typeof invitar>>
+  try {
+    resultado = await invitar(String(formData.get('correo') ?? ''), String(formData.get('nombre') ?? '') || null)
+  } catch (error) {
+    // `invitar()` lanza cuando el usuario se creó pero su página no —ya compensado
+    // borrando la fila—, para que ese fallo no quede escondido detrás de un `{ error }`
+    // normal. Acá se atrapa igual, con un mensaje que le sirve a quien invita, sin
+    // filtrar el detalle técnico.
+    console.error('invitarUsuario:', error)
+    return { error: 'No se pudo invitar: la página del usuario no se pudo crear. Intenta de nuevo.' }
+  }
   if ('error' in resultado) return { error: resultado.error }
   // El primer código sale con la invitación: el invitado entra sin pedir nada.
   const enviado = await pedir(resultado.usuario.correo)
