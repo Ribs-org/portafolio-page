@@ -110,63 +110,45 @@ video.upload: the same form sends the media to the creator's inbox as a draft in
 We never read other people's data.
 ```
 
-## Guion del video
+## Qué hacer, en orden
 
-Cuatro a cinco minutos, una sola toma, subtítulos en inglés. Entre corchetes, lo que dices
-o rotulas; el resto es lo que haces.
+Una sola toma, sin narración. El número de la derecha es el subtítulo que va en ese
+momento; la lista completa está más abajo. No hay que medir tiempos: los saca después
+quien arma los subtítulos, del archivo grabado.
 
-**1. Quién eres y dónde corre esto.** La pestaña del sitio con su icono, y al lado Basic
-Info con el mismo icono. La pestaña Sandbox con tu cuenta como target user.
-*[Same icon on the website and in Basic Info. This demo runs in sandbox.]*
+| # | Acción | Subt. |
+|---|---|---|
+| 1 | Pestaña del sitio con su icono, y al lado Basic Info con el mismo icono. Detenerse dos segundos. | 1 |
+| 2 | Pestaña **Sandbox**, con `vicente_pareja` como target user. | 2 |
+| 3 | Ir a `tu-parrilla.cl/ingresar`. Escribir el correo. Pulsar «Mandarme un código». | 3 |
+| 4 | Abrir el correo, mostrar el código de seis dígitos, escribirlo, entrar. | 4, 5 |
+| 5 | **Cuentas**. TikTok aparece sin conectar. Pulsar Conectar. | 6 |
+| 6 | **Detenerse tres segundos** en la pantalla de permisos. Contar que sean **cuatro**. | 7, 8 |
+| 7 | Autorizar. Volver y mostrar la tarjeta con el nombre de la cuenta. | |
+| 8 | Pulsar **Sincronizar**. Abrir **Contenido** y mostrar los videos con sus contadores. | 9 |
+| 9 | **Calendario** → Programar una publicación. Subir `prueba-video-vertical.mp4`. Marcar **TikTok**. | 10 |
+| 10 | Enseñar el bloque de TikTok **sin tocarlo**: la cuenta, la privacidad sin elegir, comentarios/dúo/pegar apagados, el contenido comercial y el aviso. | 11 |
+| 11 | Intentar **Programar** sin elegir privacidad. Dejar ver que se bloquea. | 13 |
+| 12 | Elegir **«Solo yo»**. | 12 |
+| 13 | Pulsar **Ahora** y **Programar**. | 14 |
+| 14 | **Sin esperar**: publicación nueva con las tres fotos, TikTok, «Solo yo», Ahora, Programar. | 16 |
+| 15 | Volver al calendario y mostrar el video pasando a **publicando** y luego a **publicado**. | 15 |
+| 16 | Abrir TikTok y mostrar el video en el perfil, privado. Y el carrusel. | |
+| 17 | Publicación nueva con el video, marcar **«Enviar como borrador»**, Ahora, Programar. | 17 |
+| 18 | Esperar la etiqueta, abrir TikTok y mostrar el borrador listo para editar. | |
+| 19 | **Cuentas** → Desconectar. La tarjeta desaparece. | 18 |
+| 20 | Ajustes de TikTok → Seguridad y permisos → revocar la app desde ahí también. | 19 |
+| 21 | Abrir `/privacidad` y enseñar qué se guarda y cómo se borra. | 20 |
+| 22 | Terminar la grabación. | |
 
-**2. El panel es privado.** Abre `/ingresar`. Escribe tu correo, pulsa el botón, muestra el
-código que llega al correo, escríbelo, entra.
-*[No public signup. An admin invites an email address; the person signs in with a six-digit
-code. Each creator only ever sees their own data.]*
+**Si en el paso 6 salen dos permisos en vez de cuatro, cortar ahí.** Significa que la app
+no quedó revocada, y esa escena es la que demuestra los cuatro scopes de una sola vez: sin
+ella el video no sirve y no se arregla editando.
 
-Esto es nuevo respecto del video anterior y conviene que se vea: explica de una sola vez por
-qué no hay registro abierto y por qué nadie ve lo de otro.
-
-**3. Login Kit — `user.info.basic`.** Ve a Cuentas. TikTok aparece sin conectar. Pulsa
-Conectar. En la pantalla de permisos, **detente tres segundos** y deja leer los cuatro:
-perfil, ver tus videos públicos, publicar, y cargar borrador. Si solo salen dos, es que no
-revocaste la app desde TikTok: corta y empieza de nuevo, porque ahí se demuestran los cuatro
-scopes de una sola vez. Autoriza. Vuelve y muestra la tarjeta con el nombre de la cuenta.
-*[user.info.basic: we keep open_id and display_name to label the account. Tokens are
-encrypted at rest.]*
-
-**4. Display API — `video.list`.** Pulsa Sincronizar. Abre Contenido y muestra tus videos
-con sus contadores, y la columna de visitas que cada uno trajo al sitio.
-*[video.list is read-only, and only over the creator's own videos.]*
-
-**5. Content Posting — `video.publish`, video.** Calendario, publicación nueva, sube el
-video, marca TikTok. Enseña el bloque de opciones sin tocarlo: el nombre de la cuenta, la
-privacidad **sin elegir**, las casillas de comentarios, dúo y pegar apagadas, el contenido
-comercial y el aviso legal. Intenta programar sin elegir privacidad y deja ver que se
-bloquea. Elige «Solo yo». Programa para dentro de un minuto. Espera la corrida: la etiqueta
-pasa a publicando y luego a publicado. Abre TikTok y muestra el video en tu perfil, privado.
-*[creator_info first. The privacy level is chosen by the creator, never defaulted. We poll
-the publish status until it completes.]*
-
-> **El pinger corre cada 5 minutos, no cada uno.** «Programa para dentro de un minuto» puede
-> ser hasta cinco minutos de cámara esperando, en un video que dura cuatro o cinco. Programa
-> este video y **haz la escena 6 mientras se publica**; cuando vuelvas, ya salió. La espera
-> se llena con contenido en vez de con silencio, y la toma sigue siendo una sola.
-
-**6. `video.publish`, fotos.** Lo mismo con tres fotos, más rápido, hasta verlas en el
-perfil.
-*[The same flow posts a photo carousel.]*
-
-**7. `video.upload`, borrador.** Publicación nueva con un video, marca «Enviar como
-borrador». Programa, espera, la etiqueta dice que está en tu bandeja de TikTok. Abre TikTok,
-muestra la notificación y el borrador listo para editar.
-*[video.upload sends the media to the creator's inbox as a draft, to finish in the app.]*
-
-**8. Salir limpio.** En Cuentas, pulsa Desconectar: la tarjeta desaparece. Entra a los
-ajustes de TikTok y revoca la app desde ahí también.
-*[Disconnecting deletes the stored tokens. The creator can also revoke access from TikTok.]*
-
-**9. Cierre** en `/privacidad`, enseñando qué se guarda y cómo se borra.
+**Los pasos 13 a 15 están en ese orden a propósito.** El pinger corre cada cinco minutos,
+así que entre programar el video y verlo publicado puede pasar ese rato. Hacer el carrusel
+en el medio llena la espera con contenido en vez de con una pantalla quieta, y la toma
+sigue siendo una sola.
 
 ## Cómo grabar
 
