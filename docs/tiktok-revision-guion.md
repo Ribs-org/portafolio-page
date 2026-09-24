@@ -49,9 +49,7 @@ de arriba hay que replicarlo acá, o el video y la ficha se contradicen.
 - [x] **Icono** subido también acá (confirmado 2026-09-22).
 - [x] **Redirect URIs limpios** (2026-09-22): quedó solo `https://tu-parrilla.cl/api/social/tiktok/callback`, el mismo dominio del Web URL declarado y del video.
 - [x] **Descripción en inglés**, la misma que lee el revisor en el texto de revisión.
-- [ ] **Borrar el video viejo.** Al 2026-09-22 seguía cargado
-      `qir-mvfv-qfx (2026-08-26 ...).mp4`, que es **el que TikTok rechazó**. Si se envía así,
-      el revisor vuelve a ver el video rechazado.
+- [x] **Enviada a revisión el 2026-09-24.** El video viejo del 26 de agosto se reemplazó por la toma nueva: 1920x1032, sin audio, con los veinte subtítulos quemados y comprimida a 8 MB para entrar en el límite de 50 del formulario. Motivo declarado: «New demo video: the full flow in sandbox, a scene per scope, and the app icon now matches the site.»
 
 ### Qué credenciales están desplegadas
 
