@@ -44,9 +44,12 @@ type Props = {
    *  `/<slug>`. Lo decide el servidor con `rutaPublicaDe` —que necesita el id del admin,
    *  algo que este componente de cliente no tiene por qué conocer— y llega ya resuelto. */
   enRaiz: boolean
+  /** Si esta es la única página del dueño. `deleteProfile` se niega a borrarla igual, pero
+   *  la interfaz no debe ofrecer un botón que solo lleva a ese error. */
+  soloPerfil: boolean
 }
 
-export function ProfileEditor({ profile, initialLinks, origin, enRaiz }: Props) {
+export function ProfileEditor({ profile, initialLinks, origin, enRaiz, soloPerfil }: Props) {
   const router = useRouter()
   const [links, setLinks] = useState(initialLinks)
   const [draft, setDraft] = useState({
@@ -62,6 +65,7 @@ export function ProfileEditor({ profile, initialLinks, origin, enRaiz }: Props) 
   })
   const [showPreview, setShowPreview] = useState(false)
   const [copied, setCopied] = useState(false)
+  const [deleteError, setDeleteError] = useState<string | null>(null)
   const [pending, startTransition] = useTransition()
 
   // Re-sync after a server action adds or removes a row. Comparing the id list
@@ -391,20 +395,31 @@ export function ProfileEditor({ profile, initialLinks, origin, enRaiz }: Props) 
                 <RefreshCw className="h-4 w-4" aria-hidden /> Cambiar la URL secreta
               </Button>
             ) : null}
-            <Button
-              type="button"
-              variant="danger"
-              onClick={() => {
-                if (!confirm(`Se borra "${profile.displayName}" con sus links y métricas. ¿Seguir?`))
-                  return
-                startTransition(() => {
-                  void deleteProfile(profile.id)
-                })
-              }}
-            >
-              <Trash2 className="h-4 w-4" aria-hidden /> Borrar perfil
-            </Button>
+            {!soloPerfil ? (
+              <Button
+                type="button"
+                variant="danger"
+                onClick={() => {
+                  if (!confirm(`Se borra "${profile.displayName}" con sus links y métricas. ¿Seguir?`))
+                    return
+                  startTransition(() => {
+                    void deleteProfile(profile.id).then((result) => setDeleteError(result?.error ?? null))
+                  })
+                }}
+              >
+                <Trash2 className="h-4 w-4" aria-hidden /> Borrar perfil
+              </Button>
+            ) : (
+              <p className="text-sm text-fg-muted">
+                No puedes borrar tu única página: todo usuario necesita al menos una.
+              </p>
+            )}
           </div>
+          {deleteError ? (
+            <p role="alert" className="mt-2 text-sm text-negative">
+              {deleteError}
+            </p>
+          ) : null}
         </Panel>
       </div>
 

@@ -47,6 +47,8 @@ vi.mock('@/lib/auth', () => ({
  */
 const db = vi.hoisted(() => ({
   updateCalls: [] as unknown[],
+  deleteCalls: [] as unknown[],
+  perfilesDelDueno: [{ id: 'profile-1' }, { id: 'profile-2' }] as { id: string }[],
 }))
 
 vi.mock('@/db', async (importOriginal) => {
@@ -61,6 +63,12 @@ vi.mock('@/db', async (importOriginal) => {
           },
         }),
       }),
+      select: () => ({ from: () => ({ where: async () => db.perfilesDelDueno }) }),
+      delete: () => ({
+        where: async () => {
+          db.deleteCalls.push(true)
+        },
+      }),
     }),
   }
 })
@@ -68,10 +76,12 @@ vi.mock('@/db', async (importOriginal) => {
 // Import estático, después de los `vi.mock` (Vitest los sube igual al principio del
 // archivo): un import dinámico dentro de cada `it` pagaría de nuevo la transformación de
 // todo lo que `actions.ts` arrastra.
-const { updateProfile } = await import('./actions')
+const { updateProfile, deleteProfile } = await import('./actions')
 
 beforeEach(() => {
   db.updateCalls.length = 0
+  db.deleteCalls.length = 0
+  db.perfilesDelDueno = [{ id: 'profile-1' }, { id: 'profile-2' }]
 })
 
 describe('updateProfile: guardar el perfil principal de un invitado no le cambia la dirección', () => {
@@ -137,5 +147,24 @@ describe('updateProfile: rechaza una dirección reservada del sistema', () => {
     expect(result.error).toBeTruthy()
     expect(result.error).toMatch(/reservad/i)
     expect(db.updateCalls).toHaveLength(0)
+  })
+})
+
+describe('deleteProfile: no deja borrar la última página de un usuario', () => {
+  it('se niega si el dueño solo tiene un perfil, y no borra nada', async () => {
+    db.perfilesDelDueno = [{ id: 'profile-1' }]
+
+    const result = await deleteProfile('profile-1')
+
+    expect(result.error).toBeTruthy()
+    expect(db.deleteCalls).toHaveLength(0)
+  })
+
+  it('borra y redirige si el dueño tiene más de un perfil', async () => {
+    db.perfilesDelDueno = [{ id: 'profile-1' }, { id: 'profile-2' }]
+
+    await expect(deleteProfile('profile-1')).rejects.toThrow(RedirectSignal)
+
+    expect(db.deleteCalls).toHaveLength(1)
   })
 })

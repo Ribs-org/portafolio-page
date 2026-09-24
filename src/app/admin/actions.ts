@@ -167,9 +167,27 @@ export async function makeDefault(profileId: string) {
   revalidatePath('/', 'layout')
 }
 
-export async function deleteProfile(profileId: string) {
+/**
+ * Se niega si es la última página del dueño: `rutaPublicaDe`, `enlacePublicoDe` y la
+ * invitación de un usuario nuevo (`crearPaginaDe` en `lib/usuarios.ts`) dan por hecho que
+ * todo usuario tiene siempre al menos una. El panel ya no ofrece el botón en ese caso (ver
+ * el editor), pero el servidor es quien tiene que garantizarlo de verdad.
+ *
+ * Antes no devolvía nada (siempre redirigía); ahora devuelve `{ error }` en el caso que
+ * bloquea, así que quien llama necesita leer el resultado en vez de solo disparar la
+ * promesa. En el camino feliz sigue sin cambiar: redirige, fuera de cualquier try/catch que
+ * pudiera tragarse su propio error de navegación (mismo motivo que en `conectarElegidas`).
+ */
+export async function deleteProfile(profileId: string): Promise<{ error?: string }> {
   const { id: ownerId } = await requireUser()
-  await getDb().delete(profiles).where(and(eq(profiles.id, profileId), eq(profiles.ownerId, ownerId)))
+  const db = getDb()
+
+  const propios = await db.select({ id: profiles.id }).from(profiles).where(eq(profiles.ownerId, ownerId))
+  if (propios.length <= 1) {
+    return { error: 'No puedes borrar tu única página: todo usuario necesita al menos una.' }
+  }
+
+  await db.delete(profiles).where(and(eq(profiles.id, profileId), eq(profiles.ownerId, ownerId)))
   revalidatePath('/admin/profiles')
   redirect('/admin/profiles')
 }

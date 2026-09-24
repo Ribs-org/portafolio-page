@@ -7,7 +7,7 @@ import { getDb, profiles } from '@/db'
 import { SITE_TIMEZONE } from '@/lib/analytics'
 import { requireUser } from '@/lib/auth'
 import { dominioProducto, esDominioDelProducto } from '@/lib/dominios'
-import { getAllLinks } from '@/lib/profiles'
+import { getAllLinks, getAllProfiles } from '@/lib/profiles'
 import { adminId } from '@/lib/usuarios'
 import { enlacePublicoDe, rutaPublicaDe, toZonedInput } from '@/lib/utils'
 import { ProfileEditor } from './editor'
@@ -46,6 +46,10 @@ export default async function EditProfilePage({ params }: { params: Promise<{ id
     dominioProducto: dominioProducto(),
   })
 
+  // Si es la única página del dueño, el editor no ofrece el botón de borrar: el servidor
+  // (`deleteProfile`) también se niega, pero la interfaz no debe llevar a ese error.
+  const soloPerfil = (await getAllProfiles(ownerId)).length <= 1
+
   const rows = await getAllLinks(ownerId, profile.id)
   const initialLinks: DraftLink[] = rows.map((link) => ({
     id: link.id,
@@ -83,7 +87,13 @@ export default async function EditProfilePage({ params }: { params: Promise<{ id
         </a>
       </header>
 
-      <ProfileEditor profile={profile} initialLinks={initialLinks} origin={origin} enRaiz={enRaiz} />
+      <ProfileEditor
+        profile={profile}
+        initialLinks={initialLinks}
+        origin={origin}
+        enRaiz={enRaiz}
+        soloPerfil={soloPerfil}
+      />
     </>
   )
 }
