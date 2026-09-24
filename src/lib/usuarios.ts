@@ -102,8 +102,9 @@ export async function asegurarAdmin(): Promise<Usuario> {
     .onConflictDoUpdate({ target: users.correo, set: { rol: 'admin', updatedAt: new Date() } })
     .returning()
 
-  // Solo la primera vez. Esta función corre en cada build, y el dueño ya tiene sus
-  // páginas: crear otra en cada despliegue sería una fila nueva por despliegue. Si falla,
+  // Solo la primera vez. Esta función no corre en cada build —la llaman `pedir()`,
+  // `api/mobile/session` y `social/fuentes/run.ts`, no el build— y el dueño ya tiene sus
+  // páginas: crear otra en cada llamada sería una fila nueva por llamada. Si falla,
   // no hay invitación que quede a medias: la próxima llamada lo reintenta desde cero.
   const [tiene] = await db.select({ id: profiles.id }).from(profiles).where(eq(profiles.ownerId, fila!.id)).limit(1)
   if (!tiene) await crearPaginaDe(fila!)
