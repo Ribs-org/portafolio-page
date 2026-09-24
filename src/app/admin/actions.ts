@@ -36,6 +36,7 @@ import { TIKTOK_SIN_CUENTA, consultarCreador, type CreadorTikTok } from '@/lib/s
 import { COOKIE_PENDIENTE, LOGIN_VENCIDO, elegidas, leerPendiente } from '@/lib/social/pendiente'
 import { networkLabel } from '@/lib/networks'
 import { ARCHIVO_AJENO, ARCHIVO_FALTANTE, CUERPO_ILEGIBLE, parseMediaMovil, type MediaMovil } from '@/lib/mobile-api'
+import { esReservado } from '@/lib/slugs'
 import { cerrarSesiones, invitar, pedir, quitar } from '@/lib/usuarios'
 import { fromZonedInput, normalizeUrl, slugify } from '@/lib/utils'
 
@@ -50,11 +51,23 @@ export async function logout() {
 
 function readProfileForm(formData: FormData) {
   const displayName = String(formData.get('displayName') ?? '').trim()
-  const rawSlug = String(formData.get('slug') ?? '').trim()
+  const rawSlugField = formData.get('slug')
+  // Un input deshabilitado (la URL del principal de un invitado, en el editor) no viaja en
+  // el FormData: `formData.get('slug')` da `null`, y eso dice «no toques el slug», algo
+  // distinto de una cadena vacía —que sí es una instrucción real de quien puede editarlo—.
+  // Confundir los dos era el bug: guardar el formulario de la página principal de un
+  // invitado, sin tocar la URL, le cambiaba la dirección en silencio.
+  const rawSlug = rawSlugField === null ? null : String(rawSlugField).trim()
 
   return {
     displayName,
-    slug: slugify(rawSlug) || slugify(displayName) || `perfil-${randomUUID().slice(0, 6)}`,
+    // `undefined` = no reescribir el slug que ya tiene el perfil. Solo pasa cuando el
+    // campo no vino; si vino (aunque sea vacío), se resuelve con el mismo respaldo de
+    // siempre, que sigue haciendo falta para dar de alta un perfil sin dirección todavía.
+    slug:
+      rawSlug === null
+        ? undefined
+        : slugify(rawSlug) || slugify(displayName) || `perfil-${randomUUID().slice(0, 6)}`,
     headline: String(formData.get('headline') ?? '').trim() || null,
     bio: String(formData.get('bio') ?? '').trim() || null,
     avatarUrl: String(formData.get('avatarUrl') ?? '').trim() || null,
@@ -96,6 +109,11 @@ export async function updateProfile(
   const values = readProfileForm(formData)
 
   if (!values.displayName) return { error: 'El nombre no puede quedar vacío.' }
+  if (values.slug !== undefined && esReservado(values.slug)) {
+    return {
+      error: `«${values.slug}» es una dirección reservada del sistema: elige otro nombre o escribe una URL distinta.`,
+    }
+  }
 
   try {
     await getDb()
@@ -105,7 +123,12 @@ export async function updateProfile(
   } catch (error) {
     const message = String(error)
     if (message.includes('profiles_slug_unique') || message.includes('duplicate key')) {
-      return { error: `La URL /${values.slug} ya está en uso por otro perfil.` }
+      return {
+        error:
+          values.slug !== undefined
+            ? `La URL /${values.slug} ya está en uso por otro perfil.`
+            : 'No se pudo guardar. Intenta de nuevo.',
+      }
     }
     return { error: 'No se pudo guardar. Intenta de nuevo.' }
   }
