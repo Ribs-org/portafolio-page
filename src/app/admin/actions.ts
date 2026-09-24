@@ -37,7 +37,7 @@ import { COOKIE_PENDIENTE, LOGIN_VENCIDO, elegidas, leerPendiente } from '@/lib/
 import { networkLabel } from '@/lib/networks'
 import { ARCHIVO_AJENO, ARCHIVO_FALTANTE, CUERPO_ILEGIBLE, parseMediaMovil, type MediaMovil } from '@/lib/mobile-api'
 import { esReservado } from '@/lib/slugs'
-import { cerrarSesiones, invitar, pedir, quitar } from '@/lib/usuarios'
+import { cerrarSesiones, esChoqueDeUnicidad, invitar, pedir, quitar } from '@/lib/usuarios'
 import { fromZonedInput, normalizeUrl, slugify } from '@/lib/utils'
 
 export type FormState = { error?: string; ok?: boolean; aviso?: string }
@@ -121,8 +121,12 @@ export async function updateProfile(
       .set(values)
       .where(and(eq(profiles.id, profileId), eq(profiles.ownerId, ownerId)))
   } catch (error) {
-    const message = String(error)
-    if (message.includes('profiles_slug_unique') || message.includes('duplicate key')) {
+    // `String(error)` nunca casaba: drizzle envuelve la consulta fallida en un
+    // `DrizzleQueryError` cuyo propio mensaje es solo `Failed query: <sql>\nparams:
+    // <params>` — ni el nombre de la restricción ni "duplicate key" aparecen ahí, solo en
+    // `cause`, que es justo donde mira `esChoqueDeUnicidad` (ya usada, y ya probada, en
+    // `lib/usuarios.ts`).
+    if (esChoqueDeUnicidad(error)) {
       return {
         error:
           values.slug !== undefined

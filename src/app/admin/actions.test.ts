@@ -49,6 +49,9 @@ const db = vi.hoisted(() => ({
   updateCalls: [] as unknown[],
   deleteCalls: [] as unknown[],
   perfilesDelDueno: [{ id: 'profile-1' }, { id: 'profile-2' }] as { id: string }[],
+  // Lo que el `.where()` del UPDATE debe lanzar, si algo: así un test puede simular el
+  // choque de unicidad (o cualquier otro fallo) sin que el resto tenga que configurarlo.
+  updateError: null as unknown,
 }))
 
 vi.mock('@/db', async (importOriginal) => {
@@ -60,6 +63,7 @@ vi.mock('@/db', async (importOriginal) => {
         set: (values: unknown) => ({
           where: async () => {
             db.updateCalls.push(values)
+            if (db.updateError) throw db.updateError
           },
         }),
       }),
@@ -82,7 +86,23 @@ beforeEach(() => {
   db.updateCalls.length = 0
   db.deleteCalls.length = 0
   db.perfilesDelDueno = [{ id: 'profile-1' }, { id: 'profile-2' }]
+  db.updateError = null
 })
+
+/**
+ * La forma real de un choque de unicidad tal como llega al `catch` de `updateProfile`: no
+ * el error del driver crudo, sino `DrizzleQueryError`, que drizzle-orm usa para envolver
+ * cualquier consulta fallida. Su propio mensaje es solo `Failed query: <sql>\nparams:
+ * <params>` — ni el nombre de la restricción ni "duplicate key" aparecen ahí, solo en
+ * `cause`, que es donde `esChoqueDeUnicidad` (de `lib/usuarios.ts`) sabe mirar.
+ */
+function erorDrizzleEnvuelto(causa: unknown): Error {
+  const error = new Error('Failed query: update "profiles" set "slug" = $1 where "id" = $2\nparams: tomado,profile-1')
+  ;(error as { cause?: unknown }).cause = causa
+  return error
+}
+
+const erorPostgres = (constraint_name: string) => ({ code: '23505', constraint_name })
 
 describe('updateProfile: guardar el perfil principal de un invitado no le cambia la dirección', () => {
   it('sin el campo slug en el FormData (input deshabilitado), no toca el slug aunque cambie el nombre', async () => {
@@ -147,6 +167,32 @@ describe('updateProfile: rechaza una dirección reservada del sistema', () => {
     expect(result.error).toBeTruthy()
     expect(result.error).toMatch(/reservad/i)
     expect(db.updateCalls).toHaveLength(0)
+  })
+})
+
+describe('updateProfile: mensaje claro cuando la URL ya está en uso', () => {
+  it('reconoce el choque de unicidad con la forma real que envuelve drizzle (DrizzleQueryError + cause)', async () => {
+    db.updateError = erorDrizzleEnvuelto(erorPostgres('profiles_slug_unique'))
+
+    const formData = new FormData()
+    formData.set('displayName', 'Ana')
+    formData.set('slug', 'tomado')
+
+    const result = await updateProfile('profile-1', {}, formData)
+
+    expect(result.error).toBe('La URL /tomado ya está en uso por otro perfil.')
+  })
+
+  it('cualquier otro fallo sigue con el mensaje genérico, no el de la URL tomada', async () => {
+    db.updateError = new Error('la base no responde')
+
+    const formData = new FormData()
+    formData.set('displayName', 'Ana')
+    formData.set('slug', 'lo-que-sea')
+
+    const result = await updateProfile('profile-1', {}, formData)
+
+    expect(result.error).toBe('No se pudo guardar. Intenta de nuevo.')
   })
 })
 
