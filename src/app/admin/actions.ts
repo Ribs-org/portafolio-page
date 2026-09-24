@@ -139,7 +139,12 @@ export async function updateProfile(
   return { ok: true }
 }
 
-/** Exactly one profile is served at `/`, so promoting one demotes the rest. */
+/**
+ * Promotes one profile to default and demotes the rest — but only within the same owner:
+ * each user has exactly one default profile, not the whole deployment. And `/` only ever
+ * serves the admin's default profile; a guest's default profile lives at `/<slug>` like
+ * any other of theirs (see `rutaPublicaDe` in `lib/utils.ts`).
+ */
 export async function makeDefault(profileId: string) {
   const { id: ownerId } = await requireUser()
   const db = getDb()

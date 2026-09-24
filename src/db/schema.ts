@@ -50,7 +50,11 @@ export const codigosIngreso = pgTable(
   (t) => [index('codigos_ingreso_user_idx').on(t.userId, t.createdAt)],
 )
 
-/** A public page. The default one is served at `/`, the rest at `/<slug>`. */
+/**
+ * A public page. Every owner has exactly one default profile; the rest live at `/<slug>`.
+ * Only the admin's default profile is served at `/` — a guest's default profile lives at
+ * `/<slug>` too, same as their other pages (see `rutaPublicaDe` in `lib/utils.ts`).
+ */
 export const profiles = pgTable(
   'profiles',
   {
