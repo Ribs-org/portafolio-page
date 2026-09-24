@@ -192,7 +192,13 @@ export function ProfileEditor({ profile, initialLinks, origin, enRaiz }: Props) 
 
             <Field
               label="URL"
-              hint={enRaiz ? 'Este perfil se sirve en la raíz del sitio.' : undefined}
+              hint={
+                enRaiz
+                  ? 'Este perfil se sirve en la raíz del sitio.'
+                  : profile.isDefault
+                    ? 'Esta es tu página principal. Su dirección salió de tu correo.'
+                    : undefined
+              }
             >
               <div className="flex items-center gap-2">
                 <span className="font-mono text-sm text-fg-faint">/</span>
