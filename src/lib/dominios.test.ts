@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { esDominioDelProducto } from './dominios'
+import { dominioProducto, esDominioDelProducto } from './dominios'
 
 /**
  * La raíz pública sirve la página de un creador desde hace meses, en cuatro dominios. Esta
@@ -76,5 +76,21 @@ describe('esDominioDelProducto', () => {
   it('un host ausente nunca es el del producto', () => {
     expect(esDominioDelProducto(null, 'tu-parrilla.cl')).toBe(false)
     expect(esDominioDelProducto('', 'tu-parrilla.cl')).toBe(false)
+  })
+})
+
+describe('dominioProducto', () => {
+  it('sin configurar, no hay dónde mandar el enlace', () => {
+    expect(dominioProducto(undefined)).toBeNull()
+    expect(dominioProducto(null)).toBeNull()
+    expect(dominioProducto('')).toBeNull()
+  })
+
+  it('devuelve el host normalizado, aunque venga con esquema, barra o mayúsculas', () => {
+    expect(dominioProducto('https://TU-PARRILLA.CL/')).toBe('tu-parrilla.cl')
+  })
+
+  it('con varios hosts separados por coma, usa el primero: el que de verdad se comparte', () => {
+    expect(dominioProducto('tu-parrilla.cl, localhost:3000')).toBe('tu-parrilla.cl')
   })
 })

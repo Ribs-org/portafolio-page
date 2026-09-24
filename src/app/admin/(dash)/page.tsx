@@ -1,3 +1,4 @@
+import { headers } from 'next/headers'
 import Link from 'next/link'
 import { ArrowUpRight, ExternalLink, Pencil } from 'lucide-react'
 import { BarList } from '@/components/charts/bar-list'
@@ -19,11 +20,12 @@ import {
   previousPeriod,
 } from '@/lib/analytics'
 import { requireUser } from '@/lib/auth'
+import { dominioProducto, esDominioDelProducto } from '@/lib/dominios'
 import { parseFilters } from '@/lib/filters'
 import { cargaPorDia } from '@/lib/posts'
 import { getAllProfiles } from '@/lib/profiles'
 import { adminId } from '@/lib/usuarios'
-import { formatNumber, formatPercent, rutaPublicaDe } from '@/lib/utils'
+import { enlacePublicoDe, formatNumber, formatPercent, rutaPublicaDe } from '@/lib/utils'
 
 export const dynamic = 'force-dynamic'
 
@@ -37,6 +39,10 @@ export default async function OverviewPage({
   // Para saber si un perfil de la lista de abajo vive en `/`: solo el principal del admin
   // del despliegue, no el principal de cualquier usuario. Ver el comentario de `rutaPublicaDe`.
   const admin = await adminId()
+  const host = (await headers()).get('host')
+  // Para que «abrir» de cada perfil enlace a un host que de verdad lo sirva. Ver el
+  // comentario de `enlacePublicoDe`.
+  const dominio = { enElProducto: esDominioDelProducto(host), dominioProducto: dominioProducto() }
   const filters = parseFilters(params, ownerId)
   const profiles = await getAllProfiles(ownerId)
 
@@ -144,7 +150,7 @@ export default async function OverviewPage({
                   <Pencil className="h-4 w-4" aria-hidden />
                 </Link>
                 <a
-                  href={rutaPublicaDe(profile, admin)}
+                  href={enlacePublicoDe(profile, admin, dominio)}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="rounded-lg p-1.5 text-fg-faint transition-colors hover:text-fg"

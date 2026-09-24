@@ -47,3 +47,19 @@ export function esDominioDelProducto(
     .filter(Boolean)
     .includes(buscado)
 }
+
+/**
+ * El dominio del producto al que apuntar un enlace, normalizado — el que se usa cuando una
+ * página no la sirve el host donde está parado quien la mira. `DOMINIO_PRODUCTO` puede traer
+ * varios hosts separados por coma (producción, previews, local); el primero es el que de
+ * verdad se comparte, así que es el único que esta función devuelve.
+ *
+ * `null` sin configurar, igual que `esDominioDelProducto`: es la señal de «no cambies nada».
+ */
+export function dominioProducto(
+  configurado: string | null | undefined = process.env.DOMINIO_PRODUCTO,
+): string | null {
+  if (!configurado) return null
+  const [primero] = configurado.split(',').map(normalizar).filter(Boolean)
+  return primero ?? null
+}

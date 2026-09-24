@@ -195,7 +195,12 @@ export function slugify(raw: string): string {
 }
 
 /**
- * La dirección pública de un perfil.
+ * La dirección pública de un perfil, asumiendo que se ve en un host que sirve la principal
+ * del admin en `/` —esto es, cualquier dominio salvo el del producto: ver
+ * `esDominioDelProducto` en `lib/dominios.ts`. En el dominio del producto la raíz es la
+ * landing y no es la página de nadie, ni siquiera la del admin: ahí toda página, la
+ * principal incluida, vive en `/<slug>`. Quien llame a esta función en ese host tiene que
+ * corregir el resultado — `enlacePublicoDe`, más abajo, es esa corrección.
  *
  * `isDefault` significa dos cosas que no hay que confundir. En `crearPaginaDe`
  * (`lib/usuarios.ts`) es «la página principal de ESTE usuario»: todos la tienen, admin e
@@ -213,4 +218,38 @@ export function rutaPublicaDe(
   adminId: string,
 ): string {
   return perfil.isDefault && perfil.ownerId === adminId ? '/' : `/${perfil.slug}`
+}
+
+/**
+ * A dónde manda de verdad el «ver página» del panel — a diferencia de `rutaPublicaDe`, que
+ * es solo la ruta y asume que el host actual la sirve. Esa asunción falla en dos sentidos
+ * opuestos (ver el comentario de más arriba y el de `esDominioDelProducto`):
+ *
+ * - En el dominio del producto, la raíz no es la página de nadie: toda página, incluida la
+ *   principal del admin, vive en `/<slug>`.
+ * - En cualquier otro dominio, solo se sirven las páginas del admin del despliegue; la de
+ *   un invitado ahí da 404, sea o no su principal.
+ *
+ * Por eso, si el perfil no es del admin y el host actual no es el del producto, el enlace
+ * sale absoluto hacia el dominio del producto en vez de una ruta relativa a un host que no
+ * la sirve. Sin `DOMINIO_PRODUCTO` configurado no hay dónde mandarlo: se devuelve la ruta
+ * de siempre, sin cambiar nada — la restricción de toda esta rama.
+ *
+ * Pura, como `rutaPublicaDe`: recibe si el host actual es el del producto y cuál es el
+ * dominio del producto (ver `esDominioDelProducto` y `dominioProducto` en `lib/dominios.ts`)
+ * en vez de averiguarlo, así la puede llamar cualquier página del panel con lo que ya leyó
+ * de `headers()`.
+ */
+export function enlacePublicoDe(
+  perfil: { isDefault: boolean; slug: string; ownerId: string | null },
+  adminId: string,
+  dominio: { enElProducto: boolean; dominioProducto: string | null },
+): string {
+  if (dominio.enElProducto) return `/${perfil.slug}`
+
+  const ruta = rutaPublicaDe(perfil, adminId)
+  const loSirveEsteHost = perfil.ownerId === adminId
+  if (loSirveEsteHost || !dominio.dominioProducto) return ruta
+
+  return `https://${dominio.dominioProducto}/${perfil.slug}`
 }
