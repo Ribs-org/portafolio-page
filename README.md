@@ -9,10 +9,10 @@ quede con tus números.
 | URL | Qué es |
 | --- | --- |
 | `/` | El perfil marcado como principal |
-| `/<slug>` | Cualquier otro perfil. El privado usa un slug que no se adivina |
+| `/<slug>` | La página de un usuario. Cada dominio sirve solo las de su dueño; el del producto las sirve todas |
 | `/admin` | Tu panel: resumen, analítica y editor |
 
-Corre en planes gratis: Next.js 16 en Vercel, Postgres en Neon y la media en Cloudflare R2
+Corre en planes gratis: Next.js 16 en Vercel, Postgres en Supabase y la media en Cloudflare R2
 (10 GB gratis, egress $0).
 
 ---
@@ -77,7 +77,9 @@ datos"**. Es lo esperado: todavía no hay base de datos. Sigue.
 
 En tu proyecto de Vercel, pestaña **Storage**:
 
-- **Create Database → Neon** — inyecta `DATABASE_URL` sola. Obligatoria.
+- **Create Database → Supabase** — inyecta `DATABASE_URL` sola. Obligatoria. Usa el
+  *pooler* (`aws-0-<región>.pooler.supabase.com`), no la conexión directa: esa es solo IPv6
+  y las funciones de Vercel no la alcanzan.
 - **Almacenamiento de media** — no es de Vercel: un bucket de Cloudflare R2, porque
   su plan gratis son 10 GB con egress $0 y los videos programados no caben en menos.
   En dash.cloudflare.com → R2: crea el bucket, cuélgale un subdominio propio y emite
@@ -107,7 +109,7 @@ npm run db:setup             # crea las tablas y siembra dos perfiles de ejemplo
 
 ### 5. Redespliega
 
-Las variables que agregaste (Neon y R2) no entran en un deploy que ya terminó. En Vercel:
+Las variables que agregaste (Supabase y R2) no entran en un deploy que ya terminó. En Vercel:
 **Deployments → ⋯ del último → Redeploy**. O desde la terminal:
 
 ```bash
@@ -122,6 +124,13 @@ Entra en `/ingresar` con tu correo (el de `ADMIN_EMAIL`): te llega un código de
 dígitos que vale diez minutos. Solo entran los correos invitados; desde la pestaña
 **Usuarios** del panel, visible para el admin, invitas a más gente. Ya adentro cambias
 foto, bio, colores, links y slugs.
+
+Cada usuario nace con su página, en el mismo momento en que lo invitas: la dirección sale
+de su correo —`juanito@gmail.com` da `/juanito`—, y si esa ya está tomada se numera
+(`/juanito-2`). No hace falta que entre para que su página exista, y no hay ningún momento
+en que un usuario esté creado sin ella. Las direcciones que la app ya usa para otra cosa
+—`admin`, `api`, `ingresar`— están reservadas: nadie recibe una página que quede tapada por
+una ruta real.
 Los dos perfiles de ejemplo están para que los edites, no para que los borres y empieces
 de cero.
 
@@ -140,6 +149,22 @@ segundo recibe un aviso, no la cuenta de otro.
 
 En Vercel: **Settings → Domains → Add**, escribe tu dominio y copia los registros DNS que
 te muestre en tu proveedor. El certificado HTTPS lo emite Vercel solo, en minutos.
+
+**Un dominio sirve las páginas de su dueño; el del producto las sirve todas.** Varios
+dominios pueden apuntar al mismo despliegue, y lo que cada uno muestra depende de si es el
+que declaraste en `DOMINIO_PRODUCTO`:
+
+| | `/` | `/<slug>` |
+| --- | --- | --- |
+| El dominio de `DOMINIO_PRODUCTO` | la landing del producto | la página de cualquier usuario |
+| Cualquier otro dominio | la página principal del dueño | solo las páginas del dueño; el resto responde 404 |
+
+Ese 404 es indistinguible del de una dirección que no existe —mismo código, mismo cuerpo,
+mismos metadatos—, a propósito: si se notara la diferencia, tu dominio serviría para
+averiguar qué usuarios hay.
+
+Sin `DOMINIO_PRODUCTO` configurada no hay dominio del producto: todos sirven solo lo del
+dueño, que es como funcionaba antes de que existiera la landing.
 
 <details>
 <summary>Sin el botón (fork manual)</summary>
@@ -494,8 +519,8 @@ PR y se revisan como código:
 2. `npm run db:generate` crea `drizzle/NNNN_*.sql`; commitéalo junto al cambio. El CI falla
    si el esquema cambió y la migración no está.
 3. Al desplegar, Vercel corre `npm run db:migrate` antes de construir: si la migración
-   falla, el código nuevo no se promueve. Los previews migran contra su propia rama de
-   Neon cuando la integración la crea (`MIGRAR_PREVIEWS=1`); hasta entonces se saltan.
+   falla, el código nuevo no se promueve. Los previews solo migran con `MIGRAR_PREVIEWS=1`;
+   hasta entonces se saltan.
 
 Mientras los previews no migren, un preview de un PR que agrega una columna corre código
 nuevo contra la base de producción sin esa columna: las páginas que la usan responden 500
@@ -514,7 +539,7 @@ perdido).
 
 ### Si una migración falla a medias
 
-El migrador de neon-http aplica las sentencias de cada archivo una por una, sin
+El migrador aplica las sentencias de cada archivo una por una, sin
 transacción, y solo registra la migración cuando todas terminan bien. Si una falla a
 mitad de camino, las sentencias anteriores quedan aplicadas y nada queda registrado: el
 próximo build vuelve a intentar el mismo archivo desde el principio y falla en la primera
@@ -530,7 +555,7 @@ Vercel y bajan con `vercel env pull .env.local`.
 
 | Variable | Para qué | ¿Obligatoria? |
 | --- | --- | --- |
-| `DATABASE_URL` | Neon Postgres | Sí — la pone la integración |
+| `DATABASE_URL` | Supabase Postgres, por el *pooler* | Sí — la pone la integración |
 | `ADMIN_EMAIL` | El correo del primer usuario | Sí |
 | `ADMIN_PASSWORD` | Contraseña de la app del teléfono | Sí |
 | `AUTH_SECRET` | Firma de la cookie de sesión | Sí |
@@ -541,6 +566,7 @@ Vercel y bajan con `vercel env pull .env.local`.
 | `R2_SECRET_ACCESS_KEY` | Llave secreta para R2 | No — sin ella no puedes subir media |
 | `R2_BUCKET` | Nombre del bucket de R2 | No — sin ella no puedes subir media |
 | `R2_PUBLIC_BASE` | URL pública del bucket de R2 | No — sin ella no puedes subir media |
+| `DOMINIO_PRODUCTO` | El dominio donde vive la landing del producto. Ese dominio sirve las páginas de todos; los demás, solo las de su dueño | No — sin ella ningún dominio es el del producto y todos sirven solo lo del dueño |
 | `SITE_TIMEZONE` | Zona en la que el dashboard agrupa los días | No — por defecto `America/Santiago` |
 | `YOUTUBE_API_KEY` | Métricas de YouTube | No — sin ella esa red aparece como no conectada |
 | `YOUTUBE_CHANNEL_ID` | Métricas de YouTube | No — sin ella esa red aparece como no conectada |
@@ -555,7 +581,7 @@ Vercel y bajan con `vercel env pull .env.local`.
 | `X_CLIENT_ID` | Conectar X para publicar (OAuth 2.0 + PKCE) | El Client ID de la app en developer.x.com |
 | `X_CLIENT_SECRET` | El secreto de esa app | Junto con el anterior |
 | `CRON_SECRET` | Autoriza las corridas programadas (sync diario y publicación cada 5 minutos) | No — la pone Vercel solo, al declarar el cron |
-| `MIGRAR_PREVIEWS` | Que los previews migren su rama de Neon | Solo cuando la integración de Neon crea una rama por preview |
+| `MIGRAR_PREVIEWS` | Que los previews migren la base | Solo cuando el preview tenga una base propia; contra la de producción, no |
 | `SCHEDULE_API_KEY` | Autoriza `POST /api/schedule/batch` (carga masiva), `GET /api/schedule/posts` (calendario) y `GET /api/metrics/posts` (métricas) | Sin ella los tres endpoints quedan cerrados; genérala igual que `CRON_SECRET` |
 | `RESEND_API_KEY` | Manda los códigos de ingreso y el aviso de publicación fallida | Sí — sin ella nadie puede entrar al panel |
 | `PUBLISH_ALERT_TO` | A qué correo llega el aviso de fallo | Sin ella no se envía ningún email; el calendario sigue mostrando el fallo |
@@ -643,8 +669,8 @@ en la ventana, salido o no: texto, `fecha` (ISO con offset), portada, media en o
 ```
 src/
   app/
-    page.tsx               perfil principal
-    [slug]/                perfiles por slug
+    page.tsx               la landing en el dominio del producto; el perfil principal en el resto
+    [slug]/                la página de un usuario, acotada al dueño del dominio
     icon.svg               favicon
     api/track/click/       endpoint del sendBeacon
     ingresar/              entrada: correo y código
@@ -656,6 +682,8 @@ src/
     click-tracker.tsx      escucha delegada de clicks
     charts/                gráficos y paleta validada
   lib/
+    slugs.ts               qué direcciones están reservadas y cuál le toca a cada correo
+    dominios.ts            si un host es el del producto
     tracking.ts            contexto de la visita desde headers
     analytics.ts           consultas del dashboard
     auth.ts                sesión del panel
