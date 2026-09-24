@@ -172,10 +172,18 @@ export async function makeDefault(profileId: string) {
 }
 
 /**
- * Se niega si es la última página del dueño: `rutaPublicaDe`, `enlacePublicoDe` y la
- * invitación de un usuario nuevo (`crearPaginaDe` en `lib/usuarios.ts`) dan por hecho que
- * todo usuario tiene siempre al menos una. El panel ya no ofrece el botón en ese caso (ver
- * el editor), pero el servidor es quien tiene que garantizarlo de verdad.
+ * Se niega en dos casos: si es la última página del dueño, o si es la principal
+ * (`isDefault`) y hay otras. Lo segundo no es un capricho: `getDefaultProfile(adminId)` en
+ * `src/app/page.tsx` da por hecho que el admin del despliegue siempre tiene una principal, y
+ * nada repromueve otra si esta se borra — dejarlo pasar serviría la pantalla de primer
+ * arranque en la raíz de un dominio personal ya en producción. El mensaje dice cómo salir:
+ * hacer principal a otra página primero (`makeDefault`, en «Perfiles»). El panel ya no
+ * ofrece el botón en ninguno de los dos casos (ver el editor), pero el servidor es quien
+ * tiene que garantizarlo de verdad.
+ *
+ * Contar las páginas del dueño y decidir si esta es de las dos que no se pueden borrar
+ * corre en la misma transacción que el borrado: sueltas, dos borrados a la vez podrían leer
+ * ambos «tengo dos» antes de que el otro termine, y dejar al dueño en cero.
  *
  * Antes no devolvía nada (siempre redirigía); ahora devuelve `{ error }` en el caso que
  * bloquea, así que quien llama necesita leer el resultado en vez de solo disparar la
@@ -186,12 +194,23 @@ export async function deleteProfile(profileId: string): Promise<{ error?: string
   const { id: ownerId } = await requireUser()
   const db = getDb()
 
-  const propios = await db.select({ id: profiles.id }).from(profiles).where(eq(profiles.ownerId, ownerId))
-  if (propios.length <= 1) {
-    return { error: 'No puedes borrar tu única página: todo usuario necesita al menos una.' }
-  }
+  const bloqueo = await db.transaction(async (tx) => {
+    const propios = await tx
+      .select({ id: profiles.id, isDefault: profiles.isDefault })
+      .from(profiles)
+      .where(eq(profiles.ownerId, ownerId))
+    if (propios.length <= 1) {
+      return 'No puedes borrar tu única página: todo usuario necesita al menos una.'
+    }
+    if (propios.find((p) => p.id === profileId)?.isDefault) {
+      return 'No puedes borrar tu página principal: primero haz principal a otra página, desde «Perfiles».'
+    }
 
-  await db.delete(profiles).where(and(eq(profiles.id, profileId), eq(profiles.ownerId, ownerId)))
+    await tx.delete(profiles).where(and(eq(profiles.id, profileId), eq(profiles.ownerId, ownerId)))
+    return null
+  })
+  if (bloqueo) return { error: bloqueo }
+
   revalidatePath('/admin/profiles')
   redirect('/admin/profiles')
 }

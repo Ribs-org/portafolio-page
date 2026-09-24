@@ -395,7 +395,10 @@ export function ProfileEditor({ profile, initialLinks, origin, enRaiz, soloPerfi
                 <RefreshCw className="h-4 w-4" aria-hidden /> Cambiar la URL secreta
               </Button>
             ) : null}
-            {!soloPerfil ? (
+            {/* `deleteProfile` se niega en los dos mismos casos: que sea la única página, o
+                que sea la principal habiendo otras. La interfaz no debe ofrecer un botón
+                que solo lleva a ese error. */}
+            {!soloPerfil && !profile.isDefault ? (
               <Button
                 type="button"
                 variant="danger"
@@ -411,7 +414,9 @@ export function ProfileEditor({ profile, initialLinks, origin, enRaiz, soloPerfi
               </Button>
             ) : (
               <p className="text-sm text-fg-muted">
-                No puedes borrar tu única página: todo usuario necesita al menos una.
+                {soloPerfil
+                  ? 'No puedes borrar tu única página: todo usuario necesita al menos una.'
+                  : 'No puedes borrar tu página principal: primero haz principal a otra página, desde «Perfiles».'}
               </p>
             )}
           </div>

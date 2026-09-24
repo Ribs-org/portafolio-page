@@ -43,12 +43,16 @@ vi.mock('@/lib/auth', () => ({
 /**
  * Doble mínimo de `getDb()`, en el mismo espíritu que `usuarios.test.ts`: solo cubre lo que
  * `updateProfile` y `deleteProfile` de verdad usan (`update().set().where()`,
- * `select().from().where()` y `delete().where()`), con estado mutable que cada test llena.
+ * `select().from().where()`, `delete().where()` y, ahora, `transaction()`), con estado
+ * mutable que cada test llena.
  */
 const db = vi.hoisted(() => ({
   updateCalls: [] as unknown[],
   deleteCalls: [] as unknown[],
-  perfilesDelDueno: [{ id: 'profile-1' }, { id: 'profile-2' }] as { id: string }[],
+  perfilesDelDueno: [
+    { id: 'profile-1', isDefault: false },
+    { id: 'profile-2', isDefault: false },
+  ] as { id: string; isDefault: boolean }[],
   // Lo que el `.where()` del UPDATE debe lanzar, si algo: así un test puede simular el
   // choque de unicidad (o cualquier otro fallo) sin que el resto tenga que configurarlo.
   updateError: null as unknown,
@@ -56,6 +60,12 @@ const db = vi.hoisted(() => ({
 
 vi.mock('@/db', async (importOriginal) => {
   const real = await importOriginal<typeof import('@/db')>()
+  const select = () => ({ from: () => ({ where: async () => db.perfilesDelDueno }) })
+  const del = () => ({
+    where: async () => {
+      db.deleteCalls.push(true)
+    },
+  })
   return {
     ...real,
     getDb: () => ({
@@ -67,12 +77,13 @@ vi.mock('@/db', async (importOriginal) => {
           },
         }),
       }),
-      select: () => ({ from: () => ({ where: async () => db.perfilesDelDueno }) }),
-      delete: () => ({
-        where: async () => {
-          db.deleteCalls.push(true)
-        },
-      }),
+      select,
+      delete: del,
+      // Sin rollback real, igual que el doble de `usuarios.test.ts`: solo corre el
+      // callback con un `tx` que comparte el mismo estado mutable que fuera de la
+      // transacción, así los tests pueden comprobar count-y-borra como una sola unidad.
+      transaction: async (fn: (tx: { select: typeof select; delete: typeof del }) => Promise<unknown>) =>
+        fn({ select, delete: del }),
     }),
   }
 })
@@ -85,7 +96,10 @@ const { updateProfile, deleteProfile } = await import('./actions')
 beforeEach(() => {
   db.updateCalls.length = 0
   db.deleteCalls.length = 0
-  db.perfilesDelDueno = [{ id: 'profile-1' }, { id: 'profile-2' }]
+  db.perfilesDelDueno = [
+    { id: 'profile-1', isDefault: false },
+    { id: 'profile-2', isDefault: false },
+  ]
   db.updateError = null
 })
 
@@ -198,7 +212,7 @@ describe('updateProfile: mensaje claro cuando la URL ya está en uso', () => {
 
 describe('deleteProfile: no deja borrar la última página de un usuario', () => {
   it('se niega si el dueño solo tiene un perfil, y no borra nada', async () => {
-    db.perfilesDelDueno = [{ id: 'profile-1' }]
+    db.perfilesDelDueno = [{ id: 'profile-1', isDefault: true }]
 
     const result = await deleteProfile('profile-1')
 
@@ -206,8 +220,39 @@ describe('deleteProfile: no deja borrar la última página de un usuario', () =>
     expect(db.deleteCalls).toHaveLength(0)
   })
 
-  it('borra y redirige si el dueño tiene más de un perfil', async () => {
-    db.perfilesDelDueno = [{ id: 'profile-1' }, { id: 'profile-2' }]
+  it('borra y redirige si el dueño tiene más de un perfil y el que se borra no es el principal', async () => {
+    db.perfilesDelDueno = [
+      { id: 'profile-1', isDefault: false },
+      { id: 'profile-2', isDefault: true },
+    ]
+
+    await expect(deleteProfile('profile-1')).rejects.toThrow(RedirectSignal)
+
+    expect(db.deleteCalls).toHaveLength(1)
+  })
+})
+
+describe('deleteProfile: no deja borrar la página principal mientras haya otras', () => {
+  it('se niega si el perfil a borrar es el principal, y no borra nada', async () => {
+    db.perfilesDelDueno = [
+      { id: 'profile-1', isDefault: true },
+      { id: 'profile-2', isDefault: false },
+    ]
+
+    const result = await deleteProfile('profile-1')
+
+    expect(result.error).toBeTruthy()
+    expect(result.error).toMatch(/principal/i)
+    // Dice cómo salir: hacer principal a otra página primero.
+    expect(result.error).toMatch(/otra/i)
+    expect(db.deleteCalls).toHaveLength(0)
+  })
+
+  it('borra sin problema el perfil que sí es el principal, si primero se le quitó ese estado', async () => {
+    db.perfilesDelDueno = [
+      { id: 'profile-1', isDefault: false },
+      { id: 'profile-2', isDefault: true },
+    ]
 
     await expect(deleteProfile('profile-1')).rejects.toThrow(RedirectSignal)
 
