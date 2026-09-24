@@ -78,8 +78,8 @@ estado a nivel de base. El ensayo dejó de ser opcional.
 - [x] **Reconectar** y comprobar que la pantalla muestra los cuatro permisos. Hecho el 2026-09-23: la pantalla dijo «Tu Parrilla (Sandbox)» y pidió los cuatro, que además confirma que el despliegue tiene las credenciales del sandbox.
 - [x] **Sincronizar** y ver los videos con contadores en Contenido. Hecho el 2026-09-23.
 - [x] **Un video directo «Solo yo»** y un **carrusel de tres fotos**: hechos el 2026-09-23, con un archivo de 8,5 MB a propósito, para probar que la subida ya no cruza la función.
-- [ ] **Un borrador** (`video.upload`), que es lo único de la publicación que sigue sin probarse.
-- [ ] **Desconectar** y ver que la tarjeta desaparece.
+- [x] **Un borrador** (`video.upload`): probado el 2026-09-24. Con eso los cuatro scopes quedaron ejercitados contra Supabase, incluida la escritura al publicar.
+- [x] **Desconectar** y ver que la tarjeta desaparece.
 - [ ] Borrar los posts de prueba de la parrilla.
 
 ### Justo antes de rodar
@@ -167,6 +167,63 @@ ajustes de TikTok y revoca la app desde ahí también.
 *[Disconnecting deletes the stored tokens. The creator can also revoke access from TikTok.]*
 
 **9. Cierre** en `/privacidad`, enseñando qué se guarda y cómo se borra.
+
+## Cómo grabar
+
+La toma del 2026-09-23 se hizo con Google Meet y eso costó casi medio minuto de video en
+la interfaz de la reunión —la cámara, «You are presenting», el link, el correo del dueño—
+y dejó la pantalla ocupando media imagen a 720p. El formulario de TikTok pide
+explícitamente que la interfaz se vea con claridad.
+
+**Grabar solo la ventana del navegador, a pantalla completa, en 1080p.** Con la barra de
+juegos de Windows alcanza:
+
+1. Poner el navegador en primer plano, maximizado, con las pestañas que hacen falta y
+   ninguna más.
+2. `Win + G` para abrir la barra, y empezar a grabar con `Win + Alt + R`.
+3. Grabar **la ventana**, no la pantalla entera: así no entran la barra de tareas ni una
+   notificación que aparezca.
+4. Cámara apagada. El revisor mira el producto, no a quien lo muestra.
+5. `Win + Alt + R` otra vez para terminar. El archivo queda en `Vídeos\Capturas`.
+
+Empezar a grabar **después** de tener todo listo, y terminar **antes** de cerrar nada: los
+segundos de armado y de cierre no muestran el producto y son los primeros que el revisor
+ve.
+
+## Los subtítulos
+
+El panel está en español y el revisor lee inglés: sin subtítulos no puede seguir lo que
+pasa en pantalla. No son una transcripción de lo que se dice, sino el rótulo de lo que se
+está demostrando, uno o dos por escena.
+
+Cada línea va sola o en dos renglones, corta para que se lea mientras pasa la acción. En
+orden, con la escena a la que pertenece:
+
+| # | Escena | Línea |
+|---|---|---|
+| 1 | 1 | Same icon on the site and in Basic Info. |
+| 2 | 1 | This demo runs in the sandbox app. |
+| 3 | 2 | No public signup: an admin invites an email address. |
+| 4 | 2 | The creator signs in with a six-digit code. |
+| 5 | 2 | Each creator only ever sees their own data. |
+| 6 | 3 | Login Kit asks for all four scopes at once. |
+| 7 | 3 | user.info.basic: we keep open_id and display_name to label the account. |
+| 8 | 3 | Tokens are encrypted at rest. |
+| 9 | 4 | video.list is read-only, over the creator's own videos. |
+| 10 | 5 | Content Posting API, direct post. |
+| 11 | 5 | We call creator_info first. |
+| 12 | 5 | The privacy level is chosen by the creator, never defaulted. |
+| 13 | 5 | Scheduling is blocked until they choose one. |
+| 14 | 5 | Media is pulled from our verified domain. |
+| 15 | 5 | We poll the publish status until it completes. |
+| 16 | 6 | The same form posts a photo carousel. |
+| 17 | 7 | video.upload sends the media to the creator's inbox as a draft. |
+| 18 | 8 | Disconnecting deletes the stored tokens. |
+| 19 | 8 | The creator can also revoke access from TikTok. |
+| 20 | 9 | What we store, and how it is deleted. |
+
+Se quemarán en el video con `ffmpeg` cuando la toma esté lista: los tiempos salen de dónde
+empieza cada escena, que se sacan del archivo grabado y no se adivinan.
 
 ## Errores que ya costaron un rechazo
 
