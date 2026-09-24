@@ -190,6 +190,18 @@ Empezar a grabar **después** de tener todo listo, y terminar **antes** de cerra
 segundos de armado y de cierre no muestran el producto y son los primeros que el revisor
 ve.
 
+**Sin narración.** Los subtítulos se bastan solos, así que el video va en silencio y con el
+micrófono apagado: en la barra de juegos, `Win + Alt + M` lo silencia, y conviene
+confirmarlo antes de empezar porque graba con él encendido por defecto.
+
+La decisión no es de comodidad. El resumen automático de la toma del 2026-09-23 decía «the
+archive permission enables automated posting every 3 to 5 minutes»: no existe ningún
+«archive permission», y esos cinco minutos son el pinger propio y no un permiso de TikTok.
+Da igual si se dijo mal o si la transcripción lo deformó —**un revisor que escucha una cosa
+y lee otra encuentra una contradicción donde no la hay**, y este proyecto ya fue rechazado
+una vez por contradicciones. En silencio, lo único que el revisor puede juzgar es lo que
+pasa en pantalla, que es lo que de verdad importa.
+
 ## Los subtítulos
 
 El panel está en español y el revisor lee inglés: sin subtítulos no puede seguir lo que
