@@ -59,3 +59,25 @@ export function direccionBase(correo: string): string {
 export function candidato(base: string, intento: number): string {
   return intento <= 1 ? base : `${base}-${intento}`
 }
+
+/**
+ * La primera dirección de la serie que quede.
+ *
+ * `intentar` es el efecto —en producción, insertar la fila— y devuelve si quedó. Está
+ * inyectado a propósito: la única garantía real de unicidad es la restricción de la base,
+ * porque dos invitaciones simultáneas pueden elegir el mismo número y solo una gana. Con
+ * el efecto afuera, toda esta lógica se prueba sin base, que es lo que hace falta para que
+ * corra en CI.
+ */
+export async function primeraDireccionLibre(
+  base: string,
+  intentar: (slug: string) => Promise<boolean>,
+  tope = 20,
+): Promise<string> {
+  for (let intento = 1; intento <= tope; intento++) {
+    const slug = candidato(base, intento)
+    if (esReservado(slug)) continue
+    if (await intentar(slug)) return slug
+  }
+  throw new Error(`No se pudo elegir una dirección para «${base}» en ${tope} intentos.`)
+}

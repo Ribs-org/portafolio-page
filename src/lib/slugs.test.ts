@@ -1,6 +1,6 @@
 import { readdirSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
-import { candidato, direccionBase, esReservado } from './slugs'
+import { candidato, direccionBase, esReservado, primeraDireccionLibre } from './slugs'
 
 describe('direccionBase', () => {
   it('toma lo que va antes de la arroba', () => {
@@ -93,5 +93,52 @@ describe('la lista cubre las rutas reales', () => {
 
   it.each([...deApp, ...deGrupos, ...dePublic])('«%s» está reservada', (ruta) => {
     expect(esReservado(ruta)).toBe(true)
+  })
+})
+
+describe('primeraDireccionLibre', () => {
+  it('si la base está libre, esa es', async () => {
+    const intentados: string[] = []
+    const dir = await primeraDireccionLibre('juanito', async (s) => {
+      intentados.push(s)
+      return true
+    })
+    expect(dir).toBe('juanito')
+    expect(intentados).toEqual(['juanito'])
+  })
+
+  it('numera hasta encontrar una que quede', async () => {
+    const tomadas = new Set(['juanito', 'juanito-2'])
+    const dir = await primeraDireccionLibre('juanito', async (s) => !tomadas.has(s))
+    expect(dir).toBe('juanito-3')
+  })
+
+  it('se saltea las reservadas sin siquiera intentarlas', async () => {
+    const intentados: string[] = []
+    const dir = await primeraDireccionLibre('admin', async (s) => {
+      intentados.push(s)
+      return true
+    })
+    // «admin» está reservada: no se intenta contra la base, se pasa directo al desempate.
+    expect(intentados).toEqual(['admin-2'])
+    expect(dir).toBe('admin-2')
+  })
+
+  it('se rinde con un error claro en vez de intentar para siempre', async () => {
+    await expect(primeraDireccionLibre('juanito', async () => false, 3)).rejects.toThrow(
+      /no se pudo elegir una dirección/i,
+    )
+  })
+
+  // Si `intentar` falla porque la base se cayó, eso no es lo mismo que «la dirección está
+  // ocupada»: hay que enterarse. Este test deja clavado que el error se propaga tal cual, y
+  // no se confunde con el «no se pudo elegir una dirección» del agotamiento del tope.
+  it('si «intentar» falla, el error se propaga tal cual, no como agotamiento del tope', async () => {
+    const errorDeConexion = new Error('la base no responde')
+    await expect(
+      primeraDireccionLibre('juanito', async () => {
+        throw errorDeConexion
+      }),
+    ).rejects.toBe(errorDeConexion)
   })
 })
