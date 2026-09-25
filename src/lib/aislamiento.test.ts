@@ -108,7 +108,7 @@ const { getRecentVisits } = await import('./analytics')
 const { getCuentas, cargaPorDia, getPostRows } = await import('./posts')
 const { getAllProfiles, getProfileBySlug } = await import('./profiles')
 const { getCola } = await import('./comentarios-cola')
-const { cuentasPrimarias } = await import('./social/cuentas')
+const { cuentasPrimarias, verificarCuentas, cuentaUnicaPorRed } = await import('./social/cuentas')
 const { leerAjuste } = await import('./ajustes')
 const { makeDefault, updateProfile, deleteScheduledPost } = await import('@/app/admin/actions')
 
@@ -270,6 +270,18 @@ describe('aislamiento por dueño (SQL generado, sin base)', () => {
     const consultas = await todasLasConsultas(() => cuentasPrimarias(DUENO, ['instagram']))
     expect(consultas).toHaveLength(1)
     for (const c of consultas) esperarFiltradoPorDueno(c)
+  })
+
+  it('social/cuentas: verificarCuentas ata la consulta al dueño', async () => {
+    const consultas = await todasLasConsultas(() => verificarCuentas(DUENO, ['cuenta-1']))
+    expect(consultas).toHaveLength(1)
+    esperarFiltradoPorDueno(consultas[0]!)
+  })
+
+  it('social/cuentas: cuentaUnicaPorRed ata la consulta al dueño', async () => {
+    const consultas = await todasLasConsultas(() => cuentaUnicaPorRed(DUENO, ['instagram']))
+    expect(consultas).toHaveLength(1)
+    esperarFiltradoPorDueno(consultas[0]!)
   })
 
   it('ajustes: leerAjuste filtra por dueño', async () => {
