@@ -55,15 +55,18 @@ describe('armarProgramados', () => {
   const filas = [
     {
       post,
-      target: { network: 'instagram', status: 'published', lastError: null, externalId: '18', attemptCount: 1 },
+      target: { network: 'instagram', status: 'published', lastError: null, externalId: '18', attemptCount: 1, accountId: 'acc-ig' },
+      handle: '@vicente',
     },
     {
       post,
-      target: { network: 'x', status: 'failed', lastError: 'X aún no recibe video desde el calendario.', externalId: null, attemptCount: 3 },
+      target: { network: 'x', status: 'failed', lastError: 'X aún no recibe video desde el calendario.', externalId: null, attemptCount: 3, accountId: 'acc-x' },
+      handle: null,
     },
     {
       post: { id: 'p2', caption: '', scheduledAt: new Date('2026-06-22T12:00:00Z'), coverUrl: null, atributos: null },
-      target: { network: 'threads', status: 'scheduled', lastError: null, externalId: null, attemptCount: 0 },
+      target: { network: 'threads', status: 'scheduled', lastError: null, externalId: null, attemptCount: 0, accountId: 'acc-th' },
+      handle: '@vicentethreads',
     },
   ]
   const medias = [
@@ -85,8 +88,8 @@ describe('armarProgramados', () => {
       ],
       atributos: { hook: 'pregunta' },
       redes: [
-        { red: 'instagram', estado: 'published', error: null, externalId: '18', intentos: 1 },
-        { red: 'x', estado: 'failed', error: 'X aún no recibe video desde el calendario.', externalId: null, intentos: 3 },
+        { red: 'instagram', estado: 'published', error: null, externalId: '18', intentos: 1, cuentaId: 'acc-ig', handle: '@vicente' },
+        { red: 'x', estado: 'failed', error: 'X aún no recibe video desde el calendario.', externalId: null, intentos: 3, cuentaId: 'acc-x', handle: null },
       ],
     })
   })

@@ -43,7 +43,13 @@ export type FilaProgramada = {
     lastError: string | null
     externalId: string | null
     attemptCount: number
+    accountId: string
   }
+  // De un `leftJoin` con `socialAccounts`: null si la cuenta ya no existe. El
+  // identificador (`target.accountId`) sí sigue firme — es a la fila de destino a la
+  // que pertenece, no a la cuenta — así que un destino huérfano no pierde su id, solo
+  // su handle.
+  handle: string | null
 }
 
 export type MediaProgramada = {
@@ -66,6 +72,10 @@ export type PostProgramadoApi = {
     error: string | null
     externalId: string | null
     intentos: number
+    // La superficie para descubrir identificadores de cuenta: `POST /api/schedule/batch`
+    // los pide en `cuentas`, y este es el único lugar público donde se pueden leer.
+    cuentaId: string
+    handle: string | null
   }>
 }
 
@@ -87,7 +97,7 @@ export function armarProgramados(
   }
 
   const posts = new Map<string, PostProgramadoApi>()
-  for (const { post, target } of filas) {
+  for (const { post, target, handle } of filas) {
     const entrada = posts.get(post.id) ?? {
       id: post.id,
       texto: post.caption,
@@ -105,6 +115,8 @@ export function armarProgramados(
       error: target.lastError,
       externalId: target.externalId,
       intentos: target.attemptCount,
+      cuentaId: target.accountId,
+      handle,
     })
     posts.set(post.id, entrada)
   }

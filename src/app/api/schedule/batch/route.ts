@@ -31,6 +31,7 @@ export async function POST(request: Request) {
       return {
         fecha: typeof p.fecha === 'string' ? p.fecha : '',
         texto: typeof p.texto === 'string' ? p.texto : '',
+        cuentas: Array.isArray(p.cuentas) ? p.cuentas.map(String) : [],
         redes: Array.isArray(p.redes) ? p.redes.map(String) : [],
         media: Array.isArray(p.media) ? p.media.map(String) : [],
         portada: typeof p.portada === 'string' ? p.portada : '',

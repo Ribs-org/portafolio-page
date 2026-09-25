@@ -646,7 +646,12 @@ viaja aparte — pero es público: si prefieres que no lo sea, muévelo fuera de
 
 `POST /api/schedule/batch` con header `Authorization: Bearer <SCHEDULE_API_KEY>` y
 cuerpo `{ "posts": [{ "fecha": "2026-09-03 10:00", "texto": "Hola", "redes": ["x"], "media": [] }] }`
-(máximo 50). Responde el resultado por item; las filas rechazadas traen su motivo.
+(máximo 50). Cada item elige su destino de dos formas: `cuentas` (identificadores de
+cuenta) o `redes` (nombres de red). Si la fila trae `cuentas`, esas mandan y `redes` se
+ignora. Nombrar solo `redes` sigue funcionando, pero cada nombre se resuelve a una
+cuenta solo cuando el dueño tiene **exactamente una** conectada de esa red — con dos, la
+fila se rechaza nombrando las candidatas y sus handles; no hay adivinanza posible.
+Responde el resultado por item; las filas rechazadas traen su motivo.
 Si la función alcanza su tiempo máximo a mitad de un lote, la respuesta se pierde pero las filas ya procesadas quedan programadas — re-enviar el lote vuelve a programar las que habían entrado (no hay deduplicación), así que conviene reintentar solo las filas pendientes.
 
 Cada item acepta además `atributos`: un objeto plano de valores simples
@@ -656,9 +661,12 @@ taxonomía de quien crea el contenido: sirve para correlacionar decisiones creat
 con resultados. El CSV no lo lleva; el editor de un post programado lo muestra y
 permite corregirlo.
 
-Y `opciones`, obligatorio cuando la fila va a TikTok: el modo (directo o borrador), la
-privacidad y las casillas que TikTok exige elegir por publicación. El detalle está en
-`public/docs/api-editor.md`.
+Y `opciones`, obligatorio cuando algún destino de la fila es una cuenta de TikTok: el
+modo (directo o borrador), la privacidad y las casillas que TikTok exige elegir por
+publicación. Se llavea por destino: cada clave se busca primero entre los
+identificadores de cuenta de la fila, y si no coincide con ninguno se acepta como
+nombre de red — resuelta solo si la fila tiene una única cuenta de esa red, igual que
+`redes`. El detalle está en `public/docs/api-editor.md`.
 
 ### Métricas por API
 
@@ -685,8 +693,10 @@ números recién al día siguiente.
 y `hasta` (`YYYY-MM-DD` en la zona del sitio, ambos inclusive; por defecto de hoy a 30
 días). Devuelve `{ desde, hasta, posts }` con lo programado cuya **hora de salida** cae
 en la ventana, salido o no: texto, `fecha` (ISO con offset), portada, media en orden,
-`atributos`, y por cada red su estado (`scheduled`, `publishing`, `published`,
-`failed`), el `externalId` si ya salió, los intentos y la frase de error si falló.
+`atributos`, y por cada destino su estado (`scheduled`, `publishing`, `published`,
+`failed`), el `externalId` si ya salió, los intentos, la frase de error si falló, y
+`cuentaId`/`handle` de la cuenta — es la única forma pública de conseguir un
+identificador de cuenta, para usarlo después en el `cuentas` de la carga masiva.
 
 ## Estructura
 
