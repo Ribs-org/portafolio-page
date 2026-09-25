@@ -6,8 +6,10 @@ import { ArrowLeft, ExternalLink } from 'lucide-react'
 import { getDb, profiles } from '@/db'
 import { SITE_TIMEZONE } from '@/lib/analytics'
 import { requireUser } from '@/lib/auth'
-import { getAllLinks } from '@/lib/profiles'
-import { toZonedInput } from '@/lib/utils'
+import { dominioProducto, esDominioDelProducto } from '@/lib/dominios'
+import { getAllLinks, getAllProfiles } from '@/lib/profiles'
+import { adminId } from '@/lib/usuarios'
+import { enlacePublicoDe, toZonedInput, urlPublicaDe } from '@/lib/utils'
 import { ProfileEditor } from './editor'
 import type { DraftLink } from './link-row'
 
@@ -24,6 +26,28 @@ export default async function EditProfilePage({ params }: { params: Promise<{ id
     .limit(1)
   if (!profile) notFound()
 
+  const requestHeaders = await headers()
+  const host = requestHeaders.get('host') ?? 'localhost:3000'
+  const protocol = host.startsWith('localhost') ? 'http' : 'https'
+  const origin = `${protocol}://${host}`
+
+  const admin = await adminId()
+  // «Ver página» no siempre puede usar la ruta cruda: este host puede no servirla (la
+  // principal de un invitado en un dominio que no es el del producto) o servirla en otra
+  // parte (cualquier página en el dominio del producto, donde la raíz es la landing). Ver
+  // el comentario de `enlacePublicoDe`.
+  const dominio = { enElProducto: esDominioDelProducto(host), dominioProducto: dominioProducto() }
+  const hrefVerPagina = enlacePublicoDe(profile, admin, dominio)
+  // Lo que el editor muestra y copia en «Compartir» tiene que ser la misma dirección: se
+  // calcula acá con la misma función (`urlPublicaDe`, que envuelve `enlacePublicoDe`) y se
+  // le pasa ya resuelta. Como componente de cliente no tiene por qué conocer el id del
+  // admin ni el dominio del producto para llegar a lo mismo por su cuenta.
+  const publicUrl = urlPublicaDe(profile, admin, dominio, origin)
+
+  // Si es la única página del dueño, el editor no ofrece el botón de borrar: el servidor
+  // (`deleteProfile`) también se niega, pero la interfaz no debe llevar a ese error.
+  const soloPerfil = (await getAllProfiles(ownerId)).length <= 1
+
   const rows = await getAllLinks(ownerId, profile.id)
   const initialLinks: DraftLink[] = rows.map((link) => ({
     id: link.id,
@@ -37,11 +61,6 @@ export default async function EditProfilePage({ params }: { params: Promise<{ id
     startsAt: toZonedInput(link.startsAt, SITE_TIMEZONE),
     endsAt: toZonedInput(link.endsAt, SITE_TIMEZONE),
   }))
-
-  const requestHeaders = await headers()
-  const host = requestHeaders.get('host') ?? 'localhost:3000'
-  const protocol = host.startsWith('localhost') ? 'http' : 'https'
-  const origin = `${protocol}://${host}`
 
   return (
     <>
@@ -57,7 +76,7 @@ export default async function EditProfilePage({ params }: { params: Promise<{ id
           {profile.displayName}
         </h1>
         <a
-          href={profile.isDefault ? '/' : `/${profile.slug}`}
+          href={hrefVerPagina}
           target="_blank"
           rel="noopener noreferrer"
           className="ml-auto inline-flex items-center gap-1.5 rounded-xl border border-white/10 px-3 py-1.5 text-xs text-fg-muted transition-colors hover:text-fg"
@@ -66,7 +85,13 @@ export default async function EditProfilePage({ params }: { params: Promise<{ id
         </a>
       </header>
 
-      <ProfileEditor profile={profile} initialLinks={initialLinks} origin={origin} />
+      <ProfileEditor
+        profile={profile}
+        initialLinks={initialLinks}
+        origin={origin}
+        publicUrl={publicUrl}
+        soloPerfil={soloPerfil}
+      />
     </>
   )
 }

@@ -40,9 +40,17 @@ type Props = {
   profile: Profile
   initialLinks: DraftLink[]
   origin: string
+  /** La URL pública completa de este perfil — la misma a la que lleva «Ver página» en esta
+   *  misma pantalla. La calcula el servidor con `urlPublicaDe` (que envuelve
+   *  `enlacePublicoDe`), porque necesita el id del admin y el dominio del producto, ninguno
+   *  de los cuales tiene por qué conocer este componente de cliente. */
+  publicUrl: string
+  /** Si esta es la única página del dueño. `deleteProfile` se niega a borrarla igual, pero
+   *  la interfaz no debe ofrecer un botón que solo lleva a ese error. */
+  soloPerfil: boolean
 }
 
-export function ProfileEditor({ profile, initialLinks, origin }: Props) {
+export function ProfileEditor({ profile, initialLinks, origin, publicUrl, soloPerfil }: Props) {
   const router = useRouter()
   const [links, setLinks] = useState(initialLinks)
   const [draft, setDraft] = useState({
@@ -58,6 +66,7 @@ export function ProfileEditor({ profile, initialLinks, origin }: Props) {
   })
   const [showPreview, setShowPreview] = useState(false)
   const [copied, setCopied] = useState(false)
+  const [deleteError, setDeleteError] = useState<string | null>(null)
   const [pending, startTransition] = useTransition()
 
   // Re-sync after a server action adds or removes a row. Comparing the id list
@@ -88,8 +97,11 @@ export function ProfileEditor({ profile, initialLinks, origin }: Props) {
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   )
 
-  const publicPath = profile.isDefault ? '/' : `/${draft.slug}`
-  const publicUrl = `${origin}${publicPath}`
+  // Si `publicUrl` —la misma dirección a la que lleva «Ver página»— es la raíz de este
+  // origen, este perfil se sirve de verdad en `/` de este host. No se puede leer eso de
+  // `profile.isDefault` a secas: en el dominio del producto la principal del admin también
+  // es `isDefault` y sin embargo vive en `/<slug>`, no en `/` (ver `urlPublicaDe`).
+  const enRaiz = publicUrl === `${origin}/`
 
   const previewLinks = useMemo(
     () =>
@@ -184,7 +196,13 @@ export function ProfileEditor({ profile, initialLinks, origin }: Props) {
 
             <Field
               label="URL"
-              hint={profile.isDefault ? 'Este perfil se sirve en la raíz del sitio.' : undefined}
+              hint={
+                enRaiz
+                  ? 'Este perfil se sirve en la raíz del sitio.'
+                  : profile.isDefault
+                    ? 'Esta es tu página principal, por eso su dirección no se edita aquí. Para cambiarla, haz principal a otra página primero.'
+                    : undefined
+              }
             >
               <div className="flex items-center gap-2">
                 <span className="font-mono text-sm text-fg-faint">/</span>
@@ -377,20 +395,36 @@ export function ProfileEditor({ profile, initialLinks, origin }: Props) {
                 <RefreshCw className="h-4 w-4" aria-hidden /> Cambiar la URL secreta
               </Button>
             ) : null}
-            <Button
-              type="button"
-              variant="danger"
-              onClick={() => {
-                if (!confirm(`Se borra "${profile.displayName}" con sus links y métricas. ¿Seguir?`))
-                  return
-                startTransition(() => {
-                  void deleteProfile(profile.id)
-                })
-              }}
-            >
-              <Trash2 className="h-4 w-4" aria-hidden /> Borrar perfil
-            </Button>
+            {/* `deleteProfile` se niega en los dos mismos casos: que sea la única página, o
+                que sea la principal habiendo otras. La interfaz no debe ofrecer un botón
+                que solo lleva a ese error. */}
+            {!soloPerfil && !profile.isDefault ? (
+              <Button
+                type="button"
+                variant="danger"
+                onClick={() => {
+                  if (!confirm(`Se borra "${profile.displayName}" con sus links y métricas. ¿Seguir?`))
+                    return
+                  startTransition(() => {
+                    void deleteProfile(profile.id).then((result) => setDeleteError(result?.error ?? null))
+                  })
+                }}
+              >
+                <Trash2 className="h-4 w-4" aria-hidden /> Borrar perfil
+              </Button>
+            ) : (
+              <p className="text-sm text-fg-muted">
+                {soloPerfil
+                  ? 'No puedes borrar tu única página: todo usuario necesita al menos una.'
+                  : 'No puedes borrar tu página principal: primero haz principal a otra página, desde «Perfiles».'}
+              </p>
+            )}
           </div>
+          {deleteError ? (
+            <p role="alert" className="mt-2 text-sm text-negative">
+              {deleteError}
+            </p>
+          ) : null}
         </Panel>
       </div>
 

@@ -1,14 +1,25 @@
+import { headers } from 'next/headers'
 import Link from 'next/link'
 import { ExternalLink, Plus, Star } from 'lucide-react'
 import { Submit } from '@/components/ui'
 import { requireUser } from '@/lib/auth'
+import { dominioProducto, esDominioDelProducto } from '@/lib/dominios'
 import { getAllLinks, getAllProfiles } from '@/lib/profiles'
+import { adminId } from '@/lib/usuarios'
+import { enlacePublicoDe, rutaMostradaDe } from '@/lib/utils'
 import { createProfile, makeDefault } from '../../actions'
 
 export const dynamic = 'force-dynamic'
 
 export default async function ProfilesPage() {
   const { id: ownerId } = await requireUser()
+  // Solo el principal del admin del despliegue vive en `/`; el de cualquier otro usuario
+  // vive en su propia dirección. Ver el comentario de `rutaPublicaDe`.
+  const admin = await adminId()
+  const host = (await headers()).get('host')
+  // Para que «abrir» enlace a un host que de verdad sirva la página. Ver el comentario de
+  // `enlacePublicoDe`.
+  const dominio = { enElProducto: esDominioDelProducto(host), dominioProducto: dominioProducto() }
   const profiles = await getAllProfiles(ownerId)
   const counts = await Promise.all(
     profiles.map(async (profile) => (await getAllLinks(ownerId, profile.id)).length),
@@ -57,7 +68,7 @@ export default async function ProfilesPage() {
                   ) : null}
                 </div>
                 <p className="mt-1 truncate font-mono text-[0.72rem] text-fg-faint">
-                  /{profile.isDefault ? '' : profile.slug}
+                  {rutaMostradaDe(profile, admin, dominio)}
                 </p>
                 <p className="mt-2 text-[0.78rem] text-fg-muted">
                   {counts[i]} link{counts[i] === 1 ? '' : 's'}
@@ -74,7 +85,7 @@ export default async function ProfilesPage() {
                 Editar
               </Link>
               <a
-                href={profile.isDefault ? '/' : `/${profile.slug}`}
+                href={enlacePublicoDe(profile, admin, dominio)}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="inline-flex items-center gap-1 rounded-xl border border-white/10 px-3 py-1.5 text-xs text-fg-muted transition-colors hover:text-fg"

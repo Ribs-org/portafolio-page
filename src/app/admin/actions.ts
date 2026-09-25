@@ -36,7 +36,8 @@ import { TIKTOK_SIN_CUENTA, consultarCreador, type CreadorTikTok } from '@/lib/s
 import { COOKIE_PENDIENTE, LOGIN_VENCIDO, elegidas, leerPendiente } from '@/lib/social/pendiente'
 import { networkLabel } from '@/lib/networks'
 import { ARCHIVO_AJENO, ARCHIVO_FALTANTE, CUERPO_ILEGIBLE, parseMediaMovil, type MediaMovil } from '@/lib/mobile-api'
-import { cerrarSesiones, invitar, pedir, quitar } from '@/lib/usuarios'
+import { esReservado } from '@/lib/slugs'
+import { cerrarSesiones, esChoqueDeUnicidad, invitar, pedir, quitar } from '@/lib/usuarios'
 import { fromZonedInput, normalizeUrl, slugify } from '@/lib/utils'
 
 export type FormState = { error?: string; ok?: boolean; aviso?: string }
@@ -50,11 +51,23 @@ export async function logout() {
 
 function readProfileForm(formData: FormData) {
   const displayName = String(formData.get('displayName') ?? '').trim()
-  const rawSlug = String(formData.get('slug') ?? '').trim()
+  const rawSlugField = formData.get('slug')
+  // Un input deshabilitado (la URL del principal de un invitado, en el editor) no viaja en
+  // el FormData: `formData.get('slug')` da `null`, y eso dice «no toques el slug», algo
+  // distinto de una cadena vacía —que sí es una instrucción real de quien puede editarlo—.
+  // Confundir los dos era el bug: guardar el formulario de la página principal de un
+  // invitado, sin tocar la URL, le cambiaba la dirección en silencio.
+  const rawSlug = rawSlugField === null ? null : String(rawSlugField).trim()
 
   return {
     displayName,
-    slug: slugify(rawSlug) || slugify(displayName) || `perfil-${randomUUID().slice(0, 6)}`,
+    // `undefined` = no reescribir el slug que ya tiene el perfil. Solo pasa cuando el
+    // campo no vino; si vino (aunque sea vacío), se resuelve con el mismo respaldo de
+    // siempre, que sigue haciendo falta para dar de alta un perfil sin dirección todavía.
+    slug:
+      rawSlug === null
+        ? undefined
+        : slugify(rawSlug) || slugify(displayName) || `perfil-${randomUUID().slice(0, 6)}`,
     headline: String(formData.get('headline') ?? '').trim() || null,
     bio: String(formData.get('bio') ?? '').trim() || null,
     avatarUrl: String(formData.get('avatarUrl') ?? '').trim() || null,
@@ -96,6 +109,11 @@ export async function updateProfile(
   const values = readProfileForm(formData)
 
   if (!values.displayName) return { error: 'El nombre no puede quedar vacío.' }
+  if (values.slug !== undefined && esReservado(values.slug)) {
+    return {
+      error: `«${values.slug}» es una dirección reservada del sistema: elige otro nombre o escribe una URL distinta.`,
+    }
+  }
 
   try {
     await getDb()
@@ -103,9 +121,18 @@ export async function updateProfile(
       .set(values)
       .where(and(eq(profiles.id, profileId), eq(profiles.ownerId, ownerId)))
   } catch (error) {
-    const message = String(error)
-    if (message.includes('profiles_slug_unique') || message.includes('duplicate key')) {
-      return { error: `La URL /${values.slug} ya está en uso por otro perfil.` }
+    // `String(error)` nunca casaba: drizzle envuelve la consulta fallida en un
+    // `DrizzleQueryError` cuyo propio mensaje es solo `Failed query: <sql>\nparams:
+    // <params>` — ni el nombre de la restricción ni "duplicate key" aparecen ahí, solo en
+    // `cause`, que es justo donde mira `esChoqueDeUnicidad` (ya usada, y ya probada, en
+    // `lib/usuarios.ts`).
+    if (esChoqueDeUnicidad(error)) {
+      return {
+        error:
+          values.slug !== undefined
+            ? `La URL /${values.slug} ya está en uso por otro perfil.`
+            : 'No se pudo guardar. Intenta de nuevo.',
+      }
     }
     return { error: 'No se pudo guardar. Intenta de nuevo.' }
   }
@@ -116,7 +143,12 @@ export async function updateProfile(
   return { ok: true }
 }
 
-/** Exactly one profile is served at `/`, so promoting one demotes the rest. */
+/**
+ * Promotes one profile to default and demotes the rest — but only within the same owner:
+ * each user has exactly one default profile, not the whole deployment. And `/` only ever
+ * serves the admin's default profile; a guest's default profile lives at `/<slug>` like
+ * any other of theirs (see `rutaPublicaDe` in `lib/utils.ts`).
+ */
 export async function makeDefault(profileId: string) {
   const { id: ownerId } = await requireUser()
   const db = getDb()
@@ -126,22 +158,65 @@ export async function makeDefault(profileId: string) {
     .where(and(eq(profiles.id, profileId), eq(profiles.ownerId, ownerId)))
   if (!profile) return
 
-  await db
-    .update(profiles)
-    .set({ isDefault: false })
-    .where(and(ne(profiles.id, profileId), eq(profiles.ownerId, ownerId)))
-  await db
-    .update(profiles)
-    .set({ isDefault: true, isPublished: true })
-    .where(and(eq(profiles.id, profileId), eq(profiles.ownerId, ownerId)))
+  // Las dos escrituras van juntas en una transacción: degradar a todos y no llegar a
+  // promover a nadie (p.ej. la conexión se cae entre medio) dejaría al dueño sin ninguna
+  // página principal — y si es el admin, sin raíz en su dominio personal, ya en
+  // producción. Es la misma herida que `deleteProfile` cierra del otro lado.
+  await db.transaction(async (tx) => {
+    await tx
+      .update(profiles)
+      .set({ isDefault: false })
+      .where(and(ne(profiles.id, profileId), eq(profiles.ownerId, ownerId)))
+    await tx
+      .update(profiles)
+      .set({ isDefault: true, isPublished: true })
+      .where(and(eq(profiles.id, profileId), eq(profiles.ownerId, ownerId)))
+  })
 
   revalidatePath('/admin/profiles')
   revalidatePath('/', 'layout')
 }
 
-export async function deleteProfile(profileId: string) {
+/**
+ * Se niega en dos casos: si es la última página del dueño, o si es la principal
+ * (`isDefault`) y hay otras. Lo segundo no es un capricho: `getDefaultProfile(adminId)` en
+ * `src/app/page.tsx` da por hecho que el admin del despliegue siempre tiene una principal, y
+ * nada repromueve otra si esta se borra — dejarlo pasar serviría la pantalla de primer
+ * arranque en la raíz de un dominio personal ya en producción. El mensaje dice cómo salir:
+ * hacer principal a otra página primero (`makeDefault`, en «Perfiles»). El panel ya no
+ * ofrece el botón en ninguno de los dos casos (ver el editor), pero el servidor es quien
+ * tiene que garantizarlo de verdad.
+ *
+ * Contar las páginas del dueño y decidir si esta es de las dos que no se pueden borrar
+ * corre en la misma transacción que el borrado: sueltas, dos borrados a la vez podrían leer
+ * ambos «tengo dos» antes de que el otro termine, y dejar al dueño en cero.
+ *
+ * Antes no devolvía nada (siempre redirigía); ahora devuelve `{ error }` en el caso que
+ * bloquea, así que quien llama necesita leer el resultado en vez de solo disparar la
+ * promesa. En el camino feliz sigue sin cambiar: redirige, fuera de cualquier try/catch que
+ * pudiera tragarse su propio error de navegación (mismo motivo que en `conectarElegidas`).
+ */
+export async function deleteProfile(profileId: string): Promise<{ error?: string }> {
   const { id: ownerId } = await requireUser()
-  await getDb().delete(profiles).where(and(eq(profiles.id, profileId), eq(profiles.ownerId, ownerId)))
+  const db = getDb()
+
+  const bloqueo = await db.transaction(async (tx) => {
+    const propios = await tx
+      .select({ id: profiles.id, isDefault: profiles.isDefault })
+      .from(profiles)
+      .where(eq(profiles.ownerId, ownerId))
+    if (propios.length <= 1) {
+      return 'No puedes borrar tu única página: todo usuario necesita al menos una.'
+    }
+    if (propios.find((p) => p.id === profileId)?.isDefault) {
+      return 'No puedes borrar tu página principal: primero haz principal a otra página, desde «Perfiles».'
+    }
+
+    await tx.delete(profiles).where(and(eq(profiles.id, profileId), eq(profiles.ownerId, ownerId)))
+    return null
+  })
+  if (bloqueo) return { error: bloqueo }
+
   revalidatePath('/admin/profiles')
   redirect('/admin/profiles')
 }
@@ -1099,7 +1174,17 @@ export async function guardarInstruccionesComentarios(
 
 export async function invitarUsuario(_prev: FormState, formData: FormData): Promise<FormState> {
   await requireAdmin()
-  const resultado = await invitar(String(formData.get('correo') ?? ''), String(formData.get('nombre') ?? '') || null)
+  let resultado: Awaited<ReturnType<typeof invitar>>
+  try {
+    resultado = await invitar(String(formData.get('correo') ?? ''), String(formData.get('nombre') ?? '') || null)
+  } catch (error) {
+    // `invitar()` lanza cuando el usuario se creó pero su página no —ya compensado
+    // borrando la fila—, para que ese fallo no quede escondido detrás de un `{ error }`
+    // normal. Acá se atrapa igual, con un mensaje que le sirve a quien invita, sin
+    // filtrar el detalle técnico.
+    console.error('invitarUsuario:', error)
+    return { error: 'No se pudo invitar: la página del usuario no se pudo crear. Intenta de nuevo.' }
+  }
   if ('error' in resultado) return { error: resultado.error }
   // El primer código sale con la invitación: el invitado entra sin pedir nada.
   const enviado = await pedir(resultado.usuario.correo)

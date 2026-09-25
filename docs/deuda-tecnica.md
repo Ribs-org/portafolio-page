@@ -61,3 +61,123 @@ Textos como «Sincronizado hace 5 horas» o «la conexión vence mañana» se ca
 servidor y otra vez en el cliente. Si el cálculo cruza un cambio de unidad entre ambos,
 React aborta la hidratación con el error #418 y cae al boundary — que además muestra la
 frase equivocada, ver arriba. Es intermitente y difícil de reproducir a pedido.
+
+## Un guardia de choque de unicidad estuvo muerto sin que nadie lo notara
+
+**Abierto el 2026-09-24, cerrado el mismo día.** Queda escrito porque la forma de fallar se
+va a repetir.
+
+`isCampaignUniqueViolation` comparaba el error contra una propiedad `constraint`. Ese es el
+nombre que usa `node-postgres`; el driver de este proyecto es `postgres-js`, que mapea ese
+campo a **`constraint_name`** (`node_modules/postgres/src/connection.js:46`). La función no
+podía devolver `true` nunca, así que un choque de `social_posts_campaign_unique` reventaba
+la sincronización en vez de reintentar con la etiqueta desambiguada, que es justo lo que su
+comentario prometía.
+
+Sobrevivió porque nadie lo probó: `sync.ts` no tenía tests. Y estuvo a punto de propagarse,
+porque se mandó copiar ese archivo como precedente para el guardia equivalente de
+`profiles.slug`.
+
+**Las dos mitades que hay que recordar**, porque arreglar solo una deja el guardia igual de
+muerto:
+
+1. El nombre del campo es `constraint_name`, no `constraint`.
+2. **Drizzle envuelve toda consulta fallida** en `DrizzleQueryError` y deja el error del
+   driver en `cause` (`drizzle-orm/errors.cjs:35-45`, `pg-core/session.js:41`), así que hay
+   que mirar en los dos niveles.
+
+Los dos sitios quedaron arreglados y con tests que usan la forma real del driver envuelta.
+Si aparece un tercer guardia de este tipo, sale de ahí.
+
+## La página de un usuario se crea al invitarlo, pero nadie rellena hacia atrás
+
+**Abierto desde 2026-09-24.**
+
+Desde que existe la página por usuario, `invitar()` y `asegurarAdmin()` la crean junto con
+el usuario, y de ahí sale el invariante que el resto del código puede suponer: **todo
+usuario tiene exactamente una página**. Para los usuarios creados **antes** de ese cambio no
+hay nada que la cree: `asegurarAdmin()` repara solo al admin, y el migrador solo adopta
+perfiles huérfanos, no crea los que faltan.
+
+Hoy no muerde —se consultó la base al desplegarlo: un solo usuario, el admin, con su página
+ya creada—, así que no se escribió un relleno para cero filas. Pero si alguna vez hay
+usuarios sin página, el síntoma va a ser silencioso: su dominio responde 404 en todo, sin
+error. Un `select` de usuarios sin fila en `profiles` lo detecta en un segundo, y el relleno
+es el mismo `crearPaginaDe` en un bucle.
+
+## Dos cosas anteriores que la página por usuario dejó más expuestas
+
+**Anotado el 2026-09-24.** Ninguna es de esa entrega; las dos quedaron con más superficie.
+
+- **`isPublished` se filtra en memoria, no en el SQL** (`src/app/[slug]/page.tsx`). Un
+  perfil despublicado sale igual de la base para descartarse después, que es lo contrario
+  del principio que enuncia el comentario de `getProfileBySlug` dos archivos más allá. No es
+  una fuga —la fila nunca llega al cliente—, pero la incoherencia invita a copiar el patrón.
+- **Una petición anónima puede escribir.** `adminId()` llama a `asegurarAdmin()`, que hace
+  un `insert … on conflict do update` si falta la fila del admin. Antes eso colgaba solo de
+  la raíz `/`; ahora también de `/<cualquier-cosa>`, o sea de un espacio de nombres
+  ilimitado. El patrón es anterior y está asumido, pero conviene saber que creció.
+
+## La suite falla unas 3 pruebas en 1 de cada 20 corridas
+
+**Abierto desde 2026-09-24.**
+
+`npx vitest run` pasa 725/725 casi siempre, y de vez en cuando caen tres. Reprodujo una vez
+en veintiuna corridas y no volvió en las siguientes, así que no se pudo capturar cuáles ni
+con qué mensaje. Las sospechas razonables, por orden: estado compartido entre archivos de
+test, un mock que se filtra entre ellos, o una dependencia del orden en que vitest los
+reparte entre procesos.
+
+Mientras no se identifique, **una corrida roja en CI no se puede dar por buena sin mirar qué
+falló**: puede ser esto o puede ser real, y la diferencia importa.
+
+## Dos guardias de choque de unicidad, idénticos, en dos archivos
+
+**Abierto desde 2026-09-24.**
+
+`esChoqueDeUnicidad` (`src/lib/usuarios.ts`) e `isCampaignUniqueViolation`
+(`src/lib/social/sync.ts`) son la misma función con otro nombre de restricción: una
+comentada en español y otra en inglés, con dos suites de tests que prueban lo mismo. El bug
+del `constraint_name` vivió en las dos copias **justamente por eso**, y se arregló dos veces.
+
+Un `esViolacionDeUnicidad(error, nombreRestriccion)` compartido cierra la puerta. Si aparece
+un tercer guardia de este tipo antes de que eso pase, la deuda ya costó más de lo que ahorró.
+
+## La prueba que «no envejece» solo mira directorios
+
+**Abierto desde 2026-09-24.**
+
+`src/lib/slugs.test.ts` lee `src/app` y `public/` del disco para exigir que toda ruta real
+esté en `RESERVADOS`, y esa es su gracia: agregar una ruta y olvidar la lista rompe el test
+en vez de romperle la página a un usuario.
+
+Pero solo lee **directorios**. Una ruta de convención por archivo —`sitemap.ts`,
+`manifest.ts`, `opengraph-image.tsx`— no la vería. `robots.ts` ya existe y está cubierto
+solo porque alguien lo escribió a mano en la lista, que es exactamente lo que este test
+existe para no depender. Hoy no falta ninguna; la garantía es más chica que su promesa.
+
+## El tercer detector de choque de unicidad, y por qué se cuentan tres
+
+**Anotado el 2026-09-24.** Los tres están arreglados; queda escrito el patrón.
+
+`updateProfile` detectaba el choque con `String(error).includes('profiles_slug_unique')`.
+Nunca podía casar: drizzle envuelve la consulta fallida en un `DrizzleQueryError` cuyo
+mensaje es solo `Failed query: <sql>`, y deja el error del driver en `cause`. Venía desde el
+primer commit del repositorio.
+
+Con este van **tres** detectores muertos del mismo choque, escritos en tres formas
+distintas, en tres archivos, a lo largo de meses. Ninguno falló ruidosamente: cada uno
+degradó en silencio —una sincronización que revienta en vez de reintentar, un reintento de
+dirección que nunca ocurre, un mensaje que no dice qué pasó—. El arreglo de los tres cabe en
+una función.
+
+La lección operativa, para la próxima vez que haya que reconocer un error de Postgres:
+
+- **El código va en `cause`**, no en el error que se atrapa. Drizzle envuelve siempre.
+- **El campo es `constraint_name`**, que es lo que expone `postgres-js`. `constraint` es de
+  `node-postgres`, que no es el driver de este proyecto.
+- **Comparar contra el texto del mensaje no funciona** y, peor, no falla: devuelve `false` y
+  el camino alternativo simplemente no ocurre.
+- **Escribe el test con la forma real del driver envuelta por drizzle.** Un test que arma un
+  objeto plano `{ code, constraint }` pasa con la función rota; los tres detectores
+  sobrevivieron justamente porque nadie los probó, o los probó contra una ficción.

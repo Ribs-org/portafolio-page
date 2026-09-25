@@ -3,8 +3,23 @@ import { and, asc, eq, inArray, isNull, or, gte, lte } from 'drizzle-orm'
 import { getDb, links, profiles } from '@/db'
 import type { Link, Profile } from '@/db'
 
-export async function getProfileBySlug(slug: string): Promise<Profile | null> {
-  const [row] = await getDb().select().from(profiles).where(eq(profiles.slug, slug)).limit(1)
+/**
+ * La página de esa dirección, y con `ownerId`, solo si es de ese dueño.
+ *
+ * El filtro va en el SQL y no después en memoria: una página ajena no debe salir de la
+ * base para que alguien la descarte más tarde, que es como se filtran los datos sin querer.
+ */
+export async function getProfileBySlug(slug: string, ownerId?: string): Promise<Profile | null> {
+  const [row] = await getDb()
+    .select()
+    .from(profiles)
+    // Presencia, no verdad: un `ownerId` de '' es un valor válido de `string | undefined`,
+    // no "no lo pasaron". `ownerId ? … : …` lo trataría igual que la ausencia del
+    // argumento y dejaría la consulta sin acotar.
+    .where(
+      ownerId === undefined ? eq(profiles.slug, slug) : and(eq(profiles.slug, slug), eq(profiles.ownerId, ownerId)),
+    )
+    .limit(1)
   return row ?? null
 }
 

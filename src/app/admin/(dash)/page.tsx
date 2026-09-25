@@ -1,3 +1,4 @@
+import { headers } from 'next/headers'
 import Link from 'next/link'
 import { ArrowUpRight, ExternalLink, Pencil } from 'lucide-react'
 import { BarList } from '@/components/charts/bar-list'
@@ -19,10 +20,12 @@ import {
   previousPeriod,
 } from '@/lib/analytics'
 import { requireUser } from '@/lib/auth'
+import { dominioProducto, esDominioDelProducto } from '@/lib/dominios'
 import { parseFilters } from '@/lib/filters'
 import { cargaPorDia } from '@/lib/posts'
 import { getAllProfiles } from '@/lib/profiles'
-import { formatNumber, formatPercent } from '@/lib/utils'
+import { adminId } from '@/lib/usuarios'
+import { enlacePublicoDe, formatNumber, formatPercent, rutaMostradaDe } from '@/lib/utils'
 
 export const dynamic = 'force-dynamic'
 
@@ -33,6 +36,13 @@ export default async function OverviewPage({
 }) {
   const params = await searchParams
   const { id: ownerId } = await requireUser()
+  // Para saber si un perfil de la lista de abajo vive en `/`: solo el principal del admin
+  // del despliegue, no el principal de cualquier usuario. Ver el comentario de `rutaPublicaDe`.
+  const admin = await adminId()
+  const host = (await headers()).get('host')
+  // Para que «abrir» de cada perfil enlace a un host que de verdad lo sirva. Ver el
+  // comentario de `enlacePublicoDe`.
+  const dominio = { enElProducto: esDominioDelProducto(host), dominioProducto: dominioProducto() }
   const filters = parseFilters(params, ownerId)
   const profiles = await getAllProfiles(ownerId)
 
@@ -127,7 +137,7 @@ export default async function OverviewPage({
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-medium">{profile.displayName}</p>
                   <p className="truncate font-mono text-[0.7rem] text-fg-faint">
-                    /{profile.isDefault ? '' : profile.slug}
+                    {rutaMostradaDe(profile, admin, dominio)}
                     {profile.isDefault ? ' (principal)' : ''}
                     {profile.isPublished ? '' : ' · borrador'}
                   </p>
@@ -140,7 +150,7 @@ export default async function OverviewPage({
                   <Pencil className="h-4 w-4" aria-hidden />
                 </Link>
                 <a
-                  href={profile.isDefault ? '/' : `/${profile.slug}`}
+                  href={enlacePublicoDe(profile, admin, dominio)}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="rounded-lg p-1.5 text-fg-faint transition-colors hover:text-fg"

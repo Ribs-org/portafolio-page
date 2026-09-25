@@ -39,6 +39,15 @@ vi.mock('postgres', () => ({
 process.env.DATABASE_URL = 'postgres://usuario:clave@host/base'
 process.env.SITE_TIMEZONE = 'America/Santiago'
 
+// Import estático, después de los `vi.mock`: Vitest los sube al principio del archivo al
+// transformarlo, así que el orden de las líneas no importa, pero un import dinámico dentro
+// de cada `it` sí importa —cada uno paga otra vez la transformación de todo lo que
+// `analytics`/`posts` arrastran (drizzle-orm, postgres, …), y bajo carga esa primera
+// transformación puede no alcanzar a terminar antes de `testTimeout`. Mismo motivo que en
+// `usuarios.test.ts` (ver el comentario de sus líneas 50-54).
+const { getTimeSeries } = await import('./analytics')
+const { getPostSeries } = await import('./posts')
+
 beforeEach(() => {
   parametros.length = 0
 })
@@ -58,7 +67,6 @@ function todos(): unknown[] {
 
 describe('ningún Date llega crudo al driver', () => {
   it('analytics: getTimeSeries manda sus fechas como texto', async () => {
-    const { getTimeSeries } = await import('./analytics')
     await getTimeSeries(FILTROS)
     const enviados = todos()
     expect(enviados.length).toBeGreaterThan(0)
@@ -66,7 +74,6 @@ describe('ningún Date llega crudo al driver', () => {
   })
 
   it('posts: getPostSeries manda sus fechas como texto', async () => {
-    const { getPostSeries } = await import('./posts')
     await getPostSeries(FILTROS)
     const enviados = todos()
     expect(enviados.length).toBeGreaterThan(0)

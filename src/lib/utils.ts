@@ -193,3 +193,103 @@ export function slugify(raw: string): string {
     .replace(/^-+|-+$/g, '')
     .slice(0, 60)
 }
+
+/**
+ * La dirección pública de un perfil, asumiendo que se ve en un host que sirve la principal
+ * del admin en `/` —esto es, cualquier dominio salvo el del producto: ver
+ * `esDominioDelProducto` en `lib/dominios.ts`. En el dominio del producto la raíz es la
+ * landing y no es la página de nadie, ni siquiera la del admin: ahí toda página, la
+ * principal incluida, vive en `/<slug>`. Quien llame a esta función en ese host tiene que
+ * corregir el resultado — `enlacePublicoDe`, más abajo, es esa corrección.
+ *
+ * `isDefault` significa dos cosas que no hay que confundir. En `crearPaginaDe`
+ * (`lib/usuarios.ts`) es «la página principal de ESTE usuario»: todos la tienen, admin e
+ * invitados por igual. Pero la raíz del sitio (`/`) sirve una sola página: la del admin
+ * del despliegue —`src/app/page.tsx` la resuelve con `adminId()`—. Tratar `isDefault` como
+ * si dijera «vive en /» manda al invitado a la página de otro: la suya, principal y todo,
+ * vive en `/<slug>` igual que cualquier perfil secundario.
+ *
+ * Pura a propósito: no resuelve quién es el admin, lo recibe. Así la puede llamar tanto un
+ * componente de servidor (que ya tiene `adminId()`) como el editor de perfil, que corre en
+ * el cliente y no puede pedirlo.
+ */
+export function rutaPublicaDe(
+  perfil: { isDefault: boolean; slug: string; ownerId: string | null },
+  adminId: string,
+): string {
+  return perfil.isDefault && perfil.ownerId === adminId ? '/' : `/${perfil.slug}`
+}
+
+/**
+ * A dónde manda de verdad el «ver página» del panel — a diferencia de `rutaPublicaDe`, que
+ * es solo la ruta y asume que el host actual la sirve. Esa asunción falla en dos sentidos
+ * opuestos (ver el comentario de más arriba y el de `esDominioDelProducto`):
+ *
+ * - En el dominio del producto, la raíz no es la página de nadie: toda página, incluida la
+ *   principal del admin, vive en `/<slug>`.
+ * - En cualquier otro dominio, solo se sirven las páginas del admin del despliegue; la de
+ *   un invitado ahí da 404, sea o no su principal.
+ *
+ * Por eso, si el perfil no es del admin y el host actual no es el del producto, el enlace
+ * sale absoluto hacia el dominio del producto en vez de una ruta relativa a un host que no
+ * la sirve. Sin `DOMINIO_PRODUCTO` configurado no hay dónde mandarlo: se devuelve la ruta
+ * de siempre, sin cambiar nada — la restricción de toda esta rama.
+ *
+ * Pura, como `rutaPublicaDe`: recibe si el host actual es el del producto y cuál es el
+ * dominio del producto (ver `esDominioDelProducto` y `dominioProducto` en `lib/dominios.ts`)
+ * en vez de averiguarlo, así la puede llamar cualquier página del panel con lo que ya leyó
+ * de `headers()`.
+ */
+export function enlacePublicoDe(
+  perfil: { isDefault: boolean; slug: string; ownerId: string | null },
+  adminId: string,
+  dominio: { enElProducto: boolean; dominioProducto: string | null },
+): string {
+  if (dominio.enElProducto) return `/${perfil.slug}`
+
+  const ruta = rutaPublicaDe(perfil, adminId)
+  const loSirveEsteHost = perfil.ownerId === adminId
+  if (loSirveEsteHost || !dominio.dominioProducto) return ruta
+
+  return `https://${dominio.dominioProducto}/${perfil.slug}`
+}
+
+/**
+ * La URL pública completa a mostrar y copiar en el editor de un perfil — la misma dirección
+ * a la que lleva «Ver página» en esa misma pantalla, ya resuelta contra `origin`.
+ *
+ * El bug que esto arregla: el editor calculaba su propio camino (`enRaiz ? '/' :
+ * /${slug}`) sin mirar el host, así que en el dominio del producto el botón Copiar de la
+ * principal del admin copiaba `${origin}/` —la landing— en vez de `${origin}/<slug>` —el
+ * perfil de verdad—, mientras «Ver página», que ya usaba `enlacePublicoDe`, apuntaba bien.
+ * Las dos deben coincidir siempre, así que las dos parten de la misma función.
+ *
+ * `enlacePublicoDe` devuelve a veces una ruta relativa a este host (se compone con
+ * `origin`) y a veces una URL absoluta hacia el dominio del producto (este host no sirve
+ * ese perfil, y ya trae su propio dominio): esa segunda se deja tal cual.
+ */
+export function urlPublicaDe(
+  perfil: { isDefault: boolean; slug: string; ownerId: string | null },
+  adminId: string,
+  dominio: { enElProducto: boolean; dominioProducto: string | null },
+  origin: string,
+): string {
+  const enlace = enlacePublicoDe(perfil, adminId, dominio)
+  return enlace.startsWith('http') ? enlace : `${origin}${enlace}`
+}
+
+/**
+ * Qué mostrar como ruta de un perfil en una lista de solo texto (no un enlace): el mismo
+ * camino al que apunta `enlacePublicoDe`, pero sin el dominio cuando esa función devolvió
+ * una URL absoluta — acá el dominio sería ruido, la lista ya vive dentro del panel del
+ * propio dueño. Mismo desfase que `urlPublicaDe`: sin esto, la principal del admin se
+ * mostraba en `/` aunque el host actual fuera el del producto, donde vive en `/<slug>`.
+ */
+export function rutaMostradaDe(
+  perfil: { isDefault: boolean; slug: string; ownerId: string | null },
+  adminId: string,
+  dominio: { enElProducto: boolean; dominioProducto: string | null },
+): string {
+  const enlace = enlacePublicoDe(perfil, adminId, dominio)
+  return enlace.startsWith('http') ? new URL(enlace).pathname : enlace
+}
