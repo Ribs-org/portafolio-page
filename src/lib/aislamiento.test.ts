@@ -86,6 +86,12 @@ vi.mock('postgres', () => ({
     }
     cliente.options = { parsers: {}, serializers: {} }
     cliente.end = async () => {}
+    // `db.transaction()` de postgres-js pide `client.begin(fn)` (ver
+    // `drizzle-orm/postgres-js/session`), no `unsafe()` directo. Este test no verifica
+    // atomicidad de verdad (eso lo cubre `actions.test.ts`), solo que las consultas de
+    // adentro también queden atadas al dueño — así que basta con correr el callback con el
+    // mismo cliente, sin BEGIN/COMMIT reales.
+    cliente.begin = async (fn: (client: typeof cliente) => Promise<unknown>) => fn(cliente)
     return cliente
   },
 }))

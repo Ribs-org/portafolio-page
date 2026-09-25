@@ -158,14 +158,20 @@ export async function makeDefault(profileId: string) {
     .where(and(eq(profiles.id, profileId), eq(profiles.ownerId, ownerId)))
   if (!profile) return
 
-  await db
-    .update(profiles)
-    .set({ isDefault: false })
-    .where(and(ne(profiles.id, profileId), eq(profiles.ownerId, ownerId)))
-  await db
-    .update(profiles)
-    .set({ isDefault: true, isPublished: true })
-    .where(and(eq(profiles.id, profileId), eq(profiles.ownerId, ownerId)))
+  // Las dos escrituras van juntas en una transacción: degradar a todos y no llegar a
+  // promover a nadie (p.ej. la conexión se cae entre medio) dejaría al dueño sin ninguna
+  // página principal — y si es el admin, sin raíz en su dominio personal, ya en
+  // producción. Es la misma herida que `deleteProfile` cierra del otro lado.
+  await db.transaction(async (tx) => {
+    await tx
+      .update(profiles)
+      .set({ isDefault: false })
+      .where(and(ne(profiles.id, profileId), eq(profiles.ownerId, ownerId)))
+    await tx
+      .update(profiles)
+      .set({ isDefault: true, isPublished: true })
+      .where(and(eq(profiles.id, profileId), eq(profiles.ownerId, ownerId)))
+  })
 
   revalidatePath('/admin/profiles')
   revalidatePath('/', 'layout')

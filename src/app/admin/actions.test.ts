@@ -42,9 +42,9 @@ vi.mock('@/lib/auth', () => ({
 
 /**
  * Doble mínimo de `getDb()`, en el mismo espíritu que `usuarios.test.ts`: solo cubre lo que
- * `updateProfile` y `deleteProfile` de verdad usan (`update().set().where()`,
- * `select().from().where()`, `delete().where()` y, ahora, `transaction()`), con estado
- * mutable que cada test llena.
+ * `updateProfile`, `deleteProfile` y `makeDefault` de verdad usan (`update().set().where()`,
+ * `select().from().where()`, `delete().where()` y `transaction()`), con estado mutable que
+ * cada test llena.
  */
 const db = vi.hoisted(() => ({
   updateCalls: [] as unknown[],
@@ -56,6 +56,14 @@ const db = vi.hoisted(() => ({
   // Lo que el `.where()` del UPDATE debe lanzar, si algo: así un test puede simular el
   // choque de unicidad (o cualquier otro fallo) sin que el resto tenga que configurarlo.
   updateError: null as unknown,
+  // Lo que `makeDefault` de verdad escribió DENTRO de la transacción — a diferencia de
+  // `updateCalls`, que anota cada intento al tiro, esto solo recibe algo si las dos
+  // escrituras de la transacción terminaron sin lanzar. Así un test puede comprobar que un
+  // fallo en la segunda (la promoción) no deja aplicada la primera (la degradación).
+  makeDefaultCalls: [] as unknown[],
+  // 0 = nunca falla. N = la N-ésima escritura dentro de la transacción de `makeDefault`
+  // lanza en vez de aplicarse (1 = degradar, 2 = promover).
+  makeDefaultErrorAtCall: 0 as number,
 }))
 
 vi.mock('@/db', async (importOriginal) => {
@@ -79,11 +87,35 @@ vi.mock('@/db', async (importOriginal) => {
       }),
       select,
       delete: del,
-      // Sin rollback real, igual que el doble de `usuarios.test.ts`: solo corre el
-      // callback con un `tx` que comparte el mismo estado mutable que fuera de la
-      // transacción, así los tests pueden comprobar count-y-borra como una sola unidad.
-      transaction: async (fn: (tx: { select: typeof select; delete: typeof del }) => Promise<unknown>) =>
-        fn({ select, delete: del }),
+      // Sin rollback real, igual que el doble de `usuarios.test.ts`, pero el `update` de
+      // acá sí simula el efecto que a `makeDefault` le importa: bufferea cada escritura y
+      // solo las vuelca a `makeDefaultCalls` si el callback completo sin lanzar. Si la
+      // segunda escritura falla, la primera queda en el buffer y nunca llega a
+      // `makeDefaultCalls` — tal como una transacción real la habría revertido.
+      transaction: async (
+        fn: (tx: {
+          select: typeof select
+          delete: typeof del
+          update: () => { set: (values: unknown) => { where: () => Promise<void> } }
+        }) => Promise<unknown>,
+      ) => {
+        const buffer: unknown[] = []
+        let llamada = 0
+        const update = () => ({
+          set: (values: unknown) => ({
+            where: async () => {
+              llamada += 1
+              if (db.makeDefaultErrorAtCall && llamada === db.makeDefaultErrorAtCall) {
+                throw new Error('la base no responde')
+              }
+              buffer.push(values)
+            },
+          }),
+        })
+        const resultado = await fn({ select, delete: del, update })
+        db.makeDefaultCalls.push(...buffer)
+        return resultado
+      },
     }),
   }
 })
@@ -91,7 +123,7 @@ vi.mock('@/db', async (importOriginal) => {
 // Import estático, después de los `vi.mock` (Vitest los sube igual al principio del
 // archivo): un import dinámico dentro de cada `it` pagaría de nuevo la transformación de
 // todo lo que `actions.ts` arrastra.
-const { updateProfile, deleteProfile } = await import('./actions')
+const { updateProfile, deleteProfile, makeDefault } = await import('./actions')
 
 beforeEach(() => {
   db.updateCalls.length = 0
@@ -101,6 +133,8 @@ beforeEach(() => {
     { id: 'profile-2', isDefault: false },
   ]
   db.updateError = null
+  db.makeDefaultCalls.length = 0
+  db.makeDefaultErrorAtCall = 0
 })
 
 /**
@@ -257,5 +291,34 @@ describe('deleteProfile: no deja borrar la página principal mientras haya otras
     await expect(deleteProfile('profile-1')).rejects.toThrow(RedirectSignal)
 
     expect(db.deleteCalls).toHaveLength(1)
+  })
+})
+
+describe('makeDefault: degradar y promover son atómicos', () => {
+  it('camino feliz: degrada al resto y promueve al elegido, en ese orden, dentro de una transacción', async () => {
+    await makeDefault('profile-1')
+
+    expect(db.makeDefaultCalls).toEqual([{ isDefault: false }, { isDefault: true, isPublished: true }])
+  })
+
+  // La razón de este arreglo: degradar a todos y luego fallar al promover dejaría al dueño
+  // sin ninguna página principal — y si es el admin, sin raíz en su dominio personal, ya en
+  // producción. Envolver las dos escrituras en una transacción hace que un fallo en la
+  // segunda deshaga también la primera.
+  it('si falla la promoción (la segunda escritura), no deja ninguna página degradada', async () => {
+    db.makeDefaultErrorAtCall = 2
+
+    await expect(makeDefault('profile-1')).rejects.toThrow()
+
+    // Nada llegó a aplicarse: ni la degradación que sí alcanzó a intentarse.
+    expect(db.makeDefaultCalls).toEqual([])
+  })
+
+  it('si falla la degradación (la primera escritura), tampoco intenta promover', async () => {
+    db.makeDefaultErrorAtCall = 1
+
+    await expect(makeDefault('profile-1')).rejects.toThrow()
+
+    expect(db.makeDefaultCalls).toEqual([])
   })
 })
