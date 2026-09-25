@@ -1,0 +1,64 @@
+name: App a la tienda
+
+# A mano y solo a mano: construir un binario nuevo cuesta minutos de máquina y ocupa un
+# número de versión que no se puede reutilizar. Un cambio de JavaScript no necesita pasar
+# por acá — eso va por aire con `eas update`, ver mobile/README.md.
+#
+# Se dispara desde la app de GitHub en el teléfono: Actions → «App a la tienda» → Run.
+on:
+  workflow_dispatch:
+    inputs:
+      enviar:
+        description: 'Enviar a la pista interna de la Play Store al terminar'
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+# Dos binarios a la vez pelearían por el mismo número de versión.
+concurrency:
+  group: app-tienda
+  cancel-in-progress: false
+
+jobs:
+  construir:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+
+      - run: npm ci
+        working-directory: mobile
+
+      # La reja de siempre antes de gastar una máquina de build: si la app no pasa sus
+      # propias pruebas, no tiene sentido construir el binario.
+      - run: npm test
+        working-directory: mobile
+      - run: npm run typecheck
+        working-directory: mobile
+      - run: npm run lint
+        working-directory: mobile
+
+      - uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      # `--wait`: el paso termina cuando el binario está listo, no cuando la cola lo acepta,
+      # para que el envío de abajo tenga algo que enviar.
+      - name: Construir el binario de producción
+        run: eas build --platform android --profile production --non-interactive --wait
+        working-directory: mobile
+
+      # La credencial de la cuenta de servicio de Google vive en el almacén de EAS, no en
+      # este repositorio: `eas submit` la toma de ahí. La pista la fija eas.json.
+      - name: Enviar a la pista interna
+        if: ${{ inputs.enviar }}
+        run: eas submit --platform android --profile production --latest --non-interactive
+        working-directory: mobile

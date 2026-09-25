@@ -51,10 +51,35 @@ siguiente.
 Cuando cambia una pantalla o la lógica (no un módulo nativo), basta con:
 
 ```bash
-npx eas-cli update --channel preview --message "qué cambió"
+npx eas-cli update --channel preview --environment preview --message "qué cambió"
 ```
 
 La app lo descarga la próxima vez que se abre y lo aplica en la apertura siguiente.
+
+### Cuidado con el canal: hay dos, y una actualización solo llega al suyo
+
+Cada instalación escucha el canal con el que se construyó, y **una actualización publicada
+en el otro canal no le llega nunca** —sin error, sin aviso: se queda con el código del día
+que se instaló—.
+
+| Cómo la instalaste | Canal |
+|---|---|
+| El APK que se descarga a mano (perfil `preview`) | `preview` |
+| Desde la Play Store, pista interna (perfil `production`) | `production` |
+
+Así que **mientras tengas las dos instaladas hay que publicar a las dos**, una detrás de la
+otra:
+
+```bash
+npx eas-cli update --channel preview    --environment preview    --message "qué cambió"
+npx eas-cli update --channel production --environment production --message "qué cambió"
+```
+
+Cuando el APK a mano quede retirado —que es el plan en cuanto la app esté en la tienda—,
+queda solo el segundo comando.
+
+La separación no es burocracia: es lo que deja probar algo en el teléfono antes de que
+llegue a la versión que usas de verdad.
 Solo llega a los teléfonos que tengan instalada la misma versión de `app.json`; si
 subiste la versión, hay que generar el APK de nuevo.
 

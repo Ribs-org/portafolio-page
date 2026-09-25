@@ -8,7 +8,7 @@ export const metadata: Metadata = {
 /** The one value a fork has to change before deploying these pages. */
 const CONTACTO = 'vicente.pareja.jones@gmail.com'
 
-const ACTUALIZADO = '28 de agosto de 2026'
+const ACTUALIZADO = '25 de septiembre de 2026'
 
 export default function PrivacidadPage() {
   return (
@@ -83,9 +83,10 @@ export default function PrivacidadPage() {
           Cuentas de redes sociales conectadas
         </h2>
         <p className="leading-relaxed text-fg-muted">
-          El panel privado puede conectarse a las cuentas de Instagram, TikTok y YouTube{' '}
-          <span className="text-fg">del propio dueño del sitio</span> para leer las métricas de
-          sus publicaciones. La de Instagram se conecta{' '}
+          El panel privado puede conectarse a las cuentas de Instagram, Facebook, TikTok,
+          YouTube, Threads y X <span className="text-fg">del propio dueño del sitio</span>, para
+          leer las métricas de sus publicaciones y para publicar en ellas. La de Instagram se
+          conecta{' '}
           <span className="text-fg">mediante un inicio de sesión de Facebook</span>: eso lee la
           lista de páginas de Facebook del dueño, y solo para encontrar cuál de ellas tiene
           asociada la cuenta de Instagram. De esa lista no se guarda nada —ni nombres de
@@ -94,11 +95,12 @@ export default function PrivacidadPage() {
         </p>
         <ul className="space-y-2 leading-relaxed text-fg-muted">
           <li>
-            Los tokens de acceso se guardan <span className="text-fg">cifrados</span> (AES-256-GCM).
-            Hoy se usan únicamente para pedir esas métricas. La conexión con Instagram pide
-            además permiso para publicar, pensando en una función futura del panel:{' '}
-            <span className="text-fg">por ahora no se publica nada</span>, ni desde el panel ni
-            de forma automática.
+            Los tokens de acceso se guardan <span className="text-fg">cifrados</span> (AES-256-GCM),
+            y se usan para dos cosas: pedir las métricas de esas publicaciones y{' '}
+            <span className="text-fg">publicar en esas mismas cuentas</span> lo que el dueño
+            haya programado desde el panel o desde la aplicación del teléfono. La publicación
+            ocurre <span className="text-fg">a la hora que el dueño eligió</span>, sin que haga
+            falta que esté presente, y solo con el contenido que él mismo escribió y subió.
           </li>
           <li>
             Se guardan los datos públicos de esas publicaciones: identificador, enlace,
@@ -117,11 +119,46 @@ export default function PrivacidadPage() {
       </section>
 
       <section className="space-y-3">
+        <h2 className="font-titulo text-lg font-semibold uppercase tracking-[0.03em]">
+          La aplicación del teléfono
+        </h2>
+        <p className="leading-relaxed text-fg-muted">
+          Existe una aplicación para Android, «Vicente · Números», que es el mismo panel en el
+          teléfono. No es pública: se distribuye a una lista cerrada de probadores y hace falta
+          una cuenta para usarla.
+        </p>
+        <ul className="space-y-2 leading-relaxed text-fg-muted">
+          <li>
+            <span className="text-fg">No recoge datos de terceros.</span> Lo único que maneja es
+            lo que el dueño de la cuenta escribe o elige: el texto de una publicación, las fotos
+            o videos que le adjunta, y la fecha en que quiere que salga.
+          </li>
+          <li>
+            <span className="text-fg">Pide acceso a fotos y videos</span> por una sola razón:
+            para que puedas elegir los archivos que vas a publicar. No los recorre, no los
+            indexa y no sube ninguno que no hayas seleccionado.
+          </li>
+          <li>
+            <span className="text-fg">La sesión vive en el almacenamiento seguro del teléfono</span>
+            , el que el sistema operativo cifra. Cerrar sesión la borra.
+          </li>
+          <li>
+            <span className="text-fg">Habla únicamente con este sitio.</span> No hay analítica,
+            ni publicidad, ni servicios de terceros dentro de la aplicación, y nada de lo que
+            pasa por ella se comparte con nadie.
+          </li>
+          <li>
+            <span className="text-fg">Todo viaja cifrado</span>, por HTTPS.
+          </li>
+        </ul>
+      </section>
+
+      <section className="space-y-3">
         <h2 className="font-titulo text-lg font-semibold uppercase tracking-[0.03em]">Dónde vive todo</h2>
         <p className="leading-relaxed text-fg-muted">
           El sitio está alojado en Vercel y los datos en una base de datos Postgres gestionada por
-          Neon. Las imágenes que el dueño sube se almacenan en Vercel Blob. Ninguno de esos
-          proveedores recibe los datos para usarlos por su cuenta: los alojan.
+          Supabase. Las imágenes y videos que el dueño sube se almacenan en Cloudflare R2. Ninguno
+          de esos proveedores recibe los datos para usarlos por su cuenta: los alojan.
         </p>
       </section>
 
