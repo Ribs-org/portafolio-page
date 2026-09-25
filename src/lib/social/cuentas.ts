@@ -1,5 +1,8 @@
-// La consulta que resuelve red → cuenta mientras el resto del sistema sigue hablando
-// en redes. Sin `server-only`: `crear.ts` lo importa y `actions.ts` ya es server.
+// Las cuentas como destino, no las redes: `verificarCuentas` comprueba identificadores
+// de cuenta elegidos a mano, y `cuentaUnicaPorRed` resuelve una red a su cuenta solo
+// cuando no hay ambigüedad (un identificador vale siempre; nombrar la red ya no alcanza
+// con dos cuentas conectadas de la misma). Sin `server-only`: `crear.ts` lo importa y
+// `actions.ts` ya es server.
 import { and, asc, eq, inArray, isNotNull } from 'drizzle-orm'
 import { getDb, socialAccounts } from '@/db'
 import { SIN_CUENTA, agruparPorRed } from './cuenta'
@@ -8,9 +11,10 @@ import { SIN_CUENTA, agruparPorRed } from './cuenta'
 export class CuentaInvalida extends Error {}
 
 // Hereda de `CuentaInvalida` para que quien atrapa destinos inválidos no tenga que
-// enumerar los motivos: un solo `instanceof CuentaInvalida` cubre también «sin cuenta»,
-// y el `instanceof SinCuenta` que ya usan los llamadores existentes sigue funcionando —
-// una subclase satisface los dos.
+// enumerar los motivos: un solo `instanceof CuentaInvalida` cubre también «sin cuenta».
+// Todos los llamadores de este módulo preguntan así hoy, ninguno por `instanceof
+// SinCuenta` — si alguna vez hace falta distinguir «sin cuenta» del resto, sigue
+// siendo una subclase real, no una unión aparte.
 export class SinCuenta extends CuentaInvalida {
   constructor(public readonly network: string) {
     super(SIN_CUENTA(network))
