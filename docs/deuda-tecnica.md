@@ -187,16 +187,20 @@ La lección operativa, para la próxima vez que haya que reconocer un error de P
 **Abierto desde 2026-09-24.**
 
 `aislamiento.test.ts` importa funciones de `src/lib` y comprueba que cada una ate su
-consulta al dueño. Eso deja sin protección cualquier consulta escrita **dentro de una
-página**: `schedule/page.tsx` arma su propio `leftJoin` inline, no una función de
-`src/lib`, así que el arnés no la alcanza. Hoy ese `leftJoin` es correcto —el filtro del
-dueño sigue en el `WHERE`, verificado a mano— pero nada impide que mañana alguien lo mueva
-al `ON` del join sin que ninguna prueba chille.
+consulta al dueño. Eso deja sin protección cualquier consulta escrita **fuera de
+`src/lib`**: `schedule/page.tsx` arma su propio `leftJoin` inline, no una función de
+`src/lib`, así que el arnés no la alcanza. Esta rama sumó tres más con el mismo patrón,
+las tres en rutas de API: `api/schedule/posts/route.ts`, `api/mobile/schedule/route.ts` y
+`api/mobile/overview/route.ts` (esta última con dos, una por cada ventana que arma —
+«hoy» y «próximos»). Las cuatro son correctas hoy —el filtro del dueño sigue en el
+`WHERE` de cada una, verificado a mano— pero nada impide que mañana alguien mueva uno al
+`ON` del join sin que ninguna prueba chille.
 
-Extraer solo esa consulta para cubrirla arreglaría un caso de muchos sin criterio: el
-patrón real del repositorio es que el arnés llega a `src/lib` y no a las páginas. Cerrarlo
-de verdad pide decidir qué páginas arman SQL inline y trasladar esas consultas a
-`src/lib`, o extender el arnés para que también las alcance ahí donde viven.
+Extraer solo una de esas consultas para cubrirla arreglaría un caso de varios sin
+criterio: el patrón real del repositorio es que el arnés llega a `src/lib` y no a las
+páginas ni a las rutas de API que arman su propio SQL. Cerrarlo de verdad pide decidir
+qué páginas y rutas arman SQL inline y trasladar esas consultas a `src/lib`, o extender
+el arnés para que también las alcance ahí donde viven.
 
 ## Dos caminos que crean publicaciones, sin código compartido
 
