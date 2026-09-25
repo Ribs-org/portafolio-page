@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { and, asc, eq, gt, inArray, lte } from 'drizzle-orm'
-import { getDb, scheduledPosts, scheduledPostMedia, scheduledPostTargets } from '@/db'
+import { getDb, scheduledPosts, scheduledPostMedia, scheduledPostTargets, socialAccounts } from '@/db'
 import { SITE_TIMEZONE } from '@/lib/analytics'
 import { isoInZone } from '@/lib/metrics-api'
 import { requireMobileUser } from '@/lib/mobile-guardia'
@@ -12,9 +12,10 @@ import {
   parseBorradorMovil,
   parseMediaMovil,
   resolverCuando,
+  resolverDestinos,
 } from '@/lib/mobile-api'
 import { crearPostProgramado } from '@/lib/social/publish/crear'
-import { CuentaInvalida, cuentaUnicaPorRed, type CuentaDestino } from '@/lib/social/cuentas'
+import { CuentaInvalida } from '@/lib/social/cuentas'
 import { validateScheduleDraft } from '@/lib/social/publish/validate'
 import { basePublica, existe, keyDesdeUrl } from '@/lib/storage'
 
@@ -33,9 +34,12 @@ export async function GET(request: Request) {
   const now = new Date()
   const db = getDb()
   const filas = await db
-    .select({ post: scheduledPosts, target: scheduledPostTargets })
+    .select({ post: scheduledPosts, target: scheduledPostTargets, handle: socialAccounts.handle })
     .from(scheduledPosts)
     .innerJoin(scheduledPostTargets, eq(scheduledPostTargets.postId, scheduledPosts.id))
+    // `leftJoin`, no `innerJoin`: una cuenta borrada no hace desaparecer el destino,
+    // solo su handle — mismo criterio que `GET /api/schedule/posts` (Tarea 5).
+    .leftJoin(socialAccounts, eq(socialAccounts.id, scheduledPostTargets.accountId))
     .where(
       and(
         eq(scheduledPosts.ownerId, usuario.id),
@@ -62,9 +66,16 @@ export async function GET(request: Request) {
 
   const mapa = new Map<
     string,
-    { id: string; texto: string; cuando: string; portada: string | null; miniatura: string | null; redes: Array<{ red: string; estado: string; error: string | null }> }
+    {
+      id: string
+      texto: string
+      cuando: string
+      portada: string | null
+      miniatura: string | null
+      redes: Array<{ red: string; handle: string | null; estado: string; error: string | null }>
+    }
   >()
-  for (const { post, target } of filas) {
+  for (const { post, target, handle } of filas) {
     const entrada = mapa.get(post.id) ?? {
       id: post.id,
       texto: post.caption,
@@ -73,7 +84,7 @@ export async function GET(request: Request) {
       miniatura: miniaturaPorPost.get(post.id) ?? null,
       redes: [],
     }
-    entrada.redes.push({ red: target.network, estado: target.status, error: target.lastError })
+    entrada.redes.push({ red: target.network, handle, estado: target.status, error: target.lastError })
     mapa.set(post.id, entrada)
   }
 
@@ -83,10 +94,12 @@ export async function GET(request: Request) {
 /**
  * El post con sus archivos ya en R2. Antes de crear: que cada URL sea del almacén
  * propio y bajo `scheduled/` (un cuerpo forjado no puede apuntar a cualquier URL de
- * internet), que `cuando` y el resto del borrador pasen las reglas de
- * `validateScheduleDraft` — el tope de diez archivos y cada regla son gratis, así que
- * van antes —, y por último que cada objeto exista en R2 (un HEAD es un viaje de ida y
- * vuelta, y no vale la pena pagarlo si el post ya iba a rechazarse por otra razón).
+ * internet), que se resuelva el destino real con `resolverDestinos` (compartida con
+ * `check/route.ts` — ver su comentario), que `cuando` y el resto del borrador pasen las
+ * reglas de `validateScheduleDraft` sobre la red de cada destino resuelto, no una
+ * declarada aparte, y por último que cada objeto exista en R2 (un HEAD es un viaje de
+ * ida y vuelta, y no vale la pena pagarlo si el post ya iba a rechazarse por otra
+ * razón).
  */
 export async function POST(request: Request) {
   const usuario = await requireMobileUser(request)
@@ -113,6 +126,17 @@ export async function POST(request: Request) {
     }
   }
 
+  // `check/route.ts` promete lo que este `POST` cumple: las dos rutas llaman a
+  // `resolverDestinos` con el mismo borrador, así que nunca se pueden desacordar.
+  let cuentas: Awaited<ReturnType<typeof resolverDestinos>>['cuentas']
+  let networks: string[]
+  try {
+    ;({ cuentas, networks } = await resolverDestinos(usuario.id, borrador))
+  } catch (fallo) {
+    if (fallo instanceof CuentaInvalida) return NextResponse.json({ error: fallo.message }, { status: 400 })
+    throw fallo
+  }
+
   const now = new Date()
   const scheduledAt = resolverCuando(borrador.ahora, borrador.cuando, now)
   const error = validateScheduleDraft(
@@ -120,24 +144,12 @@ export async function POST(request: Request) {
       caption: borrador.texto,
       imageCount: media.filter((m) => m.mediaType === 'image').length,
       videoCount: media.filter((m) => m.mediaType === 'video').length,
-      networks: borrador.redes,
+      networks,
       scheduledAt,
     },
     now,
   )
   if (error) return NextResponse.json({ error }, { status: 400 })
-
-  // Puente mientras la app siga mandando redes: resuelve cada una a su única cuenta
-  // conectada, igual que hacía `exigirCuentas` antes de esta entrega — con la diferencia
-  // que esta entrega suma, que con dos cuentas en la misma red ya no adivina. La Tarea 7
-  // hace que la app mande cuentas directamente, y este puente deja de hacer falta.
-  let cuentas: CuentaDestino[]
-  try {
-    cuentas = [...(await cuentaUnicaPorRed(usuario.id, borrador.redes)).values()]
-  } catch (fallo) {
-    if (fallo instanceof CuentaInvalida) return NextResponse.json({ error: fallo.message }, { status: 400 })
-    throw fallo
-  }
 
   try {
     for (const m of media) {

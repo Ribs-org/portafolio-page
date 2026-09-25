@@ -7,13 +7,16 @@ import {
   SIN_SENAL_SUBIDA,
   TIPO_NO_PUBLICABLE,
   describirArchivo,
+  etiquetaCuenta,
   etiquetaEnvio,
   proximaHoraEnPunto,
   puedeEnviar,
   reducirEnvio,
   textoConfirmacion,
+  vieneMarcada,
   type Envio,
 } from './publicar'
+import type { CuentaApp } from './tipos'
 
 describe('describirArchivo', () => {
   it('toma el tipo que entrega el selector', () => {
@@ -123,15 +126,62 @@ describe('etiquetaEnvio', () => {
   })
 })
 
+function cuenta(red: string, handle: string | null): CuentaApp {
+  return { id: `${red}-1`, red, handle, conectada: true }
+}
+
 describe('textoConfirmacion', () => {
-  it('nombra las redes con «y» al final y avisa el plazo', () => {
-    expect(textoConfirmacion(['instagram'])).toBe('¿Publicar ahora en Instagram? Saldrá en los próximos 5 minutos.')
-    expect(textoConfirmacion(['instagram', 'youtube'])).toBe(
-      '¿Publicar ahora en Instagram y YouTube? Saldrá en los próximos 5 minutos.',
+  it('nombra los handles con «y» al final y avisa el plazo', () => {
+    expect(textoConfirmacion([cuenta('instagram', '@mi_ig')])).toBe(
+      '¿Publicar ahora en @mi_ig? Saldrá en los próximos 5 minutos.',
     )
-    expect(textoConfirmacion(['instagram', 'facebook', 'x'])).toBe(
-      '¿Publicar ahora en Instagram, Facebook y X? Saldrá en los próximos 5 minutos.',
+    expect(textoConfirmacion([cuenta('instagram', '@mi_ig'), cuenta('youtube', '@mi_canal')])).toBe(
+      '¿Publicar ahora en @mi_ig y @mi_canal? Saldrá en los próximos 5 minutos.',
     )
+    expect(
+      textoConfirmacion([cuenta('instagram', '@mi_ig'), cuenta('facebook', '@mi_fb'), cuenta('x', '@mi_x')]),
+    ).toBe('¿Publicar ahora en @mi_ig, @mi_fb y @mi_x? Saldrá en los próximos 5 minutos.')
+  })
+
+  it('sin handle, cae al nombre de la red', () => {
+    expect(textoConfirmacion([cuenta('youtube', null)])).toBe(
+      '¿Publicar ahora en YouTube? Saldrá en los próximos 5 minutos.',
+    )
+  })
+})
+
+describe('vieneMarcada', () => {
+  it('con una sola cuenta conectada, viene marcada', () => {
+    const sola = cuenta('instagram', '@mi_ig')
+    expect(vieneMarcada(sola, [sola])).toBe(true)
+  })
+
+  it('con dos cuentas conectadas, no viene ninguna', () => {
+    const a = cuenta('instagram', '@mi_ig')
+    const b = cuenta('facebook', '@mi_fb')
+    expect(vieneMarcada(a, [a, b])).toBe(false)
+    expect(vieneMarcada(b, [a, b])).toBe(false)
+  })
+
+  it('una desconectada no cuenta para decidir ni viene marcada', () => {
+    const viva = cuenta('instagram', '@mi_ig')
+    const muerta = { ...cuenta('facebook', '@mi_fb'), conectada: false }
+    expect(vieneMarcada(viva, [viva, muerta])).toBe(true)
+    expect(vieneMarcada(muerta, [viva, muerta])).toBe(false)
+  })
+})
+
+describe('etiquetaCuenta', () => {
+  it('junta el nombre de la red y el handle', () => {
+    expect(etiquetaCuenta(cuenta('instagram', '@mi_ig'))).toBe('Instagram · @mi_ig')
+  })
+
+  it('sin handle, dice «sin nombre»', () => {
+    expect(etiquetaCuenta(cuenta('facebook', null))).toBe('Facebook · sin nombre')
+  })
+
+  it('una red sin nombre conocido usa el código tal cual', () => {
+    expect(etiquetaCuenta(cuenta('mastodon', '@yo'))).toBe('mastodon · @yo')
   })
 })
 
@@ -146,10 +196,19 @@ describe('proximaHoraEnPunto', () => {
 })
 
 describe('puedeEnviar', () => {
-  it('solo impide mandar un formulario sin nada: el resto lo dice el servidor', () => {
-    expect(puedeEnviar('', 0)).toBe(false)
-    expect(puedeEnviar('   ', 0)).toBe(false)
-    expect(puedeEnviar('Hola', 0)).toBe(true)
-    expect(puedeEnviar('', 1)).toBe(true)
+  it('sin texto ni archivo, no envía aunque haya una cuenta elegida', () => {
+    expect(puedeEnviar('', 0, 1)).toBe(false)
+    expect(puedeEnviar('   ', 0, 1)).toBe(false)
+  })
+
+  it('con texto o archivo, pero sin ninguna cuenta elegida, tampoco envía', () => {
+    expect(puedeEnviar('Hola', 0, 0)).toBe(false)
+    expect(puedeEnviar('', 1, 0)).toBe(false)
+  })
+
+  it('con algo que mandar y al menos una cuenta, envía: el resto lo dice el servidor', () => {
+    expect(puedeEnviar('Hola', 0, 1)).toBe(true)
+    expect(puedeEnviar('', 1, 1)).toBe(true)
+    expect(puedeEnviar('Hola', 0, 2)).toBe(true)
   })
 })

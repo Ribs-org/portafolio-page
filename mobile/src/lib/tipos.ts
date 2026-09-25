@@ -2,10 +2,13 @@ export type PostProgramado = {
   id: string
   texto: string
   cuando: string
-  redes: { red: string; estado: string; error?: string | null }[]
+  redes: { red: string; handle: string | null; estado: string; error?: string | null }[]
   portada?: string | null
   miniatura?: string | null
 }
+
+/** Una cuenta del dueño, para elegir destino por cuenta y no por red (Tarea 7). */
+export type CuentaApp = { id: string; red: string; handle: string | null; conectada: boolean }
 
 export type Overview = {
   desde: string

@@ -122,7 +122,7 @@ export default function Calendario() {
                             style={{ color: COLORES.texto, fontSize: 12 }}
                             numberOfLines={2}
                           >
-                            {NOMBRE_RED[r.red] ?? r.red}
+                            {r.handle ?? NOMBRE_RED[r.red] ?? r.red}
                             {r.error ? ` — ${r.error}` : ''}
                           </Text>
                         ))}

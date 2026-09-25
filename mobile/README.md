@@ -3,7 +3,7 @@
 Esta es la app para el celular de Vicente. Muestra, de un vistazo, los números de
 sus redes (Instagram, Facebook, YouTube): seguidores, alcance, publicaciones
 recientes y el detalle de cada post, y desde la versión 1.1 también **publica**:
-eliges fotos o un video de la galería, escribes el texto, marcas las redes y lo
+eliges fotos o un video de la galería, escribes el texto, marcas las cuentas y lo
 programas, o lo mandas a salir ahora. Los datos son los mismos que ve el panel web,
 leídos desde `https://www.vicente-pareja.cl/api/mobile/*`.
 
@@ -82,7 +82,10 @@ En la pestaña **Publicar**:
 1. Escribe el texto. En YouTube, el primer renglón es el título del video.
 2. Toca **Fotos o video** y elige de la galería (hasta diez archivos; un video de
    hasta 500 MB).
-3. Marca las redes. Instagram viene marcada.
+3. Marca las cuentas a las que sale (el chip lleva la red y el handle, para distinguir
+   dos cuentas de una misma red). Si tienes una sola cuenta conectada viene marcada,
+   porque no hay entre qué elegir; con dos o más, ninguna. TikTok no se ofrece todavía
+   como destino desde el teléfono: no hay dónde pedir sus opciones por publicación.
 4. Toca **Cuándo** para elegir día y hora, y luego **Programar**. O toca
    **Publicar ahora**: confirma, y sale en los próximos cinco minutos.
 

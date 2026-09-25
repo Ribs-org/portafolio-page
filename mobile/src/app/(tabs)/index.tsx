@@ -113,7 +113,7 @@ export function FilaProgramada({ post }: { post: PostProgramado }) {
         {post.redes.map((r) => (
           <View key={r.red} style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
             <PuntoEstado estado={r.estado} />
-            <Text style={{ color: COLORES.tenue, fontSize: 11 }}>{NOMBRE_RED[r.red] ?? r.red}</Text>
+            <Text style={{ color: COLORES.tenue, fontSize: 11 }}>{r.handle ?? NOMBRE_RED[r.red] ?? r.red}</Text>
           </View>
         ))}
       </View>

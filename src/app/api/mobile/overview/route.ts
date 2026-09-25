@@ -38,9 +38,12 @@ export async function GET(request: Request) {
       )
       .orderBy(asc(accountMetrics.day)),
     db
-      .select({ post: scheduledPosts, target: scheduledPostTargets })
+      .select({ post: scheduledPosts, target: scheduledPostTargets, handle: socialAccounts.handle })
       .from(scheduledPosts)
       .innerJoin(scheduledPostTargets, eq(scheduledPostTargets.postId, scheduledPosts.id))
+      // `leftJoin`: una cuenta borrada no hace desaparecer el destino, solo su handle —
+      // mismo criterio que `GET /api/schedule/posts` (Tarea 5) y `GET /api/mobile/schedule`.
+      .leftJoin(socialAccounts, eq(socialAccounts.id, scheduledPostTargets.accountId))
       // La misma ventana que el rango «hoy», sin volver a escribir la regla.
       .where(
         and(
@@ -51,9 +54,10 @@ export async function GET(request: Request) {
       )
       .orderBy(asc(scheduledPosts.scheduledAt)),
     db
-      .select({ post: scheduledPosts, target: scheduledPostTargets })
+      .select({ post: scheduledPosts, target: scheduledPostTargets, handle: socialAccounts.handle })
       .from(scheduledPosts)
       .innerJoin(scheduledPostTargets, eq(scheduledPostTargets.postId, scheduledPosts.id))
+      .leftJoin(socialAccounts, eq(socialAccounts.id, scheduledPostTargets.accountId))
       .where(and(eq(scheduledPosts.ownerId, ownerId), gt(scheduledPosts.scheduledAt, now)))
       .orderBy(asc(scheduledPosts.scheduledAt)),
   ])
@@ -62,15 +66,18 @@ export async function GET(request: Request) {
 
   // Una fila por post con sus redes juntas: la app dibuja una tarjeta, no un join.
   const agrupar = (filas: typeof hoy) => {
-    const mapa = new Map<string, { id: string; texto: string; cuando: string; redes: Array<{ red: string; estado: string }> }>()
-    for (const { post, target } of filas) {
+    const mapa = new Map<
+      string,
+      { id: string; texto: string; cuando: string; redes: Array<{ red: string; handle: string | null; estado: string }> }
+    >()
+    for (const { post, target, handle } of filas) {
       const entrada = mapa.get(post.id) ?? {
         id: post.id,
         texto: post.caption,
         cuando: isoInZone(post.scheduledAt, SITE_TIMEZONE),
         redes: [],
       }
-      entrada.redes.push({ red: target.network, estado: target.status })
+      entrada.redes.push({ red: target.network, handle, estado: target.status })
       mapa.set(post.id, entrada)
     }
     return [...mapa.values()]

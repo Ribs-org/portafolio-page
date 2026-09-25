@@ -37,6 +37,9 @@ vi.mock('@/lib/auth', () => ({
   requireAdmin: async () => USUARIO,
   destroySession: async () => {},
 }))
+// La Tarea 7 suma la primera ruta móvil a este archivo: el guardia del teléfono no lee
+// la petición que le pasa el test, así que una `Request` cualquiera sirve.
+vi.mock('@/lib/mobile-guardia', () => ({ requireMobileUser: async () => USUARIO }))
 
 type Captura = { sql: string; params: unknown[] }
 const capturas: Captura[] = []
@@ -185,6 +188,11 @@ function esperarFiltradoPorDueno({ sql, params }: Captura) {
   const partes = sql.split(/\bwhere\b/i)
   expect(partes.length).toBeGreaterThan(1) // tiene que existir al menos un WHERE real.
   expect(partes.pop()).toMatch(/"owner_id"\s*=\s*\$/)
+}
+
+/** Una petición cualquiera: `requireMobileUser` está simulado y no la mira. */
+function peticionMovil(): Request {
+  return new Request('https://ejemplo.cl/api/mobile/schedule/accounts')
 }
 
 describe('aislamiento por dueño (SQL generado, sin base)', () => {
@@ -371,5 +379,27 @@ describe('aislamiento por dueño, escrituras (SQL generado, sin base)', () => {
     ])
     expect(consultas).toHaveLength(2)
     for (const c of consultas) esperarFiltradoPorDueno(c)
+  })
+
+  it('api/mobile/schedule/accounts: lista solo las cuentas del dueño', async () => {
+    const { GET } = await import('../app/api/mobile/schedule/accounts/route')
+    const consultas = await todasLasConsultas(() => GET(peticionMovil()))
+    expect(consultas).toHaveLength(1)
+    esperarFiltradoPorDueno(consultas[0]!)
+  })
+
+  /**
+   * Ronda de arreglos de la Tarea 7, punto 1: sin este filtro, una cuenta de TikTok
+   * saldría en la lista y la app dibujaría un chip que el servidor iba a rechazar
+   * después de que el dueño subiera el archivo.
+   */
+  it('api/mobile/schedule/accounts: no ofrece redes que el teléfono no publica (TikTok)', async () => {
+    const { GET } = await import('../app/api/mobile/schedule/accounts/route')
+    const consultas = await todasLasConsultas(() => GET(peticionMovil()))
+    expect(consultas).toHaveLength(1)
+    const { sql, params } = consultas[0]!
+    const where = sql.split(/\bwhere\b/i).pop()!
+    expect(where).toMatch(/"network"\s+in\s*\(/i)
+    expect(params).not.toContain('tiktok')
   })
 })
