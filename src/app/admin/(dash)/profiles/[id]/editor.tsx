@@ -200,7 +200,7 @@ export function ProfileEditor({ profile, initialLinks, origin, publicUrl, soloPe
                 enRaiz
                   ? 'Este perfil se sirve en la raíz del sitio.'
                   : profile.isDefault
-                    ? 'Esta es tu página principal. Su dirección salió de tu correo.'
+                    ? 'Esta es tu página principal, por eso su dirección no se edita aquí. Para cambiarla, haz principal a otra página primero.'
                     : undefined
               }
             >
