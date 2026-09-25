@@ -268,6 +268,26 @@ Desconectar borra las credenciales de esa cuenta y conserva su historial. Para v
 **Reconectar** en su tarjeta; para sumar otra cuenta de la misma red, **Agregar
 cuenta** en el bloque de la red.
 
+#### Varias cuentas de una misma red
+
+Puedes tener dos cuentas de Instagram —`@vicente` y `@vicenteclips`— y decidir a cuáles
+sale cada publicación. **El compositor del panel lista tus cuentas, no las redes**, con su
+handle a la vista, y marcas las que quieras: el mismo corte puede salir a las dos.
+
+Nada viene marcado por omisión, salvo que tengas exactamente una cuenta conectada. Es
+deliberado: antes el sistema mandaba siempre a la más antigua de cada red sin preguntar, y
+la segunda quedaba conectada y muda. Una sola posibilidad no es una elección; dos sí, y las
+eliges tú.
+
+Una cuenta cuya credencial venció aparece igual, apagada y con el aviso de reconectarla, en
+vez de desaparecer sin explicación. Y donde antes se leía la red —el calendario, la cola,
+el editor— ahora se lee el handle, para que dos destinos de la misma red se distingan.
+
+TikTok pide sus propias opciones por destino —privacidad, comentarios, dúo, comercial—, así
+que con dos cuentas de TikTok marcadas verás dos bloques, uno por cuenta. No se comparten a
+propósito: TikTok consulta los permisos por creador, y lo que una cuenta admite la otra
+puede no admitirlo.
+
 ### TikTok
 
 En [developers.tiktok.com](https://developers.tiktok.com), registra una app con los
