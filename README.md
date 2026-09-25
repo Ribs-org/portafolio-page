@@ -702,8 +702,11 @@ días). Devuelve `{ desde, hasta, posts }` con lo programado cuya **hora de sali
 en la ventana, salido o no: texto, `fecha` (ISO con offset), portada, media en orden,
 `atributos`, y por cada destino su estado (`scheduled`, `publishing`, `published`,
 `failed`), el `externalId` si ya salió, los intentos, la frase de error si falló, y
-`cuentaId`/`handle` de la cuenta — es la única forma pública de conseguir un
-identificador de cuenta, para usarlo después en el `cuentas` de la carga masiva.
+`cuentaId`/`handle` de la cuenta — útil para recuperar el id de una cuenta que ya tiene
+algún destino programado. Para una cuenta recién conectada, que todavía no tiene
+ninguno, el id está en su tarjeta en **Cuentas** del panel, con un botón para
+copiarlo: es la única superficie que no pide llave de API, solo la sesión de quien
+entra al panel.
 
 ## Estructura
 

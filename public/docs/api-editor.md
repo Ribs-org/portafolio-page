@@ -90,12 +90,18 @@ el post. Para elegir destino, `redes` se ignora cuando `cuentas` no está vacío
 la mandes igual, sigue debiendo tener nombres válidos y sin repetir (ver abajo), así que
 lo más simple es no mandarla en ese caso.
 
-**De dónde salen los identificadores:** no los inventas ni los adivinas del panel — el
-panel no los muestra. La superficie para conseguirlos es `GET /api/schedule/posts`
-(sección 3, más abajo): cada destino de `redes[]` trae `cuentaId` y `handle`. Programa
-la primera vez con `redes` (o con un identificador que ya conozcas de otra fuente),
-lee el post recién creado, y de ahí en adelante ya tienes el id para repetir esa cuenta
-exacta.
+**De dónde salen los identificadores:** no los inventas ni los adivinas. Cada cuenta
+conectada muestra el suyo en su tarjeta, en `/admin/accounts`, con un botón para
+copiarlo — es la forma de conseguir el de una cuenta recién conectada, incluso antes
+de que tenga algo programado, y no pide llave de API, solo la sesión del panel. Si ya
+tienes acceso por API y la cuenta tiene al menos un destino programado, `GET
+/api/schedule/posts` (sección 3, más abajo) también lo trae: cada destino de `redes[]`
+trae `cuentaId` y `handle`.
+
+Lo que **no** resuelve la ambigüedad: programar primero con `redes` para leer el id
+después en el post recién creado. Esa entrada solo se acepta cuando la red no es
+ambigua (ver abajo) — que es justo el caso en que nombrar la red ya alcanza y el id no
+hacía falta.
 
 Un identificador que no es tuyo, o que es de una cuenta desconectada, rechaza la fila
 entera — ver la tabla de errores.
