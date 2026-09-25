@@ -253,3 +253,43 @@ export function enlacePublicoDe(
 
   return `https://${dominio.dominioProducto}/${perfil.slug}`
 }
+
+/**
+ * La URL pública completa a mostrar y copiar en el editor de un perfil — la misma dirección
+ * a la que lleva «Ver página» en esa misma pantalla, ya resuelta contra `origin`.
+ *
+ * El bug que esto arregla: el editor calculaba su propio camino (`enRaiz ? '/' :
+ * /${slug}`) sin mirar el host, así que en el dominio del producto el botón Copiar de la
+ * principal del admin copiaba `${origin}/` —la landing— en vez de `${origin}/<slug>` —el
+ * perfil de verdad—, mientras «Ver página», que ya usaba `enlacePublicoDe`, apuntaba bien.
+ * Las dos deben coincidir siempre, así que las dos parten de la misma función.
+ *
+ * `enlacePublicoDe` devuelve a veces una ruta relativa a este host (se compone con
+ * `origin`) y a veces una URL absoluta hacia el dominio del producto (este host no sirve
+ * ese perfil, y ya trae su propio dominio): esa segunda se deja tal cual.
+ */
+export function urlPublicaDe(
+  perfil: { isDefault: boolean; slug: string; ownerId: string | null },
+  adminId: string,
+  dominio: { enElProducto: boolean; dominioProducto: string | null },
+  origin: string,
+): string {
+  const enlace = enlacePublicoDe(perfil, adminId, dominio)
+  return enlace.startsWith('http') ? enlace : `${origin}${enlace}`
+}
+
+/**
+ * Qué mostrar como ruta de un perfil en una lista de solo texto (no un enlace): el mismo
+ * camino al que apunta `enlacePublicoDe`, pero sin el dominio cuando esa función devolvió
+ * una URL absoluta — acá el dominio sería ruido, la lista ya vive dentro del panel del
+ * propio dueño. Mismo desfase que `urlPublicaDe`: sin esto, la principal del admin se
+ * mostraba en `/` aunque el host actual fuera el del producto, donde vive en `/<slug>`.
+ */
+export function rutaMostradaDe(
+  perfil: { isDefault: boolean; slug: string; ownerId: string | null },
+  adminId: string,
+  dominio: { enElProducto: boolean; dominioProducto: string | null },
+): string {
+  const enlace = enlacePublicoDe(perfil, adminId, dominio)
+  return enlace.startsWith('http') ? new URL(enlace).pathname : enlace
+}

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { enlacePublicoDe, rutaPublicaDe } from './utils'
+import { enlacePublicoDe, rutaMostradaDe, rutaPublicaDe, urlPublicaDe } from './utils'
 
 describe('rutaPublicaDe', () => {
   const ADMIN = 'admin-1'
@@ -69,5 +69,80 @@ describe('enlacePublicoDe', () => {
     const perfil = { isDefault: true, slug: 'ana', ownerId: 'invitado-1' }
     const enlace = enlacePublicoDe(perfil, ADMIN, { enElProducto: false, dominioProducto: null })
     expect(enlace).toBe('/ana')
+  })
+})
+
+describe('urlPublicaDe', () => {
+  const ADMIN = 'admin-1'
+  const PRODUCTO = 'tu-parrilla.cl'
+  const ORIGIN = 'https://tu-parrilla.cl'
+
+  // El bug que este arreglo existe para resolver: el editor de la principal del admin, en
+  // el dominio del producto, mostraba y copiaba `${origin}/` (la landing) en vez de la
+  // dirección real del perfil — a diferencia de «Ver página», que ya usaba `enlacePublicoDe`
+  // y sí apuntaba a `/<slug>`. Las dos tienen que coincidir siempre.
+  it('en el dominio del producto, la principal del admin copia /<slug>, no la raíz', () => {
+    const perfil = { isDefault: true, slug: 'vicente', ownerId: ADMIN }
+    const url = urlPublicaDe(perfil, ADMIN, { enElProducto: true, dominioProducto: PRODUCTO }, ORIGIN)
+    expect(url).toBe('https://tu-parrilla.cl/vicente')
+  })
+
+  it('fuera del dominio del producto, la principal del admin sigue copiando la raíz', () => {
+    const perfil = { isDefault: true, slug: 'vicente', ownerId: ADMIN }
+    const url = urlPublicaDe(perfil, ADMIN, { enElProducto: false, dominioProducto: PRODUCTO }, ORIGIN)
+    expect(url).toBe('https://tu-parrilla.cl/')
+  })
+
+  it('un perfil secundario compone la ruta relativa con el origen actual', () => {
+    const perfil = { isDefault: false, slug: 'segundo', ownerId: ADMIN }
+    const url = urlPublicaDe(perfil, ADMIN, { enElProducto: false, dominioProducto: PRODUCTO }, ORIGIN)
+    expect(url).toBe('https://tu-parrilla.cl/segundo')
+  })
+
+  // Cuando `enlacePublicoDe` ya manda a un dominio ajeno al origen actual, esa URL
+  // absoluta se deja tal cual: componerla con el origen de quien mira la duplicaría mal.
+  it('cuando el enlace ya es absoluto (dominio ajeno), no se compone con el origen actual', () => {
+    const perfil = { isDefault: true, slug: 'ana', ownerId: 'invitado-1' }
+    const url = urlPublicaDe(
+      perfil,
+      ADMIN,
+      { enElProducto: false, dominioProducto: PRODUCTO },
+      'https://vicente-parrilla.cl',
+    )
+    expect(url).toBe('https://tu-parrilla.cl/ana')
+  })
+
+  it('sin DOMINIO_PRODUCTO configurado, nada cambia: la restricción global de la rama', () => {
+    const perfil = { isDefault: true, slug: 'vicente', ownerId: ADMIN }
+    const url = urlPublicaDe(perfil, ADMIN, { enElProducto: false, dominioProducto: null }, ORIGIN)
+    expect(url).toBe('https://tu-parrilla.cl/')
+  })
+})
+
+describe('rutaMostradaDe', () => {
+  const ADMIN = 'admin-1'
+  const PRODUCTO = 'tu-parrilla.cl'
+
+  // El mismo desfase de `urlPublicaDe`, pero en las etiquetas de solo texto de
+  // `(dash)/profiles/page.tsx` y `(dash)/page.tsx`: mostraban `/` para la principal del
+  // admin aunque el host actual fuera el del producto, donde en realidad vive en `/<slug>`.
+  it('en el dominio del producto, la principal del admin muestra /<slug>, no /', () => {
+    const perfil = { isDefault: true, slug: 'vicente', ownerId: ADMIN }
+    const ruta = rutaMostradaDe(perfil, ADMIN, { enElProducto: true, dominioProducto: PRODUCTO })
+    expect(ruta).toBe('/vicente')
+  })
+
+  it('fuera del dominio del producto, la principal del admin sigue mostrando /', () => {
+    const perfil = { isDefault: true, slug: 'vicente', ownerId: ADMIN }
+    const ruta = rutaMostradaDe(perfil, ADMIN, { enElProducto: false, dominioProducto: PRODUCTO })
+    expect(ruta).toBe('/')
+  })
+
+  // Solo texto, no un enlace: si `enlacePublicoDe` ya resolvió una URL absoluta hacia el
+  // dominio del producto, se muestra únicamente el camino, sin el dominio como ruido.
+  it('si el enlace real es absoluto, muestra solo el camino', () => {
+    const perfil = { isDefault: true, slug: 'ana', ownerId: 'invitado-1' }
+    const ruta = rutaMostradaDe(perfil, ADMIN, { enElProducto: false, dominioProducto: PRODUCTO })
+    expect(ruta).toBe('/ana')
   })
 })

@@ -6,7 +6,7 @@ import { requireUser } from '@/lib/auth'
 import { dominioProducto, esDominioDelProducto } from '@/lib/dominios'
 import { getAllLinks, getAllProfiles } from '@/lib/profiles'
 import { adminId } from '@/lib/usuarios'
-import { enlacePublicoDe, rutaPublicaDe } from '@/lib/utils'
+import { enlacePublicoDe, rutaMostradaDe } from '@/lib/utils'
 import { createProfile, makeDefault } from '../../actions'
 
 export const dynamic = 'force-dynamic'
@@ -68,7 +68,7 @@ export default async function ProfilesPage() {
                   ) : null}
                 </div>
                 <p className="mt-1 truncate font-mono text-[0.72rem] text-fg-faint">
-                  {rutaPublicaDe(profile, admin)}
+                  {rutaMostradaDe(profile, admin, dominio)}
                 </p>
                 <p className="mt-2 text-[0.78rem] text-fg-muted">
                   {counts[i]} link{counts[i] === 1 ? '' : 's'}

@@ -40,16 +40,17 @@ type Props = {
   profile: Profile
   initialLinks: DraftLink[]
   origin: string
-  /** Si este perfil vive en `/` (el principal del admin del despliegue) en vez de en
-   *  `/<slug>`. Lo decide el servidor con `rutaPublicaDe` —que necesita el id del admin,
-   *  algo que este componente de cliente no tiene por qué conocer— y llega ya resuelto. */
-  enRaiz: boolean
+  /** La URL pública completa de este perfil — la misma a la que lleva «Ver página» en esta
+   *  misma pantalla. La calcula el servidor con `urlPublicaDe` (que envuelve
+   *  `enlacePublicoDe`), porque necesita el id del admin y el dominio del producto, ninguno
+   *  de los cuales tiene por qué conocer este componente de cliente. */
+  publicUrl: string
   /** Si esta es la única página del dueño. `deleteProfile` se niega a borrarla igual, pero
    *  la interfaz no debe ofrecer un botón que solo lleva a ese error. */
   soloPerfil: boolean
 }
 
-export function ProfileEditor({ profile, initialLinks, origin, enRaiz, soloPerfil }: Props) {
+export function ProfileEditor({ profile, initialLinks, origin, publicUrl, soloPerfil }: Props) {
   const router = useRouter()
   const [links, setLinks] = useState(initialLinks)
   const [draft, setDraft] = useState({
@@ -96,12 +97,11 @@ export function ProfileEditor({ profile, initialLinks, origin, enRaiz, soloPerfi
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   )
 
-  // `draft.slug` y no `profile.slug`: cuando el campo está habilitado (perfil no
-  // principal) la vista previa de la URL debe seguir lo que se está escribiendo, no lo
-  // último guardado. `enRaiz` no cambia en el cliente —lo decidió el servidor— así que da
-  // igual que la ruta salga de `draft.slug` y no de `profile.slug`.
-  const publicPath = enRaiz ? '/' : `/${draft.slug}`
-  const publicUrl = `${origin}${publicPath}`
+  // Si `publicUrl` —la misma dirección a la que lleva «Ver página»— es la raíz de este
+  // origen, este perfil se sirve de verdad en `/` de este host. No se puede leer eso de
+  // `profile.isDefault` a secas: en el dominio del producto la principal del admin también
+  // es `isDefault` y sin embargo vive en `/<slug>`, no en `/` (ver `urlPublicaDe`).
+  const enRaiz = publicUrl === `${origin}/`
 
   const previewLinks = useMemo(
     () =>

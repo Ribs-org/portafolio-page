@@ -9,7 +9,7 @@ import { requireUser } from '@/lib/auth'
 import { dominioProducto, esDominioDelProducto } from '@/lib/dominios'
 import { getAllLinks, getAllProfiles } from '@/lib/profiles'
 import { adminId } from '@/lib/usuarios'
-import { enlacePublicoDe, rutaPublicaDe, toZonedInput } from '@/lib/utils'
+import { enlacePublicoDe, toZonedInput, urlPublicaDe } from '@/lib/utils'
 import { ProfileEditor } from './editor'
 import type { DraftLink } from './link-row'
 
@@ -32,19 +32,17 @@ export default async function EditProfilePage({ params }: { params: Promise<{ id
   const origin = `${protocol}://${host}`
 
   const admin = await adminId()
-  // Solo el principal del admin del despliegue vive en `/`. El editor necesita saberlo
-  // también para su propia vista previa de la URL, pero como componente de cliente no
-  // tiene por qué conocer el id del admin: se resuelve acá y se le pasa ya el booleano.
-  const ruta = rutaPublicaDe(profile, admin)
-  const enRaiz = ruta === '/'
-  // «Ver página» no siempre puede usar `ruta` tal cual: este host puede no servirla (la
+  // «Ver página» no siempre puede usar la ruta cruda: este host puede no servirla (la
   // principal de un invitado en un dominio que no es el del producto) o servirla en otra
   // parte (cualquier página en el dominio del producto, donde la raíz es la landing). Ver
   // el comentario de `enlacePublicoDe`.
-  const hrefVerPagina = enlacePublicoDe(profile, admin, {
-    enElProducto: esDominioDelProducto(host),
-    dominioProducto: dominioProducto(),
-  })
+  const dominio = { enElProducto: esDominioDelProducto(host), dominioProducto: dominioProducto() }
+  const hrefVerPagina = enlacePublicoDe(profile, admin, dominio)
+  // Lo que el editor muestra y copia en «Compartir» tiene que ser la misma dirección: se
+  // calcula acá con la misma función (`urlPublicaDe`, que envuelve `enlacePublicoDe`) y se
+  // le pasa ya resuelta. Como componente de cliente no tiene por qué conocer el id del
+  // admin ni el dominio del producto para llegar a lo mismo por su cuenta.
+  const publicUrl = urlPublicaDe(profile, admin, dominio, origin)
 
   // Si es la única página del dueño, el editor no ofrece el botón de borrar: el servidor
   // (`deleteProfile`) también se niega, pero la interfaz no debe llevar a ese error.
@@ -91,7 +89,7 @@ export default async function EditProfilePage({ params }: { params: Promise<{ id
         profile={profile}
         initialLinks={initialLinks}
         origin={origin}
-        enRaiz={enRaiz}
+        publicUrl={publicUrl}
         soloPerfil={soloPerfil}
       />
     </>

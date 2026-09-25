@@ -25,7 +25,7 @@ import { parseFilters } from '@/lib/filters'
 import { cargaPorDia } from '@/lib/posts'
 import { getAllProfiles } from '@/lib/profiles'
 import { adminId } from '@/lib/usuarios'
-import { enlacePublicoDe, formatNumber, formatPercent, rutaPublicaDe } from '@/lib/utils'
+import { enlacePublicoDe, formatNumber, formatPercent, rutaMostradaDe } from '@/lib/utils'
 
 export const dynamic = 'force-dynamic'
 
@@ -137,7 +137,7 @@ export default async function OverviewPage({
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-medium">{profile.displayName}</p>
                   <p className="truncate font-mono text-[0.7rem] text-fg-faint">
-                    {rutaPublicaDe(profile, admin)}
+                    {rutaMostradaDe(profile, admin, dominio)}
                     {profile.isDefault ? ' (principal)' : ''}
                     {profile.isPublished ? '' : ' · borrador'}
                   </p>
