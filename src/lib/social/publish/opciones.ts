@@ -151,8 +151,8 @@ export function validarOpcionesPorCuenta(
  * privacidad viaja vacía a propósito: así la validación responde con la frase de la
  * privacidad y no con la de la forma.
  *
- * Convive con `opcionesDesdeFormulario` (sin sufijo, keyed por red) mientras el
- * compositor no mande cuentas: esta es aditiva y todavía no tiene llamador en producción.
+ * Convive con `opcionesDesdeFormulario` (sin sufijo, keyed por red): esa sigue viva por
+ * la ruta móvil hasta la Tarea 7; el compositor web ya llama a esta.
  */
 export function opcionesDesdeFormularioPorCuenta(
   formData: FormData,

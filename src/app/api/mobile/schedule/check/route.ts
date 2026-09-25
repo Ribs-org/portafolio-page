@@ -7,7 +7,7 @@ import {
   resolverCuando,
 } from '@/lib/mobile-api'
 import { validateScheduleDraft } from '@/lib/social/publish/validate'
-import { exigirCuentas, SinCuenta } from '@/lib/social/cuentas'
+import { CuentaInvalida, cuentaUnicaPorRed } from '@/lib/social/cuentas'
 
 export const dynamic = 'force-dynamic'
 
@@ -46,11 +46,15 @@ export async function POST(request: Request) {
   )
   if (error) return NextResponse.json({ error }, { status: 400 })
 
-  // Este chequeo existe para fallar antes de la subida, así que también tiene que saberlo.
+  // Este chequeo existe para fallar antes de la subida, así que también tiene que
+  // prometer lo mismo que el `POST` va a cumplir: con dos cuentas en una red, ninguno
+  // adivina. `cuentaUnicaPorRed`, no `exigirCuentas` — si aquí dijera que sí con la más
+  // antigua y el `POST` fuera el único que se da cuenta de la ambigüedad, la app subiría
+  // el archivo por datos móviles para que el envío se rechace recién al final.
   try {
-    await exigirCuentas(usuario.id, borrador.redes)
+    await cuentaUnicaPorRed(usuario.id, borrador.redes)
   } catch (fallo) {
-    if (fallo instanceof SinCuenta) return NextResponse.json({ error: fallo.message }, { status: 400 })
+    if (fallo instanceof CuentaInvalida) return NextResponse.json({ error: fallo.message }, { status: 400 })
     throw fallo
   }
 

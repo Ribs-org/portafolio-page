@@ -23,12 +23,22 @@ import {
   tipoArchivo,
   PORTADA_NEEDS_VIDEO,
 } from '@/lib/social/publish/batch'
-import { opcionesDesdeFormulario, validarOpciones, validarOpcionesPorRed } from '@/lib/social/publish/opciones'
+import {
+  opcionesDesdeFormularioPorCuenta,
+  validarOpciones,
+  validarOpcionesPorCuenta,
+} from '@/lib/social/publish/opciones'
 import { extensionDe, validateScheduleDraft } from '@/lib/social/publish/validate'
 import { validateAtributos, ATRIBUTOS_ERROR, type Atributos } from '@/lib/social/publish/atributos'
 import { diffMedia, diffTargets } from '@/lib/social/publish/edit'
 import { crearPostProgramado } from '@/lib/social/publish/crear'
-import { SinCuenta, exigirCuentas, cuentasPrimarias } from '@/lib/social/cuentas'
+import {
+  CuentaInvalida,
+  SinCuenta,
+  exigirCuentas,
+  verificarCuentas,
+  type CuentaDestino,
+} from '@/lib/social/cuentas'
 import { CUENTA_DE_OTRO, CuentaDeOtro, guardarCuenta, tokensDePaginas } from '@/lib/social/conectar'
 import { SIN_TOKEN_DE_PAGINA } from '@/lib/social/facebook'
 import { tiktokConnector } from '@/lib/social/tiktok'
@@ -564,19 +574,19 @@ export async function updatePostCampaign(
 
 /**
  * Lo que el bloque de TikTok del compositor necesita al abrirse: nombre, avatar y qué
- * privacidades puede elegir el dueño hoy. Por la cuenta primaria de TikTok, la misma a
- * la que `crearPostProgramado` va a apuntar el destino.
+ * privacidades puede elegir el dueño hoy. Por la cuenta que se le pide, no por «la»
+ * cuenta de TikTok: con dos conectadas, las privacidades permitidas pueden diferir.
  */
-export async function leerCreadorTikTok(): Promise<{ creador: CreadorTikTok } | { error: string }> {
+export async function leerCreadorTikTok(accountId: string): Promise<{ creador: CreadorTikTok } | { error: string }> {
   const { id: ownerId } = await requireUser()
-  const cuentas = await cuentasPrimarias(ownerId, ['tiktok'])
-  const id = cuentas.get('tiktok')
-  if (!id) return { error: TIKTOK_SIN_CUENTA }
   const [account] = await getDb()
     .select()
     .from(socialAccounts)
-    .where(and(eq(socialAccounts.id, id), eq(socialAccounts.ownerId, ownerId)))
-  const token = account ? await tiktokConnector.ensureCredential(account) : null
+    .where(and(eq(socialAccounts.id, accountId), eq(socialAccounts.ownerId, ownerId)))
+  // Sin esto, el identificador de una cuenta propia de otra red pasa el filtro del dueño
+  // y `ensureCredential` manda su token a la API de TikTok igual.
+  if (!account || account.network !== 'tiktok') return { error: TIKTOK_SIN_CUENTA }
+  const token = await tiktokConnector.ensureCredential(account)
   if (!token) return { error: TIKTOK_SIN_CUENTA }
   return consultarCreador(token)
 }
@@ -638,7 +648,22 @@ export async function createScheduledPost(_prev: FormState, formData: FormData):
   const { id: ownerId } = await requireUser()
 
   const caption = String(formData.get('caption') ?? '').trim()
-  const networks = formData.getAll('networks').map(String)
+
+  const elegidas = formData.getAll('cuentas').map(String)
+  if (elegidas.length === 0) return { error: 'Elige al menos una cuenta.' }
+
+  let cuentas: CuentaDestino[]
+  try {
+    cuentas = await verificarCuentas(ownerId, elegidas)
+  } catch (error) {
+    if (error instanceof CuentaInvalida) return { error: error.message }
+    throw error
+  }
+
+  // `validateScheduleDraft` razona en redes (el vídeo obligatorio de TikTok, los 280 de
+  // X): las redes son las de las cuentas elegidas, sin repetir.
+  const networks = [...new Set(cuentas.map((c) => c.network))]
+
   // El botón «Ahora» del compositor no manda una hora, manda esta marca: el reloj del
   // navegador puede ir atrasado y quien decide si algo está en el futuro es este proceso.
   // Un minuto de margen para que la validación no dependa de cuánto tardó el envío.
@@ -668,26 +693,20 @@ export async function createScheduledPost(_prev: FormState, formData: FormData):
   // Lo que la red exige por destino. Ya no protege la subida —el navegador subió antes de
   // enviar—, pero sigue evitando que se cree un post que ninguna red aceptaría. Lo que
   // quede huérfano en el bucket lo borra el barrido diario.
-  const opcionesCheck = validarOpcionesPorRed(networks, opcionesDesdeFormulario(formData, networks))
+  const opcionesCheck = validarOpcionesPorCuenta(cuentas, opcionesDesdeFormularioPorCuenta(formData, cuentas))
   if ('error' in opcionesCheck) return { error: opcionesCheck.error }
 
   const reglaCheck = validarRegla(reglaDesdeFormulario(formData))
   if ('error' in reglaCheck) return { error: reglaCheck.error }
 
-
-  try {
-    await crearPostProgramado(ownerId, {
-      caption,
-      scheduledAt: scheduledAt!,
-      media: uploaded,
-      networks,
-      opciones: opcionesCheck.opciones,
-      regla: reglaCheck.regla,
-    })
-  } catch (error) {
-    if (error instanceof SinCuenta) return { error: error.message }
-    throw error
-  }
+  await crearPostProgramado(ownerId, {
+    caption,
+    scheduledAt: scheduledAt!,
+    media: uploaded,
+    cuentas,
+    opciones: opcionesCheck.opciones,
+    regla: reglaCheck.regla,
+  })
 
   revalidatePath('/admin/schedule')
   return { ok: true }

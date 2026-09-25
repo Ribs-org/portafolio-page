@@ -14,7 +14,7 @@ import {
   resolverCuando,
 } from '@/lib/mobile-api'
 import { crearPostProgramado } from '@/lib/social/publish/crear'
-import { SinCuenta } from '@/lib/social/cuentas'
+import { CuentaInvalida, cuentaUnicaPorRed, type CuentaDestino } from '@/lib/social/cuentas'
 import { validateScheduleDraft } from '@/lib/social/publish/validate'
 import { basePublica, existe, keyDesdeUrl } from '@/lib/storage'
 
@@ -127,6 +127,18 @@ export async function POST(request: Request) {
   )
   if (error) return NextResponse.json({ error }, { status: 400 })
 
+  // Puente mientras la app siga mandando redes: resuelve cada una a su única cuenta
+  // conectada, igual que hacía `exigirCuentas` antes de esta entrega — con la diferencia
+  // que esta entrega suma, que con dos cuentas en la misma red ya no adivina. La Tarea 7
+  // hace que la app mande cuentas directamente, y este puente deja de hacer falta.
+  let cuentas: CuentaDestino[]
+  try {
+    cuentas = [...(await cuentaUnicaPorRed(usuario.id, borrador.redes)).values()]
+  } catch (fallo) {
+    if (fallo instanceof CuentaInvalida) return NextResponse.json({ error: fallo.message }, { status: 400 })
+    throw fallo
+  }
+
   try {
     for (const m of media) {
       if (!(await existe(m.url))) return NextResponse.json({ error: ARCHIVO_FALTANTE }, { status: 400 })
@@ -141,11 +153,10 @@ export async function POST(request: Request) {
       caption: borrador.texto,
       scheduledAt: scheduledAt!,
       media,
-      networks: borrador.redes,
+      cuentas,
     })
     return NextResponse.json({ id, cuando: isoInZone(scheduledAt!, SITE_TIMEZONE) })
   } catch (dbError) {
-    if (dbError instanceof SinCuenta) return NextResponse.json({ error: dbError.message }, { status: 400 })
     console.error('schedule/crear:', String(dbError).slice(0, 300))
     return NextResponse.json({ error: NO_SE_GUARDO }, { status: 500 })
   }
