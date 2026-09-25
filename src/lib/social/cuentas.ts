@@ -2,7 +2,7 @@
 // en redes. Sin `server-only`: `crear.ts` lo importa y `actions.ts` ya es server.
 import { and, asc, eq, inArray, isNotNull } from 'drizzle-orm'
 import { getDb, socialAccounts } from '@/db'
-import { SIN_CUENTA, agruparPorRed, primariaDe } from './cuenta'
+import { SIN_CUENTA, agruparPorRed } from './cuenta'
 
 /** Lo que no se puede usar como destino: ajena, inexistente o sin credencial. */
 export class CuentaInvalida extends Error {}
@@ -33,43 +33,6 @@ export function RED_AMBIGUA(network: string, handles: Array<string | null>): str
   return `Tienes ${handles.length} cuentas de ${network} (${lista}). Elige cuál con «cuentas».`
 }
 
-/**
- * Red → id de su cuenta primaria (la más antigua del dueño), para las redes pedidas. Solo
- * cuentas con credencial: una desconectada no puede recibir destinos. Una red sin fila no
- * aparece: quien escribe decide qué frase dar. Hasta que la entrega 3 traiga
- * `destinos`, «la cuenta de facebook» es esta.
- */
-export async function cuentasPrimarias(ownerId: string, networks: string[]): Promise<Map<string, string>> {
-  if (networks.length === 0) return new Map()
-  const filas = await getDb()
-    .select({ id: socialAccounts.id, network: socialAccounts.network, createdAt: socialAccounts.createdAt })
-    .from(socialAccounts)
-    .where(
-      and(
-        inArray(socialAccounts.network, networks),
-        isNotNull(socialAccounts.accessToken),
-        eq(socialAccounts.ownerId, ownerId),
-      ),
-    )
-    .orderBy(asc(socialAccounts.createdAt))
-  const porRed = agruparPorRed(filas)
-  const resultado = new Map<string, string>()
-  for (const [network, cuentas] of porRed) {
-    const id = primariaDe(cuentas)
-    if (id) resultado.set(network, id)
-  }
-  return resultado
-}
-
-/** Como `cuentasPrimarias`, pero lanza `SinCuenta` a la primera red sin cuenta. */
-export async function exigirCuentas(ownerId: string, networks: string[]): Promise<Map<string, string>> {
-  const cuentas = await cuentasPrimarias(ownerId, networks)
-  for (const network of networks) {
-    if (!cuentas.has(network)) throw new SinCuenta(network)
-  }
-  return cuentas
-}
-
 /** Fila cruda de `social_accounts`, lo mínimo que necesita una decisión de verificación. */
 type FilaVerificable = { id: string; network: string; handle: string | null; accessToken: string | null }
 
@@ -94,10 +57,10 @@ export function decidirVerificacion(accountIds: string[], filas: FilaVerificable
  * Las cuentas elegidas, verificadas: todas del dueño y todas conectadas. Devuelve en el
  * orden pedido, sin repetir.
  *
- * Es la inversa de la vieja `cuentasPrimarias`: no elige por nadie, comprueba lo que le
- * dieron. Los identificadores llegan del navegador o del teléfono, así que la pertenencia
- * es una comprobación de seguridad, no una cortesía — sin ella se podría programar una
- * publicación en la cuenta de otro mandando su identificador.
+ * No elige por nadie: comprueba lo que le dieron. Los identificadores llegan del
+ * navegador o del teléfono, así que la pertenencia es una comprobación de seguridad, no
+ * una cortesía — sin ella se podría programar una publicación en la cuenta de otro
+ * mandando su identificador.
  *
  * Una lista vacía no es un error acá: devuelve `[]` sin consultar. Exigir «al menos un
  * destino» le toca a quien llama, no a esta función — un llamador distraído programaría

@@ -111,7 +111,7 @@ const { getRecentVisits } = await import('./analytics')
 const { getCuentas, cargaPorDia, getPostRows } = await import('./posts')
 const { getAllProfiles, getProfileBySlug } = await import('./profiles')
 const { getCola } = await import('./comentarios-cola')
-const { cuentasPrimarias, verificarCuentas, cuentaUnicaPorRed } = await import('./social/cuentas')
+const { verificarCuentas, cuentaUnicaPorRed } = await import('./social/cuentas')
 const { leerAjuste } = await import('./ajustes')
 const { makeDefault, updateProfile, deleteScheduledPost } = await import('@/app/admin/actions')
 
@@ -270,12 +270,6 @@ describe('aislamiento por dueño (SQL generado, sin base)', () => {
 
   it('comentarios-cola: getCola filtra por el dueño de la cuenta', async () => {
     const consultas = await todasLasConsultas(() => getCola(DUENO, { estado: 'pendientes', red: null }))
-    expect(consultas).toHaveLength(1)
-    for (const c of consultas) esperarFiltradoPorDueno(c)
-  })
-
-  it('social/cuentas: cuentasPrimarias filtra por dueño', async () => {
-    const consultas = await todasLasConsultas(() => cuentasPrimarias(DUENO, ['instagram']))
     expect(consultas).toHaveLength(1)
     for (const c of consultas) esperarFiltradoPorDueno(c)
   })

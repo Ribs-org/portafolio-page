@@ -99,20 +99,6 @@ export function validarOpciones(
   return { error: OPCIONES_ERROR }
 }
 
-/** Para una fila entera: un objeto por red pedida, solo con las que tienen opciones. */
-export function validarOpcionesPorRed(
-  networks: string[],
-  raw: Record<string, unknown>,
-): { opciones: Record<string, OpcionesDestino> } | { error: string } {
-  const opciones: Record<string, OpcionesDestino> = {}
-  for (const network of networks) {
-    const check = validarOpciones(network, raw[network])
-    if ('error' in check) return check
-    if (check.opciones) opciones[network] = check.opciones
-  }
-  return { opciones }
-}
-
 /**
  * Para una fila entera: un objeto por cuenta elegida, solo con las que tienen opciones.
  *
@@ -150,9 +136,6 @@ export function validarOpcionesPorCuenta(
  * puede haber dos bloques en el mismo formulario. Con TikTok marcado y sin campos, la
  * privacidad viaja vacía a propósito: así la validación responde con la frase de la
  * privacidad y no con la de la forma.
- *
- * Convive con `opcionesDesdeFormulario` (sin sufijo, keyed por red): esa sigue viva por
- * la ruta móvil hasta la Tarea 7; el compositor web ya llama a esta.
  */
 export function opcionesDesdeFormularioPorCuenta(
   formData: FormData,
@@ -172,30 +155,6 @@ export function opcionesDesdeFormularioPorCuenta(
             duo: formData.get(`tiktokDuo:${cuenta.id}`) === 'on',
             pegar: formData.get(`tiktokPegar:${cuenta.id}`) === 'on',
             comercial: String(formData.get(`tiktokComercial:${cuenta.id}`) ?? 'no'),
-          }
-  }
-  return raw
-}
-
-/**
- * Lo que el compositor manda, tal cual, listo para `validarOpcionesPorRed`. Con TikTok
- * marcado y sin campos, la privacidad viaja vacía a propósito: así la validación
- * responde con la frase de la privacidad y no con la de la forma.
- */
-export function opcionesDesdeFormulario(formData: FormData, networks: string[]): Record<string, unknown> {
-  const raw: Record<string, unknown> = {}
-  if (networks.includes('tiktok')) {
-    const modo = String(formData.get('tiktokModo') ?? 'directo')
-    raw.tiktok =
-      modo === 'borrador'
-        ? { modo: 'borrador' }
-        : {
-            modo: 'directo',
-            privacidad: String(formData.get('tiktokPrivacidad') ?? ''),
-            comentarios: formData.get('tiktokComentarios') === 'on',
-            duo: formData.get('tiktokDuo') === 'on',
-            pegar: formData.get('tiktokPegar') === 'on',
-            comercial: String(formData.get('tiktokComercial') ?? 'no'),
           }
   }
   return raw

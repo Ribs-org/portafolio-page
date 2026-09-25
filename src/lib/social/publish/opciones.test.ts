@@ -3,12 +3,10 @@ import {
   OPCIONES_ERROR,
   TIKTOK_PATROCINADO_PRIVADO,
   TIKTOK_SIN_PRIVACIDAD,
-  opcionesDesdeFormulario,
   opcionesDesdeFormularioPorCuenta,
   resumenOpciones,
   validarOpciones,
   validarOpcionesPorCuenta,
-  validarOpcionesPorRed,
 } from './opciones'
 
 const directo = {
@@ -88,23 +86,6 @@ describe('validarOpciones para otras redes', () => {
   })
 })
 
-describe('validarOpcionesPorRed', () => {
-  it('devuelve solo las redes con opciones', () => {
-    expect(validarOpcionesPorRed(['instagram', 'tiktok'], { tiktok: directo })).toEqual({
-      opciones: { tiktok: directo },
-    })
-    expect(validarOpcionesPorRed(['instagram'], {})).toEqual({ opciones: {} })
-  })
-
-  it('una red pedida sin sus opciones falla con su frase', () => {
-    expect(validarOpcionesPorRed(['tiktok'], {})).toEqual({ error: TIKTOK_SIN_PRIVACIDAD })
-  })
-
-  it('ignora opciones de redes que no están en la fila', () => {
-    expect(validarOpcionesPorRed(['instagram'], { tiktok: directo })).toEqual({ opciones: {} })
-  })
-})
-
 describe('validarOpcionesPorCuenta', () => {
   // Dos cuentas con valores que se distinguen entre sí (una en borrador, otra directa
   // con una privacidad concreta) a propósito: si algún día se cruzaran las identidades
@@ -133,8 +114,7 @@ describe('validarOpcionesPorCuenta', () => {
     expect(check.opciones['tt-2']).toEqual(raw['tt-2'])
   })
 
-  // Simétrico con el test de `validarOpcionesPorRed` que hace lo mismo por red: una
-  // clave sobrante en `raw` no es un error, es una decisión documentada.
+  // Una clave sobrante en `raw` no es un error, es una decisión documentada.
   it('ignora las claves de raw que no corresponden a ninguna cuenta pedida', () => {
     const cuentas = [{ id: 'tt-1', network: 'tiktok', handle: '@vicente' }]
     const raw = { 'tt-1': { modo: 'borrador' }, 'tt-2': { modo: 'directo', privacidad: 'SELF_ONLY' } }
@@ -187,48 +167,51 @@ describe('opcionesDesdeFormularioPorCuenta', () => {
     expect(raw['tt-1']).toEqual({ modo: 'borrador' })
     expect((raw['tt-2'] as Record<string, unknown>).privacidad).toBe('SELF_ONLY')
   })
-})
 
-describe('opcionesDesdeFormulario', () => {
-  function form(entries: Record<string, string>): FormData {
+  // Con cuentas de dos redes en la misma fila (el caso que esta entrega hizo posible),
+  // una cuenta que no es de TikTok no puede dejar entrada: si la dejara, ese valor no
+  // vacío llegaría a `validarOpciones` para una red que no acepta nada, y la fila entera
+  // se rechazaría con el error de forma en vez de publicarse en la cuenta de TikTok.
+  it('una cuenta que no es de TikTok no produce entrada, aunque venga marcada', () => {
     const fd = new FormData()
-    for (const [k, v] of Object.entries(entries)) fd.set(k, v)
-    return fd
-  }
-
-  it('arma el objeto de tiktok desde los campos del compositor', () => {
-    const fd = form({
-      tiktokModo: 'directo',
-      tiktokPrivacidad: 'SELF_ONLY',
-      tiktokComentarios: 'on',
-      tiktokComercial: 'marca_propia',
-    })
-    expect(opcionesDesdeFormulario(fd, ['tiktok'])).toEqual({
-      tiktok: {
-        modo: 'directo',
-        privacidad: 'SELF_ONLY',
-        comentarios: true,
-        duo: false,
-        pegar: false,
-        comercial: 'marca_propia',
+    fd.set('tiktokModo:tt-1', 'directo')
+    fd.set('tiktokPrivacidad:tt-1', 'SELF_ONLY')
+    const cuentas = [
+      { id: 'ig-1', network: 'instagram', handle: '@insta' },
+      { id: 'tt-1', network: 'tiktok', handle: '@vicente' },
+    ]
+    const raw = opcionesDesdeFormularioPorCuenta(fd, cuentas)
+    expect(Object.keys(raw)).toEqual(['tt-1'])
+    // De punta a punta: mezclar una cuenta de otra red no revienta la validación.
+    expect(validarOpcionesPorCuenta(cuentas, raw)).toEqual({
+      opciones: {
+        'tt-1': {
+          modo: 'directo',
+          privacidad: 'SELF_ONLY',
+          comentarios: false,
+          duo: false,
+          pegar: false,
+          comercial: 'no',
+        },
       },
     })
   })
 
-  it('en borrador solo viaja el modo', () => {
-    expect(opcionesDesdeFormulario(form({ tiktokModo: 'borrador', tiktokPrivacidad: 'SELF_ONLY' }), ['tiktok'])).toEqual({
-      tiktok: { modo: 'borrador' },
+  // El comentario de la función dice que esto es a propósito: sin campos, la privacidad
+  // viaja vacía (no ausente) para que la validación responda con su frase propia —
+  // `TIKTOK_SIN_PRIVACIDAD`— y no con la del formulario que no entiende `OPCIONES_ERROR`.
+  it('con TikTok marcado y sin campos, la privacidad viaja vacía a propósito', () => {
+    const cuentas = [{ id: 'tt-1', network: 'tiktok', handle: '@a' }]
+    const raw = opcionesDesdeFormularioPorCuenta(new FormData(), cuentas)
+    expect(raw['tt-1']).toEqual({
+      modo: 'directo',
+      privacidad: '',
+      comentarios: false,
+      duo: false,
+      pegar: false,
+      comercial: 'no',
     })
-  })
-
-  it('sin tiktok entre las redes no produce nada', () => {
-    expect(opcionesDesdeFormulario(form({ tiktokModo: 'directo' }), ['instagram'])).toEqual({})
-  })
-
-  it('con tiktok y sin campos, la privacidad va vacía para que la validación hable', () => {
-    expect(opcionesDesdeFormulario(form({}), ['tiktok'])).toEqual({
-      tiktok: { modo: 'directo', privacidad: '', comentarios: false, duo: false, pegar: false, comercial: 'no' },
-    })
+    expect(validarOpcionesPorCuenta(cuentas, raw)).toEqual({ error: TIKTOK_SIN_PRIVACIDAD })
   })
 })
 

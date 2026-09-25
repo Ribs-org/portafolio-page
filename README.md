@@ -144,7 +144,9 @@ publicación, comentarios) siguen recorriendo *todo* el despliegue sin filtrar p
 dueño — un cron por inquilino es otro subproyecto, no esta entrega. La llave de API
 (`SCHEDULE_API_KEY`) y la raíz pública (`/`) siguen siendo del admin. Y hasta la entrega
 3, dos usuarios todavía no pueden conectar la misma cuenta de la misma red: quien llega
-segundo recibe un aviso, no la cuenta de otro.
+segundo recibe un aviso, no la cuenta de otro. Eso es entre dos usuarios distintos: un
+mismo dueño sí puede conectar varias cuentas suyas de la misma red y elegir a cuáles sale
+cada publicación — ver «Varias cuentas de una misma red», más abajo.
 
 > El segundo perfil nace con un slug aleatorio (`circulo-a1b2c3d4`) y con `noindex`, para
 > que exista una versión que solo compartes a mano. Cámbialo por lo que quieras.
