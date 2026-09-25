@@ -1,32 +1,41 @@
-import { useCallback, useEffect, useReducer, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react'
 import { Alert, KeyboardAvoidingView, ScrollView, Text, TextInput, View } from 'react-native'
 import { DateTimePickerAndroid } from '@react-native-community/datetimepicker'
 import * as ImagePicker from 'expo-image-picker'
 import { useRouter } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
-import { Boton, COLORES, Chip, Miniatura } from '../../components/ui'
-import { SesionCaducada } from '../../lib/api'
+import { Boton, COLORES, Chip, ErrorConReintento, Miniatura } from '../../components/ui'
+import { SesionCaducada, apiGet } from '../../lib/api'
 import { anotarCambio } from '../../lib/cambios'
 import {
   ENVIO_INICIAL,
   MAX_ARCHIVOS,
-  REDES_PUBLICABLES,
   describirArchivo,
+  etiquetaCuenta,
   etiquetaEnvio,
   proximaHoraEnPunto,
   puedeEnviar,
   reducirEnvio,
   textoConfirmacion,
+  vieneMarcada,
   type Elegido,
   type Retomar,
 } from '../../lib/publicar'
 import { clearToken } from '../../lib/session'
 import { ejecutarEnvio, type SubidaHecha } from '../../lib/subir'
-import { NOMBRE_RED } from '../../lib/tipos'
+import type { CuentaApp } from '../../lib/tipos'
 import { useToken } from '../../lib/useToken'
 
 const MAX_TEXTO = 2200
+
+/**
+ * `disponibles` no alcanza para distinguir «todavía no sabemos» de «el dueño no tiene
+ * ninguna»: las dos empiezan en una lista vacía. Este estado sí las distingue, para
+ * poder dibujar cargando/error/vacío en vez de una fila de chips en blanco que se ve
+ * igual en los tres casos.
+ */
+type EstadoCuentas = { paso: 'cargando' } | { paso: 'error' } | { paso: 'listo'; disponibles: CuentaApp[] }
 
 // El contenedor mide desde su padre y el teclado desde la pantalla; en medio está la
 // cabecera. Es el estándar de Android (expo-router no reexporta `useHeaderHeight`): confirmar en el teléfono la primera vez.
@@ -46,20 +55,61 @@ export default function Publicar() {
   const insets = useSafeAreaInsets()
   const [texto, setTexto] = useState('')
   const [archivos, setArchivos] = useState<Elegido[]>([])
-  const [redes, setRedes] = useState<string[]>(['instagram'])
+  const [cuentas, setCuentas] = useState<string[]>([])
+  const [cuentasEstado, setCuentasEstado] = useState<EstadoCuentas>({ paso: 'cargando' })
+  // Solo cuando ya se supo qué cuentas hay: mientras carga o si falló, no hay ninguna
+  // que ofrecer — el estado de arriba es el que distingue esos dos casos de «ninguna».
+  // Memoizada: un `[]` nuevo en cada render volvía a disparar el efecto de abajo que
+  // la usa como dependencia.
+  const disponibles = useMemo(
+    () => (cuentasEstado.paso === 'listo' ? cuentasEstado.disponibles : []),
+    [cuentasEstado],
+  )
   const [fecha, setFecha] = useState<Date>(() => proximaHoraEnPunto(new Date()))
   const [envio, despachar] = useReducer(reducirEnvio, ENVIO_INICIAL)
   const [aviso, setAviso] = useState<string | null>(null)
   // Lo que ya subió en un intento anterior y el AbortController del envío en curso.
   // Refs, no estado: cambiarlos no debe redibujar, y el orquestador los lee entre awaits.
   const subidas = useRef<(SubidaHecha | null)[]>([])
-  const ultimoBorrador = useRef<{ texto: string; redes: string[]; cuando: string | null; ahora: boolean } | null>(null)
+  const ultimoBorrador = useRef<{ texto: string; cuentas: string[]; cuando: string | null; ahora: boolean } | null>(
+    null,
+  )
   const abortar = useRef<AbortController | null>(null)
 
   const salir = useCallback(async () => {
     await clearToken()
     router.replace('/login')
   }, [router])
+
+  // La misma regla que la web: con una sola cuenta conectada viene marcada, porque no
+  // hay entre qué elegir; con dos o más no viene ninguna (`vieneMarcada`). Separada de
+  // `aviso` (avisos del selector de archivos) a propósito: `elegir()` no debe poder
+  // borrar un error de carga de cuentas que sigue siendo cierto, y viceversa.
+  const cargarCuentas = useCallback(async () => {
+    if (!token) return
+    setCuentasEstado({ paso: 'cargando' })
+    let lista: CuentaApp[]
+    try {
+      ;({ cuentas: lista } = await apiGet<{ cuentas: CuentaApp[] }>('/api/mobile/schedule/accounts', token))
+    } catch (e) {
+      if (e instanceof SesionCaducada) {
+        await salir()
+        return
+      }
+      setCuentasEstado({ paso: 'error' })
+      return
+    }
+    setCuentasEstado({ paso: 'listo', disponibles: lista })
+    setCuentas(lista.filter((c) => vieneMarcada(c, lista)).map((c) => c.id))
+  }, [token, salir])
+
+  useEffect(() => {
+    // La regla ve `setCuentasEstado({ paso: 'cargando' })` antes del primer `await`
+    // dentro de `cargarCuentas` y no puede saber que es el arranque legítimo del
+    // pedido de red, no un `setState` gratuito disparado a ciegas desde el efecto.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    void cargarCuentas()
+  }, [cargarCuentas])
 
   async function elegir() {
     const permiso = await ImagePicker.requestMediaLibraryPermissionsAsync()
@@ -97,8 +147,8 @@ export default function Publicar() {
     despachar({ tipo: 'cancelar' })
   }
 
-  function alternarRed(red: string) {
-    setRedes(redes.includes(red) ? redes.filter((r) => r !== red) : [...redes, red])
+  function alternarCuenta(id: string) {
+    setCuentas(cuentas.includes(id) ? cuentas.filter((c) => c !== id) : [...cuentas, id])
   }
 
   function elegirFecha() {
@@ -128,7 +178,7 @@ export default function Publicar() {
     if (!token) return
     const borrador =
       retomar.paso === 'chequeando'
-        ? { texto: texto.trim(), redes, cuando: ahora ? null : fecha.toISOString(), ahora }
+        ? { texto: texto.trim(), cuentas, cuando: ahora ? null : fecha.toISOString(), ahora }
         : ultimoBorrador.current
     if (!borrador) return
     ultimoBorrador.current = borrador
@@ -160,7 +210,8 @@ export default function Publicar() {
   }
 
   function publicarAhora() {
-    Alert.alert('Publicar ahora', textoConfirmacion(redes), [
+    const elegidas = disponibles.filter((c) => cuentas.includes(c.id))
+    Alert.alert('Publicar ahora', textoConfirmacion(elegidas), [
       { text: 'Cancelar', style: 'cancel' },
       { text: 'Publicar', onPress: () => void enviar(true, { paso: 'chequeando' }) },
     ])
@@ -189,7 +240,9 @@ export default function Publicar() {
       despachar({ tipo: 'cancelar' })
       setTexto('')
       setArchivos([])
-      setRedes(['instagram'])
+      // La misma regla que al abrir la pantalla: con una sola cuenta conectada, vuelve
+      // marcada; con dos o más, ninguna.
+      setCuentas(disponibles.filter((c) => vieneMarcada(c, disponibles)).map((c) => c.id))
       setFecha(proximaHoraEnPunto(new Date()))
       setAviso(null)
       subidas.current = []
@@ -197,7 +250,7 @@ export default function Publicar() {
       router.navigate('/(tabs)/calendario')
     }, 1000)
     return () => clearTimeout(salto)
-  }, [envio.paso, router])
+  }, [envio.paso, router, disponibles])
 
   // 'hecho' también cuenta: durante el segundo que se ve «Listo» la pantalla ya no
   // acepta nada, para que un toque de más no despache el mismo post dos veces.
@@ -258,17 +311,52 @@ export default function Publicar() {
           ) : null}
         </View>
 
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
-          {REDES_PUBLICABLES.map((red) => (
-            <Chip
-              key={red}
-              texto={NOMBRE_RED[red] ?? red}
-              activo={redes.includes(red)}
-              onPress={() => alternarRed(red)}
-              deshabilitado={ocupado}
-            />
-          ))}
-        </View>
+        {cuentasEstado.paso === 'cargando' ? (
+          <Text style={{ color: COLORES.tenue, fontSize: 12 }}>Cargando cuentas…</Text>
+        ) : cuentasEstado.paso === 'error' ? (
+          <ErrorConReintento mensaje="No se pudieron cargar las cuentas." onReintentar={() => void cargarCuentas()} />
+        ) : disponibles.length === 0 ? (
+          // Cierto tanto si no hay ninguna cuenta como si la única que hay es de una
+          // red que el teléfono no ofrece (hoy, TikTok): el endpoint ya las filtró, y
+          // desde acá no se puede distinguir un caso del otro.
+          <Text style={{ color: COLORES.tenue, fontSize: 12 }}>
+            No hay ninguna cuenta lista para publicar desde el teléfono. Conecta una en la
+            pestaña Cuentas.
+          </Text>
+        ) : (
+          <>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
+              {disponibles.map((c) =>
+                c.conectada ? (
+                  <Chip
+                    key={c.id}
+                    texto={etiquetaCuenta(c)}
+                    activo={cuentas.includes(c.id)}
+                    onPress={() => alternarCuenta(c.id)}
+                    deshabilitado={ocupado}
+                  />
+                ) : (
+                  // No es un `Chip`: nunca se puede tocar, así que no lleva su
+                  // `deshabilitado` (que atenúa con opacidad 0.5 un texto ya tenue —
+                  // el mismo contraste insuficiente que `calendario.tsx` evita para un
+                  // estado transitorio, y acá sería uno permanente). Texto a contraste
+                  // completo más la palabra que falta, como «reconéctala» en el panel.
+                  <View
+                    key={c.id}
+                    style={{ paddingHorizontal: 12, paddingVertical: 10, minHeight: 44, justifyContent: 'center' }}
+                  >
+                    <Text style={{ color: COLORES.texto, fontSize: 12 }}>
+                      {etiquetaCuenta(c)} · <Text style={{ color: COLORES.rojo }}>reconéctala</Text>
+                    </Text>
+                  </View>
+                ),
+              )}
+            </View>
+            {cuentas.length === 0 ? (
+              <Text style={{ color: COLORES.tenue, fontSize: 11 }}>Elige al menos una cuenta.</Text>
+            ) : null}
+          </>
+        )}
 
         <Chip
           texto={`Cuándo: ${fechaLegible(fecha)}`}
@@ -295,8 +383,17 @@ export default function Publicar() {
             <Boton texto="Cancelar" onPress={cancelar} deshabilitado={envio.paso !== 'subiendo'} />
           ) : (
             <>
-              <Boton texto="Programar" onPress={programar} deshabilitado={!puedeEnviar(texto, archivos.length)} />
-              <Boton texto="Publicar ahora" onPress={publicarAhora} deshabilitado={!puedeEnviar(texto, archivos.length)} destacado />
+              <Boton
+                texto="Programar"
+                onPress={programar}
+                deshabilitado={!puedeEnviar(texto, archivos.length, cuentas.length)}
+              />
+              <Boton
+                texto="Publicar ahora"
+                onPress={publicarAhora}
+                deshabilitado={!puedeEnviar(texto, archivos.length, cuentas.length)}
+                destacado
+              />
             </>
           )}
         </View>

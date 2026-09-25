@@ -3,7 +3,7 @@
 Esta es la app para el celular de Vicente. Muestra, de un vistazo, los números de
 sus redes (Instagram, Facebook, YouTube): seguidores, alcance, publicaciones
 recientes y el detalle de cada post, y desde la versión 1.1 también **publica**:
-eliges fotos o un video de la galería, escribes el texto, marcas las redes y lo
+eliges fotos o un video de la galería, escribes el texto, marcas las cuentas y lo
 programas, o lo mandas a salir ahora. Los datos son los mismos que ve el panel web,
 leídos desde `https://www.vicente-pareja.cl/api/mobile/*`.
 
@@ -58,6 +58,18 @@ La app lo descarga la próxima vez que se abre y lo aplica en la apertura siguie
 Solo llega a los teléfonos que tengan instalada la misma versión de `app.json`; si
 subiste la versión, hay que generar el APK de nuevo.
 
+**Si el cambio también toca la API del sitio** (algo bajo `src/app/api/mobile/`), el
+orden deja de ser libre: corre este comando **inmediatamente después** de que ese
+cambio llegue a `main` —Vercel despliega solo con cada fusión, ver «Cómo entra un
+cambio» en el `README.md` de la raíz—, no cuando convenga. El despliegue web y esta
+actualización dejaron de ser independientes: si la web sale primero y el OTA se
+demora, un teléfono con la versión vieja instalada puede toparse con un error que le
+pide un campo que esa versión no sabe mandar (pasa con las cuentas: una app vieja que
+manda `redes` para una red con dos cuentas ahora conectadas recibe un rechazo pidiendo
+`cuentas`, campo que esa versión nunca aprendió a enviar). Si el OTA sale primero, la
+app nueva pide un endpoint que el backend todavía no tiene — degrada bien, con
+reintento, pero no publica hasta que la web la alcance.
+
 ## Cómo instalarla en el teléfono
 
 1. Abre ese link **desde el navegador del teléfono** (no hace falta cable ni
@@ -82,7 +94,10 @@ En la pestaña **Publicar**:
 1. Escribe el texto. En YouTube, el primer renglón es el título del video.
 2. Toca **Fotos o video** y elige de la galería (hasta diez archivos; un video de
    hasta 500 MB).
-3. Marca las redes. Instagram viene marcada.
+3. Marca las cuentas a las que sale (el chip lleva la red y el handle, para distinguir
+   dos cuentas de una misma red). Si tienes una sola cuenta conectada viene marcada,
+   porque no hay entre qué elegir; con dos o más, ninguna. TikTok no se ofrece todavía
+   como destino desde el teléfono: no hay dónde pedir sus opciones por publicación.
 4. Toca **Cuándo** para elegir día y hora, y luego **Programar**. O toca
    **Publicar ahora**: confirma, y sale en los próximos cinco minutos.
 

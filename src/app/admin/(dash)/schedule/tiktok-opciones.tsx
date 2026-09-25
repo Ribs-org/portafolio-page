@@ -4,26 +4,30 @@ import Image from 'next/image'
 import { useEffect, useState } from 'react'
 import { leerCreadorTikTok } from '@/app/admin/actions'
 import { Field, GroupLabel, Select, Toggle } from '@/components/ui'
+import type { CuentaDestino } from '@/lib/social/cuentas'
 import { TIKTOK_CREADOR_ILEGIBLE, type CreadorTikTok } from '@/lib/social/publish/tiktok-creador'
 import { ETIQUETA_PRIVACIDAD, PRIVACIDADES_TIKTOK, type PrivacidadTikTok } from '@/lib/social/publish/opciones'
 
 const MUSIC_USAGE = 'https://www.tiktok.com/legal/page/global/music-usage-confirmation/en'
 const BRANDED_CONTENT = 'https://www.tiktok.com/legal/page/global/bc-policy/en'
 
-// Cacheada a nivel de módulo: marcar y desmarcar TikTok en el compositor (soloFotos
-// cambia el árbol y remonta este componente) no debe repetir la consulta a
-// creator_info por cada toggle. Un error la limpia para que el siguiente montaje
-// reintente en vez de quedar pegado al mismo fallo.
-let creadorPromesa: ReturnType<typeof leerCreadorTikTok> | null = null
+// Cacheada a nivel de módulo, por cuenta: marcar y desmarcar una cuenta de TikTok en el
+// compositor (soloFotos cambia el árbol y remonta este componente) no debe repetir la
+// consulta a creator_info por cada toggle. Con dos cuentas de TikTok marcadas, cada una
+// tiene su propia promesa — comparten módulo pero no cuenta. Un error limpia la suya
+// para que el siguiente montaje reintente en vez de quedar pegado al mismo fallo.
+const creadorPromesas = new Map<string, ReturnType<typeof leerCreadorTikTok>>()
 
 /**
  * Lo que TikTok obliga a preguntar antes de publicar directo, en el orden y con los
  * valores iniciales que su guía exige: privacidad sin elegir, interacciones apagadas,
- * comercial apagado. Cada campo lleva el nombre que `opcionesDesdeFormulario` lee.
+ * comercial apagado. Cada campo lleva el nombre que `opcionesDesdeFormularioPorCuenta`
+ * lee, con el identificador de la cuenta como sufijo — puede haber dos bloques en el
+ * mismo formulario.
  *
  * `soloFotos` esconde dúo y pegar: TikTok no los ofrece en carruseles.
  */
-export function TikTokOpciones({ soloFotos }: { soloFotos: boolean }) {
+export function TikTokOpciones({ cuenta, soloFotos }: { cuenta: CuentaDestino; soloFotos: boolean }) {
   const [creador, setCreador] = useState<CreadorTikTok | null>(null)
   const [aviso, setAviso] = useState<string | null>(null)
   const [borrador, setBorrador] = useState(false)
@@ -33,25 +37,29 @@ export function TikTokOpciones({ soloFotos }: { soloFotos: boolean }) {
 
   useEffect(() => {
     let vivo = true
-    if (!creadorPromesa) creadorPromesa = leerCreadorTikTok()
-    creadorPromesa
+    let promesa = creadorPromesas.get(cuenta.id)
+    if (!promesa) {
+      promesa = leerCreadorTikTok(cuenta.id)
+      creadorPromesas.set(cuenta.id, promesa)
+    }
+    promesa
       .then((r) => {
         if (!vivo) return
         if ('error' in r) {
-          creadorPromesa = null
+          creadorPromesas.delete(cuenta.id)
           setAviso(r.error)
         } else {
           setCreador(r.creador)
         }
       })
       .catch(() => {
-        creadorPromesa = null
+        creadorPromesas.delete(cuenta.id)
         if (vivo) setAviso(TIKTOK_CREADOR_ILEGIBLE)
       })
     return () => {
       vivo = false
     }
-  }, [])
+  }, [cuenta.id])
 
   // Sin creator_info se ofrecen las cuatro: el cron vuelve a consultar antes de subir y
   // falla con frase propia si la elegida ya no está permitida.
@@ -66,14 +74,14 @@ export function TikTokOpciones({ soloFotos }: { soloFotos: boolean }) {
           <Image src={creador.avatarUrl} alt="" width={32} height={32} unoptimized className="h-8 w-8 rounded-full" />
         ) : null}
         <div>
-          <GroupLabel>TikTok</GroupLabel>
+          <GroupLabel>TikTok · {cuenta.handle ?? 'sin nombre'}</GroupLabel>
           <p className="text-sm">
             {creador ? `Se publicará en la cuenta ${creador.nombre}` : aviso ?? 'Leyendo tu cuenta…'}
           </p>
         </div>
       </div>
 
-      <input type="hidden" name="tiktokModo" value={borrador ? 'borrador' : 'directo'} />
+      <input type="hidden" name={`tiktokModo:${cuenta.id}`} value={borrador ? 'borrador' : 'directo'} />
       <Toggle
         label="Enviar como borrador a mi bandeja de TikTok"
         hint={borrador ? 'Te llegará una notificación en TikTok para terminar la publicación desde el teléfono.' : undefined}
@@ -85,7 +93,7 @@ export function TikTokOpciones({ soloFotos }: { soloFotos: boolean }) {
         <>
           <Field label="Quién puede verlo">
             <Select
-              name="tiktokPrivacidad"
+              name={`tiktokPrivacidad:${cuenta.id}`}
               required
               value={privacidad}
               onChange={(e) => setPrivacidad(e.target.value as PrivacidadTikTok | '')}
@@ -118,11 +126,19 @@ export function TikTokOpciones({ soloFotos }: { soloFotos: boolean }) {
           <div>
             <GroupLabel>Permitir</GroupLabel>
             <div className="flex flex-wrap gap-4 text-sm">
-              <Casilla name="tiktokComentarios" label="Comentarios" bloqueada={creador?.comentariosDeshabilitados} />
+              <Casilla
+                name={`tiktokComentarios:${cuenta.id}`}
+                label="Comentarios"
+                bloqueada={creador?.comentariosDeshabilitados}
+              />
               {soloFotos ? null : (
                 <>
-                  <Casilla name="tiktokDuo" label="Dúos" bloqueada={creador?.duoDeshabilitado} />
-                  <Casilla name="tiktokPegar" label="Pegar (Stitch)" bloqueada={creador?.pegarDeshabilitado} />
+                  <Casilla name={`tiktokDuo:${cuenta.id}`} label="Dúos" bloqueada={creador?.duoDeshabilitado} />
+                  <Casilla
+                    name={`tiktokPegar:${cuenta.id}`}
+                    label="Pegar (Stitch)"
+                    bloqueada={creador?.pegarDeshabilitado}
+                  />
                 </>
               )}
             </div>
@@ -134,13 +150,16 @@ export function TikTokOpciones({ soloFotos }: { soloFotos: boolean }) {
               checked={comercial}
               onChange={setComercial}
             />
-            <input type="hidden" name="tiktokComercial" value={comercial ? tipoComercial : 'no'} />
+            <input type="hidden" name={`tiktokComercial:${cuenta.id}`} value={comercial ? tipoComercial : 'no'} />
             {comercial ? (
               <div className="ml-12 space-y-1 text-sm">
                 <label className="flex items-center gap-2">
                   <input
                     type="radio"
-                    name="tiktokTipoComercial"
+                    // Con dos bloques de TikTok en el mismo formulario, sin sufijo los
+                    // radios de ambas cuentas compartirían grupo: elegir «marca propia»
+                    // en una desmarcaría a la otra en el navegador.
+                    name={`tiktokTipoComercial:${cuenta.id}`}
                     checked={tipoComercial === 'marca_propia'}
                     onChange={() => setTipoComercial('marca_propia')}
                   />
@@ -150,7 +169,7 @@ export function TikTokOpciones({ soloFotos }: { soloFotos: boolean }) {
                 <label className="flex items-center gap-2">
                   <input
                     type="radio"
-                    name="tiktokTipoComercial"
+                    name={`tiktokTipoComercial:${cuenta.id}`}
                     checked={tipoComercial === 'patrocinado'}
                     onChange={() => {
                       setTipoComercial('patrocinado')

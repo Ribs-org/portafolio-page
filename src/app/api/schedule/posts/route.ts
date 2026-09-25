@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { and, asc, eq, gte, inArray, lt } from 'drizzle-orm'
-import { getDb, scheduledPosts, scheduledPostMedia, scheduledPostTargets } from '@/db'
+import { getDb, scheduledPosts, scheduledPostMedia, scheduledPostTargets, socialAccounts } from '@/db'
 import { SITE_TIMEZONE } from '@/lib/analytics'
 import { env } from '@/lib/env'
 import { armarProgramados, parseVentana } from '@/lib/schedule-api'
@@ -34,10 +34,15 @@ export async function GET(request: Request) {
   const ownerId = await adminId()
 
   const db = getDb()
+  // `leftJoin` y no `innerJoin` con `socialAccounts`: un destino cuya cuenta ya no
+  // exista no debe desaparecer de la respuesta — mismo criterio que el calendario del
+  // panel (`(dash)/schedule/page.tsx`). El id del destino sigue viniendo de
+  // `scheduledPostTargets.accountId`, no de este join; solo el handle depende de él.
   const filas = await db
-    .select({ post: scheduledPosts, target: scheduledPostTargets })
+    .select({ post: scheduledPosts, target: scheduledPostTargets, handle: socialAccounts.handle })
     .from(scheduledPosts)
     .innerJoin(scheduledPostTargets, eq(scheduledPostTargets.postId, scheduledPosts.id))
+    .leftJoin(socialAccounts, eq(socialAccounts.id, scheduledPostTargets.accountId))
     .where(
       and(
         eq(scheduledPosts.ownerId, ownerId),

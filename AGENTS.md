@@ -45,3 +45,22 @@ Dos reglas que hacen que esto funcione:
 Lo que **no** va en la documentación: el detalle de una implementación que el código ya
 cuenta, ni un registro de lo que pasó en una sesión. Los documentos explican **por qué** algo
 es como es, no narran cómo se llegó.
+
+## La regla no se aparca para el final
+
+Esta parte se agregó porque la regla de arriba falló en su primera entrega larga: un plan
+de ocho tareas puso toda la documentación en la última, cinco tareas cambiaron
+comportamiento visible, y el README pasó días describiendo una pantalla que ya no existía.
+
+- **La documentación de un cambio pertenece a la tarea que lo hace**, no a una tarea de
+  limpieza al final. Si el trabajo va por partes, cada parte deja la documentación cierta
+  al terminar. Un documento que describe la pantalla de anteayer es peor que uno que no
+  existe: el que llega lo cree.
+- **Que el encargo no lo mencione no exime.** Si estás implementando una tarea y su brief
+  no dice nada de documentación, la regla sigue valiendo: revisa la tabla de arriba y
+  actualiza lo que corresponda, en el mismo commit.
+- **Documenta lo que es cierto hoy, no lo que va a ser cierto al final.** En una rama a
+  medio hacer, escribir el estado final es escribir algo falso. Cada commit se sostiene
+  solo.
+- **Si de verdad no toca nada, dilo en el informe** —«revisé README y docs/, nada que
+  actualizar»— para que quien revise sepa que lo miraste y no que se te olvidó.

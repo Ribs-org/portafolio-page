@@ -1,5 +1,17 @@
 import { describe, expect, it } from 'vitest'
-import { etiquetaDestino } from './etiqueta'
+import { networkLabel } from '@/lib/networks'
+import { etiquetaDestino, nombreDestino } from './etiqueta'
+
+describe('nombreDestino', () => {
+  it('distingue dos destinos de la misma red por su handle', () => {
+    const texto = nombreDestino({ network: 'instagram', handle: '@vicenteclips' })
+    expect(texto).toContain('@vicenteclips')
+  })
+
+  it('sin handle cae en el nombre de la red', () => {
+    expect(nombreDestino({ network: 'instagram', handle: null })).toBe(networkLabel('instagram'))
+  })
+})
 
 describe('etiquetaDestino', () => {
   it('los estados de siempre', () => {

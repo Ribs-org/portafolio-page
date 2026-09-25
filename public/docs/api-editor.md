@@ -54,6 +54,9 @@ Content-Type: application/json
 }
 ```
 
+El destino de cada post se elige con `cuentas` o con `redes` — no hace falta el campo
+`cuentas` si nombrar la red alcanza (ver la sección de cada campo, abajo).
+
 **Máximo 50 posts por request.** Más de eso: `400` con `Máximo 50 posts por lote.`
 Cuerpo que no sea `{ posts: [...] }`: `400` con
 `El cuerpo debe ser JSON con { posts: [...] }.`
@@ -79,10 +82,46 @@ Límites, que solo aplican si esa red está en el post:
 - con `threads`: 500 caracteres
 - siempre: 2200 caracteres (límite de Instagram)
 
-### `redes` (obligatorio)
+### `cuentas` (opcional) — elige cuentas exactas, sin ambigüedad
 
-Array con una o más de: `instagram`, `facebook`, `youtube`, `threads`, `x`. Sin
-repetir. Un mismo post sale a todas las que pongas.
+Array de identificadores de cuenta. Si la fila trae `cuentas` con al menos un elemento,
+**esas mandan**: es la única forma de elegir a cuál de dos cuentas de la misma red sale
+el post. Para elegir destino, `redes` se ignora cuando `cuentas` no está vacío — aunque
+la mandes igual, sigue debiendo tener nombres válidos y sin repetir (ver abajo), así que
+lo más simple es no mandarla en ese caso.
+
+**De dónde salen los identificadores:** no los inventas ni los adivinas. Cada cuenta
+conectada muestra el suyo en su tarjeta, en `/admin/accounts`, con un botón para
+copiarlo — es la forma de conseguir el de una cuenta recién conectada, incluso antes
+de que tenga algo programado, y no pide llave de API, solo la sesión del panel. Si ya
+tienes acceso por API y la cuenta tiene al menos un destino programado, `GET
+/api/schedule/posts` (sección 3, más abajo) también lo trae: cada destino de `redes[]`
+trae `cuentaId` y `handle`.
+
+Lo que **no** resuelve la ambigüedad: programar primero con `redes` para leer el id
+después en el post recién creado. Esa entrada solo se acepta cuando la red no es
+ambigua (ver abajo) — que es justo el caso en que nombrar la red ya alcanza y el id no
+hacía falta.
+
+Un identificador que no es tuyo, o que es de una cuenta desconectada, rechaza la fila
+entera — ver la tabla de errores.
+
+En el CSV (panel, no esta API), `cuentas` es la octava columna, después de `regla`,
+con los identificadores separados por `|` igual que `redes` y `media`.
+
+### `redes` (obligatorio si la fila no trae `cuentas`)
+
+Array con una o más de: `instagram`, `facebook`, `youtube`, `threads`, `x`, `tiktok`.
+Sin repetir. Un mismo post sale a todas las que pongas.
+
+Cada nombre se resuelve a una cuenta **solo si tienes exactamente una** conectada de
+esa red — es el atajo para cuando no hay ambigüedad, y sigue siendo la forma más simple
+de programar si todavía solo tienes una cuenta por red. Con dos cuentas conectadas de la
+misma red, nombrar solo la red ya no alcanza: la fila se rechaza nombrando las cuentas
+candidatas y sus handles, y hay que usar `cuentas` para decir cuál.
+
+Una fila sin `cuentas` y sin `redes` (o con ambas vacías) se rechaza: no hay a dónde
+publicar.
 
 ### `media` (opcional)
 
@@ -125,10 +164,17 @@ que puedes descubrir qué funciona: etiqueta de forma consistente lo que decides
 Recomendación práctica: mantén un vocabulario estable entre posts. `"hook": "pregunta"`
 en unos y `"gancho": "pregunta-directa"` en otros hace imposible comparar.
 
-### `opciones` (obligatorio si `redes` incluye `tiktok`)
+### `opciones` (obligatorio si algún destino de la fila es una cuenta de TikTok)
 
-Lo que cada red exige elegir por destino. Hoy solo TikTok pide algo, así que el objeto
-lleva una clave `tiktok`:
+Lo que cada destino exige elegir. Hoy solo TikTok pide algo. La clave del objeto **no
+es la red**: es el identificador de la cuenta destino. Para no obligarte a conocer los
+identificadores cuando no hace falta, cada clave se resuelve con la misma regla que
+`redes`: se busca primero entre los identificadores de cuenta de los destinos de la
+fila, y si no coincide con ninguno se acepta como **nombre de red**, resuelta a su
+destino solo si la fila tiene exactamente uno de esa red.
+
+Con una sola cuenta de TikTok en la fila (el caso normal), seguir escribiendo `"tiktok"`
+como clave funciona igual que siempre:
 
 ```json
 "opciones": {
@@ -142,6 +188,23 @@ lleva una clave `tiktok`:
   }
 }
 ```
+
+Con `cuentas` y dos cuentas de TikTok en la misma fila, `"tiktok"` como clave es
+**ambiguo** — la fila se rechaza nombrando las dos cuentas — y hace falta una clave por
+cuenta:
+
+```json
+"opciones": {
+  "<id de la primera cuenta de TikTok>": { "modo": "directo", "privacidad": "SELF_ONLY", "comercial": "no" },
+  "<id de la segunda cuenta de TikTok>": { "modo": "borrador" }
+}
+```
+
+No mezcles las dos formas para el mismo destino: con una sola cuenta de TikTok en la
+fila, `"tiktok"` y su id resuelven al mismo destino, así que traer las dos claves a la
+vez (`{"tiktok": …, "<id>": …}`) es ambiguo igual que traer dos cuentas — la fila se
+rechaza nombrando las dos claves en vez de quedarse en silencio con la última que trae
+el JSON.
 
 - `modo`: `directo` publica en el perfil a la hora programada; `borrador` deja el video o las
   fotos en la bandeja de TikTok del dueño para terminarlos desde el teléfono. En `borrador`
@@ -184,7 +247,7 @@ palabra, hasta 30 letras. `mensaje`: 1 a 1000 caracteres. `respuestaPublica`: op
 | X hasta 4 imágenes | `x` + 5 o más | `X recibe hasta cuatro imágenes.` |
 | Threads: un archivo | `threads` + 2 o más | `Threads recibe un solo archivo por post.` |
 | Tope general | 11 o más archivos, con alguna red además de `tiktok` (una fila solo con `tiktok` admite hasta 35 fotos) | `Máximo diez archivos por publicación.` |
-| Al menos una red | `redes: []` | `Elige al menos una plataforma.` |
+| Al menos un destino | sin `cuentas` y sin `redes` (o ambas vacías) | `Elige al menos una cuenta o una red.` |
 | Fecha futura | hora ya pasada | `La hora debe estar en el futuro.` |
 
 Facebook además no admite **mezclar** video y fotos en un mismo post; eso se detecta
@@ -207,10 +270,17 @@ Instagram acepta: 1 foto, 1 video, o 2–10 fotos (carrusel).
 | `El texto excede los 280 caracteres de X.` | caption largo con `x` en las redes |
 | `El texto excede los 500 caracteres de Threads.` | caption largo con `threads` |
 | `El texto es demasiado largo para Instagram.` | caption sobre 2200 |
-| `TikTok necesita que elijas la privacidad.` | `tiktok` en redes sin `opciones.tiktok`, o `directo` sin `privacidad` válida |
+| `TikTok necesita que elijas la privacidad.` | un destino de TikTok en la fila sin sus `opciones`, o `directo` sin `privacidad` válida |
 | `Un contenido patrocinado no puede ser privado.` | `comercial: patrocinado` con `SELF_ONLY` |
-| `Las opciones de la red no se entendieron.` | `opciones` no es objeto, `modo` desconocido, casilla no booleana, u opciones para una red que no pide |
+| `Las opciones de la red no se entendieron.` | `opciones` no es objeto, `modo` desconocido, casilla no booleana, u opciones para un destino que no las pide |
+| `«<handle>»: <cualquiera de las dos frases de TikTok de arriba>` | la fila tiene **dos** cuentas de TikTok y la que falló no se puede nombrar por red sola, así que el handle va primero |
+| `«<red>» en opciones es ambiguo: la fila tiene N cuentas de esa red (<handles>). Usa el id de cada cuenta como clave.` | la clave de `opciones` nombra una red con dos o más destinos en esta fila |
+| `«<clave1>» y «<clave2>» en opciones nombran el mismo destino. Deja una sola clave por destino.` | dos claves de `opciones` (por ejemplo el id de una cuenta y el nombre de su única red) resuelven al mismo destino |
 | `TikTok recibe un video, o hasta 35 fotos JPG o WebP.` | dos videos, mezcla, más de 35 fotos, png/gif, o video que no es mp4/mov/webm |
+| `Una de las cuentas elegidas no es tuya.` | un identificador en `cuentas` que no es una cuenta del dueño (o no existe) |
+| `La cuenta <handle> no está conectada. Vuelve a conectarla en Cuentas.` | un identificador en `cuentas` que existe pero perdió la credencial — **solo con `cuentas`**: con `redes`, una cuenta desconectada da la frase de abajo |
+| `No hay una cuenta de <red> conectada.` | un nombre en `redes` sin ninguna cuenta *conectada* de esa red — no tiene ninguna, o la única que tiene está desconectada; las dos dan la misma frase |
+| `Tienes N cuentas de <red> (<handles>). Elige cuál con «cuentas».` | un nombre en `redes` con dos o más cuentas conectadas de esa red — hay que repetir la fila usando `cuentas` |
 | `La palabra clave es una sola palabra, sin espacios, hasta 30 letras.` | `regla.palabra` vacía con mensaje, con espacios o símbolos, o `regla` que no es objeto |
 | `El mensaje del privado va de 1 a 1000 caracteres.` | `regla.mensaje` ausente, vacío o largo |
 | `La respuesta pública va de 1 a 300 caracteres.` | `regla.respuestaPublica` larga |
@@ -356,9 +426,9 @@ Un rango pasado vale (lista lo ya publicado). Formato inválido o rango invertid
       "media": [{ "url": "https://media.vicente-pareja.cl/scheduled/…mp4", "tipo": "video" }],
       "atributos": { "hook": "pregunta-polemica", "tema": "retail" },
       "redes": [
-        { "red": "instagram", "estado": "published", "error": null, "externalId": "18114074218999893", "intentos": 1 },
-        { "red": "youtube", "estado": "scheduled", "error": null, "externalId": null, "intentos": 0 },
-        { "red": "x", "estado": "failed", "error": "X aún no recibe video desde el calendario.", "externalId": null, "intentos": 3 }
+        { "red": "instagram", "estado": "published", "error": null, "externalId": "18114074218999893", "intentos": 1, "cuentaId": "8f0a…", "handle": "@vicente" },
+        { "red": "youtube", "estado": "scheduled", "error": null, "externalId": null, "intentos": 0, "cuentaId": "b21c…", "handle": null },
+        { "red": "x", "estado": "failed", "error": "X aún no recibe video desde el calendario.", "externalId": null, "intentos": 3, "cuentaId": "9d4e…", "handle": "@vicentepareja" }
       ]
     }
   ]
@@ -371,10 +441,14 @@ Un rango pasado vale (lista lo ya publicado). Formato inválido o rango invertid
 - **`media`** viene en el orden del carrusel, ya en el almacén propio (la URL de
   origen que mandaste no se conserva).
 - **`atributos`** trae exactamente lo que enviaste; `null` si no mandaste ninguno.
-- **`redes`**: un estado por red. `scheduled` espera su hora; `publishing` está en
+- **`redes`**: un estado por destino. `scheduled` espera su hora; `publishing` está en
   vuelo (Meta procesando un video); `published` salió y `externalId` es su id en la
   red, el mismo que usa `/api/metrics/posts`; `failed` agotó los tres intentos y
   `error` dice por qué con una frase fija. `intentos` cuenta los intentos hechos.
+  **`cuentaId`** es el identificador de cuenta de ese destino — la fuente para el
+  campo `cuentas` de la sección 1, cuando nombrar la red no alcanza — y **`handle`**
+  es el de esa cuenta, o `null` si la cuenta ya no existe (el destino se conserva
+  igual, solo pierde el handle).
 
 Un post `published` en todas sus redes aparece en `/api/metrics/posts` desde la
 sincronización del día siguiente, con `atributos` idénticos: ese es el puente entre
@@ -456,4 +530,24 @@ Leer el mes:
 ```bash
 curl -s "https://www.vicente-pareja.cl/api/metrics/posts?desde=2026-09-01&hasta=2026-09-30" \
   -H "Authorization: Bearer $SCHEDULE_API_KEY"
+```
+
+Programar a una cuenta exacta (útil cuando hay dos cuentas de la misma red — acá, dos
+de TikTok — y nombrar solo `tiktok` sería ambiguo):
+
+```bash
+curl -X POST https://www.vicente-pareja.cl/api/schedule/batch \
+  -H "Authorization: Bearer $SCHEDULE_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "posts": [
+      {
+        "fecha": "2026-09-10 12:00",
+        "texto": "Solo para la marca A.",
+        "cuentas": ["<id de la cuenta TikTok de marca A>"],
+        "media": ["https://ejemplo.com/clip-a.mp4"],
+        "opciones": { "<id de la cuenta TikTok de marca A>": { "modo": "directo", "privacidad": "SELF_ONLY" } }
+      }
+    ]
+  }'
 ```

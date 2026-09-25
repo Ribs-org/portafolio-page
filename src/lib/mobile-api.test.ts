@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import {
   AHORA_MS,
   ARCHIVO_MUY_GRANDE,
@@ -11,7 +11,9 @@ import {
   parseRango,
   prepararSubida,
   resolverCuando,
+  resolverDestinos,
 } from './mobile-api'
+import { CuentaInvalida, type CuentaDestino } from './social/cuentas'
 
 const now = new Date('2026-06-15T18:00:00Z')
 
@@ -101,6 +103,7 @@ describe('parseBorradorMovil', () => {
     expect(parseBorradorMovil(bueno)).toEqual({
       texto: 'Hola',
       redes: ['instagram', 'youtube'],
+      cuentas: [],
       cuando: '2026-09-10T22:00:00.000Z',
       ahora: false,
     })
@@ -110,6 +113,7 @@ describe('parseBorradorMovil', () => {
     expect(parseBorradorMovil({ redes: ['x'], ahora: true })).toEqual({
       texto: '',
       redes: ['x'],
+      cuentas: [],
       cuando: null,
       ahora: true,
     })
@@ -144,6 +148,36 @@ describe('parseBorradorMovil', () => {
     expect(parseBorradorMovil({ ...bueno, texto: 5 })).toEqual({ error: CUERPO_ILEGIBLE })
     expect(parseBorradorMovil({ ...bueno, cuando: 5 })).toEqual({ error: CUERPO_ILEGIBLE })
     expect(parseBorradorMovil({ ...bueno, ahora: 'sí' })).toEqual({ error: CUERPO_ILEGIBLE })
+  })
+
+  /**
+   * La Tarea 7: la app nueva manda `cuentas` en vez de `redes` — el cuerpo puede traer
+   * una sin la otra. `redes` sigue aceptándose (una app vieja instalada la sigue
+   * mandando) pero ya no hace falta.
+   */
+  it('acepta cuentas en vez de redes, sin redes en el cuerpo', () => {
+    expect(parseBorradorMovil({ texto: 'Hola', cuentas: ['cuenta-1', 'cuenta-2'], ahora: true })).toEqual({
+      texto: 'Hola',
+      redes: [],
+      cuentas: ['cuenta-1', 'cuenta-2'],
+      cuando: null,
+      ahora: true,
+    })
+  })
+
+  it('cuentas ausente es lista vacía: el cuerpo de una app vieja sigue andando', () => {
+    expect(parseBorradorMovil(bueno)).toMatchObject({ cuentas: [] })
+  })
+
+  it('quita cuentas repetidas sin quejarse, igual que con redes', () => {
+    expect(parseBorradorMovil({ ...bueno, cuentas: ['a', 'a', 'b'] })).toMatchObject({
+      cuentas: ['a', 'b'],
+    })
+  })
+
+  it('rechaza cuentas que no es una lista de strings', () => {
+    expect(parseBorradorMovil({ ...bueno, cuentas: 'cuenta-1' })).toEqual({ error: CUERPO_ILEGIBLE })
+    expect(parseBorradorMovil({ ...bueno, cuentas: [1] })).toEqual({ error: CUERPO_ILEGIBLE })
   })
 })
 
@@ -205,5 +239,83 @@ describe('resolverCuando', () => {
     expect(resolverCuando(false, null, now)).toBeNull()
     expect(resolverCuando(false, 'mañana', now)).toBeNull()
     expect(resolverCuando(false, '', now)).toBeNull()
+  })
+})
+
+describe('resolverDestinos', () => {
+  const IG: CuentaDestino = { id: 'c-ig', network: 'instagram', handle: '@ig' }
+  const FB: CuentaDestino = { id: 'c-fb', network: 'facebook', handle: '@fb' }
+  const TT: CuentaDestino = { id: 'c-tt', network: 'tiktok', handle: '@tt' }
+
+  function deps(over: Partial<{ verificarCuentas: unknown; cuentaUnicaPorRed: unknown }> = {}) {
+    return {
+      verificarCuentas: vi.fn(),
+      cuentaUnicaPorRed: vi.fn(),
+      ...over,
+    } as unknown as {
+      verificarCuentas: (ownerId: string, accountIds: string[]) => Promise<CuentaDestino[]>
+      cuentaUnicaPorRed: (ownerId: string, networks: string[]) => Promise<Map<string, CuentaDestino>>
+    }
+  }
+
+  it('con cuentas, verifica pertenencia y deriva las redes de los destinos reales', async () => {
+    const d = deps({ verificarCuentas: vi.fn().mockResolvedValue([IG]) })
+    const r = await resolverDestinos('owner-1', { cuentas: ['c-ig'], redes: [] }, d)
+    expect(d.verificarCuentas).toHaveBeenCalledWith('owner-1', ['c-ig'])
+    expect(d.cuentaUnicaPorRed).not.toHaveBeenCalled()
+    expect(r).toEqual({ cuentas: [IG], networks: ['instagram'] })
+  })
+
+  it('sin cuentas, resuelve por redes con cuentaUnicaPorRed (camino de una app vieja)', async () => {
+    const d = deps({ cuentaUnicaPorRed: vi.fn().mockResolvedValue(new Map([['instagram', IG]])) })
+    const r = await resolverDestinos('owner-1', { cuentas: [], redes: ['instagram'] }, d)
+    expect(d.cuentaUnicaPorRed).toHaveBeenCalledWith('owner-1', ['instagram'])
+    expect(d.verificarCuentas).not.toHaveBeenCalled()
+    expect(r).toEqual({ cuentas: [IG], networks: ['instagram'] })
+  })
+
+  it('con las dos, cuentas manda: redes se ignora por completo, ni se consulta', async () => {
+    const d = deps({ verificarCuentas: vi.fn().mockResolvedValue([IG]) })
+    const r = await resolverDestinos('owner-1', { cuentas: ['c-ig'], redes: ['facebook'] }, d)
+    expect(d.verificarCuentas).toHaveBeenCalledWith('owner-1', ['c-ig'])
+    expect(d.cuentaUnicaPorRed).not.toHaveBeenCalled()
+    expect(r).toEqual({ cuentas: [IG], networks: ['instagram'] })
+  })
+
+  it('sin ninguna, no consulta nada y devuelve listas vacías sin reventar', async () => {
+    const d = deps({ cuentaUnicaPorRed: vi.fn().mockResolvedValue(new Map()) })
+    const r = await resolverDestinos('owner-1', { cuentas: [], redes: [] }, d)
+    expect(r).toEqual({ cuentas: [], networks: [] })
+  })
+
+  it('dos cuentas de redes distintas, ambas publicables: las dos redes quedan', async () => {
+    const d = deps({ verificarCuentas: vi.fn().mockResolvedValue([IG, FB]) })
+    const r = await resolverDestinos('owner-1', { cuentas: ['c-ig', 'c-fb'], redes: [] }, d)
+    expect(r.networks.sort()).toEqual(['facebook', 'instagram'])
+  })
+
+  it('una cuenta de una red que el teléfono no publica revienta con la frase de red desconocida', async () => {
+    const d = deps({ verificarCuentas: vi.fn().mockResolvedValue([TT]) })
+    await expect(resolverDestinos('owner-1', { cuentas: ['c-tt'], redes: [] }, d)).rejects.toThrow(
+      'Red desconocida o sin publicación: tiktok.',
+    )
+  })
+
+  it('mezclada (una publicable y una no), rechaza la fila entera en vez de descartar en silencio', async () => {
+    const d = deps({ verificarCuentas: vi.fn().mockResolvedValue([IG, TT]) })
+    await expect(resolverDestinos('owner-1', { cuentas: ['c-ig', 'c-tt'], redes: [] }, d)).rejects.toBeInstanceOf(
+      CuentaInvalida,
+    )
+  })
+
+  it('la defensa corre también por el camino de redes, aunque parseBorradorMovil ya lo bloquee antes', async () => {
+    // No hay forma de que `borrador.redes` traiga «tiktok» pasando por
+    // `parseBorradorMovil` (la rechaza antes), pero `resolverDestinos` no depende de
+    // eso: si algo (un cambio futuro, un llamador distinto) le pasa `redes` sin pasar
+    // por ese filtro, sigue protegido.
+    const d = deps({ cuentaUnicaPorRed: vi.fn().mockResolvedValue(new Map([['tiktok', TT]])) })
+    await expect(resolverDestinos('owner-1', { cuentas: [], redes: ['tiktok'] }, d)).rejects.toThrow(
+      'Red desconocida o sin publicación: tiktok.',
+    )
   })
 })

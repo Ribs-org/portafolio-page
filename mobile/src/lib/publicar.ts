@@ -1,9 +1,7 @@
-import { NOMBRE_RED } from './tipos'
+import { NOMBRE_RED, type CuentaApp } from './tipos'
 
 export const MAX_BYTES = 500 * 1024 * 1024
 export const MAX_ARCHIVOS = 10
-/** Las cinco con publisher; TikTok lee métricas pero no publica. */
-export const REDES_PUBLICABLES = ['instagram', 'facebook', 'youtube', 'threads', 'x']
 
 export const TIPO_NO_PUBLICABLE = 'Ese tipo de archivo no se puede publicar.'
 export const ARCHIVO_MUY_GRANDE = 'El archivo supera los 500 MB.'
@@ -130,11 +128,32 @@ export function etiquetaEnvio(estado: Envio): string | null {
   }
 }
 
-export function textoConfirmacion(redes: string[]): string {
-  const nombres = redes.map((r) => NOMBRE_RED[r] ?? r)
+/** El texto del `Alert` de «Publicar ahora»: nombra los handles, no las redes. */
+export function textoConfirmacion(cuentas: CuentaApp[]): string {
+  const nombres = cuentas.map((c) => c.handle ?? NOMBRE_RED[c.red] ?? c.red)
   const lista =
     nombres.length <= 1 ? nombres.join('') : `${nombres.slice(0, -1).join(', ')} y ${nombres[nombres.length - 1]}`
   return `¿Publicar ahora en ${lista}? Saldrá en los próximos 5 minutos.`
+}
+
+/**
+ * Si tienes una sola cuenta conectada, viene marcada: no hay entre qué elegir. Con dos
+ * o más no viene ninguna — misma regla que `vieneMarcada` en el panel
+ * (`admin/(dash)/schedule/composer.tsx`), pero contada sobre `disponibles`, que acá es
+ * lo que trae `GET /api/mobile/schedule/accounts`: las cuentas del dueño en las redes
+ * que la app publica, sin TikTok. El panel cuenta sobre todas las cuentas del dueño,
+ * TikTok incluido, así que con una sola cuenta de Instagram y una de TikTok el panel
+ * no marca nada (dos candidatas) y el teléfono marca la de Instagram (una sola
+ * posibilidad ahí, que es la única que existe de verdad en esta pantalla). No es una
+ * discrepancia: son dos universos distintos, cada uno correcto para su superficie.
+ */
+export function vieneMarcada(cuenta: CuentaApp, disponibles: CuentaApp[]): boolean {
+  return cuenta.conectada && disponibles.filter((c) => c.conectada).length === 1
+}
+
+/** El texto de un chip de cuenta: la red y el handle, o «sin nombre» si no lo tiene. */
+export function etiquetaCuenta(cuenta: CuentaApp): string {
+  return `${NOMBRE_RED[cuenta.red] ?? cuenta.red} · ${cuenta.handle ?? 'sin nombre'}`
 }
 
 /** El valor inicial del selector: la próxima hora en punto, nunca «ahora mismo». */
@@ -144,7 +163,12 @@ export function proximaHoraEnPunto(now: Date): Date {
   return siguiente
 }
 
-/** La única regla que la app aplica sola; todas las demás las dice el servidor. */
-export function puedeEnviar(texto: string, archivos: number): boolean {
-  return texto.trim().length > 0 || archivos > 0
+/**
+ * Las dos reglas que la app aplica sola, antes de que el servidor diga nada: algo que
+ * mandar (texto o archivo) y al menos un destino elegido. Sin la segunda, el envío
+ * llegaba a rechazarse recién en el servidor con «Elige al menos una plataforma»
+ * debajo de una fila de chips que ya no dicen «plataforma», dicen cuenta.
+ */
+export function puedeEnviar(texto: string, archivos: number, cuentas: number): boolean {
+  return (texto.trim().length > 0 || archivos > 0) && cuentas > 0
 }

@@ -1,6 +1,7 @@
 'use client'
 
 import { useActionState } from 'react'
+import Link from 'next/link'
 import { uploadBatch } from '@/app/admin/actions'
 import { cn } from '@/lib/utils'
 
@@ -20,7 +21,14 @@ export function BatchUpload() {
         <p className="text-[0.8rem] leading-relaxed text-fg-faint">
           Una fila por post: fecha en tu zona horaria, texto entre comillas si lleva
           comas, redes y URLs de media separadas por <code>|</code>, y portada
-          (opcional, JPG/PNG, solo con video) como quinta columna. Máximo 50 filas.
+          (opcional, JPG/PNG, solo con video) como quinta columna. Si tienes dos cuentas
+          conectadas en la misma red, nombrar solo la red ya no alcanza: agrega una
+          octava columna <code>cuentas</code> con sus identificadores (también
+          separados por <code>|</code>) — cada tarjeta en{' '}
+          <Link className="underline" href="/admin/accounts">
+            Cuentas
+          </Link>{' '}
+          trae el suyo, con botón para copiarlo. Máximo 50 filas.
         </p>
         <pre className="overflow-x-auto rounded-lg bg-white/[0.06] p-3 text-xs text-fg-muted">{PLANTILLA}</pre>
 

@@ -4,6 +4,11 @@ import {
   tipoArchivo,
   typeFromContentType,
   validateBatchItem,
+  destinoPedido,
+  clavesDeOpciones,
+  opcionesClaveAmbigua,
+  opcionesClaveDuplicada,
+  opcionesDeFila,
   PORTADA_NEEDS_VIDEO,
   PORTADA_NOT_IMAGE,
   PORTADA_FORMAT,
@@ -13,11 +18,13 @@ import { ATRIBUTOS_ERROR } from './atributos'
 import { TIKTOK_SIN_PRIVACIDAD, OPCIONES_ERROR } from './opciones'
 import { TIKTOK_MEDIA } from './validate'
 import { REGLA_PALABRA, REGLA_MENSAJE } from '../comentarios/reglas'
+import type { CuentaDestino } from '../cuentas'
 
 const now = new Date('2026-09-02T12:00:00Z')
 const base: BatchItem = {
   fecha: '2026-09-03 10:00',
   texto: 'Hola lote',
+  cuentas: [],
   redes: ['threads', 'x'],
   media: [],
 }
@@ -33,6 +40,88 @@ describe('mediaTypeFromUrl', () => {
   it('extensión desconocida es null: no se adivina', () => {
     expect(mediaTypeFromUrl('https://ej.com/archivo.pdf')).toBeNull()
     expect(mediaTypeFromUrl('https://ej.com/sin-extension')).toBeNull()
+  })
+})
+
+describe('destinoPedido', () => {
+  it('nombrar cuentas manda sobre nombrar redes', () => {
+    expect(destinoPedido({ ...base, cuentas: ['ig-2'], redes: ['tiktok'] })).toEqual({
+      cuentas: ['ig-2'],
+    })
+  })
+
+  it('sin cuentas, se piden las redes', () => {
+    expect(destinoPedido({ ...base, cuentas: [], redes: ['instagram'] })).toEqual({
+      redes: ['instagram'],
+    })
+  })
+})
+
+describe('validateBatchItem, destinos', () => {
+  it('una fila sin cuentas ni redes se rechaza con una frase útil', () => {
+    const item = { ...base, redes: [], cuentas: [] }
+    expect(validateBatchItem(item, now)).toMatch(/cuenta/i)
+  })
+
+  it('una fila con cuentas y sin redes es válida', () => {
+    expect(validateBatchItem({ ...base, redes: [], cuentas: ['ig-1'] }, now)).toBeNull()
+  })
+})
+
+describe('clavesDeOpciones', () => {
+  const ig1: CuentaDestino = { id: 'ig-1', network: 'instagram', handle: '@uno' }
+  const tiktokA: CuentaDestino = { id: 'tt-a', network: 'tiktok', handle: '@tta' }
+  const tiktokB: CuentaDestino = { id: 'tt-b', network: 'tiktok', handle: '@ttb' }
+
+  it('una clave que es un identificador de cuenta se usa tal cual', () => {
+    expect(clavesDeOpciones([ig1, tiktokA], { 'tt-a': { modo: 'borrador' } })).toEqual({
+      raw: { 'tt-a': { modo: 'borrador' } },
+    })
+  })
+
+  it('una clave que nombra una red se resuelve a su única cuenta', () => {
+    expect(clavesDeOpciones([ig1, tiktokA], { tiktok: { modo: 'borrador' } })).toEqual({
+      raw: { 'tt-a': { modo: 'borrador' } },
+    })
+  })
+
+  it('con dos destinos de esa red, la clave de red es ambigua y nombra las candidatas', () => {
+    expect(clavesDeOpciones([tiktokA, tiktokB], { tiktok: { modo: 'borrador' } })).toEqual({
+      error: opcionesClaveAmbigua('tiktok', ['@tta', '@ttb']),
+    })
+  })
+
+  it('una clave que no es ni un id de la fila ni una de sus redes se ignora', () => {
+    expect(clavesDeOpciones([ig1], { facebook: { modo: 'directo' } })).toEqual({ raw: {} })
+  })
+
+  it('dos claves que resuelven al mismo destino se pisarían: la fila falla nombrando las dos', () => {
+    // 'tt-a' (el id) y 'tiktok' (su única red) resuelven al mismo destino; sin esta
+    // regla, la segunda clave en el objeto pisaría en silencio a la primera.
+    expect(
+      clavesDeOpciones([ig1, tiktokA], {
+        'tt-a': { modo: 'borrador' },
+        tiktok: { modo: 'directo', privacidad: 'SELF_ONLY' },
+      }),
+    ).toEqual({ error: opcionesClaveDuplicada('tt-a', 'tiktok') })
+  })
+})
+
+describe('opcionesDeFila', () => {
+  const ig1: CuentaDestino = { id: 'ig-1', network: 'instagram', handle: '@uno' }
+  const tiktokA: CuentaDestino = { id: 'tt-a', network: 'tiktok', handle: '@tta' }
+
+  it('con destinos reales, una clave de red se resuelve al id de la cuenta antes de validar', () => {
+    // ig1.id / tiktokA.id no son nombres de red: si `opcionesDeFila` no pasara por la
+    // normalización de claves, `tiktok` nunca llegaría a mirarse contra `tt-a`.
+    const item: BatchItem = { ...base, cuentas: [ig1.id, tiktokA.id], opciones: { tiktok: { modo: 'borrador' } } }
+    expect(opcionesDeFila(item, [ig1, tiktokA])).toEqual({ opciones: { 'tt-a': { modo: 'borrador' } } })
+  })
+
+  it('con destinos null (comprobación previa a la base), no valida contenido: solo la forma', () => {
+    const item: BatchItem = { ...base, cuentas: ['tt-a'], opciones: { tiktok: { modo: 'borrador' } } }
+    expect(opcionesDeFila(item, null)).toEqual({ opciones: {} })
+    expect(opcionesDeFila({ ...item, opciones: 'no es objeto' }, null)).toEqual({ error: OPCIONES_ERROR })
   })
 })
 

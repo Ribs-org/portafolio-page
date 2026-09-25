@@ -1,8 +1,9 @@
 import Link from 'next/link'
 import { asc, eq, inArray } from 'drizzle-orm'
-import { getDb, scheduledPosts, scheduledPostTargets, scheduledPostMedia } from '@/db'
+import { getDb, scheduledPosts, scheduledPostTargets, scheduledPostMedia, socialAccounts } from '@/db'
 import { SITE_TIMEZONE } from '@/lib/analytics'
 import { requireUser } from '@/lib/auth'
+import { getCuentas } from '@/lib/posts'
 import { addDays, contarPorDia, normalizeWeekParam } from '@/lib/schedule-week'
 import { cn } from '@/lib/utils'
 import { Composer } from './composer'
@@ -48,11 +49,17 @@ export default async function SchedulePage({
   )
 
   const { id: ownerId } = await requireUser()
+  const cuentas = await getCuentas(ownerId)
   const db = getDb()
+  // `leftJoin` y no `innerJoin` con `socialAccounts`: un destino cuya cuenta ya no
+  // exista no debe desaparecer del calendario, debe mostrarse por su red (ver
+  // `nombreDestino` en `./etiqueta`). El `on` de este join es solo la relación
+  // destino↔cuenta; el filtro por dueño se queda en el `where` de abajo.
   const rows = await db
-    .select({ post: scheduledPosts, target: scheduledPostTargets })
+    .select({ post: scheduledPosts, target: scheduledPostTargets, handle: socialAccounts.handle })
     .from(scheduledPosts)
     .innerJoin(scheduledPostTargets, eq(scheduledPostTargets.postId, scheduledPosts.id))
+    .leftJoin(socialAccounts, eq(socialAccounts.id, scheduledPostTargets.accountId))
     .where(eq(scheduledPosts.ownerId, ownerId))
     .orderBy(asc(scheduledPosts.scheduledAt))
 
@@ -60,13 +67,13 @@ export default async function SchedulePage({
     string,
     {
       post: (typeof rows)[number]['post']
-      targets: Array<(typeof rows)[number]['target']>
+      targets: Array<(typeof rows)[number]['target'] & { handle: string | null }>
       media: Array<typeof scheduledPostMedia.$inferSelect>
     }
   >()
   for (const row of rows) {
     const entry = posts.get(row.post.id) ?? { post: row.post, targets: [], media: [] }
-    entry.targets.push(row.target)
+    entry.targets.push({ ...row.target, handle: row.handle })
     posts.set(row.post.id, entry)
   }
 
@@ -107,7 +114,7 @@ export default async function SchedulePage({
       </header>
 
       <div className="space-y-6">
-        <Composer carga={carga} />
+        <Composer carga={carga} cuentas={cuentas} />
         <BatchUpload />
         <div>
           <div className="mb-3 flex items-center gap-1.5">

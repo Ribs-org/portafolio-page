@@ -181,3 +181,85 @@ La lección operativa, para la próxima vez que haya que reconocer un error de P
 - **Escribe el test con la forma real del driver envuelta por drizzle.** Un test que arma un
   objeto plano `{ code, constraint }` pasa con la función rota; los tres detectores
   sobrevivieron justamente porque nadie los probó, o los probó contra una ficción.
+
+## El arnés de aislamiento solo llega a `src/lib`
+
+**Abierto desde 2026-09-24.**
+
+`aislamiento.test.ts` importa funciones de `src/lib` y comprueba que cada una ate su
+consulta al dueño. Eso deja sin protección cualquier consulta escrita **fuera de
+`src/lib`**: `schedule/page.tsx` arma su propio `leftJoin` inline, no una función de
+`src/lib`, así que el arnés no la alcanza. Esta rama sumó tres más con el mismo patrón,
+las tres en rutas de API: `api/schedule/posts/route.ts`, `api/mobile/schedule/route.ts` y
+`api/mobile/overview/route.ts` (esta última con dos, una por cada ventana que arma —
+«hoy» y «próximos»). Las cuatro son correctas hoy —el filtro del dueño sigue en el
+`WHERE` de cada una, verificado a mano— pero nada impide que mañana alguien mueva uno al
+`ON` del join sin que ninguna prueba chille.
+
+Extraer solo una de esas consultas para cubrirla arreglaría un caso de varios sin
+criterio: el patrón real del repositorio es que el arnés llega a `src/lib` y no a las
+páginas ni a las rutas de API que arman su propio SQL. Cerrarlo de verdad pide decidir
+qué páginas y rutas arman SQL inline y trasladar esas consultas a `src/lib`, o extender
+el arnés para que también las alcance ahí donde viven.
+
+## Dos caminos que crean publicaciones, sin código compartido
+
+**Abierto desde 2026-09-24.**
+
+`crearPostProgramado` (`src/lib/social/publish/crear.ts`) y los `insert` propios de
+`POST /api/schedule/batch` (`src/lib/social/publish/batch.ts`) escriben posts y sus
+destinos por caminos separados. `batch.ts` no llama a `crearPostProgramado` porque esa
+función no sabe de portada (`coverUrl`) ni de `atributos`, dos columnas que solo la carga
+masiva escribe. Es una duplicación anterior a esta entrega, que la conservó a propósito
+—extender `crearPostProgramado` habría tocado la pieza del camino de publicar que ya usa
+el compositor, el más transitado, a cuestas de un cambio de vocabulario—.
+
+El costo: un cambio futuro en cómo se escriben los destinos de un post (la tabla
+`scheduled_post_targets`, sus columnas, su validación) hay que hacerlo dos veces, y las dos
+copias pueden divergir sin que nada lo note. Cerrarlo pide que `crearPostProgramado` acepte
+portada y atributos, o que `batch.ts` la llame para escribir destinos y solo haga sus
+propios `insert` para lo que le es propio.
+
+## Los `insert` del lote no van en transacción
+
+**Abierto, anterior a esta entrega.**
+
+`POST /api/schedule/batch` escribe cada fila con varios `insert` separados: el post y sus
+destinos, siempre; su media, si la fila trae archivos; y la regla de palabra clave, si la
+fila la pidió — hasta cuatro. Si el de los destinos falla después de que el del post (y,
+si corresponde, el de la media) ya confirmaron, queda un post con su media y **sin ningún
+destino** — invisible para el cron de publicación, porque este solo recorre destinos
+pendientes. El dueño ve un post «fantasma» en la carga masiva que nunca sale, sin ningún
+error visible después del hecho.
+
+Envolverlos todos en una transacción de drizzle lo cierra.
+
+## Las métricas siguen agrupadas por red, no por cuenta
+
+**Abierto desde 2026-09-24.** Es lo que esta entrega deja pendiente de su propia idea.
+
+`api/mobile/accounts` (`src/app/api/mobile/accounts/route.ts`) y
+`src/lib/account-stats.ts` agrupan las filas por `network`, no por cuenta: con dos
+cuentas de Instagram conectadas, sus seguidores y sus métricas se suman en una sola
+tarjeta, como si fueran una cuenta. Es la misma limitación que ya advertía el README antes
+de esta entrega («la analítica todavía agrupa por red»), y elegir a qué cuenta sale cada
+publicación no la tocó — programar y medir son caminos distintos.
+
+Cerrarlo pide que `account-stats.ts` agrupe por `accountId` en vez de por `network`, y que
+el panel y la app muestren una tarjeta por cuenta en vez de una por red.
+
+## Un par de restos chicos de esta entrega
+
+**Anotado el 2026-09-24.** Ninguno tiene efecto observable hoy; quedan escritos para no
+perderlos.
+
+- **`validateScheduleDraft` corre dos veces con los mismos datos** en las filas de
+  `POST /api/schedule/batch` que traen `redes` (`src/lib/social/publish/batch.ts`): una
+  vez para la validación de la forma y otra al derivar `cuentas`. Redundante, sin
+  resultado distinto entre una corrida y otra.
+- **Las dos rutas móviles simulan `resolverDestinos` en sus propios tests**
+  (`src/app/api/mobile/schedule/check/route.test.ts` y
+  `src/app/api/mobile/schedule/route.test.ts`), así que la precedencia entre `cuentas` y
+  `redes` solo queda cubierta contra la función real en `mobile-api.test.ts`. División
+  razonable —ver el ledger de la entrega— pero vale saber dónde vive esa cobertura antes
+  de tocar `resolverDestinos`.

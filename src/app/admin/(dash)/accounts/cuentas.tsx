@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState, useTransition } from 'react'
-import { AlertTriangle, Check, RefreshCw } from 'lucide-react'
+import { AlertTriangle, Check, Copy, RefreshCw } from 'lucide-react'
 import { disconnectAccount, syncSocialNow } from '@/app/admin/actions'
 import { NEGATIVE, POSITIVE } from '@/components/charts/theme'
 import { SOCIAL_NETWORKS } from '@/db/schema'
@@ -122,6 +122,7 @@ export function Cuentas({ rows }: { rows: CuentaRow[] }) {
 function Tarjeta({ row, network }: { row: CuentaRow; network: string }) {
   const [pending, startTransition] = useTransition()
   const [desconectada, setDesconectada] = useState(false)
+  const [idCopiado, setIdCopiado] = useState(false)
   const nombre = nombreDe(row)
 
   useEffect(() => {
@@ -129,6 +130,26 @@ function Tarjeta({ row, network }: { row: CuentaRow; network: string }) {
     const id = setTimeout(() => setDesconectada(false), AVISO_MS)
     return () => clearTimeout(id)
   }, [desconectada])
+
+  useEffect(() => {
+    if (!idCopiado) return
+    const id = setTimeout(() => setIdCopiado(false), AVISO_MS)
+    return () => clearTimeout(id)
+  }, [idCopiado])
+
+  // El id de esta cuenta: lo que `cuentas` de la carga masiva y de la API espera
+  // cuando nombrar la red ya no alcanza porque hay dos conectadas de la misma. Con dos
+  // cuentas de una red, es la única forma pública de conseguirlo para una recién
+  // conectada — `GET /api/schedule/posts` solo trae ids de cuentas que ya tienen un
+  // destino programado.
+  function copiarId() {
+    const clipboard = navigator.clipboard
+    if (!clipboard) return
+    clipboard
+      .writeText(row.id)
+      .then(() => setIdCopiado(true))
+      .catch(() => {})
+  }
 
   function desconectar() {
     const seguir = window.confirm(
@@ -165,6 +186,26 @@ function Tarjeta({ row, network }: { row: CuentaRow; network: string }) {
       {row.externalId ? (
         <p className="mt-0.5 truncate font-mono text-[0.68rem] text-fg-faint">{row.externalId}</p>
       ) : null}
+      {/*
+        El id de la cuenta, discreto: no es protagonista de la tarjeta, pero tiene que
+        poder sacarse de ella. Es distinto del `externalId` de arriba (el id que le da
+        la red): este es el que la carga masiva y la API esperan en `cuentas` cuando
+        nombrar la red ya no alcanza.
+      */}
+      <button
+        type="button"
+        onClick={copiarId}
+        title="Id de cuenta — para «cuentas» en la carga masiva o la API"
+        className="mt-0.5 flex max-w-full items-center gap-1 font-mono text-[0.68rem] text-fg-faint transition-colors hover:text-fg-muted"
+      >
+        <span className="truncate">{row.id}</span>
+        {idCopiado ? (
+          <Check className="h-3 w-3 shrink-0" style={{ color: POSITIVE }} aria-hidden />
+        ) : (
+          <Copy className="h-3 w-3 shrink-0" aria-hidden />
+        )}
+        <span className="sr-only">Copiar id de cuenta</span>
+      </button>
       <p className="mt-0.5 font-mono text-[0.68rem] text-fg-faint">
         {row.lastSyncedAt ? `Sincronizado ${syncedAgo(row.lastSyncedAt)}` : 'Sin sincronizar'}
       </p>

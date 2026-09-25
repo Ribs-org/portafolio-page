@@ -1,6 +1,8 @@
 // Lo que cada red obliga a elegir por destino antes de publicar. Hoy solo TikTok pide
 // algo; la unión crece red por red y el resto del sistema solo transporta el objeto.
 
+import type { CuentaDestino } from '../cuentas'
+
 export type PrivacidadTikTok = 'PUBLIC_TO_EVERYONE' | 'MUTUAL_FOLLOW_FRIENDS' | 'FOLLOWER_OF_CREATOR' | 'SELF_ONLY'
 export type ComercialTikTok = 'no' | 'marca_propia' | 'patrocinado'
 
@@ -97,39 +99,62 @@ export function validarOpciones(
   return { error: OPCIONES_ERROR }
 }
 
-/** Para una fila entera: un objeto por red pedida, solo con las que tienen opciones. */
-export function validarOpcionesPorRed(
-  networks: string[],
+/**
+ * Para una fila entera: un objeto por cuenta elegida, solo con las que tienen opciones.
+ *
+ * Por cuenta y no por red: la API de TikTok consulta `creator_info` por creador, y las
+ * privacidades permitidas pueden diferir entre dos cuentas del mismo dueño. Compartirlas
+ * dejaría mandar a una cuenta una privacidad que no admite, y eso se descubre publicando.
+ *
+ * Cuando el dueño tiene dos o más cuentas de la misma red, un bloque idéntico se repite
+ * en pantalla por cada una y la frase fija («TikTok necesita que elijas la privacidad.»)
+ * ya no dice a cuál se refiere. En ese caso, y solo en ese caso, se antepone el handle de
+ * la cuenta que falló; con una sola cuenta de esa red nombrarla sería ruido.
+ */
+export function validarOpcionesPorCuenta(
+  cuentas: CuentaDestino[],
   raw: Record<string, unknown>,
 ): { opciones: Record<string, OpcionesDestino> } | { error: string } {
+  const cuentasPorRed = new Map<string, number>()
+  for (const cuenta of cuentas) cuentasPorRed.set(cuenta.network, (cuentasPorRed.get(cuenta.network) ?? 0) + 1)
+
   const opciones: Record<string, OpcionesDestino> = {}
-  for (const network of networks) {
-    const check = validarOpciones(network, raw[network])
-    if ('error' in check) return check
-    if (check.opciones) opciones[network] = check.opciones
+  for (const cuenta of cuentas) {
+    const check = validarOpciones(cuenta.network, raw[cuenta.id])
+    if ('error' in check) {
+      const redAmbigua = (cuentasPorRed.get(cuenta.network) ?? 0) > 1
+      return redAmbigua ? { error: `«${cuenta.handle ?? cuenta.network}»: ${check.error}` } : check
+    }
+    if (check.opciones) opciones[cuenta.id] = check.opciones
   }
   return { opciones }
 }
 
 /**
- * Lo que el compositor manda, tal cual, listo para `validarOpcionesPorRed`. Con TikTok
- * marcado y sin campos, la privacidad viaja vacía a propósito: así la validación
- * responde con la frase de la privacidad y no con la de la forma.
+ * Lo que el compositor manda, tal cual, listo para `validarOpcionesPorCuenta`. Los campos
+ * de TikTok llevan el identificador de la cuenta como sufijo (`tiktokModo:<id>`) porque
+ * puede haber dos bloques en el mismo formulario. Con TikTok marcado y sin campos, la
+ * privacidad viaja vacía a propósito: así la validación responde con la frase de la
+ * privacidad y no con la de la forma.
  */
-export function opcionesDesdeFormulario(formData: FormData, networks: string[]): Record<string, unknown> {
+export function opcionesDesdeFormularioPorCuenta(
+  formData: FormData,
+  cuentas: CuentaDestino[],
+): Record<string, unknown> {
   const raw: Record<string, unknown> = {}
-  if (networks.includes('tiktok')) {
-    const modo = String(formData.get('tiktokModo') ?? 'directo')
-    raw.tiktok =
+  for (const cuenta of cuentas) {
+    if (cuenta.network !== 'tiktok') continue
+    const modo = String(formData.get(`tiktokModo:${cuenta.id}`) ?? 'directo')
+    raw[cuenta.id] =
       modo === 'borrador'
         ? { modo: 'borrador' }
         : {
             modo: 'directo',
-            privacidad: String(formData.get('tiktokPrivacidad') ?? ''),
-            comentarios: formData.get('tiktokComentarios') === 'on',
-            duo: formData.get('tiktokDuo') === 'on',
-            pegar: formData.get('tiktokPegar') === 'on',
-            comercial: String(formData.get('tiktokComercial') ?? 'no'),
+            privacidad: String(formData.get(`tiktokPrivacidad:${cuenta.id}`) ?? ''),
+            comentarios: formData.get(`tiktokComentarios:${cuenta.id}`) === 'on',
+            duo: formData.get(`tiktokDuo:${cuenta.id}`) === 'on',
+            pegar: formData.get(`tiktokPegar:${cuenta.id}`) === 'on',
+            comercial: String(formData.get(`tiktokComercial:${cuenta.id}`) ?? 'no'),
           }
   }
   return raw

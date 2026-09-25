@@ -5,9 +5,8 @@ import { useState, useTransition } from 'react'
 import { deleteScheduledPost, rescheduleTarget, subirAhora } from '@/app/admin/actions'
 import { Button, Input } from '@/components/ui'
 import type { ScheduledPost, ScheduledPostTarget } from '@/db/schema'
-import { networkLabel } from '@/lib/networks'
 import { cn } from '@/lib/utils'
-import { etiquetaDestino } from './etiqueta'
+import { etiquetaDestino, nombreDestino } from './etiqueta'
 import { cortarCola } from './orden'
 
 // El mismo corte que la tabla de contenido: de entrada solo las primeras veinte, que
@@ -18,7 +17,7 @@ export function Queue({
   items,
   volver,
 }: {
-  items: Array<{ post: ScheduledPost; targets: ScheduledPostTarget[] }>
+  items: Array<{ post: ScheduledPost; targets: Array<ScheduledPostTarget & { handle: string | null }> }>
   volver: string
 }) {
   const [pending, start] = useTransition()
@@ -130,7 +129,7 @@ export function Queue({
                     'bg-white/[0.08] text-fg-muted',
                 )}
               >
-                {networkLabel(target.network)}: {etiquetaDestino(target)}
+                {nombreDestino(target)}: {etiquetaDestino(target)}
                 {target.status === 'failed' && target.lastError && ` — ${target.lastError}`}
                 {target.status === 'failed' && (
                   <button

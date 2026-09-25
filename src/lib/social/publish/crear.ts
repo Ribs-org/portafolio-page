@@ -1,5 +1,5 @@
 import { getDb, reglasClave, scheduledPostMedia, scheduledPosts, scheduledPostTargets } from '@/db'
-import { exigirCuentas } from '../cuentas'
+import type { CuentaDestino } from '../cuentas'
 import type { ReglaLimpia } from '../comentarios/reglas'
 import type { OpcionesDestino } from './opciones'
 
@@ -7,13 +7,13 @@ export type MediaSubida = { url: string; mediaType: 'image' | 'video' }
 
 /**
  * Las tres inserciones de un post programado, en el orden que el resto del sistema
- * espera: el post, su media en posición de carrusel, y un target por red con lo que esa
- * red exigió elegir. Compartido por el compositor web y la ruta móvil para que ambos
- * escriban exactamente lo mismo. La media ya vive en el almacén: subirla es problema de
- * quien llama. Las opciones llegan ya validadas por `validarOpcionesPorRed`.
+ * espera: el post, su media en posición de carrusel, y un target por cuenta elegida con
+ * lo que esa cuenta exigió elegir. Compartido por el compositor web y la ruta móvil para
+ * que ambos escriban exactamente lo mismo. La media ya vive en el almacén: subirla es
+ * problema de quien llama. Las opciones llegan ya validadas por `validarOpcionesPorCuenta`.
  *
- * Lanza `SinCuenta` si una red no tiene cuenta conectada; el llamador la traduce a su
- * frase.
+ * Las cuentas ya vienen verificadas por quien llama: esta función no habla con el
+ * navegador y no tiene con qué comprobar pertenencia. Ver `verificarCuentas`.
  */
 export async function crearPostProgramado(
   ownerId: string,
@@ -21,14 +21,12 @@ export async function crearPostProgramado(
     caption: string
     scheduledAt: Date
     media: MediaSubida[]
-    networks: string[]
+    cuentas: CuentaDestino[]
     opciones?: Record<string, OpcionesDestino>
     regla?: ReglaLimpia | null
   },
 ): Promise<string> {
   const db = getDb()
-  // Antes de escribir nada: un post sin cuenta a la que salir no debe quedar a medias.
-  const cuentas = await exigirCuentas(ownerId, input.networks)
   const [post] = await db
     .insert(scheduledPosts)
     .values({ ownerId, caption: input.caption, scheduledAt: input.scheduledAt })
@@ -44,11 +42,11 @@ export async function crearPostProgramado(
     )
   }
   await db.insert(scheduledPostTargets).values(
-    input.networks.map((network) => ({
+    input.cuentas.map((cuenta) => ({
       postId: post!.id,
-      network,
-      accountId: cuentas.get(network)!,
-      opciones: input.opciones?.[network] ?? null,
+      network: cuenta.network,
+      accountId: cuenta.id,
+      opciones: input.opciones?.[cuenta.id] ?? null,
     })),
   )
   if (input.regla) {

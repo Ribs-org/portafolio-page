@@ -32,10 +32,18 @@ describe('csvToBatchItems', () => {
     )
     expect(result).toEqual({
       items: [
-        { fecha: '2026-09-03 10:00', texto: 'Hola, lote', redes: ['threads', 'x'], media: [], portada: '' },
+        {
+          fecha: '2026-09-03 10:00',
+          texto: 'Hola, lote',
+          cuentas: [],
+          redes: ['threads', 'x'],
+          media: [],
+          portada: '',
+        },
         {
           fecha: '2026-09-03 18:30',
           texto: 'Con foto',
+          cuentas: [],
           redes: ['instagram'],
           media: ['https://ej.com/a.jpg', 'https://ej.com/b.jpg'],
           portada: '',
@@ -137,6 +145,36 @@ describe('regla en el CSV', () => {
     ].join('\n')
     expect(csvToBatchItems(text)).toMatchObject({
       items: [{ opciones: { tiktok: { modo: 'borrador' } }, regla: { palabra: 'guia', mensaje: 'm' } }],
+    })
+  })
+})
+
+describe('cuentas en el CSV', () => {
+  it('la octava columna trae identificadores de cuenta separados por |; celda vacía es sin cuentas', () => {
+    const text = [
+      'fecha,texto,redes,media,portada,opciones,regla,cuentas',
+      '2026-09-18 10:00,Con cuentas,,,,,,acc-ig-1|acc-ig-2',
+      '2026-09-18 11:00,Sin cuentas,threads,,,,,',
+    ].join('\n')
+    expect(csvToBatchItems(text)).toMatchObject({
+      items: [{ cuentas: ['acc-ig-1', 'acc-ig-2'] }, { cuentas: [] }],
+    })
+  })
+
+  it('sin octava columna, toda fila sigue pidiendo por red: cuentas siempre vacío', () => {
+    const text = 'fecha,texto,redes,media,portada,opciones,regla\n2026-09-18 10:00,Hola,threads,,,,'
+    expect(csvToBatchItems(text)).toMatchObject({ items: [{ cuentas: [] }] })
+  })
+
+  it('cuentas solo puede ir octava, después de regla', () => {
+    expect(csvToBatchItems('fecha,texto,redes,media,portada,opciones,cuentas\n')).toEqual({
+      error: CSV_HEADER_ERROR,
+    })
+  })
+
+  it('nueve columnas rechazan el lote entero', () => {
+    expect(csvToBatchItems('fecha,texto,redes,media,portada,opciones,regla,cuentas,extra\n')).toEqual({
+      error: CSV_HEADER_ERROR,
     })
   })
 })

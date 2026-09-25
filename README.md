@@ -144,7 +144,9 @@ publicación, comentarios) siguen recorriendo *todo* el despliegue sin filtrar p
 dueño — un cron por inquilino es otro subproyecto, no esta entrega. La llave de API
 (`SCHEDULE_API_KEY`) y la raíz pública (`/`) siguen siendo del admin. Y hasta la entrega
 3, dos usuarios todavía no pueden conectar la misma cuenta de la misma red: quien llega
-segundo recibe un aviso, no la cuenta de otro.
+segundo recibe un aviso, no la cuenta de otro. Eso es entre dos usuarios distintos: un
+mismo dueño sí puede conectar varias cuentas suyas de la misma red y elegir a cuáles sale
+cada publicación — ver «Varias cuentas de una misma red», más abajo.
 
 > El segundo perfil nace con un slug aleatorio (`circulo-a1b2c3d4`) y con `noindex`, para
 > que exista una versión que solo compartes a mano. Cámbialo por lo que quieras.
@@ -267,6 +269,36 @@ historial de métricas ya recogido no se toca. Cuenta con hacerlo cada dos meses
 Desconectar borra las credenciales de esa cuenta y conserva su historial. Para volver,
 **Reconectar** en su tarjeta; para sumar otra cuenta de la misma red, **Agregar
 cuenta** en el bloque de la red.
+
+#### Varias cuentas de una misma red
+
+Puedes tener dos cuentas de Instagram —`@vicente` y `@vicenteclips`— y decidir a cuáles
+sale cada publicación. **El compositor del panel, y Publicar en la app del teléfono,
+listan tus cuentas, no las redes**, con su handle a la vista, y marcas las que quieras: el
+mismo corte puede salir a las dos.
+
+Nada viene marcado por omisión, salvo que tengas exactamente una cuenta conectada — contada
+sobre las cuentas que cada pantalla puede ofrecer, que no es el mismo universo en las dos:
+el panel cuenta sobre todas las tuyas, TikTok incluido; el teléfono, solo sobre las que
+puede publicar, que hoy excluye TikTok (ver más abajo). Con una cuenta de Instagram y una de
+TikTok, por ejemplo, el panel no marca nada —dos candidatas— y el teléfono marca la de
+Instagram, porque ahí es la única que existe de verdad. No es una discrepancia: cada
+pantalla acierta sobre su propio universo. Es deliberado: antes el sistema mandaba siempre a
+la más antigua de cada red sin preguntar, y la segunda quedaba conectada y muda. Una sola
+posibilidad no es una elección; dos sí, y las eliges tú.
+
+Una cuenta cuya credencial venció aparece igual, en vez de desaparecer sin explicación, con
+el mismo aviso de reconectarla en las dos superficies: en el panel, apagada y con el
+texto aparte; en el teléfono, sin poder tocarse y con «reconéctala» al lado del nombre. Y
+donde antes se leía la red —el calendario, la cola, el editor, y en el teléfono el
+Calendario y el Resumen— ahora se lee el handle, para que dos destinos de la misma red se
+distingan.
+
+TikTok pide sus propias opciones por destino —privacidad, comentarios, dúo, comercial—, así
+que con dos cuentas de TikTok marcadas verás dos bloques, uno por cuenta. No se comparten a
+propósito: TikTok consulta los permisos por creador, y lo que una cuenta admite la otra
+puede no admitirlo. La app del teléfono todavía no ofrece TikTok como destino en
+absoluto: ahí no hay dónde elegir esas opciones.
 
 ### TikTok
 
@@ -626,7 +658,12 @@ viaja aparte — pero es público: si prefieres que no lo sea, muévelo fuera de
 
 `POST /api/schedule/batch` con header `Authorization: Bearer <SCHEDULE_API_KEY>` y
 cuerpo `{ "posts": [{ "fecha": "2026-09-03 10:00", "texto": "Hola", "redes": ["x"], "media": [] }] }`
-(máximo 50). Responde el resultado por item; las filas rechazadas traen su motivo.
+(máximo 50). Cada item elige su destino de dos formas: `cuentas` (identificadores de
+cuenta) o `redes` (nombres de red). Si la fila trae `cuentas`, esas mandan y `redes` se
+ignora. Nombrar solo `redes` sigue funcionando, pero cada nombre se resuelve a una
+cuenta solo cuando el dueño tiene **exactamente una** conectada de esa red — con dos, la
+fila se rechaza nombrando las candidatas y sus handles; no hay adivinanza posible.
+Responde el resultado por item; las filas rechazadas traen su motivo.
 Si la función alcanza su tiempo máximo a mitad de un lote, la respuesta se pierde pero las filas ya procesadas quedan programadas — re-enviar el lote vuelve a programar las que habían entrado (no hay deduplicación), así que conviene reintentar solo las filas pendientes.
 
 Cada item acepta además `atributos`: un objeto plano de valores simples
@@ -636,9 +673,12 @@ taxonomía de quien crea el contenido: sirve para correlacionar decisiones creat
 con resultados. El CSV no lo lleva; el editor de un post programado lo muestra y
 permite corregirlo.
 
-Y `opciones`, obligatorio cuando la fila va a TikTok: el modo (directo o borrador), la
-privacidad y las casillas que TikTok exige elegir por publicación. El detalle está en
-`public/docs/api-editor.md`.
+Y `opciones`, obligatorio cuando algún destino de la fila es una cuenta de TikTok: el
+modo (directo o borrador), la privacidad y las casillas que TikTok exige elegir por
+publicación. Se llavea por destino: cada clave se busca primero entre los
+identificadores de cuenta de la fila, y si no coincide con ninguno se acepta como
+nombre de red — resuelta solo si la fila tiene una única cuenta de esa red, igual que
+`redes`. El detalle está en `public/docs/api-editor.md`.
 
 ### Métricas por API
 
@@ -665,8 +705,13 @@ números recién al día siguiente.
 y `hasta` (`YYYY-MM-DD` en la zona del sitio, ambos inclusive; por defecto de hoy a 30
 días). Devuelve `{ desde, hasta, posts }` con lo programado cuya **hora de salida** cae
 en la ventana, salido o no: texto, `fecha` (ISO con offset), portada, media en orden,
-`atributos`, y por cada red su estado (`scheduled`, `publishing`, `published`,
-`failed`), el `externalId` si ya salió, los intentos y la frase de error si falló.
+`atributos`, y por cada destino su estado (`scheduled`, `publishing`, `published`,
+`failed`), el `externalId` si ya salió, los intentos, la frase de error si falló, y
+`cuentaId`/`handle` de la cuenta — útil para recuperar el id de una cuenta que ya tiene
+algún destino programado. Para una cuenta recién conectada, que todavía no tiene
+ninguno, el id está en su tarjeta en **Cuentas** del panel, con un botón para
+copiarlo: es la única superficie que no pide llave de API, solo la sesión de quien
+entra al panel.
 
 ## Estructura
 

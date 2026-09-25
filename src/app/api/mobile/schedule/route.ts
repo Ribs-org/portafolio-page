@@ -1,6 +1,14 @@
 import { NextResponse } from 'next/server'
 import { and, asc, eq, gt, inArray, lte } from 'drizzle-orm'
-import { getDb, scheduledPosts, scheduledPostMedia, scheduledPostTargets } from '@/db'
+import {
+  getDb,
+  scheduledPosts,
+  scheduledPostMedia,
+  scheduledPostTargets,
+  socialAccounts,
+  type ScheduledPost,
+  type ScheduledPostTarget,
+} from '@/db'
 import { SITE_TIMEZONE } from '@/lib/analytics'
 import { isoInZone } from '@/lib/metrics-api'
 import { requireMobileUser } from '@/lib/mobile-guardia'
@@ -12,9 +20,10 @@ import {
   parseBorradorMovil,
   parseMediaMovil,
   resolverCuando,
+  resolverDestinos,
 } from '@/lib/mobile-api'
 import { crearPostProgramado } from '@/lib/social/publish/crear'
-import { SinCuenta } from '@/lib/social/cuentas'
+import { CuentaInvalida } from '@/lib/social/cuentas'
 import { validateScheduleDraft } from '@/lib/social/publish/validate'
 import { basePublica, existe, keyDesdeUrl } from '@/lib/storage'
 
@@ -23,6 +32,44 @@ export const dynamic = 'force-dynamic'
 /** Una ventana con memoria corta y futuro suficiente para lo que cabe en un pulgar. */
 const DIAS_ATRAS = 7
 const DIAS_ADELANTE = 30
+
+/** Una fila del `leftJoin`: un post con uno de sus destinos y el handle de su cuenta. */
+type FilaDestinoMovil = { post: ScheduledPost; target: ScheduledPostTarget; handle: string | null }
+
+export type PostMovil = {
+  id: string
+  texto: string
+  cuando: string
+  portada: string | null
+  miniatura: string | null
+  redes: Array<{ id: string; red: string; handle: string | null; estado: string; error: string | null }>
+}
+
+/**
+ * Agrupa las filas del join en un post por id, con sus destinos juntos. Extraída para
+ * poder probarla sin base — ver `route.test.ts`.
+ *
+ * Cada destino lleva su propio `id` (`scheduled_post_targets.id`), no solo `red`: con
+ * dos cuentas de la misma red, dos destinos del mismo post comparten `red` y solo el
+ * `id` los distingue — es la clave que el Resumen y el Calendario del teléfono usan
+ * para no repetir la de React entre ellos (repaso final de la rama).
+ */
+export function agruparPostsMovil(filas: FilaDestinoMovil[], miniaturaPorPost: Map<string, string>): PostMovil[] {
+  const mapa = new Map<string, PostMovil>()
+  for (const { post, target, handle } of filas) {
+    const entrada = mapa.get(post.id) ?? {
+      id: post.id,
+      texto: post.caption,
+      cuando: isoInZone(post.scheduledAt, SITE_TIMEZONE),
+      portada: post.coverUrl,
+      miniatura: miniaturaPorPost.get(post.id) ?? null,
+      redes: [],
+    }
+    entrada.redes.push({ id: target.id, red: target.network, handle, estado: target.status, error: target.lastError })
+    mapa.set(post.id, entrada)
+  }
+  return [...mapa.values()]
+}
 
 export async function GET(request: Request) {
   const usuario = await requireMobileUser(request)
@@ -33,9 +80,12 @@ export async function GET(request: Request) {
   const now = new Date()
   const db = getDb()
   const filas = await db
-    .select({ post: scheduledPosts, target: scheduledPostTargets })
+    .select({ post: scheduledPosts, target: scheduledPostTargets, handle: socialAccounts.handle })
     .from(scheduledPosts)
     .innerJoin(scheduledPostTargets, eq(scheduledPostTargets.postId, scheduledPosts.id))
+    // `leftJoin`, no `innerJoin`: una cuenta borrada no hace desaparecer el destino,
+    // solo su handle — mismo criterio que `GET /api/schedule/posts` (Tarea 5).
+    .leftJoin(socialAccounts, eq(socialAccounts.id, scheduledPostTargets.accountId))
     .where(
       and(
         eq(scheduledPosts.ownerId, usuario.id),
@@ -60,33 +110,18 @@ export async function GET(request: Request) {
     }
   }
 
-  const mapa = new Map<
-    string,
-    { id: string; texto: string; cuando: string; portada: string | null; miniatura: string | null; redes: Array<{ red: string; estado: string; error: string | null }> }
-  >()
-  for (const { post, target } of filas) {
-    const entrada = mapa.get(post.id) ?? {
-      id: post.id,
-      texto: post.caption,
-      cuando: isoInZone(post.scheduledAt, SITE_TIMEZONE),
-      portada: post.coverUrl,
-      miniatura: miniaturaPorPost.get(post.id) ?? null,
-      redes: [],
-    }
-    entrada.redes.push({ red: target.network, estado: target.status, error: target.lastError })
-    mapa.set(post.id, entrada)
-  }
-
-  return NextResponse.json({ posts: [...mapa.values()] })
+  return NextResponse.json({ posts: agruparPostsMovil(filas, miniaturaPorPost) })
 }
 
 /**
  * El post con sus archivos ya en R2. Antes de crear: que cada URL sea del almacén
  * propio y bajo `scheduled/` (un cuerpo forjado no puede apuntar a cualquier URL de
- * internet), que `cuando` y el resto del borrador pasen las reglas de
- * `validateScheduleDraft` — el tope de diez archivos y cada regla son gratis, así que
- * van antes —, y por último que cada objeto exista en R2 (un HEAD es un viaje de ida y
- * vuelta, y no vale la pena pagarlo si el post ya iba a rechazarse por otra razón).
+ * internet), que se resuelva el destino real con `resolverDestinos` (compartida con
+ * `check/route.ts` — ver su comentario), que `cuando` y el resto del borrador pasen las
+ * reglas de `validateScheduleDraft` sobre la red de cada destino resuelto, no una
+ * declarada aparte, y por último que cada objeto exista en R2 (un HEAD es un viaje de
+ * ida y vuelta, y no vale la pena pagarlo si el post ya iba a rechazarse por otra
+ * razón).
  */
 export async function POST(request: Request) {
   const usuario = await requireMobileUser(request)
@@ -113,6 +148,17 @@ export async function POST(request: Request) {
     }
   }
 
+  // `check/route.ts` promete lo que este `POST` cumple: las dos rutas llaman a
+  // `resolverDestinos` con el mismo borrador, así que nunca se pueden desacordar.
+  let cuentas: Awaited<ReturnType<typeof resolverDestinos>>['cuentas']
+  let networks: string[]
+  try {
+    ;({ cuentas, networks } = await resolverDestinos(usuario.id, borrador))
+  } catch (fallo) {
+    if (fallo instanceof CuentaInvalida) return NextResponse.json({ error: fallo.message }, { status: 400 })
+    throw fallo
+  }
+
   const now = new Date()
   const scheduledAt = resolverCuando(borrador.ahora, borrador.cuando, now)
   const error = validateScheduleDraft(
@@ -120,7 +166,7 @@ export async function POST(request: Request) {
       caption: borrador.texto,
       imageCount: media.filter((m) => m.mediaType === 'image').length,
       videoCount: media.filter((m) => m.mediaType === 'video').length,
-      networks: borrador.redes,
+      networks,
       scheduledAt,
     },
     now,
@@ -141,11 +187,10 @@ export async function POST(request: Request) {
       caption: borrador.texto,
       scheduledAt: scheduledAt!,
       media,
-      networks: borrador.redes,
+      cuentas,
     })
     return NextResponse.json({ id, cuando: isoInZone(scheduledAt!, SITE_TIMEZONE) })
   } catch (dbError) {
-    if (dbError instanceof SinCuenta) return NextResponse.json({ error: dbError.message }, { status: 400 })
     console.error('schedule/crear:', String(dbError).slice(0, 300))
     return NextResponse.json({ error: NO_SE_GUARDO }, { status: 500 })
   }

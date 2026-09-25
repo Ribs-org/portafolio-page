@@ -3,7 +3,7 @@ import { File } from 'expo-file-system'
 import { RechazoApi, SesionCaducada, apiPost } from './api'
 import { ARCHIVO_FALTANTE, SIN_SENAL, SIN_SENAL_SUBIDA, type Elegido, type Evento, type Retomar } from './publicar'
 
-export type BorradorApp = { texto: string; redes: string[]; cuando: string | null; ahora: boolean }
+export type BorradorApp = { texto: string; cuentas: string[]; cuando: string | null; ahora: boolean }
 export type SubidaHecha = { url: string; mediaType: 'image' | 'video' }
 
 type Destino = { subir: string; publica: string; mediaType: 'image' | 'video' }

@@ -2,11 +2,11 @@ import { env } from '@/lib/env'
 import { fromZonedInput } from '@/lib/utils'
 import { extensionDe, validateScheduleDraft } from './validate'
 import { validateAtributos } from './atributos'
-import { validarOpcionesPorRed, OPCIONES_ERROR, type OpcionesDestino } from './opciones'
+import { validarOpcionesPorCuenta, OPCIONES_ERROR, type OpcionesDestino } from './opciones'
 import { guardar } from '@/lib/storage'
 import { getDb, scheduledPosts, scheduledPostMedia, scheduledPostTargets, reglasClave } from '@/db'
 import { randomUUID } from 'node:crypto'
-import { SinCuenta, exigirCuentas } from '../cuentas'
+import { CuentaInvalida, cuentaUnicaPorRed, verificarCuentas, type CuentaDestino } from '../cuentas'
 import { validarRegla } from '../comentarios/reglas'
 
 // Same derivation as SITE_TIMEZONE in lib/analytics — duplicated here because that
@@ -28,13 +28,20 @@ function parseFecha(fecha: string): Date | null {
 export type BatchItem = {
   fecha: string
   texto: string
+  /** Identificadores de cuenta elegidos como destino. Si hay alguno, manda sobre `redes`. */
+  cuentas: string[]
   redes: string[]
   media: string[]
   /** URL pública de imagen; vacía o ausente = sin portada. Solo válida con video. */
   portada?: string
   /** JSON plano libre del editor-LLM; se valida con validateAtributos. */
   atributos?: unknown
-  /** Lo que cada red exige por destino, por red: `{ "tiktok": { … } }`. Se valida con validarOpcionesPorRed. */
+  /**
+   * Lo que cada destino exige elegir, llaveado por clave: `{ "<clave>": { … } }`. Cada
+   * clave se busca primero entre los identificadores de cuenta de los destinos de la
+   * fila; si no coincide con ninguno se acepta como nombre de red y se resuelve a su
+   * destino solo si la fila tiene exactamente uno. Se valida con validarOpcionesPorCuenta.
+   */
   opciones?: unknown
   /** { palabra, mensaje, respuestaPublica? }; se valida con validarRegla. */
   regla?: unknown
@@ -71,6 +78,22 @@ export function mediaTypeFromUrl(url: string): 'image' | 'video' | null {
   if (IMAGE_EXTENSIONS.has(extension)) return 'image'
   if (VIDEO_EXTENSIONS.has(extension)) return 'video'
   return null
+}
+
+// A URL with no recognizable extension (a Drive link) counts as an image here and gets
+// its real type from the download's content-type, which re-runs these rules. Image is
+// the safe guess: the only type-dependent rules are X's, and for X any count that fails
+// as images fails as videos too — so nothing valid is rejected early, and nothing
+// invalid slips past the re-check.
+/** Por extensión declarada, antes de descargar nada — el mismo criterio en los dos sitios que lo necesitan. */
+export function contarMedia(media: string[]): { imageCount: number; videoCount: number } {
+  let imageCount = 0
+  let videoCount = 0
+  for (const url of media) {
+    if (mediaTypeFromUrl(url) === 'video') videoCount++
+    else imageCount++
+  }
+  return { imageCount, videoCount }
 }
 
 /**
@@ -141,13 +164,98 @@ export function tipoArchivo(file: File): string {
   return file.type || tipoDesdeNombre(file.name)
 }
 
-/** Las opciones de la fila ya limpias, o la frase. Un valor que no es objeto se rechaza entero. */
-function opcionesDeFila(item: BatchItem): { opciones: Record<string, OpcionesDestino> } | { error: string } {
+/**
+ * Qué destinos pide una fila. Nombrar la cuenta manda sobre nombrar la red: lo primero es
+ * siempre inequívoco, y lo segundo solo se puede resolver cuando no hay dos candidatas.
+ */
+export function destinoPedido(item: BatchItem): { cuentas: string[] } | { redes: string[] } {
+  return item.cuentas.length > 0 ? { cuentas: item.cuentas } : { redes: item.redes }
+}
+
+/** Con dos destinos de la misma red, una clave de `opciones` que nombra la red no alcanza. */
+export function opcionesClaveAmbigua(network: string, handles: Array<string | null>): string {
+  const lista = handles.map((h) => h ?? 'sin nombre').join(', ')
+  return `«${network}» en opciones es ambiguo: la fila tiene ${handles.length} cuentas de esa red (${lista}). Usa el id de cada cuenta como clave.`
+}
+
+/** Dos claves de `opciones` que, resueltas, nombran el mismo destino: una pisaría a la otra. */
+export function opcionesClaveDuplicada(clave1: string, clave2: string): string {
+  return `«${clave1}» y «${clave2}» en opciones nombran el mismo destino. Deja una sola clave por destino.`
+}
+
+/**
+ * Reescribe las claves crudas de `opciones` a identificadores de cuenta, listas para
+ * `validarOpcionesPorCuenta`. Cada clave se busca primero entre los identificadores de
+ * `destinos`; si no coincide con ninguno se acepta como nombre de red y se resuelve al
+ * destino de esa red solo si la fila tiene exactamente uno — con dos, la clave es
+ * ambigua y la fila falla nombrando las candidatas y sus handles. Una clave que no es ni
+ * un identificador de la fila ni una de sus redes se ignora, igual que antes ignoraba
+ * una red no pedida.
+ *
+ * Dos claves que resuelven al mismo destino (el id de una cuenta y el nombre de su
+ * única red, por ejemplo) no se dejan pisar en silencio con la última que trae el
+ * JSON: la fila falla nombrando las dos claves. El sistema no elige entre dos.
+ */
+export function clavesDeOpciones(
+  destinos: CuentaDestino[],
+  raw: Record<string, unknown>,
+): { raw: Record<string, unknown> } | { error: string } {
+  const idsConocidos = new Set(destinos.map((d) => d.id))
+  const porRed = new Map<string, CuentaDestino[]>()
+  for (const destino of destinos) {
+    const lista = porRed.get(destino.network) ?? []
+    lista.push(destino)
+    porRed.set(destino.network, lista)
+  }
+
+  const resultado: Record<string, unknown> = {}
+  // Clave cruda que ya resolvió cada destino, para detectar dos claves distintas
+  // pisándose sobre el mismo id.
+  const claveDe = new Map<string, string>()
+  for (const [clave, valor] of Object.entries(raw)) {
+    let destinoId: string
+    if (idsConocidos.has(clave)) {
+      destinoId = clave
+    } else {
+      const candidatas = porRed.get(clave)
+      if (!candidatas || candidatas.length === 0) continue
+      if (candidatas.length > 1) {
+        return { error: opcionesClaveAmbigua(clave, candidatas.map((c) => c.handle)) }
+      }
+      destinoId = candidatas[0]!.id
+    }
+    const claveAnterior = claveDe.get(destinoId)
+    if (claveAnterior !== undefined) {
+      return { error: opcionesClaveDuplicada(claveAnterior, clave) }
+    }
+    claveDe.set(destinoId, clave)
+    resultado[destinoId] = valor
+  }
+  return { raw: resultado }
+}
+
+/**
+ * Las opciones de la fila ya limpias, o la frase. Un valor que no es objeto se rechaza
+ * entero, aunque `destinos` no se conozca todavía.
+ *
+ * `destinos` es `null` en la comprobación previa a la base para una fila que nombró
+ * cuentas: sin ir a la base no se sabe la red de cada una, así que ahí solo se
+ * comprueba la forma y la resolución completa queda para cuando `scheduleBatch` ya
+ * tenga los destinos verificados.
+ */
+export function opcionesDeFila(
+  item: BatchItem,
+  destinos: CuentaDestino[] | null,
+): { opciones: Record<string, OpcionesDestino> } | { error: string } {
   const raw = item.opciones
   if (raw !== undefined && raw !== null && (typeof raw !== 'object' || Array.isArray(raw))) {
     return { error: OPCIONES_ERROR }
   }
-  return validarOpcionesPorRed(item.redes, (raw ?? {}) as Record<string, unknown>)
+  if (!destinos) return { opciones: {} }
+
+  const claves = clavesDeOpciones(destinos, (raw ?? {}) as Record<string, unknown>)
+  if ('error' in claves) return claves
+  return validarOpcionesPorCuenta(destinos, claves.raw)
 }
 
 /**
@@ -158,6 +266,11 @@ export function validateBatchItem(item: BatchItem, now: Date): string | null {
   const scheduledAt = parseFecha(item.fecha)
   if (!scheduledAt) return 'La fecha no se entendió (usa YYYY-MM-DD HH:MM).'
 
+  const pedido = destinoPedido(item)
+  if ('redes' in pedido && pedido.redes.length === 0) {
+    return 'Elige al menos una cuenta o una red.'
+  }
+
   for (const red of item.redes) {
     if (!PUBLISHABLE.has(red)) return `Red desconocida o sin publicación: ${red}.`
   }
@@ -166,17 +279,7 @@ export function validateBatchItem(item: BatchItem, now: Date): string | null {
     return 'Hay redes repetidas en la fila.'
   }
 
-  // A URL with no recognizable extension (a Drive link) counts as an image here and
-  // gets its real type from the download's content-type, which re-runs these rules.
-  // Image is the safe guess: the only type-dependent rules are X's, and for X any
-  // count that fails as images fails as videos too — so nothing valid is rejected
-  // early, and nothing invalid slips past the re-check.
-  let imageCount = 0
-  let videoCount = 0
-  for (const url of item.media) {
-    if (mediaTypeFromUrl(url) === 'video') videoCount++
-    else imageCount++
-  }
+  const { imageCount, videoCount } = contarMedia(item.media)
 
   const portada = item.portada?.trim()
   if (portada) {
@@ -192,18 +295,33 @@ export function validateBatchItem(item: BatchItem, now: Date): string | null {
   const atributosCheck = validateAtributos(item.atributos)
   if ('error' in atributosCheck) return atributosCheck.error
 
-  const opcionesCheck = opcionesDeFila(item)
+  // Con redes nombradas, cada una implica un único destino conceptual: se arma un
+  // destino de mentira por red (su id es el propio nombre) para poder pasar por
+  // `validarOpcionesPorCuenta` sin tocar la base. Con cuentas nombradas no hay con qué
+  // armarlo — la red real de cada cuenta solo la sabe la base — así que aquí solo se
+  // comprueba la forma; `scheduleBatch` hace la comprobación completa ya con los
+  // destinos verificados, antes de subir nada.
+  const destinosParaOpciones = 'redes' in pedido
+    ? pedido.redes.map((network) => ({ id: network, network, handle: null }))
+    : null
+  const opcionesCheck = opcionesDeFila(item, destinosParaOpciones)
   if ('error' in opcionesCheck) return opcionesCheck.error
 
   const reglaCheck = validarRegla(item.regla)
   if ('error' in reglaCheck) return reglaCheck.error
+
+  // Igual que con las opciones: las reglas de forma por red (TikTok, X, Threads, el
+  // tope del carrusel) solo se pueden aplicar cuando la fila nombra redes. Con cuentas
+  // nombradas, `scheduleBatch` las vuelve a correr con las redes reales de los destinos
+  // verificados.
+  if (!('redes' in pedido)) return null
 
   return validateScheduleDraft(
     {
       caption: item.texto,
       imageCount,
       videoCount,
-      networks: item.redes,
+      networks: pedido.redes,
       scheduledAt,
       formats: item.media.map(extensionDe),
     },
@@ -269,7 +387,51 @@ export async function scheduleBatch(ownerId: string, items: BatchItem[]): Promis
     try {
       // Antes de subir nada: un destino sin cuenta se rechaza acá, no después de gastar
       // la subida de toda la media de la fila.
-      const cuentas = await exigirCuentas(ownerId, item.redes)
+      const pedido = destinoPedido(item)
+      const destinos =
+        'cuentas' in pedido
+          ? await verificarCuentas(ownerId, pedido.cuentas)
+          : [...(await cuentaUnicaPorRed(ownerId, pedido.redes)).values()]
+
+      // Igual de temprano: con cuentas nombradas, `validateBatchItem` solo comprobó la
+      // forma de `opciones` (no conocía la red de cada cuenta sin ir a la base). Ahora
+      // que los destinos están verificados, esta es la comprobación completa.
+      const opcionesCheck = opcionesDeFila(item, destinos)
+      if ('error' in opcionesCheck) {
+        results.push({ index, ok: false, error: opcionesCheck.error })
+        continue
+      }
+      const opciones = opcionesCheck.opciones
+
+      // Las reglas de forma por red (TikTok exige video, X no admite más de 4 fotos, …)
+      // usaban `item.redes`, que con cuentas nombradas puede venir vacío: la red real
+      // de cada destino solo se sabe acá. `validateScheduleDraft` se vuelve a correr
+      // más abajo, siempre con las redes de `destinos`.
+      const networks = [...new Set(destinos.map((d) => d.network))]
+      const scheduledAt = parseFecha(item.fecha)!
+
+      // Todavía antes de subir nada: con redes nombradas, `validateBatchItem` ya corrió
+      // estas mismas reglas de forma (TikTok exige video, X hasta 4 fotos, Threads un
+      // solo archivo, el tope del carrusel, los límites de caption, la fecha futura…).
+      // Con cuentas nombradas, esta es la primera vez que `networks` existe — sin este
+      // chequeo, una fila con fecha pasada o sin texto se descargaba y subía entera
+      // antes de rechazarse.
+      const { imageCount: imageCountDeclarado, videoCount: videoCountDeclarado } = contarMedia(item.media)
+      const preUploadError = validateScheduleDraft(
+        {
+          caption: item.texto,
+          imageCount: imageCountDeclarado,
+          videoCount: videoCountDeclarado,
+          networks,
+          scheduledAt,
+          formats: item.media.map(extensionDe),
+        },
+        now,
+      )
+      if (preUploadError) {
+        results.push({ index, ok: false, error: preUploadError })
+        continue
+      }
 
       const uploaded: Array<{ url: string; mediaType: 'image' | 'video' }> = []
       let mediaFailed = false
@@ -284,8 +446,6 @@ export async function scheduleBatch(ownerId: string, items: BatchItem[]): Promis
       }
       if (mediaFailed) continue
 
-      const scheduledAt = parseFecha(item.fecha)!
-
       // Deferred types are now real: re-run the composer's rules with the true
       // image/video split — a Drive link that turned out to be a video where only
       // images fit fails here, with the same fixed sentence the composer would use.
@@ -294,7 +454,7 @@ export async function scheduleBatch(ownerId: string, items: BatchItem[]): Promis
           caption: item.texto,
           imageCount: uploaded.filter((m) => m.mediaType === 'image').length,
           videoCount: uploaded.filter((m) => m.mediaType === 'video').length,
-          networks: item.redes,
+          networks,
           scheduledAt,
           formats: uploaded.map((m) => extensionDe(m.url)),
         },
@@ -348,21 +508,17 @@ export async function scheduleBatch(ownerId: string, items: BatchItem[]): Promis
           })),
         )
       }
-      const opcionesCheck = opcionesDeFila(item)
-      if ('error' in opcionesCheck) {
-        // Inalcanzable en la práctica (validateBatchItem ya corrió esta misma regla),
-        // pero nunca debe escribir opciones NULL para un destino de TikTok.
-        results.push({ index, ok: false, error: opcionesCheck.error })
-        continue
-      }
-      const opciones = opcionesCheck.opciones
-
+      // Dos caminos crean posts programados y no comparten código: este, y
+      // `crearPostProgramado` (`./crear.ts`), que usan el compositor y la ruta móvil.
+      // Ese no sirve acá porque no sabe de `coverUrl` ni de `atributos` — el lote es
+      // hoy el único llamador que los necesita al crear. Un cambio en cómo se escribe
+      // un target (esta forma de `scheduledPostTargets.values`) hay que replicarlo ahí.
       await db.insert(scheduledPostTargets).values(
-        item.redes.map((network) => ({
+        destinos.map((cuenta) => ({
           postId: post!.id,
-          network,
-          accountId: cuentas.get(network)!,
-          opciones: opciones[network] ?? null,
+          network: cuenta.network,
+          accountId: cuenta.id,
+          opciones: opciones[cuenta.id] ?? null,
         })),
       )
 
@@ -372,7 +528,7 @@ export async function scheduleBatch(ownerId: string, items: BatchItem[]): Promis
 
       results.push({ index, ok: true, postId: post!.id })
     } catch (error) {
-      if (error instanceof SinCuenta) {
+      if (error instanceof CuentaInvalida) {
         results.push({ index, ok: false, error: error.message })
         continue
       }

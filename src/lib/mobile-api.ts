@@ -1,10 +1,19 @@
 import { PUBLISHABLE, typeFromContentType } from './social/publish/batch'
+import { CuentaInvalida, cuentaUnicaPorRed, verificarCuentas, type CuentaDestino } from './social/cuentas'
 
 // El teléfono todavía no tiene dónde pedir las opciones que TikTok exige por
 // destino (privacidad, interacciones, comercial), así que esa red se rechaza aquí
 // aunque el lote y el compositor ya la publiquen. Quitar esta exclusión cuando la
 // app móvil traiga el bloque de TikTok.
-const REDES_MOVIL = new Set([...PUBLISHABLE].filter((red) => red !== 'tiktok'))
+//
+// Exportada: `resolverDestinos` (más abajo) también la usa para filtrar destinos
+// elegidos por cuenta, y `GET /api/mobile/schedule/accounts` para no ofrecer un chip
+// de una cuenta que después el servidor va a rechazar.
+export const REDES_MOVIL = new Set([...PUBLISHABLE].filter((red) => red !== 'tiktok'))
+
+function fraseRedNoPublicable(red: string): string {
+  return `Red desconocida o sin publicación: ${red}.`
+}
 
 /** Los tres rangos que ofrece la app; el resto del panel no viaja al teléfono. */
 export const RANGOS = ['hoy', '7d', '30d'] as const
@@ -73,7 +82,11 @@ export function prepararSubida(
   }
 }
 
-export type BorradorMovil = { texto: string; redes: string[]; cuando: string | null; ahora: boolean }
+// `cuentas` manda sobre `redes` cuando el cuerpo trae las dos (ver Tarea 7): la app
+// nueva elige destino por cuenta, no por red. `redes` se queda para una app vieja
+// instalada que todavía no la manda — se resuelve sola mientras no haya dos cuentas
+// conectadas en esa red, la regla de siempre (`cuentaUnicaPorRed`).
+export type BorradorMovil = { texto: string; redes: string[]; cuentas: string[]; cuando: string | null; ahora: boolean }
 export type MediaMovil = { url: string; mediaType: 'image' | 'video' }
 
 function esObjeto(value: unknown): value is Record<string, unknown> {
@@ -83,18 +96,66 @@ function esObjeto(value: unknown): value is Record<string, unknown> {
 /** La parte del borrador que comparten el chequeo y la creación. */
 export function parseBorradorMovil(body: unknown): BorradorMovil | { error: string } {
   if (!esObjeto(body)) return { error: CUERPO_ILEGIBLE }
-  const { texto = '', redes, cuando = null, ahora = false } = body
+  const { texto = '', redes = [], cuentas = [], cuando = null, ahora = false } = body
   if (typeof texto !== 'string') return { error: CUERPO_ILEGIBLE }
   if (!Array.isArray(redes) || !redes.every((r) => typeof r === 'string')) return { error: CUERPO_ILEGIBLE }
+  if (!Array.isArray(cuentas) || !cuentas.every((c) => typeof c === 'string')) return { error: CUERPO_ILEGIBLE }
   if (cuando !== null && typeof cuando !== 'string') return { error: CUERPO_ILEGIBLE }
   if (typeof ahora !== 'boolean') return { error: CUERPO_ILEGIBLE }
   // Repetidas se funden sin quejarse: el índice único (post, red) las rechazaría
   // después con un error de base que el teléfono no sabría explicar.
   const unicas = [...new Set(redes as string[])]
   for (const red of unicas) {
-    if (!REDES_MOVIL.has(red)) return { error: `Red desconocida o sin publicación: ${red}.` }
+    if (!REDES_MOVIL.has(red)) return { error: fraseRedNoPublicable(red) }
   }
-  return { texto: texto.trim(), redes: unicas, cuando, ahora }
+  return { texto: texto.trim(), redes: unicas, cuentas: [...new Set(cuentas as string[])], cuando, ahora }
+}
+
+/**
+ * El destino real de un borrador, resuelto una sola vez para que `check` y el `POST` de
+ * `schedule/route.ts` nunca puedan desacordarse: los dos le pasan el borrador entero y
+ * usan exactamente lo mismo que devuelve, en vez de repetir la decisión cada uno por su
+ * lado.
+ *
+ * `cuentas` manda sobre `redes` cuando el borrador trae las dos: verifica pertenencia y
+ * conexión con `verificarCuentas`. Sin `cuentas`, resuelve por `redes` con
+ * `cuentaUnicaPorRed` — el camino de una app vieja instalada, que se resuelve sola
+ * mientras no haya dos cuentas conectadas en esa red.
+ *
+ * Filtra por `REDES_MOVIL` sobre los destinos YA resueltos, no sobre lo que el cuerpo
+ * declaró: la app nueva nunca ofrece un chip de una red no publicable (el endpoint de
+ * cuentas la filtra), pero un cuerpo fabricado a mano sí podría nombrar una cuenta de
+ * TikTok sin decir «tiktok» en ninguna parte — el servidor decide, no el cliente. Con
+ * algún destino resuelto y ninguno publicable desde el teléfono, revienta con la misma
+ * frase que ya usa `parseBorradorMovil` para una red desconocida: no es un error
+ * distinto, es la misma regla aplicada un paso más tarde. Con dos o más destinos donde
+ * al menos uno sí es publicable y otro no, rechaza la fila entera nombrando el que no
+ * —igual que una `redes` mixta ya rechazaba entera en `parseBorradorMovil`— en vez de
+ * descartar el malo en silencio y publicar solo en el resto, que sorprendería a quien
+ * programó los dos juntos a propósito.
+ *
+ * Sin ningún destino (cuerpo vacío en las dos formas) no revienta: devuelve listas
+ * vacías, para que sea `validateScheduleDraft` quien dé la frase de «elige un destino».
+ *
+ * `deps` existe para poder probar esta función sin base — ver `mobile-api.test.ts`.
+ */
+export async function resolverDestinos(
+  ownerId: string,
+  borrador: Pick<BorradorMovil, 'cuentas' | 'redes'>,
+  deps: {
+    verificarCuentas: (ownerId: string, accountIds: string[]) => Promise<CuentaDestino[]>
+    cuentaUnicaPorRed: (ownerId: string, networks: string[]) => Promise<Map<string, CuentaDestino>>
+  } = { verificarCuentas, cuentaUnicaPorRed },
+): Promise<{ cuentas: CuentaDestino[]; networks: string[] }> {
+  const destinos =
+    borrador.cuentas.length > 0
+      ? await deps.verificarCuentas(ownerId, borrador.cuentas)
+      : [...(await deps.cuentaUnicaPorRed(ownerId, borrador.redes)).values()]
+
+  const noPublicable = destinos.find((d) => !REDES_MOVIL.has(d.network))
+  if (noPublicable) throw new CuentaInvalida(fraseRedNoPublicable(noPublicable.network))
+
+  return { cuentas: destinos, networks: [...new Set(destinos.map((d) => d.network))] }
 }
 
 function enteroNoNegativo(value: unknown): number | null {

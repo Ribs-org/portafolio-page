@@ -1,9 +1,10 @@
 'use client'
 
+import Link from 'next/link'
 import { useActionState, useId, useState } from 'react'
 import { createScheduledPost, type FormState } from '@/app/admin/actions'
 import { Button, Field, GroupLabel, Input, Submit, Textarea } from '@/components/ui'
-import { SOCIAL_NETWORKS } from '@/db/schema'
+import type { CuentaRow } from '@/lib/posts-kpis'
 import { networkLabel } from '@/lib/networks'
 import { calorDelDia, type Calor } from '@/lib/parrilla'
 import { subirArchivos } from '@/lib/subida-directa'
@@ -16,6 +17,31 @@ import { TikTokOpciones } from './tiktok-opciones'
 // (schedule/[id]/editor.tsx) deliberately lacks tiktok: the editor cannot collect
 // its options, so that destination is created here or in the batch only.
 const ENABLED = new Set(['instagram', 'facebook', 'youtube', 'threads', 'x', 'tiktok'])
+
+/**
+ * Si tienes una sola cuenta publicable y conectada, viene marcada: no hay entre qué elegir.
+ * Con dos o más no viene ninguna, porque marcar una por ti es exactamente el problema que
+ * esta entrega vino a resolver, en pequeño.
+ */
+export function vieneMarcada(
+  cuenta: { id: string; connected: boolean },
+  publicables: Array<{ connected: boolean }>,
+): boolean {
+  return cuenta.connected && publicables.filter((c) => c.connected).length === 1
+}
+
+/**
+ * Las cuentas de TikTok publicables que empiezan marcadas: la semilla de `cuentasTikTok`.
+ * Sin esto, un dueño cuya única cuenta publicable es de TikTok ve la casilla marcada por
+ * `vieneMarcada` (que sí corre en `defaultChecked`) pero ningún bloque de opciones,
+ * porque `alternar` solo corre en `onChange` y eso no se dispara en el primer render —
+ * queda sin poder programar nada hasta desmarcar y volver a marcar.
+ */
+export function cuentasTikTokIniciales<T extends { id: string; network: string; connected: boolean }>(
+  publicables: T[],
+): T[] {
+  return publicables.filter((c) => c.network === 'tiktok' && vieneMarcada(c, publicables))
+}
 
 /**
  * Cómo está la parrilla del día que se eligió.
@@ -51,9 +77,17 @@ const CLASE_CALOR: Record<Calor, string> = {
   llena: 'grilla-llena',
 }
 
-export function Composer({ carga }: { carga: Record<string, number> }) {
+export function Composer({ carga, cuentas }: { carga: Record<string, number>; cuentas: CuentaRow[] }) {
   const captionId = useId()
-  const [tiktok, setTiktok] = useState(false)
+  // Cuentas cuya red todavía publica desde aquí. Una cuenta de una red que no está en
+  // `ENABLED` no se ofrece, esté o no conectada.
+  const publicables = cuentas.filter((c) => ENABLED.has(c.network))
+
+  // Reemplaza al viejo booleano `tiktok`: con dos cuentas de TikTok marcadas, cada una
+  // necesita su propio bloque de opciones. Se siembra con `cuentasTikTokIniciales`, no
+  // con `[]`: las casillas ya vienen marcadas según `vieneMarcada`, y `onChange` no
+  // corre en el primer render para ponerlas de acuerdo.
+  const [cuentasTikTok, setCuentasTikTok] = useState<CuentaRow[]>(() => cuentasTikTokIniciales(publicables))
   const [soloFotos, setSoloFotos] = useState(false)
   const [archivos, setArchivos] = useState<File[]>([])
   const [cuando, setCuando] = useState('')
@@ -61,6 +95,11 @@ export function Composer({ carga }: { carga: Record<string, number> }) {
   const [ahora, setAhora] = useState(false)
   // Lo que se muestra mientras el navegador sube, que con un video puede tardar.
   const [subiendo, setSubiendo] = useState('')
+
+  function alternar(cuenta: CuentaRow, marcada: boolean) {
+    if (cuenta.network !== 'tiktok') return
+    setCuentasTikTok((prev) => (marcada ? [...prev, cuenta] : prev.filter((c) => c.id !== cuenta.id)))
+  }
 
   /**
    * Sube los archivos a R2 antes de llamar a la acción, y le manda solo las URLs.
@@ -119,35 +158,44 @@ export function Composer({ carga }: { carga: Record<string, number> }) {
           />
         </Field>
 
-        <RevisionMedia files={archivos} activo={tiktok} />
+        <RevisionMedia files={archivos} activo={cuentasTikTok.length > 0} />
 
         <div>
-          <GroupLabel>Redes</GroupLabel>
-          <div className="flex flex-wrap gap-3">
-            {SOCIAL_NETWORKS.map((network) => {
-              const enabled = ENABLED.has(network)
-              return (
+          <GroupLabel>Cuentas</GroupLabel>
+          {publicables.length === 0 ? (
+            <p className="text-sm text-fg-muted">
+              Todavía no tienes cuentas conectadas.{' '}
+              <Link className="underline" href="/admin/accounts">
+                Conecta una
+              </Link>{' '}
+              para poder programar.
+            </p>
+          ) : (
+            <div className="flex flex-wrap gap-3">
+              {publicables.map((cuenta) => (
                 <label
-                  key={network}
-                  className={cn('flex items-center gap-2 text-sm', !enabled && 'opacity-40')}
+                  key={cuenta.id}
+                  className={cn('flex items-center gap-2 text-sm', !cuenta.connected && 'opacity-40')}
                 >
                   <input
                     type="checkbox"
-                    name="networks"
-                    value={network}
-                    disabled={!enabled}
-                    defaultChecked={network === 'instagram'}
-                    onChange={network === 'tiktok' ? (e) => setTiktok(e.target.checked) : undefined}
+                    name="cuentas"
+                    value={cuenta.id}
+                    disabled={!cuenta.connected}
+                    defaultChecked={vieneMarcada(cuenta, publicables)}
+                    onChange={(e) => alternar(cuenta, e.target.checked)}
                   />
-                  {networkLabel(network)}
-                  {!enabled && <span className="text-xs text-fg-faint">próximamente</span>}
+                  {networkLabel(cuenta.network)} · {cuenta.handle ?? 'sin nombre'}
+                  {!cuenta.connected && <span className="text-xs text-fg-faint">reconéctala</span>}
                 </label>
-              )
-            })}
-          </div>
+              ))}
+            </div>
+          )}
         </div>
 
-        {tiktok ? <TikTokOpciones soloFotos={soloFotos} /> : null}
+        {cuentasTikTok.map((cuenta) => (
+          <TikTokOpciones key={cuenta.id} cuenta={cuenta} soloFotos={soloFotos} />
+        ))}
 
         <ReglaClave />
 

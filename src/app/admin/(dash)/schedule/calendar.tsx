@@ -5,10 +5,11 @@ import type { ScheduledPost, ScheduledPostTarget, TargetStatus } from '@/db/sche
 import { dayLabel, dayKey, groupByDay, hourLabel, weekDays, weekLabel } from '@/lib/schedule-week'
 import { calorDelDia, coccionDe, type Coccion } from '@/lib/parrilla'
 import { cn } from '@/lib/utils'
+import { nombreDestino } from './etiqueta'
 
 type Item = {
   post: ScheduledPost
-  targets: ScheduledPostTarget[]
+  targets: Array<ScheduledPostTarget & { handle: string | null }>
   media: Array<{ blobUrl: string; mediaType: string }>
 }
 
@@ -147,7 +148,7 @@ export function WeekCalendar({
                           // punto de color. La cocción dice que algo falló; esto dice
                           // cuál, sin tener que entrar al editor.
                           title={targets
-                            .map((t) => `${t.network}: ${NOMBRE_ESTADO[t.status]}`)
+                            .map((t) => `${nombreDestino(t)}: ${NOMBRE_ESTADO[t.status]}`)
                             .join(' · ')}
                           className={cn(
                             'corte block p-2 transition-transform hover:-translate-y-0.5',
@@ -212,7 +213,7 @@ export function WeekCalendar({
                           */}
                           <span className="sr-only">
                             {NOMBRE_COCCION[coccion]} en{' '}
-                            {targets.map((t) => t.network).join(', ') || 'ninguna red'}
+                            {targets.map((t) => nombreDestino(t)).join(', ') || 'ninguna red'}
                           </span>
                         </Link>
                       )
