@@ -139,8 +139,13 @@ export function textoConfirmacion(cuentas: CuentaApp[]): string {
 /**
  * Si tienes una sola cuenta conectada, viene marcada: no hay entre qué elegir. Con dos
  * o más no viene ninguna — misma regla que `vieneMarcada` en el panel
- * (`admin/(dash)/schedule/composer.tsx`), contada sobre todas las cuentas del dueño, no
- * por red: marcar una por ti entre redes distintas es el mismo problema en pequeño.
+ * (`admin/(dash)/schedule/composer.tsx`), pero contada sobre `disponibles`, que acá es
+ * lo que trae `GET /api/mobile/schedule/accounts`: las cuentas del dueño en las redes
+ * que la app publica, sin TikTok. El panel cuenta sobre todas las cuentas del dueño,
+ * TikTok incluido, así que con una sola cuenta de Instagram y una de TikTok el panel
+ * no marca nada (dos candidatas) y el teléfono marca la de Instagram (una sola
+ * posibilidad ahí, que es la única que existe de verdad en esta pantalla). No es una
+ * discrepancia: son dos universos distintos, cada uno correcto para su superficie.
  */
 export function vieneMarcada(cuenta: CuentaApp, disponibles: CuentaApp[]): boolean {
   return cuenta.conectada && disponibles.filter((c) => c.conectada).length === 1

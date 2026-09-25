@@ -277,10 +277,15 @@ sale cada publicación. **El compositor del panel, y Publicar en la app del tel�
 listan tus cuentas, no las redes**, con su handle a la vista, y marcas las que quieras: el
 mismo corte puede salir a las dos.
 
-Nada viene marcado por omisión, salvo que tengas exactamente una cuenta conectada. Es
-deliberado: antes el sistema mandaba siempre a la más antigua de cada red sin preguntar, y
-la segunda quedaba conectada y muda. Una sola posibilidad no es una elección; dos sí, y las
-eliges tú.
+Nada viene marcado por omisión, salvo que tengas exactamente una cuenta conectada — contada
+sobre las cuentas que cada pantalla puede ofrecer, que no es el mismo universo en las dos:
+el panel cuenta sobre todas las tuyas, TikTok incluido; el teléfono, solo sobre las que
+puede publicar, que hoy excluye TikTok (ver más abajo). Con una cuenta de Instagram y una de
+TikTok, por ejemplo, el panel no marca nada —dos candidatas— y el teléfono marca la de
+Instagram, porque ahí es la única que existe de verdad. No es una discrepancia: cada
+pantalla acierta sobre su propio universo. Es deliberado: antes el sistema mandaba siempre a
+la más antigua de cada red sin preguntar, y la segunda quedaba conectada y muda. Una sola
+posibilidad no es una elección; dos sí, y las eliges tú.
 
 Una cuenta cuya credencial venció aparece igual, en vez de desaparecer sin explicación, con
 el mismo aviso de reconectarla en las dos superficies: en el panel, apagada y con el
