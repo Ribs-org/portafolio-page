@@ -643,12 +643,14 @@ export async function createScheduledPost(_prev: FormState, formData: FormData):
 
   const caption = String(formData.get('caption') ?? '').trim()
 
-  const elegidas = formData.getAll('cuentas').map(String)
-  if (elegidas.length === 0) return { error: 'Elige al menos una cuenta.' }
+  // No `elegidas`: taparía la función homónima que este archivo importa de
+  // `@/lib/social/pendiente` y ya usa más arriba, en `conectarElegidas`.
+  const idsElegidos = formData.getAll('cuentas').map(String)
+  if (idsElegidos.length === 0) return { error: 'Elige al menos una cuenta.' }
 
   let cuentas: CuentaDestino[]
   try {
-    cuentas = await verificarCuentas(ownerId, elegidas)
+    cuentas = await verificarCuentas(ownerId, idsElegidos)
   } catch (error) {
     if (error instanceof CuentaInvalida) return { error: error.message }
     throw error
