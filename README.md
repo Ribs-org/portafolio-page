@@ -290,9 +290,11 @@ posibilidad no es una elección; dos sí, y las eliges tú.
 Una cuenta cuya credencial venció aparece igual, en vez de desaparecer sin explicación, con
 el mismo aviso de reconectarla en las dos superficies: en el panel, apagada y con el
 texto aparte; en el teléfono, sin poder tocarse y con «reconéctala» al lado del nombre. Y
-donde antes se leía la red —el calendario, la cola, el editor, y en el teléfono el
-Calendario y el Resumen— ahora se lee el handle, para que dos destinos de la misma red se
-distingan.
+donde antes se leía solo la red —el calendario, la cola, el editor, y en el teléfono el
+Calendario y el Resumen— ahora se leen la red **y** el handle: `Instagram · @vicenteclips`.
+Las dos cosas, porque ninguna de esas pantallas dibuja un icono de la red, así que el handle
+solo obligaba a adivinar de cuál era cada destino, y la red sola no distingue dos cuentas de
+la misma red en el mismo corte.
 
 TikTok pide sus propias opciones por destino —privacidad, comentarios, dúo, comercial—, así
 que con dos cuentas de TikTok marcadas verás dos bloques, uno por cuenta. No se comparten a

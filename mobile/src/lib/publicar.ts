@@ -151,8 +151,16 @@ export function vieneMarcada(cuenta: CuentaApp, disponibles: CuentaApp[]): boole
   return cuenta.conectada && disponibles.filter((c) => c.conectada).length === 1
 }
 
-/** El texto de un chip de cuenta: la red y el handle, o «sin nombre» si no lo tiene. */
-export function etiquetaCuenta(cuenta: CuentaApp): string {
+/**
+ * Cómo se nombra una cuenta en pantalla: la red y el handle, o «sin nombre» si no lo
+ * tiene. Sirve tanto para el chip que se elige como para el destino que se mira en el
+ * calendario y en el resumen: ninguna de las tres pantallas dibuja un icono de la red, así
+ * que el handle solo obligaba a adivinar de qué red era cada destino.
+ *
+ * Recibe la forma mínima —red y handle— y no una `CuentaApp` entera, porque un destino del
+ * calendario trae su estado y su error, pero no si la cuenta sigue conectada.
+ */
+export function etiquetaCuenta(cuenta: { red: string; handle: string | null }): string {
   return `${NOMBRE_RED[cuenta.red] ?? cuenta.red} · ${cuenta.handle ?? 'sin nombre'}`
 }
 

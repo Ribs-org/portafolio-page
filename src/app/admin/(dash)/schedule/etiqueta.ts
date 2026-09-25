@@ -10,12 +10,17 @@ const ESTADO: Record<string, string> = {
 }
 
 /**
- * Quién es el destino: el handle, o el nombre de la red si no hay handle. Con una sola
- * cuenta por red el handle sobra, pero mostrarlo siempre evita la única lectura ambigua
- * que importa: dos destinos de la misma red en el mismo corte.
+ * Quién es el destino: su red y su handle. Las dos cosas, porque ni el calendario ni la
+ * cola dibujan un icono de la red —se dio por supuesto que sí, y no lo hay—, así que el
+ * handle solo obligaba a adivinar de qué red era cada destino. Y la red sola no distingue
+ * dos cuentas de la misma red en el mismo corte, que es la lectura que importa.
+ *
+ * Sin handle queda el nombre de la red, que ahí no es ambiguo: una cuenta sin handle es
+ * una que todavía no sincronizó.
  */
 export function nombreDestino(destino: { network: string; handle: string | null }): string {
-  return destino.handle ?? networkLabel(destino.network)
+  const red = networkLabel(destino.network)
+  return destino.handle ? `${red} · ${destino.handle}` : red
 }
 
 /**
