@@ -15,11 +15,11 @@ import {
   Vacio,
 } from '../../components/ui'
 import { num, pct, shortDate } from '../../lib/format'
+import { etiquetaCuenta } from '../../lib/publicar'
 import { clearToken } from '../../lib/session'
 import { useScreenData } from '../../lib/useScreenData'
 import {
   ETIQUETA_RANGO,
-  NOMBRE_RED,
   RANGOS,
   type Overview,
   type PostProgramado,
@@ -115,7 +115,7 @@ export function FilaProgramada({ post }: { post: PostProgramado }) {
           // se repite dentro de un post y ya no sirve de clave.
           <View key={r.id} style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
             <PuntoEstado estado={r.estado} />
-            <Text style={{ color: COLORES.tenue, fontSize: 11 }}>{r.handle ?? NOMBRE_RED[r.red] ?? r.red}</Text>
+            <Text style={{ color: COLORES.tenue, fontSize: 11 }}>{etiquetaCuenta(r)}</Text>
           </View>
         ))}
       </View>

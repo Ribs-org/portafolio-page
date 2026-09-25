@@ -18,7 +18,8 @@ import { calorDelDia, coccionDe, NOMBRE_COCCION } from '../../lib/parrilla'
 import { clearToken } from '../../lib/session'
 import { useScreenData } from '../../lib/useScreenData'
 import { useToken } from '../../lib/useToken'
-import { NOMBRE_RED, type Calendario as CalendarioData } from '../../lib/tipos'
+import { type Calendario as CalendarioData } from '../../lib/tipos'
+import { etiquetaCuenta } from '../../lib/publicar'
 
 export default function Calendario() {
   const token = useToken()
@@ -124,7 +125,7 @@ export default function Calendario() {
                             style={{ color: COLORES.texto, fontSize: 12 }}
                             numberOfLines={2}
                           >
-                            {r.handle ?? NOMBRE_RED[r.red] ?? r.red}
+                            {etiquetaCuenta(r)}
                             {r.error ? ` — ${r.error}` : ''}
                           </Text>
                         ))}

@@ -3,9 +3,12 @@ import { networkLabel } from '@/lib/networks'
 import { etiquetaDestino, nombreDestino } from './etiqueta'
 
 describe('nombreDestino', () => {
-  it('distingue dos destinos de la misma red por su handle', () => {
+  it('nombra la red y el handle, para que dos destinos de la misma red se distingan', () => {
     const texto = nombreDestino({ network: 'instagram', handle: '@vicenteclips' })
     expect(texto).toContain('@vicenteclips')
+    // La red también: en el calendario y en la cola no hay icono que la diga, así que
+    // el handle solo obligaba a adivinar de qué red era cada destino.
+    expect(texto).toContain(networkLabel('instagram'))
   })
 
   it('sin handle cae en el nombre de la red', () => {
