@@ -4,8 +4,10 @@ import {
   TIKTOK_PATROCINADO_PRIVADO,
   TIKTOK_SIN_PRIVACIDAD,
   opcionesDesdeFormulario,
+  opcionesDesdeFormularioPorCuenta,
   resumenOpciones,
   validarOpciones,
+  validarOpcionesPorCuenta,
   validarOpcionesPorRed,
 } from './opciones'
 
@@ -100,6 +102,90 @@ describe('validarOpcionesPorRed', () => {
 
   it('ignora opciones de redes que no están en la fila', () => {
     expect(validarOpcionesPorRed(['instagram'], { tiktok: directo })).toEqual({ opciones: {} })
+  })
+})
+
+describe('validarOpcionesPorCuenta', () => {
+  // Dos cuentas con valores que se distinguen entre sí (una en borrador, otra directa
+  // con una privacidad concreta) a propósito: si algún día se cruzaran las identidades
+  // —que 'tt-1' terminara leyendo lo de 'tt-2' y viceversa— este test lo vería, porque
+  // comprobar solo las claves no lo detectaría.
+  it('valida las opciones de cada cuenta por separado, sin cruzar identidades', () => {
+    const cuentas = [
+      { id: 'tt-1', network: 'tiktok', handle: '@vicente' },
+      { id: 'tt-2', network: 'tiktok', handle: '@vicenteclips' },
+    ]
+    const raw = {
+      'tt-1': { modo: 'borrador' },
+      'tt-2': {
+        modo: 'directo',
+        privacidad: 'PUBLIC_TO_EVERYONE',
+        comentarios: true,
+        duo: false,
+        pegar: false,
+        comercial: 'no',
+      },
+    }
+    const check = validarOpcionesPorCuenta(cuentas, raw)
+    expect('error' in check).toBe(false)
+    if ('error' in check) return
+    expect(check.opciones['tt-1']).toEqual({ modo: 'borrador' })
+    expect(check.opciones['tt-2']).toEqual(raw['tt-2'])
+  })
+
+  // Simétrico con el test de `validarOpcionesPorRed` que hace lo mismo por red: una
+  // clave sobrante en `raw` no es un error, es una decisión documentada.
+  it('ignora las claves de raw que no corresponden a ninguna cuenta pedida', () => {
+    const cuentas = [{ id: 'tt-1', network: 'tiktok', handle: '@vicente' }]
+    const raw = { 'tt-1': { modo: 'borrador' }, 'tt-2': { modo: 'directo', privacidad: 'SELF_ONLY' } }
+    expect(validarOpcionesPorCuenta(cuentas, raw)).toEqual({ opciones: { 'tt-1': { modo: 'borrador' } } })
+  })
+
+  it('una cuenta de TikTok sin privacidad falla nombrando su frase', () => {
+    const cuentas = [{ id: 'tt-1', network: 'tiktok', handle: '@vicente' }]
+    const check = validarOpcionesPorCuenta(cuentas, { 'tt-1': { modo: 'directo', privacidad: '' } })
+    expect(check).toEqual({ error: TIKTOK_SIN_PRIVACIDAD })
+  })
+
+  // Cubre los dos lados: con dos cuentas de la misma red el error nombra la que falló
+  // (arriba, «una cuenta de TikTok sin privacidad...», cubre el lado sin ambigüedad —una
+  // sola cuenta de la red, la frase queda tal cual porque nombrarla sería ruido).
+  it('con dos cuentas de la misma red, el error antepone el handle de la que falló', () => {
+    const cuentas = [
+      { id: 'tt-1', network: 'tiktok', handle: '@vicente' },
+      { id: 'tt-2', network: 'tiktok', handle: '@vicenteclips' },
+    ]
+    const raw = { 'tt-1': { modo: 'directo', privacidad: '' }, 'tt-2': { modo: 'borrador' } }
+    expect(validarOpcionesPorCuenta(cuentas, raw)).toEqual({ error: `«@vicente»: ${TIKTOK_SIN_PRIVACIDAD}` })
+  })
+
+  // Separa «dos cuentas en total» de «dos cuentas de la misma red»: aquí hay dos cuentas,
+  // pero de redes distintas, así que TikTok sigue apareciendo una sola vez y la frase no
+  // debe llevar prefijo. Si la condición contara el total en vez de contar por red, este
+  // test lo delataría — es justo lo que separa las dos hipótesis.
+  it('con dos cuentas de redes distintas, la que falla no lleva prefijo: su red no es ambigua', () => {
+    const cuentas = [
+      { id: 'ig-1', network: 'instagram', handle: '@insta' },
+      { id: 'tt-1', network: 'tiktok', handle: '@vicente' },
+    ]
+    const raw = { 'tt-1': { modo: 'directo', privacidad: '' } }
+    expect(validarOpcionesPorCuenta(cuentas, raw)).toEqual({ error: TIKTOK_SIN_PRIVACIDAD })
+  })
+})
+
+describe('opcionesDesdeFormularioPorCuenta', () => {
+  it('el formulario lee los campos con el sufijo de cada cuenta', () => {
+    const fd = new FormData()
+    fd.set('tiktokModo:tt-1', 'borrador')
+    fd.set('tiktokModo:tt-2', 'directo')
+    fd.set('tiktokPrivacidad:tt-2', 'SELF_ONLY')
+    const cuentas = [
+      { id: 'tt-1', network: 'tiktok', handle: '@a' },
+      { id: 'tt-2', network: 'tiktok', handle: '@b' },
+    ]
+    const raw = opcionesDesdeFormularioPorCuenta(fd, cuentas)
+    expect(raw['tt-1']).toEqual({ modo: 'borrador' })
+    expect((raw['tt-2'] as Record<string, unknown>).privacidad).toBe('SELF_ONLY')
   })
 })
 
