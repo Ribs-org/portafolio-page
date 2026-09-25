@@ -114,7 +114,9 @@ export default function Calendario() {
                       <View style={{ gap: 2, marginTop: 2 }}>
                         {post.redes.map((r) => (
                           <Text
-                            key={r.red}
+                            // `r.id` es el destino, no la red: con dos cuentas de la
+                            // misma red, `r.red` se repite dentro de un post.
+                            key={r.id}
                             // Sin opacidad: sobre la carne cruda, que es la cocción más
                             // clara, el texto al 70% cae a 3.12:1 y no llega al mínimo.
                             // La jerarquía la hace el tamaño, no el desteñido. Es el

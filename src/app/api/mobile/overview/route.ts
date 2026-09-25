@@ -1,6 +1,14 @@
 import { NextResponse } from 'next/server'
 import { and, asc, eq, gt, inArray, lte } from 'drizzle-orm'
-import { accountMetrics, getDb, scheduledPosts, scheduledPostTargets, socialAccounts } from '@/db'
+import {
+  accountMetrics,
+  getDb,
+  scheduledPosts,
+  scheduledPostTargets,
+  socialAccounts,
+  type ScheduledPost,
+  type ScheduledPostTarget,
+} from '@/db'
 import { SITE_TIMEZONE, getKpis, localDay } from '@/lib/analytics'
 import { isoInZone } from '@/lib/metrics-api'
 import { requireMobileUser } from '@/lib/mobile-guardia'
@@ -9,6 +17,40 @@ import { getPostRows } from '@/lib/posts'
 import { postKpisFrom } from '@/lib/posts-kpis'
 
 export const dynamic = 'force-dynamic'
+
+/** Una fila del `leftJoin`: un post con uno de sus destinos y el handle de su cuenta. */
+type FilaDestinoMovil = { post: ScheduledPost; target: ScheduledPostTarget; handle: string | null }
+
+export type PostResumenMovil = {
+  id: string
+  texto: string
+  cuando: string
+  redes: Array<{ id: string; red: string; handle: string | null; estado: string }>
+}
+
+/**
+ * Una fila por post con sus destinos juntos: la app dibuja una tarjeta, no un join.
+ * Extraída para poder probarla sin base — ver `route.test.ts`.
+ *
+ * Cada destino lleva su propio `id` (`scheduled_post_targets.id`), no solo `red`: con
+ * dos cuentas de la misma red, dos destinos del mismo post comparten `red` y solo el
+ * `id` los distingue — es la clave que el Resumen del teléfono usa para no repetir la
+ * de React entre ellos (repaso final de la rama).
+ */
+export function agruparPostsMovil(filas: FilaDestinoMovil[]): PostResumenMovil[] {
+  const mapa = new Map<string, PostResumenMovil>()
+  for (const { post, target, handle } of filas) {
+    const entrada = mapa.get(post.id) ?? {
+      id: post.id,
+      texto: post.caption,
+      cuando: isoInZone(post.scheduledAt, SITE_TIMEZONE),
+      redes: [],
+    }
+    entrada.redes.push({ id: target.id, red: target.network, handle, estado: target.status })
+    mapa.set(post.id, entrada)
+  }
+  return [...mapa.values()]
+}
 
 export async function GET(request: Request) {
   const usuario = await requireMobileUser(request)
@@ -64,25 +106,6 @@ export async function GET(request: Request) {
 
   const contenido = postKpisFrom(rows)
 
-  // Una fila por post con sus redes juntas: la app dibuja una tarjeta, no un join.
-  const agrupar = (filas: typeof hoy) => {
-    const mapa = new Map<
-      string,
-      { id: string; texto: string; cuando: string; redes: Array<{ red: string; handle: string | null; estado: string }> }
-    >()
-    for (const { post, target, handle } of filas) {
-      const entrada = mapa.get(post.id) ?? {
-        id: post.id,
-        texto: post.caption,
-        cuando: isoInZone(post.scheduledAt, SITE_TIMEZONE),
-        redes: [],
-      }
-      entrada.redes.push({ red: target.network, handle, estado: target.status })
-      mapa.set(post.id, entrada)
-    }
-    return [...mapa.values()]
-  }
-
   // La última lectura *conocida* por red, no la última fila. Una sincronización que
   // falla a medias graba el día con `followers: null` (cada llamada de la red trae su
   // propio catch), y tomar esa fila borraría un conteo que sí sabíamos de antes.
@@ -107,7 +130,7 @@ export async function GET(request: Request) {
       arrastre: contenido.pull,
       seguidores: seguidoresTotal,
     },
-    hoy: agrupar(hoy),
-    proximos: agrupar(proximos).slice(0, 5),
+    hoy: agruparPostsMovil(hoy),
+    proximos: agruparPostsMovil(proximos).slice(0, 5),
   })
 }

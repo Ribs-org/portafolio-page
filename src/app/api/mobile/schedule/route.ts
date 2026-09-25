@@ -1,6 +1,14 @@
 import { NextResponse } from 'next/server'
 import { and, asc, eq, gt, inArray, lte } from 'drizzle-orm'
-import { getDb, scheduledPosts, scheduledPostMedia, scheduledPostTargets, socialAccounts } from '@/db'
+import {
+  getDb,
+  scheduledPosts,
+  scheduledPostMedia,
+  scheduledPostTargets,
+  socialAccounts,
+  type ScheduledPost,
+  type ScheduledPostTarget,
+} from '@/db'
 import { SITE_TIMEZONE } from '@/lib/analytics'
 import { isoInZone } from '@/lib/metrics-api'
 import { requireMobileUser } from '@/lib/mobile-guardia'
@@ -24,6 +32,44 @@ export const dynamic = 'force-dynamic'
 /** Una ventana con memoria corta y futuro suficiente para lo que cabe en un pulgar. */
 const DIAS_ATRAS = 7
 const DIAS_ADELANTE = 30
+
+/** Una fila del `leftJoin`: un post con uno de sus destinos y el handle de su cuenta. */
+type FilaDestinoMovil = { post: ScheduledPost; target: ScheduledPostTarget; handle: string | null }
+
+export type PostMovil = {
+  id: string
+  texto: string
+  cuando: string
+  portada: string | null
+  miniatura: string | null
+  redes: Array<{ id: string; red: string; handle: string | null; estado: string; error: string | null }>
+}
+
+/**
+ * Agrupa las filas del join en un post por id, con sus destinos juntos. Extraída para
+ * poder probarla sin base — ver `route.test.ts`.
+ *
+ * Cada destino lleva su propio `id` (`scheduled_post_targets.id`), no solo `red`: con
+ * dos cuentas de la misma red, dos destinos del mismo post comparten `red` y solo el
+ * `id` los distingue — es la clave que el Resumen y el Calendario del teléfono usan
+ * para no repetir la de React entre ellos (repaso final de la rama).
+ */
+export function agruparPostsMovil(filas: FilaDestinoMovil[], miniaturaPorPost: Map<string, string>): PostMovil[] {
+  const mapa = new Map<string, PostMovil>()
+  for (const { post, target, handle } of filas) {
+    const entrada = mapa.get(post.id) ?? {
+      id: post.id,
+      texto: post.caption,
+      cuando: isoInZone(post.scheduledAt, SITE_TIMEZONE),
+      portada: post.coverUrl,
+      miniatura: miniaturaPorPost.get(post.id) ?? null,
+      redes: [],
+    }
+    entrada.redes.push({ id: target.id, red: target.network, handle, estado: target.status, error: target.lastError })
+    mapa.set(post.id, entrada)
+  }
+  return [...mapa.values()]
+}
 
 export async function GET(request: Request) {
   const usuario = await requireMobileUser(request)
@@ -64,31 +110,7 @@ export async function GET(request: Request) {
     }
   }
 
-  const mapa = new Map<
-    string,
-    {
-      id: string
-      texto: string
-      cuando: string
-      portada: string | null
-      miniatura: string | null
-      redes: Array<{ red: string; handle: string | null; estado: string; error: string | null }>
-    }
-  >()
-  for (const { post, target, handle } of filas) {
-    const entrada = mapa.get(post.id) ?? {
-      id: post.id,
-      texto: post.caption,
-      cuando: isoInZone(post.scheduledAt, SITE_TIMEZONE),
-      portada: post.coverUrl,
-      miniatura: miniaturaPorPost.get(post.id) ?? null,
-      redes: [],
-    }
-    entrada.redes.push({ red: target.network, handle, estado: target.status, error: target.lastError })
-    mapa.set(post.id, entrada)
-  }
-
-  return NextResponse.json({ posts: [...mapa.values()] })
+  return NextResponse.json({ posts: agruparPostsMovil(filas, miniaturaPorPost) })
 }
 
 /**

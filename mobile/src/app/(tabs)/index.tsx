@@ -111,7 +111,9 @@ export function FilaProgramada({ post }: { post: PostProgramado }) {
         }}
       >
         {post.redes.map((r) => (
-          <View key={r.red} style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+          // `r.id` es el destino, no la red: con dos cuentas de la misma red, `r.red`
+          // se repite dentro de un post y ya no sirve de clave.
+          <View key={r.id} style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
             <PuntoEstado estado={r.estado} />
             <Text style={{ color: COLORES.tenue, fontSize: 11 }}>{r.handle ?? NOMBRE_RED[r.red] ?? r.red}</Text>
           </View>

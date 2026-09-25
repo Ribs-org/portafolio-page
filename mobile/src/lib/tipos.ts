@@ -2,7 +2,10 @@ export type PostProgramado = {
   id: string
   texto: string
   cuando: string
-  redes: { red: string; handle: string | null; estado: string; error?: string | null }[]
+  // `id` es el del destino (`scheduled_post_targets.id`), no el de la cuenta: es la
+  // clave de React en el Resumen y el Calendario. Con dos cuentas de una red, `red` ya
+  // no es única dentro de un post — solo el destino lo es.
+  redes: { id: string; red: string; handle: string | null; estado: string; error?: string | null }[]
   portada?: string | null
   miniatura?: string | null
 }
