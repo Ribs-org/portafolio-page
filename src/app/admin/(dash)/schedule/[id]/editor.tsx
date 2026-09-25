@@ -8,13 +8,15 @@ import { ArrowDown, ArrowLeft, ArrowUp, Check, Copy, ExternalLink } from 'lucide
 import { deleteScheduledPost, updateScheduledPost, type FormState } from '@/app/admin/actions'
 import { Button, Field, GroupLabel, Input, Textarea } from '@/components/ui'
 import { networkLabel } from '@/lib/networks'
+import type { CuentaRow } from '@/lib/posts-kpis'
 import { cn } from '@/lib/utils'
 import { ReglaClave } from '../regla-clave'
 
 // Gemelo de PUBLISHABLE (publish/batch.ts) y de ENABLED en el compositor
 // (schedule/composer.tsx). `tiktok` no se ofrece aquí porque el editor no puede
-// pedir sus opciones; un destino existente se dibuja vía `drawn`.
-const NETWORKS = ['instagram', 'facebook', 'youtube', 'threads', 'x']
+// pedir sus opciones; un destino existente se dibuja vía `drawnIds`, aunque su
+// cuenta sea de tiktok o ya no esté entre las ofertables.
+const ENABLED_NETWORKS = new Set(['instagram', 'facebook', 'youtube', 'threads', 'x'])
 
 type MediaRow = { id: string; blobUrl: string; mediaType: string }
 
@@ -23,6 +25,7 @@ export function Editor({
   volver,
   caption,
   scheduledAtLocal,
+  cuentas,
   targets,
   media,
   coverUrl,
@@ -33,18 +36,27 @@ export function Editor({
   volver: string
   caption: string
   scheduledAtLocal: string
-  targets: Array<{ network: string; status: string; opciones: string | null }>
+  cuentas: CuentaRow[]
+  targets: Array<{ accountId: string; network: string; status: string; opciones: string | null }>
   media: MediaRow[]
   coverUrl: string | null
   atributos: string
   regla: { palabra: string; mensaje: string; respuestaPublica: string } | null
 }) {
   const publishing = targets.some((t) => t.status === 'publishing')
-  const published = new Set(targets.filter((t) => t.status === 'published').map((t) => t.network))
-  const initialNetworks = new Set(targets.map((t) => t.network))
-  // Un destino que ya existe se dibuja aunque su red aún no se pueda agregar desde aquí.
-  const drawn = [...new Set([...NETWORKS, ...targets.map((t) => t.network)])]
-  const resumen = new Map(targets.map((t) => [t.network, t.opciones]))
+  const published = new Set(targets.filter((t) => t.status === 'published').map((t) => t.accountId))
+  const initialAccountIds = new Set(targets.map((t) => t.accountId))
+  const porId = new Map(cuentas.map((c) => [c.id, c]))
+  // Respaldo para una cuenta que no aparece en `cuentas` (hoy inalcanzable: la fila de
+  // `social_accounts` no se puede borrar mientras un destino la referencie), para poder
+  // seguir nombrando su red sin la cuenta.
+  const networkPorAccountId = new Map(targets.map((t) => [t.accountId, t.network]))
+  // Las cuentas que se pueden agregar desde el editor: `tiktok` no se ofrece porque no
+  // puede pedir sus opciones acá, igual que antes con la red. Un destino que ya existe
+  // se dibuja aunque su cuenta no se pueda agregar (una de tiktok, o desconectada).
+  const ofertables = cuentas.filter((c) => ENABLED_NETWORKS.has(c.network))
+  const drawnIds = [...new Set([...ofertables.map((c) => c.id), ...targets.map((t) => t.accountId)])]
+  const resumen = new Map(targets.map((t) => [t.accountId, t.opciones]))
 
   const [kept, setKept] = useState<MediaRow[]>(media)
   const [keptCover, setKeptCover] = useState(coverUrl)
@@ -84,8 +96,16 @@ export function Editor({
       ) : null}
       {published.size > 0 ? (
         <p className="mb-4 rounded-xl bg-positive/10 px-4 py-3 text-sm text-positive">
-          Ya publicado en {[...published].map(networkLabel).join(', ')}. Los cambios no tocan lo
-          publicado.
+          Ya publicado en{' '}
+          {[...published]
+            .map((accountId) => {
+              const cuenta = porId.get(accountId)
+              return cuenta
+                ? `${networkLabel(cuenta.network)} · ${cuenta.handle ?? 'sin nombre'}`
+                : networkLabel(networkPorAccountId.get(accountId)!)
+            })
+            .join(', ')}
+          . Los cambios no tocan lo publicado.
         </p>
       ) : null}
 
@@ -106,26 +126,49 @@ export function Editor({
           </Field>
 
           <div>
-            <GroupLabel>Redes</GroupLabel>
+            <GroupLabel>Cuentas</GroupLabel>
             <div className="flex flex-wrap gap-3">
-              {drawn.map((network) => {
-                const locked = published.has(network)
-                const linea = resumen.get(network)
+              {drawnIds.map((accountId) => {
+                const cuenta = porId.get(accountId)
+                const isPublished = published.has(accountId)
+                const isExisting = initialAccountIds.has(accountId)
+                // Una cuenta ajena a `cuentas` no se descarta: se dibuja bloqueada y
+                // marcada, nombrando solo la red, para que su id siga viajando en el
+                // formulario y el destino no desaparezca en silencio. Hoy es
+                // inalcanzable (ver `networkPorAccountId`), pero la rama defensiva no
+                // puede convertir «no la conozco» en «bórrala».
+                const desconocida = !cuenta
+                const locked = isPublished || desconocida
+                const disconnected = cuenta != null && !cuenta.connected
+                // Una cuenta desconectada que todavía no es destino no se puede
+                // agregar, igual que en el compositor. Una que YA es destino se deja
+                // interactuable: deshabilitarla la borraría en silencio al guardar
+                // (un checkbox deshabilitado no manda su valor), justo lo que la rama
+                // de arriba evita para las desconocidas.
+                const disabled = locked || (disconnected && !isExisting)
+                const linea = resumen.get(accountId)
+                const label = cuenta
+                  ? `${networkLabel(cuenta.network)} · ${cuenta.handle ?? 'sin nombre'}`
+                  : networkLabel(networkPorAccountId.get(accountId)!)
                 return (
-                  <label key={network} className={cn('flex items-center gap-1.5 text-sm', locked && 'opacity-70')}>
-                    {/* A disabled checkbox never submits; the hidden twin keeps the
-                        published network in the form so the server guard stays a
-                        backstop, not the primary path. */}
-                    {locked ? <input type="hidden" name="networks" value={network} /> : null}
+                  <label
+                    key={accountId}
+                    className={cn('flex items-center gap-1.5 text-sm', (locked || disconnected) && 'opacity-70')}
+                  >
+                    {/* A disabled checkbox never submits; the hidden twin keeps a
+                        bloqueada account (published or unknown) in the form so the
+                        server guard stays a backstop, not the primary path. */}
+                    {locked ? <input type="hidden" name="cuentas" value={accountId} /> : null}
                     <input
                       type="checkbox"
-                      name="networks"
-                      value={network}
-                      defaultChecked={initialNetworks.has(network)}
-                      disabled={locked}
+                      name="cuentas"
+                      value={accountId}
+                      defaultChecked={initialAccountIds.has(accountId)}
+                      disabled={disabled}
                     />
-                    {networkLabel(network)}
-                    {locked ? ' ✓' : ''}
+                    {label}
+                    {isPublished ? ' ✓' : ''}
+                    {disconnected ? <span className="text-xs text-fg-faint"> reconéctala</span> : null}
                     {linea ? <span className="text-xs text-fg-faint">· {linea}</span> : null}
                   </label>
                 )

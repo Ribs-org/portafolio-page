@@ -3,6 +3,7 @@ import { and, asc, eq } from 'drizzle-orm'
 import { getDb, scheduledPosts, scheduledPostTargets, scheduledPostMedia, reglasClave } from '@/db'
 import { SITE_TIMEZONE } from '@/lib/analytics'
 import { requireUser } from '@/lib/auth'
+import { getCuentas } from '@/lib/posts'
 import { toZonedInput } from '@/lib/utils'
 import { resumenOpciones } from '@/lib/social/publish/opciones'
 import { Editor } from './editor'
@@ -31,7 +32,7 @@ export default async function EditScheduledPostPage({
     .where(and(eq(scheduledPosts.id, id), eq(scheduledPosts.ownerId, ownerId)))
   if (!post) notFound()
 
-  const [targets, media, [regla]] = await Promise.all([
+  const [targets, media, [regla], cuentas] = await Promise.all([
     db.select().from(scheduledPostTargets).where(eq(scheduledPostTargets.postId, id)),
     db
       .select()
@@ -39,6 +40,7 @@ export default async function EditScheduledPostPage({
       .where(eq(scheduledPostMedia.postId, id))
       .orderBy(asc(scheduledPostMedia.position)),
     db.select().from(reglasClave).where(eq(reglasClave.postId, id)),
+    getCuentas(ownerId),
   ])
 
   return (
@@ -47,7 +49,9 @@ export default async function EditScheduledPostPage({
       volver={volver}
       caption={post.caption}
       scheduledAtLocal={toZonedInput(post.scheduledAt, SITE_TIMEZONE)}
+      cuentas={cuentas}
       targets={targets.map((t) => ({
+        accountId: t.accountId,
         network: t.network,
         status: t.status,
         opciones: resumenOpciones(t.network, t.opciones),

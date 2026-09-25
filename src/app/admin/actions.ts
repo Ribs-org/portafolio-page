@@ -32,13 +32,7 @@ import { extensionDe, validateScheduleDraft } from '@/lib/social/publish/validat
 import { validateAtributos, ATRIBUTOS_ERROR, type Atributos } from '@/lib/social/publish/atributos'
 import { diffMedia, diffTargets } from '@/lib/social/publish/edit'
 import { crearPostProgramado } from '@/lib/social/publish/crear'
-import {
-  CuentaInvalida,
-  SinCuenta,
-  exigirCuentas,
-  verificarCuentas,
-  type CuentaDestino,
-} from '@/lib/social/cuentas'
+import { CuentaInvalida, verificarCuentas, type CuentaDestino } from '@/lib/social/cuentas'
 import { CUENTA_DE_OTRO, CuentaDeOtro, guardarCuenta, tokensDePaginas } from '@/lib/social/conectar'
 import { SIN_TOKEN_DE_PAGINA } from '@/lib/social/facebook'
 import { tiktokConnector } from '@/lib/social/tiktok'
@@ -746,7 +740,30 @@ export async function updateScheduledPost(
     .orderBy(asc(scheduledPostMedia.position))
 
   const caption = String(formData.get('caption') ?? '').trim()
-  const networks = formData.getAll('networks').map(String)
+  const idsElegidos = formData.getAll('cuentas').map(String)
+  const publicadas = new Set(targets.filter((t) => t.status === 'published').map((t) => t.accountId))
+  // Las publicadas no se verifican: no se va a escribir ni publicar nada nuevo con
+  // ellas, y verificarlas es lo que convertía una cuenta desconectada *después* de
+  // publicar en un post que ya no se puede volver a tocar (ni el texto, ni la fecha,
+  // ni la media) — el gemelo oculto del checkbox las manda igual, pero su pertenencia
+  // ya la probó ser destino de este post, que ya se acotó al dueño arriba.
+  let cuentasPendientes: CuentaDestino[]
+  try {
+    cuentasPendientes = await verificarCuentas(
+      ownerId,
+      idsElegidos.filter((id) => !publicadas.has(id)),
+    )
+  } catch (error) {
+    if (error instanceof CuentaInvalida) return { error: error.message }
+    throw error
+  }
+  const idsElegidosSet = new Set(idsElegidos)
+  // Su red sale del target, no de una consulta: no hace falta verificarlas de nuevo
+  // para saber a qué red pertenecen.
+  const cuentasPublicadasElegidas: CuentaDestino[] = targets
+    .filter((t) => t.status === 'published' && idsElegidosSet.has(t.accountId))
+    .map((t) => ({ id: t.accountId, network: t.network, handle: null }))
+  const cuentas = [...cuentasPendientes, ...cuentasPublicadasElegidas]
   const scheduledAt = fromZonedInput(String(formData.get('scheduledAt') ?? ''), SITE_TIMEZONE)
   const keptIds = formData.getAll('keptMedia').map(String)
   const files = formData.getAll('media').filter((f): f is File => f instanceof File && f.size > 0)
@@ -776,18 +793,17 @@ export async function updateScheduledPost(
   // re-arm lo manda al próximo cron, el "reintenta ahora" natural.
   const dateUnchanged = scheduledAt !== null && scheduledAt.getTime() === post.scheduledAt.getTime()
 
-  // Una red ya publicada no debe imponer sus límites (280 de X, media obligatoria de
-  // IG) a lo que aún queda por salir: solo lo pendiente entra a la validación.
-  const publishedNetworks = new Set(targets.filter((t) => t.status === 'published').map((t) => t.network))
-  const pendingNetworks = networks.filter((n) => !publishedNetworks.has(n))
+  // Una cuenta ya publicada no debe imponer sus límites a lo que aún queda por salir:
+  // `cuentasPendientes` ya las excluye, al no haber pasado por la verificación de arriba.
+  const pendingNetworks = [...new Set(cuentasPendientes.map((c) => c.network))]
 
-  const targetsPlan = diffTargets(targets, networks)
+  const targetsPlan = diffTargets(targets, cuentas)
   if ('error' in targetsPlan) return { error: targetsPlan.error }
 
   // Una red que exige opciones no se puede agregar desde el editor, que no las pide:
   // el compositor y el lote sí; aquí la creación se rechaza con la misma frase.
-  for (const network of targetsPlan.create) {
-    const check = validarOpciones(network, null)
+  for (const cuenta of targetsPlan.create) {
+    const check = validarOpciones(cuenta.network, null)
     if ('error' in check) return { error: check.error }
   }
 
@@ -821,7 +837,7 @@ export async function updateScheduledPost(
     // media) o un form que desmarcó todas las redes de un post nunca publicado, lo
     // que dejaría un post huérfano sin destinos. El validador saltado habría dicho
     // exactamente esto:
-    if (publishedNetworks.size === 0) return { error: 'Elige al menos una plataforma.' }
+    if (publicadas.size === 0) return { error: 'Elige al menos una cuenta.' }
     // Igual exige una fecha legible antes de persistir.
     if (!scheduledAt) return { error: 'La fecha no se entendió.' }
   } else {
@@ -935,16 +951,13 @@ export async function updateScheduledPost(
   }
 
   if (targetsPlan.create.length > 0) {
-    let cuentas: Map<string, string>
-    try {
-      cuentas = await exigirCuentas(ownerId, targetsPlan.create)
-    } catch (error) {
-      if (error instanceof SinCuenta) return { error: error.message }
-      throw error
-    }
-    await db
-      .insert(scheduledPostTargets)
-      .values(targetsPlan.create.map((network) => ({ postId, network, accountId: cuentas.get(network)! })))
+    await db.insert(scheduledPostTargets).values(
+      targetsPlan.create.map((cuenta) => ({
+        postId,
+        network: cuenta.network,
+        accountId: cuenta.id,
+      })),
+    )
   }
   for (const id of targetsPlan.deleteIds) {
     await db.delete(scheduledPostTargets).where(
