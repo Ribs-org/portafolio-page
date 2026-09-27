@@ -8,16 +8,23 @@ export const RESPUESTA_PUBLICA_POR_DEFECTO = 'Te lo mandé por privado 📩'
 export const REGLA_PALABRA = 'La palabra clave es una sola palabra, sin espacios, hasta 30 letras.'
 export const REGLA_MENSAJE = 'El mensaje del privado va de 1 a 1000 caracteres.'
 export const REGLA_RESPUESTA = 'La respuesta pública va de 1 a 300 caracteres.'
+export const REGLA_DOCUMENTO = 'El documento tiene que ser una URL absoluta a un PDF de hasta 25 MB.'
 
 export const MAX_PALABRA = 30
 export const MAX_MENSAJE = 1000
 export const MAX_RESPUESTA = 300
+export const MAX_DOCUMENTO_BYTES = 25 * 1024 * 1024
 /** Cada automática son dos llamadas a la red dentro de los 120 s del sondeo. */
 export const MAX_AUTOMATICAS_POR_CORRIDA = 20
 
 const REDES_CON_PRIVADO = new Set(['instagram', 'facebook'])
 
-export type ReglaLimpia = { palabra: string; mensaje: string; respuestaPublica: string }
+export type ReglaLimpia = {
+  palabra: string
+  mensaje: string
+  respuestaPublica: string
+  documentoUrl: string | null
+}
 
 function sinTildes(texto: string): string {
   return texto.normalize('NFD').replace(/[̀-ͯ]/g, '')
@@ -96,7 +103,23 @@ export function validarRegla(raw: unknown): { regla: ReglaLimpia | null } | { er
   if (mensaje.length < 1 || [...mensaje].length > MAX_MENSAJE) return { error: REGLA_MENSAJE }
   const respuestaPublica = respuestaBruta.length > 0 ? respuestaBruta : RESPUESTA_PUBLICA_POR_DEFECTO
   if ([...respuestaPublica].length > MAX_RESPUESTA) return { error: REGLA_RESPUESTA }
-  return { regla: { palabra, mensaje, respuestaPublica } }
+
+  // Solo la forma: que sea una URL absoluta que el servidor pueda intentar leer. Que de
+  // verdad sea un PDF y que quepa se comprueba al descargarlo (`documento.ts`), porque
+  // esta función es pura y no puede mirar el archivo.
+  const documentoBruto = raw.documentoUrl
+  let documentoUrl: string | null = null
+  if (documentoBruto !== undefined && documentoBruto !== null && documentoBruto !== '') {
+    if (typeof documentoBruto !== 'string') return { error: REGLA_DOCUMENTO }
+    try {
+      const url = new URL(documentoBruto)
+      if (url.protocol !== 'http:' && url.protocol !== 'https:') return { error: REGLA_DOCUMENTO }
+    } catch {
+      return { error: REGLA_DOCUMENTO }
+    }
+    documentoUrl = documentoBruto
+  }
+  return { regla: { palabra, mensaje, respuestaPublica, documentoUrl } }
 }
 
 export type Plan =

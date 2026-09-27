@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  REGLA_DOCUMENTO,
   REGLA_MENSAJE,
   REGLA_PALABRA,
   REGLA_RESPUESTA,
@@ -99,10 +100,15 @@ describe('validarRegla', () => {
 
   it('normaliza la palabra y pone la respuesta por defecto', () => {
     expect(validarRegla({ palabra: 'GUÍA', mensaje: 'Toma: https://x.cl' })).toEqual({
-      regla: { palabra: 'guia', mensaje: 'Toma: https://x.cl', respuestaPublica: RESPUESTA_PUBLICA_POR_DEFECTO },
+      regla: {
+        palabra: 'guia',
+        mensaje: 'Toma: https://x.cl',
+        respuestaPublica: RESPUESTA_PUBLICA_POR_DEFECTO,
+        documentoUrl: null,
+      },
     })
     expect(validarRegla({ palabra: 'guia', mensaje: 'm', respuestaPublica: ' Listo 📩 ' })).toEqual({
-      regla: { palabra: 'guia', mensaje: 'm', respuestaPublica: 'Listo 📩' },
+      regla: { palabra: 'guia', mensaje: 'm', respuestaPublica: 'Listo 📩', documentoUrl: null },
     })
   })
 
@@ -114,11 +120,65 @@ describe('validarRegla', () => {
     expect(validarRegla({ mensaje: 'sin palabra' })).toEqual({ error: REGLA_PALABRA })
     expect(validarRegla('guia')).toEqual({ error: REGLA_PALABRA })
   })
+
+  it('acepta una regla sin documento, como hasta ahora', () => {
+    const check = validarRegla({ palabra: 'GUIA', mensaje: 'Acá va' })
+    expect('error' in check).toBe(false)
+    if ('error' in check) return
+    expect(check.regla).toEqual({
+      palabra: 'guia',
+      mensaje: 'Acá va',
+      respuestaPublica: RESPUESTA_PUBLICA_POR_DEFECTO,
+      documentoUrl: null,
+    })
+  })
+
+  it('acepta un documentoUrl y lo devuelve tal cual', () => {
+    const check = validarRegla({ palabra: 'GUIA', mensaje: 'Acá va', documentoUrl: 'https://ej.com/g.pdf' })
+    expect('error' in check).toBe(false)
+    if ('error' in check) return
+    expect(check.regla?.documentoUrl).toBe('https://ej.com/g.pdf')
+  })
+
+  it('rechaza un documentoUrl que no es una URL absoluta', () => {
+    // Una ruta relativa no se puede descargar desde el servidor, y el error tiene que
+    // salir acá y no treinta segundos después en un fetch que falla sin explicar.
+    expect(validarRegla({ palabra: 'GUIA', mensaje: 'x', documentoUrl: '/guia.pdf' })).toEqual({
+      error: REGLA_DOCUMENTO,
+    })
+  })
+
+  it('rechaza un documentoUrl que no es texto', () => {
+    expect(validarRegla({ palabra: 'GUIA', mensaje: 'x', documentoUrl: 42 })).toEqual({
+      error: REGLA_DOCUMENTO,
+    })
+  })
+
+  it('rechaza un documentoUrl con protocolo que no es http ni https', () => {
+    // No es una lista larga: son los tres esquemas que un validador descuidado deja
+    // pasar por ser URLs válidas, y los que convierten un campo de texto en algo que
+    // el servidor ejecuta (javascript:) o lee del disco (file:) en vez de descargar
+    // (ftp: representa cualquier otro esquema de red que tampoco es el que se espera).
+    expect(validarRegla({ palabra: 'GUIA', mensaje: 'x', documentoUrl: 'javascript:alert(1)' })).toEqual({
+      error: REGLA_DOCUMENTO,
+    })
+    expect(validarRegla({ palabra: 'GUIA', mensaje: 'x', documentoUrl: 'file:///etc/passwd' })).toEqual({
+      error: REGLA_DOCUMENTO,
+    })
+    expect(validarRegla({ palabra: 'GUIA', mensaje: 'x', documentoUrl: 'ftp://ej.com/g.pdf' })).toEqual({
+      error: REGLA_DOCUMENTO,
+    })
+  })
 })
 
 describe('decidirAutomatica', () => {
   const now = new Date('2026-09-16T12:00:00Z')
-  const regla = { palabra: 'guia', mensaje: 'Toma: https://www.vicente-pareja.cl/guia', respuestaPublica: 'Te lo mandé 📩' }
+  const regla = {
+    palabra: 'guia',
+    mensaje: 'Toma: https://www.vicente-pareja.cl/guia',
+    respuestaPublica: 'Te lo mandé 📩',
+    documentoUrl: null,
+  }
   const base = {
     texto: 'GUÍA porfa',
     esPropio: false,
