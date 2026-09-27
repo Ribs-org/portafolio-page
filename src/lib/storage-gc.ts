@@ -54,10 +54,14 @@ export function keysReferenciadas(urls: Set<string>, base: string): Set<string> 
 /**
  * Toda columna que puede guardar una URL de nuestro almacén. Es la fuente de verdad del
  * barrido: las consultas se generan de acá, así que una columna nueva sin registrar no
- * «se olvida en el barrido», simplemente no existe para él — y su test lo delata.
+ * «se olvida en el barrido», simplemente no existe para él.
  *
- * `social_posts.thumbnail_url` no está a propósito: esa URL es de la red social, no
- * nuestra.
+ * Lo que falta a propósito, con su motivo (y lo que hace que un test —no la memoria de
+ * quien lea esto— note una séptima columna que nadie registre): `social_posts.
+ * thumbnail_url` es el CDN de la red, no algo que copiamos; `source_posts.url` es el
+ * tuit ajeno, otra red también; `links.url` es el destino que escribe el dueño del
+ * link, no un archivo. Ver `storage-gc.test.ts`, que deriva esta lista del esquema real
+ * en vez de repetirla a mano.
  */
 export const COLUMNAS_DE_ARCHIVO = [
   { tabla: 'profiles', columna: 'avatar_url', ref: profiles.avatarUrl },

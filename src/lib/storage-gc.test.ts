@@ -1,5 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
-import { getTableName } from 'drizzle-orm'
+import { getTableColumns, getTableName, is } from 'drizzle-orm'
+import { PgTable } from 'drizzle-orm/pg-core'
+import * as schema from '@/db/schema'
 import { COLUMNAS_DE_ARCHIVO, GRACIA_MS, keysReferenciadas, objetosABorrar, urlsReferenciadas } from './storage-gc'
 import type { ObjetoAlmacenado } from './storage'
 
@@ -34,22 +36,43 @@ function obj(nombre: string, uploadedAt: Date, size = 100): ObjetoAlmacenado {
   return { key: `scheduled/${nombre}`, url: `${BASE}/scheduled/${nombre}`, size, uploadedAt }
 }
 
+/**
+ * Columnas que terminan en «url» pero no son nuestro almacén, con el motivo por el que
+ * no van en `COLUMNAS_DE_ARCHIVO` — la misma explicación que ya está en el docstring de
+ * esa constante, repetida acá porque es la que hace que escribir un nombre en esta
+ * lista cueste una decisión consciente, no un `push` sin pensar.
+ */
+const NO_ES_NUESTRO_ALMACEN: Record<string, string> = {
+  'social_posts.thumbnail_url': 'CDN de la red social, no algo que copiamos a nuestro almacén.',
+  'source_posts.url': 'El tuit ajeno: la URL de otra red, no un archivo nuestro.',
+  'links.url': 'El destino que escribe el dueño del link, no un archivo.',
+}
+
 describe('COLUMNAS_DE_ARCHIVO', () => {
-  it('la lista de columnas de archivo cubre las seis que hay', () => {
-    // Una lista escrita a mano envejece: el día que alguien agregue una columna que guarde
-    // una URL nuestra y olvide registrarla, sus archivos se borran solos y nadie se entera
-    // hasta que un enlace da 404. Este test es lo que obliga a tocar las dos cosas juntas.
-    const nombres = COLUMNAS_DE_ARCHIVO.map((c) => `${c.tabla}.${c.columna}`).sort()
-    expect(nombres).toEqual(
-      [
-        'links.image_url',
-        'profiles.avatar_url',
-        'profiles.og_image_url',
-        'reglas_clave.documento_url',
-        'scheduled_post_media.blob_url',
-        'scheduled_posts.cover_url',
-      ].sort(),
-    )
+  it('cubre toda columna del esquema real que termine en "url", salvo la lista explícita de excluidas', () => {
+    // La spec (docs/superpowers/specs/2026-09-26-documento-por-privado-design.md:136-139)
+    // promete comparar contra lo que el ESQUEMA declara, no contra una lista escrita a
+    // mano en el propio test: esa segunda forma sujeta lo que hay hoy, pero no ve una
+    // séptima columna nueva en `schema.ts` que nadie registre — sus archivos se
+    // borrarían solos y ningún test se pondría rojo. Por eso este test recorre las
+    // tablas de verdad con `getTableColumns`, no una copia de `COLUMNAS_DE_ARCHIVO`.
+    const registradas = new Set(COLUMNAS_DE_ARCHIVO.map((c) => `${c.tabla}.${c.columna}`))
+    const vistasSinRegistrar: string[] = []
+    for (const valor of Object.values(schema)) {
+      if (!is(valor, PgTable)) continue
+      const tabla = getTableName(valor)
+      for (const columna of Object.values(getTableColumns(valor))) {
+        if (!columna.name.toLowerCase().endsWith('url')) continue
+        const clave = `${tabla}.${columna.name}`
+        if (registradas.has(clave)) continue
+        vistasSinRegistrar.push(clave)
+        expect(NO_ES_NUESTRO_ALMACEN, `${clave} no está ni en COLUMNAS_DE_ARCHIVO ni en NO_ES_NUESTRO_ALMACEN`).toHaveProperty(
+          clave,
+        )
+      }
+    }
+    // Y que la lista de excluidas no acumule nombres que el esquema ya no tiene.
+    expect(Object.keys(NO_ES_NUESTRO_ALMACEN).sort()).toEqual(vistasSinRegistrar.sort())
   })
 })
 
