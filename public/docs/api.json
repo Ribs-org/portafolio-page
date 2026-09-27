@@ -1,0 +1,99 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "POST /api/schedule/batch",
+  "description": "Cuerpo exacto que acepta el único endpoint que programa posts. Documentación complementaria en /docs/api-llm.md (guía de tareas) y /docs/api-editor.md (guía para personas, misma API). No hay más endpoints de escritura: ver 'Lo que esta API no hace' en api-llm.md.",
+  "type": "object",
+  "required": ["posts"],
+  "additionalProperties": false,
+  "properties": {
+    "posts": {
+      "type": "array",
+      "description": "Un lote. Cada fila se valida y se programa por separado; una fila mala no tumba a las demás (éxito parcial).",
+      "maxItems": 50,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["fecha"],
+        "description": "Requiere 'texto' o al menos un elemento en 'media' (una fila sin ninguno de los dos se rechaza). Requiere 'redes' con al menos un elemento, o 'cuentas' con al menos un elemento (si 'cuentas' trae elementos, manda sobre 'redes' para elegir destino).",
+        "properties": {
+          "fecha": {
+            "type": "string",
+            "description": "Fecha y hora de publicación, en America/Santiago, formato exacto 'YYYY-MM-DD HH:MM' (también se acepta una 'T' en vez del espacio). No se aceptan segundos, 'Z' ni offsets: un ISO completo con zona se rechaza a propósito, para no reinterpretar un instante UTC como hora de pared. Debe ser futura.",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}[ T]\\d{2}:\\d{2}$"
+          },
+          "texto": {
+            "type": "string",
+            "description": "El caption. Se usa completo en todas las redes salvo YouTube, donde el primer renglón no vacío (recortado a 100 caracteres) se convierte en el título y el texto completo queda como descripción. Límites, solo si esa red está en el post: 280 caracteres con 'x', 500 con 'threads', 2200 siempre (límite de Instagram)."
+          },
+          "redes": {
+            "type": "array",
+            "description": "Nombra la red, no la cuenta. Cada nombre se resuelve a una cuenta solo si hay exactamente una conectada de esa red; con dos, la fila se rechaza nombrando las candidatas y hay que usar 'cuentas'. Sin repetidos.",
+            "items": {
+              "type": "string",
+              "enum": ["instagram", "facebook", "youtube", "threads", "x", "tiktok"]
+            },
+            "uniqueItems": true
+          },
+          "cuentas": {
+            "type": "array",
+            "description": "Identificadores de cuenta exactos. Si trae al menos un elemento, manda sobre 'redes' para elegir destino: es la única forma de elegir a cuál de dos cuentas de la misma red sale el post. Los identificadores se leen en /admin/accounts o en la respuesta de GET /api/schedule/posts (campo cuentaId de cada destino); no se inventan.",
+            "items": { "type": "string" }
+          },
+          "media": {
+            "type": "array",
+            "description": "URLs públicas. Cada una se descarga (30 s de tope), se verifica su tipo real por content-type, y se re-sube al almacenamiento propio. Imágenes: .jpg .jpeg .png .gif .webp. Videos: .mp4 .mov .webm. Sin extensión reconocible también sirve: el tipo lo decide el content-type real de la descarga (así funcionan los links directos de Google Drive).",
+            "items": { "type": "string", "format": "uri" }
+          },
+          "portada": {
+            "type": "string",
+            "format": "uri",
+            "description": "URL pública de una imagen JPG o PNG, solo válida si 'media' incluye un video. Se usa como portada en Instagram y Facebook, y como thumbnail en YouTube (si falla, el video igual se publica sin portada). Threads y X la ignoran sin error."
+          },
+          "atributos": {
+            "type": "object",
+            "description": "Objeto plano de valores simples (texto, número o booleano) — las claves y valores los elige quien llama; el sistema no los interpreta, solo los guarda y los devuelve junto a las métricas de GET /api/metrics/posts. Máximo 20 claves y 2000 caracteres al serializar.",
+            "maxProperties": 20,
+            "additionalProperties": { "type": ["string", "number", "boolean"] }
+          },
+          "opciones": {
+            "type": "object",
+            "description": "Lo que cada destino exige elegir. Obligatorio si algún destino de la fila es una cuenta de TikTok (hoy la única red que pide algo). La clave del objeto es el identificador de cuenta del destino, o el nombre de la red si la fila tiene exactamente una cuenta de esa red. Forma para TikTok: { modo: 'directo'|'borrador', privacidad?: 'PUBLIC_TO_EVERYONE'|'MUTUAL_FOLLOW_FRIENDS'|'FOLLOWER_OF_CREATOR'|'SELF_ONLY' (obligatoria en 'directo'; hoy solo SELF_ONLY llega a publicarse), comentarios?: boolean, duo?: boolean, pegar?: boolean, comercial?: 'no'|'marca_propia'|'patrocinado' }.",
+            "additionalProperties": true
+          },
+          "regla": {
+            "type": "object",
+            "description": "Respuesta automática por palabra clave: cuando alguien comente 'palabra' (completa, sin mayúsculas ni tildes) en Instagram, Facebook o YouTube, el sistema responde en la siguiente corrida del cron. Requiere 'palabra' y 'mensaje' juntos; si ambos faltan, la fila queda sin regla (no es error). Ver api-llm.md, sección 'Lo que Meta no permite', antes de asumir que hay un envío por privado.",
+            "required": ["palabra", "mensaje"],
+            "additionalProperties": false,
+            "properties": {
+              "palabra": {
+                "type": "string",
+                "description": "Una sola palabra, sin espacios, hasta 30 letras (se normaliza a minúsculas y sin tildes antes de comparar).",
+                "minLength": 1,
+                "maxLength": 30
+              },
+              "mensaje": {
+                "type": "string",
+                "description": "El texto que se responde. Hoy (mientras el privado de Meta esté apagado) se publica siempre como respuesta pública al comentario, con el enlace de 'documentoUrl' agregado al final si vino. Cuando Meta apruebe el privado, este texto pasará a ir por mensaje directo en Instagram y Facebook, y la respuesta pública será 'respuestaPublica'.",
+                "minLength": 1,
+                "maxLength": 1000
+              },
+              "respuestaPublica": {
+                "type": "string",
+                "description": "Opcional; por defecto 'Te lo mandé por privado 📩'. Hoy no se usa (todo el mensaje sale en público); queda listo para cuando el privado se encienda, y entonces será la respuesta pública corta mientras 'mensaje' va por DM.",
+                "minLength": 1,
+                "maxLength": 300
+              },
+              "documentoUrl": {
+                "type": "string",
+                "format": "uri",
+                "description": "URL absoluta (http o https) a un PDF de hasta 25 MB. Se descarga al programar el post (no al comentar) y se copia al almacenamiento propio; una URL de Drive que sirva una página HTML en vez del PDF, o un archivo que no sea PDF, o que no quepa, rechaza la fila. El enlace resultante es público: quien lo tenga, tiene el PDF — no hay control de acceso ni caducidad. Nunca se manda como adjunto: se concatena al final de 'mensaje', separado por una línea en blanco.",
+                "maxBytes": 26214400
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

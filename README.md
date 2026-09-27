@@ -663,6 +663,13 @@ por red, todas las frases de error y qué significa cada métrica. Se sirve tal 
 viaja aparte — pero es público: si prefieres que no lo sea, muévelo fuera de
 `public/`.
 
+Al lado, para un LLM que llama a la API a ciegas y no tiene este repositorio delante:
+`public/docs/api.json` (el JSON Schema exacto del cuerpo del lote, con los límites que
+aplica el validador) y `public/docs/api-llm.md` (la guía compacta orientada a la tarea,
+con las frases de error literales y lo que Meta no permite en el mensaje privado). Una
+prueba (`src/lib/docs-api.test.ts`) falla si cualquiera de los dos se aparta de las
+constantes reales del código.
+
 ### Carga masiva por API
 
 `POST /api/schedule/batch` con header `Authorization: Bearer <SCHEDULE_API_KEY>` y
