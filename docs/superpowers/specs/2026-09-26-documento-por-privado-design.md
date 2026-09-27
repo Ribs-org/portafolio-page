@@ -3,7 +3,7 @@
 **Fecha:** 2026-09-26.
 
 **En una frase:** que la regla de palabra clave pueda llevar un documento —subido por API, con
-una URL estable y medible— y que toda la API quede documentada de forma que un LLM la use sin
+una URL estable— y que toda la API quede documentada de forma que un LLM la use sin
 adivinar.
 
 ---
@@ -57,8 +57,13 @@ Dos consecuencias que simplifican y una que resta:
   discute, y uno que se sabe propio se puede cambiar cuando haya razón.
 - **No hace falta ningún sondeo** contra la API real: la documentación responde lo que
   importaba.
-- **Y el enlace se puede medir, cosa que un adjunto no.** Es la parte buena de la limitación:
-  el dueño va a saber cuánta gente abrió la guía.
+
+Lo que **no** se gana, y conviene decirlo porque una versión anterior de este documento lo
+prometía: **el enlace al documento no se mide.** `enlaceMedible` solo etiqueta enlaces del
+mismo host que el sitio, y el documento vive en el subdominio de R2. Y aunque se etiquetara,
+R2 sirve el archivo directamente sin pasar por la aplicación, mientras que la analítica de
+este proyecto cuenta por baliza del navegador, que una descarga no ejecuta. Medirlo es otro
+trabajo; ver la sección 10.
 
 Lo que se pierde: la persona hace un clic en vez de recibir el archivo. Se evaluó mandar el
 PDF si la persona contesta al privado —lo que sí abriría la ventana— y se descartó por ahora:
@@ -102,7 +107,7 @@ documento por publicación.
 ## 4. Dónde vive el documento
 
 **Se copia a R2 al programar; no se enlaza la URL del que llama.** Mismo tratamiento que
-`media` ya recibe, con la misma función.
+`media` ya recibe, con el mismo patrón —una función hermana, no la misma: el tipo de `mediaToBlob` es imagen o video, y ensancharlo tocaría a todos sus consumidores—.
 
 Dos razones, y las dos son fallos reales si se hace al revés:
 
@@ -134,15 +139,20 @@ columna de archivos y nadie la registre**: comparar las columnas que el esquema 
 URL de archivo contra las que el barrido consulta. Esa prueba es lo único que impide que el
 próximo la olvide igual.
 
-## 6. El mensaje, y la medición
+## 6. El mensaje, y la medición que ya existe
 
 `decidirAutomatica` es una función pura y sigue siéndolo. Su `Plan` no gana estados nuevos:
 como el documento va dentro del texto, **no hay un segundo envío que rastrear**, y
 `post_comments` no necesita ninguna columna nueva.
 
 Lo único que cambia es cómo se compone el mensaje: cuando la regla trae un documento, su
-enlace se añade al texto del privado, etiquetado por `enlaceMedible` con `?s=dm-<palabra>`
-igual que cualquier otro enlace de esa ruta.
+enlace se añade al texto.
+
+**Y el orden importa, por un detalle que solo se ve leyendo `enlaceMedible`:** esa función
+etiqueta **el primer** enlace del mensaje que apunte al sitio, y solo uno. Así que el enlace
+del documento se añade **después** del texto del dueño, para no robarle la etiqueta al enlace
+que él escribió —que sí apunta al sitio y sí se mide—. Si el documento fuera primero, el
+mensaje seguiría funcionando pero el dueño perdería la medición que hoy tiene.
 
 **Y cuando no hay privado** —fuera de la ventana de siete días, en una red sin privado, o con
 la bandera apagada— el mensaje completo ya va hoy en la respuesta pública. El enlace al
@@ -223,6 +233,10 @@ Eso es lo que separa «documentación para LLM» de «un archivo que dice cosas�
   entero —detectar la respuesta, guardar el `recipient_id`, un envío más con su estado— que se
   activaría pocas veces, y el enlace ya resuelve el problema del dueño. Queda anotado como la
   continuación natural si algún día el clic resulta ser un problema.
+- **Medir cuánta gente abre el documento.** Haría falta que el enlace pasara por la
+  aplicación —una ruta que registre y redirija a R2— y registrar ahí del lado del servidor,
+  que va en contra de la decisión de contar por baliza del navegador que este proyecto tomó
+  el 2026-09-03. Es un trabajo propio, con su propia decisión de producto detrás.
 - **TikTok**, que no tiene cola de comentarios.
 - **Desbloquear el privado.** Depende del App Review de Meta, no de código.
 - **URLs que caducan o una por persona.** El documento es público por decisión; ver la
@@ -230,8 +244,9 @@ Eso es lo que separa «documentación para LLM» de «un archivo que dice cosas�
 
 ## 11. Lo que depende del dueño, no del código
 
-1. **Poner `SITE_URL` en Vercel.** Sin ella el enlace no se etiqueta con `?s=dm-<palabra>` y se
-   pierde la medición de la sección 6. Esto vale **desde el primer día**, porque el enlace
+1. **Poner `SITE_URL` en Vercel.** Sin ella **el enlace que el dueño escribe en el mensaje** no
+   se etiqueta con `?s=dm-<palabra>` y se pierde la medición que hoy tiene. No es el enlace del
+   documento, que no se mide en ningún caso —sección 2—. Esto vale **desde el primer día**, porque el enlace
    funciona en la respuesta pública sin esperar a Meta.
 2. Activar «Mensajes» en la app de Meta y pasar App Review de `instagram_manage_messages` y
    `pages_messaging`, para que el mensaje vaya por privado en vez de público.
