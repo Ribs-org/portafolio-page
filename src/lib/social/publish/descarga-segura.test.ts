@@ -99,7 +99,19 @@ describe('hostPermitido', () => {
   it('rechaza 240.0.0.0/4 (clase E) y 255.255.255.255 (broadcast)', () => {
     expect(hostPermitido('http://240.0.0.1/')).toBe(false)
     expect(hostPermitido('http://255.255.255.255/')).toBe(false)
-    expect(hostPermitido('http://239.255.255.255/')).toBe(true)
+    // El borde de abajo de la clase E es multicast, no una dirección pública: el último
+    // unicast normal antes de los dos rangos es 223.255.255.255.
+    expect(hostPermitido('http://223.255.255.255/')).toBe(true)
+  })
+
+  it('rechaza el multicast (224.0.0.0/4)', () => {
+    // No sirve un recurso HTTP unicast, así que no es un SSRF clásico; se rechaza por la
+    // misma regla que el resto — lo que no es una dirección pública normal no se pide en
+    // nombre de un dueño — y porque una lista de rangos con un hueco invita a asumir que
+    // no hay más huecos.
+    expect(hostPermitido('http://224.0.0.1/')).toBe(false)
+    expect(hostPermitido('http://239.255.255.255/')).toBe(false)
+    expect(hostPermitido('http://223.255.255.255/')).toBe(true)
   })
 
   it('rechaza fec0::/10 (site-local, obsoleta pero enrutable donde esté configurada)', () => {

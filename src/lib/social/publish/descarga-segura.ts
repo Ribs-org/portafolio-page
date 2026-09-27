@@ -68,6 +68,9 @@ function normalizarHost(hostnameCrudo: string): string {
  * - Sin especificar: `::` (`[::]`) — el equivalente IPv6 de `0.0.0.0`.
  * - Link-local: `169.254.0.0/16` (incluye la dirección de metadata de la nube,
  *   `169.254.169.254`) y `fe80::/10`.
+ * - Multicast: `224.0.0.0/4`. No sirve un recurso HTTP unicast, así que no es un SSRF
+ *   clásico; está por la misma razón que el resto: lo que no es una dirección pública
+ *   normal no tiene por qué pedirse en nombre de un dueño.
  * - Privado: `10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`, y `fc00::/7` (ULA, el
  *   equivalente IPv6 de un rango privado); y `fec0::/10` (site-local, obsoleta pero
  *   todavía enrutable donde esté configurada).
@@ -97,6 +100,7 @@ function esHostInterno(hostnameCrudo: string): boolean {
     if (a === 172 && b >= 16 && b <= 31) return true // 172.16.0.0/12
     if (a === 192 && b === 168) return true // 192.168.0.0/16
     if (a === 192 && b === 0 && c === 0) return true // 192.0.0.0/24
+    if (a >= 224 && a <= 239) return true // 224.0.0.0/4 (multicast)
     if (a >= 240) return true // 240.0.0.0/4 (incluye 255.255.255.255)
   }
   return false

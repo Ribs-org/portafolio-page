@@ -120,7 +120,16 @@ export async function documentoToBlob(url: string): Promise<string | null> {
   // `application/pdf` a mano. Los cinco primeros bytes son el propio archivo, no lo que
   // alguien declaró sobre él — por eso se comprueban antes de guardar, no en vez del
   // content-type de arriba (que sigue rechazando de una vez lo que ni se anuncia PDF).
-  const cabecera = Buffer.from(await blob.slice(0, CABECERA_PDF.length).arrayBuffer()).toString('latin1')
+  // El `await` va envuelto no porque leer un Blob ya en memoria pueda fallar —no hay red
+  // detrás—, sino porque esta función promete no lanzar y en esta rama esa promesa ya se
+  // rompió tres veces por un `await` que parecía inofensivo. Barato de sostener.
+  let cabecera: string
+  try {
+    cabecera = Buffer.from(await blob.slice(0, CABECERA_PDF.length).arrayBuffer()).toString('latin1')
+  } catch (error) {
+    console.error('El documento: no se pudo leer su cabecera:', String(error).slice(0, 200))
+    return null
+  }
   if (cabecera !== CABECERA_PDF) {
     console.error('El documento no empieza con la cabecera de un PDF:', url.slice(0, 200))
     return null
