@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { getTableName } from 'drizzle-orm'
 
 // `usuarios.ts`, que este archivo importa por debajo de `actions.ts`, trae `server-only`,
 // que solo entiende el bundler de Next: se sustituye por un módulo vacío para poder
@@ -64,14 +65,49 @@ const db = vi.hoisted(() => ({
   // 0 = nunca falla. N = la N-ésima escritura dentro de la transacción de `makeDefault`
   // lanza en vez de aplicarse (1 = degradar, 2 = promover).
   makeDefaultErrorAtCall: 0 as number,
+  // Para `updateScheduledPost`: filas programadas para los `select().from().where()`
+  // sucesivos, en el orden real en que la función los hace (post, targets, media) — no
+  // por tabla, por orden, como en `aislamiento.test.ts`. Vacío = el `select` de siempre
+  // (el de `perfilesDelDueno`), así que las demás describe de este archivo no lo notan.
+  scheduledSelectQueue: [] as unknown[][],
+  // Cada `insert(tabla).values(...)`, con o sin `onConflictDoUpdate` encima.
+  insertCalls: [] as { tabla: string; values: unknown }[],
+  // El `set` de cada `onConflictDoUpdate`, que es lo que el arreglo #1 tiene que sujetar:
+  // que no traiga `documentoUrl` aunque la regla completa sí lo tenga.
+  onConflictDoUpdateCalls: [] as { tabla: string; values: unknown; set: unknown }[],
 }))
 
 vi.mock('@/db', async (importOriginal) => {
   const real = await importOriginal<typeof import('@/db')>()
-  const select = () => ({ from: () => ({ where: async () => db.perfilesDelDueno }) })
+  /** Un valor esperable directamente (`await ...where()`) que además admite `.orderBy()`
+   * encadenado (la consulta de media de `updateScheduledPost` sí lo encadena). */
+  function filaResultado(filas: unknown) {
+    const promesa = Promise.resolve(filas)
+    return Object.assign(promesa, { orderBy: () => Promise.resolve(filas) })
+  }
+  const select = () => ({
+    from: () => ({
+      where: () => {
+        if (db.scheduledSelectQueue.length > 0) return filaResultado(db.scheduledSelectQueue.shift())
+        return filaResultado(db.perfilesDelDueno)
+      },
+    }),
+  })
   const del = () => ({
     where: async () => {
       db.deleteCalls.push(true)
+    },
+  })
+  const insert = (tabla: unknown) => ({
+    values: (values: unknown) => {
+      db.insertCalls.push({ tabla: getTableName(tabla as never), values })
+      const resultado = Promise.resolve(undefined)
+      return Object.assign(resultado, {
+        onConflictDoUpdate: (opts: { set: unknown }) => {
+          db.onConflictDoUpdateCalls.push({ tabla: getTableName(tabla as never), values, set: opts.set })
+          return Promise.resolve(undefined)
+        },
+      })
     },
   })
   return {
@@ -87,6 +123,7 @@ vi.mock('@/db', async (importOriginal) => {
       }),
       select,
       delete: del,
+      insert,
       // Sin rollback real, igual que el doble de `usuarios.test.ts`, pero el `update` de
       // acá sí simula el efecto que a `makeDefault` le importa: bufferea cada escritura y
       // solo las vuelca a `makeDefaultCalls` si el callback completo sin lanzar. Si la
@@ -123,7 +160,7 @@ vi.mock('@/db', async (importOriginal) => {
 // Import estático, después de los `vi.mock` (Vitest los sube igual al principio del
 // archivo): un import dinámico dentro de cada `it` pagaría de nuevo la transformación de
 // todo lo que `actions.ts` arrastra.
-const { updateProfile, deleteProfile, makeDefault } = await import('./actions')
+const { updateProfile, deleteProfile, makeDefault, updateScheduledPost } = await import('./actions')
 
 beforeEach(() => {
   db.updateCalls.length = 0
@@ -135,6 +172,9 @@ beforeEach(() => {
   db.updateError = null
   db.makeDefaultCalls.length = 0
   db.makeDefaultErrorAtCall = 0
+  db.scheduledSelectQueue.length = 0
+  db.insertCalls.length = 0
+  db.onConflictDoUpdateCalls.length = 0
 })
 
 /**
@@ -320,5 +360,53 @@ describe('makeDefault: degradar y promover son atómicos', () => {
     await expect(makeDefault('profile-1')).rejects.toThrow()
 
     expect(db.makeDefaultCalls).toEqual([])
+  })
+})
+
+describe('updateScheduledPost: el editor no pisa el documento de una regla creada por API', () => {
+  /**
+   * Formulario mínimo del editor que sí toca la regla, sin tocar cuentas ni media: la
+   * cuenta elegida es la ya publicada (así `verificarCuentas` recibe la lista vacía y
+   * nunca consulta `social_accounts`), sin `media`/`mediaUrls`/`keptMedia` (así
+   * `diffMedia` sale vacío) — el camino feliz real, no un arnés que simule todo el
+   * módulo. Ver `edit.ts` (`diffTargets`/`diffMedia`) y `cuentas.ts` (`verificarCuentas`).
+   */
+  function formularioEdicion() {
+    const formData = new FormData()
+    formData.set('caption', 'Texto editado')
+    formData.set('cuentas', 'acc-1')
+    formData.set('scheduledAt', '2026-12-01T10:00')
+    formData.set('reglaPalabra', 'guia')
+    formData.set('reglaMensaje', 'Toma tu guía')
+    return formData
+  }
+
+  /** Post + su único target (ya publicado) + sin media: las tres filas, en el orden en
+   * que `updateScheduledPost` las lee (post, targets, media). */
+  function programarFilas() {
+    db.scheduledSelectQueue.push(
+      [{ id: 'post-1', ownerId: 'owner-1', scheduledAt: new Date('2026-11-01T10:00:00Z'), coverUrl: null }],
+      [{ id: 'target-1', status: 'published', accountId: 'acc-1', network: 'instagram', updatedAt: new Date() }],
+      [],
+    )
+  }
+
+  it('el `set` del onConflictDoUpdate no trae `documentoUrl`, aunque la regla completa sí lo tenga', async () => {
+    // El hallazgo más grave de la revisión: antes de este arreglo, ese `set` era
+    // `{ ...reglaCheck.regla, updatedAt }`, y como `validarRegla` siempre pone la clave
+    // `documentoUrl` (null cuando no viene del formulario), el UPDATE real ponía
+    // `documento_url = NULL` en cada guardado del editor — así se haya programado el
+    // post por API con su PDF. Esto se afirma sobre lo que de verdad llega al `set`, no
+    // sobre `columnasEditablesDeRegla` en aislado (eso ya lo prueba `reglas.test.ts`).
+    programarFilas()
+
+    await expect(updateScheduledPost('post-1', {}, formularioEdicion())).rejects.toThrow(RedirectSignal)
+
+    expect(db.onConflictDoUpdateCalls).toHaveLength(1)
+    const { tabla, set } = db.onConflictDoUpdateCalls[0]!
+    expect(tabla).toBe('reglas_clave')
+    expect(set).not.toHaveProperty('documentoUrl')
+    // Y que sí lleve lo que el editor edita, para que el test no pase por estar vacío.
+    expect(set).toMatchObject({ palabra: 'guia', mensaje: 'Toma tu guía' })
   })
 })
