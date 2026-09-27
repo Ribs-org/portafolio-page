@@ -53,13 +53,24 @@ Ninguno es largo para una app como esta.
 Pide una **URL pública**. Usa esta:
 
 ```
-https://tu-parrilla.cl/privacidad
+https://www.vicente-pareja.cl/privacidad
 ```
+
+**Comprueba que esa URL abre antes de pegarla.** Es la que sirve el sitio hoy. `tu-parrilla.cl`
+está comprado desde el 2026-09-16 y es el dominio al que el producto va a mudarse; el día que
+sirva el sitio, esta URL cambia y **hay que cambiarla también en el formulario de Google**, no
+solo acá. Un formulario que apunta a una URL muerta es otra forma de perder la cuenta.
 
 Esa página tiene una sección propia, «La aplicación del teléfono», que dice lo que Google
 quiere leer: que la app no recoge datos de nadie más que de ti, que pide acceso a fotos y
 videos solo para que elijas los archivos que vas a publicar, que la sesión vive en el
-almacenamiento seguro del teléfono, y que habla únicamente con tu propio sitio.
+almacenamiento seguro del teléfono, y con qué servidores habla.
+
+**Y son dos, no uno.** El de tu sitio, y el de Expo: la app le pregunta en cada apertura si hay
+una versión nueva de sí misma, y así llegan las actualizaciones por aire sin pasar por la tienda.
+Expo ve en esa pregunta la IP del teléfono, su sistema operativo y qué versión tiene instalada.
+Eso **no se puede omitir en el formulario de Google**: es un tercero, y es justo el servicio del
+que depende que las actualizaciones lleguen solas. Declararlo cuesta una casilla.
 
 Si algún día cambia lo que la app hace, esa sección tiene que cambiar con ella: **mentir en
 el formulario de Google cuesta la cuenta, no la app**, y el formulario tiene que coincidir
@@ -71,7 +82,10 @@ Un cuestionario sobre qué recoge la app y si lo comparte. Para esta app:
 
 - **¿Recoge o comparte datos de usuarios?** Sí, pero solo los que tú mismo produces.
 - **Tipos de datos:** archivos y documentos, por las fotos y videos que eliges para publicar.
-- **¿Se comparten con terceros?** No. Van a tu propio servidor.
+- **¿Se comparten con terceros?** Tu contenido no: va solo a tu propio servidor. Lo que sí sale
+  hacia un tercero es el **identificador del dispositivo y su IP**, hacia Expo, en la consulta de
+  actualizaciones que la app hace al abrirse. Google tiene una categoría para eso
+  («identificadores del dispositivo», con la finalidad «funcionalidad de la app»): márcala.
 - **¿Se cifran en tránsito?** Sí, todo va por HTTPS.
 - **¿Puede el usuario pedir que se borren?** Sí, tú controlas la base.
 
@@ -168,7 +182,7 @@ De aquí en adelante casi nunca vas a volver a esta consola.
   instaladas hay que publicar a las dos. Está explicado, con los comandos, en
   `mobile/README.md`.
 - **Cambio nativo**, que es raro: en la app de GitHub, **Actions → «App a la tienda» →
-  Run**. EAS corre las pruebas de la app, construye el binario, lo envía a la pista interna,
+  Run**. GitHub corre las pruebas de la app, EAS construye el binario, lo envía a la pista interna,
   y Google lo distribuye. El flujo vive en `.github/workflows/app-tienda.yml` y tiene una
   casilla por si alguna vez quieres construir sin enviar.
 

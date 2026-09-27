@@ -8,7 +8,7 @@ export const metadata: Metadata = {
 /** The one value a fork has to change before deploying these pages. */
 const CONTACTO = 'vicente.pareja.jones@gmail.com'
 
-const ACTUALIZADO = '25 de septiembre de 2026'
+const ACTUALIZADO = '27 de septiembre de 2026'
 
 export default function PrivacidadPage() {
   return (
@@ -143,9 +143,16 @@ export default function PrivacidadPage() {
             , el que el sistema operativo cifra. Cerrar sesión la borra.
           </li>
           <li>
-            <span className="text-fg">Habla únicamente con este sitio.</span> No hay analítica,
-            ni publicidad, ni servicios de terceros dentro de la aplicación, y nada de lo que
-            pasa por ella se comparte con nadie.
+            <span className="text-fg">No hay analítica ni publicidad dentro de la aplicación</span>
+            , y nada de lo que escribes o eliges en ella se comparte con nadie.
+          </li>
+          <li>
+            <span className="text-fg">Habla con dos servidores, y con ninguno más.</span> El de
+            este sitio, al que manda lo que publicas y del que lee tus números. Y el de Expo, el
+            servicio con el que está construida: cada vez que se abre, la aplicación le pregunta
+            si hay una versión nueva de sí misma, y así se actualiza sin pasar por la tienda. En
+            esa pregunta Expo ve la dirección IP del teléfono, su sistema operativo y qué versión
+            de la aplicación tiene instalada. No recibe nada de tu contenido ni de tu sesión.
           </li>
           <li>
             <span className="text-fg">Todo viaja cifrado</span>, por HTTPS.
@@ -157,8 +164,8 @@ export default function PrivacidadPage() {
         <h2 className="font-titulo text-lg font-semibold uppercase tracking-[0.03em]">Dónde vive todo</h2>
         <p className="leading-relaxed text-fg-muted">
           El sitio está alojado en Vercel y los datos en una base de datos Postgres gestionada por
-          Supabase. Las imágenes y videos que el dueño sube se almacenan en Cloudflare R2. Ninguno
-          de esos proveedores recibe los datos para usarlos por su cuenta: los alojan.
+          Supabase. Las imágenes y videos que el dueño sube se almacenan en Cloudflare R2.
+          Ninguno de esos proveedores recibe los datos para usarlos por su cuenta: los alojan.
         </p>
       </section>
 
