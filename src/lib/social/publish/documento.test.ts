@@ -16,8 +16,19 @@ afterEach(() => {
   guardarMock.mockClear()
 })
 
-function stubPdf(declarado: number, opts: { bytesReales?: number; contentType?: string } = {}) {
+/** Los cinco bytes con los que empieza cualquier PDF real, sea cual sea su versión. */
+const CABECERA_PDF = new TextEncoder().encode('%PDF-')
+
+function stubPdf(
+  declarado: number,
+  opts: { bytesReales?: number; contentType?: string; conCabecera?: boolean } = {},
+) {
   const cuerpo = new Uint8Array(opts.bytesReales ?? declarado)
+  // Por defecto el cuerpo sí empieza con la cabecera de un PDF: la mayoría de estos
+  // tests prueba otra cosa (tamaño, content-type, red) y no quiere fallar por el
+  // chequeo de cabecera del arreglo #4. `conCabecera: false` es lo que usan los tests
+  // que sí prueban ese chequeo.
+  if (opts.conCabecera !== false) cuerpo.set(CABECERA_PDF.subarray(0, Math.min(CABECERA_PDF.length, cuerpo.length)))
   vi.stubGlobal(
     'fetch',
     vi.fn(async () =>
@@ -178,5 +189,60 @@ describe('documentoToBlob', () => {
     guardarMock.mockRejectedValueOnce(new Error('credencial vencida'))
     expect(await documentoToBlob('https://ej.com/g.pdf')).toBeNull()
     expect(guardarMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('rechaza un 2xx sin cuerpo aunque el content-type diga PDF (arreglo #3)', async () => {
+    // Un 204, o cualquier 2xx que no escriba nada: antes de este arreglo `!cuerpo`
+    // devolvía un `Blob([])` que pasaba de largo, y el comentarista recibía el enlace a
+    // un PDF de 0 bytes.
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => new Response(null, { status: 204, headers: { 'content-type': 'application/pdf' } })),
+    )
+    expect(await documentoToBlob('https://ej.com/vacio.pdf')).toBeNull()
+    expect(guardarMock).not.toHaveBeenCalled()
+  })
+
+  it('rechaza un cuerpo que termina en cero bytes sin ser un `!body` (arreglo #3)', async () => {
+    const cuerpo = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.close()
+      },
+    })
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => new Response(cuerpo, { status: 200, headers: { 'content-type': 'application/pdf' } })),
+    )
+    expect(await documentoToBlob('https://ej.com/vacio-streaming.pdf')).toBeNull()
+    expect(guardarMock).not.toHaveBeenCalled()
+  })
+
+  it('no lanza si el cuerpo ya está "errored" cuando se cancela por pasarse del tope (arreglo #2)', async () => {
+    // El caso real: la señal compartida de tiempo puede vencer justo entre el `read()`
+    // que trae el chunk que pasa del tope y el `lector.cancel()` que sigue. WHATWG
+    // Streams: cancelar un stream ya "errored" devuelve la promesa RECHAZADA con ese
+    // mismo error. Antes de este arreglo ese rechazo salía por encima de
+    // `documentoToBlob`, que promete no lanzar nunca.
+    const cuerpo = new ReadableStream<Uint8Array>({
+      pull(controller) {
+        controller.enqueue(new Uint8Array(MAX_DOCUMENTO_BYTES + 1024))
+        controller.error(new Error('la señal de tiempo venció justo ahí'))
+      },
+    })
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => new Response(cuerpo, { status: 200, headers: { 'content-type': 'application/pdf' } })),
+    )
+    await expect(documentoToBlob('https://ej.com/se-pasa-y-se-rompe.pdf')).resolves.toBeNull()
+    expect(guardarMock).not.toHaveBeenCalled()
+  })
+
+  it('rechaza un cuerpo que no empieza con "%PDF-" aunque el content-type diga PDF (arreglo #4)', async () => {
+    // El hueco que deja mirar solo el header: HTML servido con `content-type:
+    // application/pdf` (la página intermedia de Drive, marcada a mano o no) entraría
+    // igual y se re-serviría como PDF desde nuestro propio dominio.
+    stubPdf(1024, { conCabecera: false })
+    expect(await documentoToBlob('https://ej.com/no-es-pdf.pdf')).toBeNull()
+    expect(guardarMock).not.toHaveBeenCalled()
   })
 })

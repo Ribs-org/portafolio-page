@@ -73,6 +73,46 @@ describe('hostPermitido', () => {
     expect(hostPermitido('http://[::ffff:169.254.169.254]/')).toBe(false)
   })
 
+  it('rechaza un IPv4 traducido (::ffff:0:a.b.c.d, RFC 6052/NAT64) y compatible (::a.b.c.d, RFC 4291)', () => {
+    // Dos formas más de embeber un IPv4 en IPv6, cada una normalizada por `URL` a un
+    // hex comprimido distinto del mapeado de arriba.
+    expect(hostPermitido('http://[::ffff:0:127.0.0.1]/')).toBe(false)
+    expect(hostPermitido('http://[::127.0.0.1]/')).toBe(false)
+    expect(hostPermitido('http://[::10.0.0.5]/')).toBe(false)
+  })
+
+  it('rechaza el CGNAT (100.64.0.0/10), incluida la metadata de Alibaba Cloud', () => {
+    expect(hostPermitido('http://100.64.0.1/')).toBe(false)
+    expect(hostPermitido('http://100.100.100.200/')).toBe(false)
+    // Fuera del rango (/10 es hasta 100.127.x.x): no debe rechazarse por confundirlo.
+    expect(hostPermitido('http://100.128.0.1/')).toBe(true)
+    expect(hostPermitido('http://100.63.255.255/')).toBe(true)
+  })
+
+  it('rechaza 192.0.0.0/24, incluida la metadata de Oracle Cloud', () => {
+    expect(hostPermitido('http://192.0.0.1/')).toBe(false)
+    expect(hostPermitido('http://192.0.0.192/')).toBe(false)
+    // Fuera del /24: 192.0.1.x no es el mismo rango.
+    expect(hostPermitido('http://192.0.1.1/')).toBe(true)
+  })
+
+  it('rechaza 240.0.0.0/4 (clase E) y 255.255.255.255 (broadcast)', () => {
+    expect(hostPermitido('http://240.0.0.1/')).toBe(false)
+    expect(hostPermitido('http://255.255.255.255/')).toBe(false)
+    expect(hostPermitido('http://239.255.255.255/')).toBe(true)
+  })
+
+  it('rechaza fec0::/10 (site-local, obsoleta pero enrutable donde esté configurada)', () => {
+    expect(hostPermitido('http://[fec0::1]/')).toBe(false)
+    expect(hostPermitido('http://[feff::1]/')).toBe(false)
+    // fe00::/9 (antes de fe80) no es site-local ni link-local: sigue permitido.
+    expect(hostPermitido('http://[fe00::1]/')).toBe(true)
+  })
+
+  it('rechaza "localhost.localdomain", el nombre que /etc/hosts apunta a 127.0.0.1 en varias distros', () => {
+    expect(hostPermitido('http://localhost.localdomain/')).toBe(false)
+  })
+
   it('rechaza cualquier esquema que no sea http/https', () => {
     // El caso real: un `Location:` de redirección con `data:` no tiene host —esta
     // comprobación de host nunca lo vería—, y `fetch` sí sabe descargarlo.
@@ -142,6 +182,31 @@ describe('descargarSeguro', () => {
     await descargarSeguro('https://ej.com/redirige.pdf', 'la prueba')
     // Una sola vez: la del único 3xx de esta cadena, no una por cada salto restante.
     expect(cancelSpy).toHaveBeenCalledTimes(1)
+  })
+
+  it('no lanza si el cuerpo del 3xx ya está "errored" cuando se cancela (arreglo #2)', async () => {
+    // El caso real: la señal compartida de tiempo puede vencer entre que llegan los
+    // headers del 3xx y este `cancel()`, o la conexión se corta sola — el stream queda
+    // "errored" por su cuenta y `cancel()` sobre un stream así devuelve la promesa
+    // RECHAZADA con ese mismo error (WHATWG Streams). Antes de este arreglo ese rechazo
+    // salía por encima de `descargarSeguro`, que promete no lanzar nunca. El test de
+    // cancelación de arriba usa un stream sano, por eso no lo vio.
+    const fetchMock = vi.fn(async () => {
+      if (fetchMock.mock.calls.length === 1) {
+        const stream = new ReadableStream({
+          start(controller) {
+            controller.error(new Error('la conexión se cortó justo ahí'))
+          },
+        })
+        return new Response(stream, { status: 302, headers: { location: 'https://ej.com/final.pdf' } })
+      }
+      return new Response('ok', { status: 200 })
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    const response = await descargarSeguro('https://ej.com/redirige.pdf', 'la prueba')
+    // No lanzó, y siguió la redirección con normalidad: el rechazo del cancel() se
+    // sostiene adentro, no interrumpe la cadena.
+    expect(await response!.text()).toBe('ok')
   })
 
   it('rechaza un host interno antes de tocar la red', async () => {

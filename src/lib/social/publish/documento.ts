@@ -16,11 +16,22 @@ const TIPO = 'application/pdf'
  *
  * También devuelve `null`, sin lanzar, si `lector.read()` lanza a mitad del cuerpo: el
  * presupuesto de tiempo compartido de `descargarSeguro` puede vencer (`TimeoutError`)
- * después de que ya se leyeron algunos chunks, o la conexión puede cortarse sola.
+ * después de que ya se leyeron algunos chunks, o la conexión puede cortarse sola. Y
+ * devuelve `null` si el cuerpo está vacío, con o sin `body` (un 2xx sin contenido, o un
+ * stream que se cierra sin haber entregado nada): un PDF de 0 bytes no es un documento
+ * válido.
  */
-async function leerConTope(response: Response, tope: number): Promise<Blob | null> {
+async function leerConTope(response: Response, tope: number, url: string): Promise<Blob | null> {
   const cuerpo = response.body
-  if (!cuerpo) return new Blob([])
+  // Un 2xx sin cuerpo (p. ej. un 204, o un origen que declara `content-type:
+  // application/pdf` sin escribir nada) no es un PDF de 0 bytes válido: antes de este
+  // arreglo salía `ok: true` con un Blob vacío, y el comentarista recibía el enlace a un
+  // PDF de 0 bytes. La validación ocurre al programar, no al enviar — así que se
+  // rechaza acá, no cuando alguien comente la palabra.
+  if (!cuerpo) {
+    console.error('El documento: la respuesta no tiene cuerpo (2xx vacío):', url.slice(0, 200))
+    return null
+  }
   const lector = cuerpo.getReader()
   const partes: Buffer[] = []
   let total = 0
@@ -42,16 +53,30 @@ async function leerConTope(response: Response, tope: number): Promise<Blob | nul
     if (done) break
     total += value.byteLength
     if (total > tope) {
-      await lector.cancel()
+      // A diferencia del `catch` de arriba, acá el stream normalmente sigue "readable"
+      // — cancelamos nosotros, no algo que ya lo rompió. Pero puede que no: la señal de
+      // tiempo compartida de `descargarSeguro` puede vencer justo entre el último
+      // `read()` y este `cancel()`, dejando el stream "errored" antes de que lleguemos
+      // acá. `cancel()` sobre un stream así devuelve la promesa rechazada con ese mismo
+      // error (misma semántica que el comentario de arriba) — el `.catch` es lo que
+      // sostiene que esta función nunca lanza.
+      await lector.cancel().catch(() => {})
       return null
     }
     partes.push(Buffer.from(value))
+  }
+  if (total === 0) {
+    console.error('El documento: la respuesta llegó vacía:', url.slice(0, 200))
+    return null
   }
   // El tipo de lib.dom (`BlobPart`) exige un `ArrayBuffer`, no el `ArrayBufferLike` con
   // el que TS tipa genéricamente un `Buffer`/`Uint8Array`; en tiempo de ejecución estos
   // siempre son `ArrayBuffer` (los creó `Buffer.from`, nunca un `SharedArrayBuffer`).
   return new Blob(partes as BlobPart[])
 }
+
+/** Los cinco primeros bytes de un PDF real, sea cual sea su versión declarada. */
+const CABECERA_PDF = '%PDF-'
 
 /**
  * El PDF de una regla, copiado a R2. Devuelve su URL pública, o `null` si no se pudo —
@@ -83,9 +108,21 @@ export async function documentoToBlob(url: string): Promise<string | null> {
     console.error('El documento declara', declarado, 'bytes y el tope es', MAX_DOCUMENTO_BYTES)
     return null
   }
-  const blob = await leerConTope(response, MAX_DOCUMENTO_BYTES)
+  const blob = await leerConTope(response, MAX_DOCUMENTO_BYTES, url)
   if (!blob) {
-    console.error('El documento supera el tope de', MAX_DOCUMENTO_BYTES, 'bytes (streaming):', url.slice(0, 200))
+    // El motivo específico (cuerpo vacío, corte a mitad, tope superado por streaming)
+    // ya quedó registrado dentro de `leerConTope`; este solo dice que la fila se rechaza.
+    console.error('El documento: se rechazó el cuerpo descargado:', url.slice(0, 200))
+    return null
+  }
+  // El `content-type` es la cabecera que manda un tercero, y miente: la spec dice que
+  // atrapa la página intermedia de Drive, pero esa página también podría venir marcada
+  // `application/pdf` a mano. Los cinco primeros bytes son el propio archivo, no lo que
+  // alguien declaró sobre él — por eso se comprueban antes de guardar, no en vez del
+  // content-type de arriba (que sigue rechazando de una vez lo que ni se anuncia PDF).
+  const cabecera = Buffer.from(await blob.slice(0, CABECERA_PDF.length).arrayBuffer()).toString('latin1')
+  if (cabecera !== CABECERA_PDF) {
+    console.error('El documento no empieza con la cabecera de un PDF:', url.slice(0, 200))
     return null
   }
   try {

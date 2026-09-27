@@ -11,13 +11,23 @@
 const MAX_REDIRECCIONES = 5
 
 /**
- * El IPv4 dentro de una forma IPv6 mapeada (`::ffff:a.b.c.d`), o null si el host no
- * tiene esa forma. `new URL(...).hostname` normaliza `::ffff:127.0.0.1` a su forma
- * hexadecimal comprimida (`::ffff:7f00:1`) en vez de a la forma con puntos, así que hay
- * que deshacer eso antes de que `esHostInterno` pueda reconocerlo.
+ * El IPv4 dentro de una de las tres formas IPv6 que lo embeben, o null si el host no
+ * tiene ninguna. `new URL(...).hostname` normaliza cada una a hexadecimal comprimido en
+ * vez de a la forma con puntos, así que hay que deshacer eso antes de que
+ * `esHostInterno` pueda reconocerlas:
+ *
+ * - Mapeada (`::ffff:a.b.c.d` -> `::ffff:7f00:1`, RFC 4291): la forma que usa un
+ *   servidor dual-stack para representar a un cliente IPv4.
+ * - Traducida (`::ffff:0:a.b.c.d` -> `::ffff:0:7f00:1`, RFC 6052/NAT64): un grupo cero
+ *   de más antes del IPv4.
+ * - Compatible (`::a.b.c.d` -> `::7f00:1`, RFC 4291, obsoleta pero que `URL` sigue
+ *   aceptando y que algún kernel todavía enruta): sin el `ffff:` de las otras dos.
  */
 function ipv4DesdeIPv6Mapeada(host: string): string | null {
-  const grupos = /^::ffff:([0-9a-f]{1,4}):([0-9a-f]{1,4})$/i.exec(host)
+  const grupos =
+    /^::ffff:0:([0-9a-f]{1,4}):([0-9a-f]{1,4})$/i.exec(host) ?? // traducida
+    /^::ffff:([0-9a-f]{1,4}):([0-9a-f]{1,4})$/i.exec(host) ?? // mapeada
+    /^::([0-9a-f]{1,4}):([0-9a-f]{1,4})$/i.exec(host) // compatible
   if (!grupos) return null
   const alto = parseInt(grupos[1]!, 16)
   const bajo = parseInt(grupos[2]!, 16)
@@ -51,30 +61,43 @@ function normalizarHost(hostnameCrudo: string): string {
  * escapaban `0.0.0.0` y `[::]`, así que aquí va la lista completa en vez de una frase
  * que invite a asumir que ya está todo:
  *
- * - `localhost` y cualquier subdominio de `localhost`.
+ * - `localhost` y cualquier subdominio de `localhost`, y `localhost.localdomain` — ese
+ *   nombre está en `/etc/hosts` apuntando a `127.0.0.1` en varias distribuciones.
  * - Loopback: `127.0.0.0/8`, `::1`, y `0.0.0.0/8` — en Linux (donde corre esta función),
  *   conectar a una dirección `0.x.x.x` es, en la práctica, conectar a loopback.
  * - Sin especificar: `::` (`[::]`) — el equivalente IPv6 de `0.0.0.0`.
  * - Link-local: `169.254.0.0/16` (incluye la dirección de metadata de la nube,
  *   `169.254.169.254`) y `fe80::/10`.
  * - Privado: `10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`, y `fc00::/7` (ULA, el
- *   equivalente IPv6 de un rango privado).
+ *   equivalente IPv6 de un rango privado); y `fec0::/10` (site-local, obsoleta pero
+ *   todavía enrutable donde esté configurada).
+ * - CGNAT: `100.64.0.0/10` (RFC 6598) — incluye `100.100.100.200`, la metadata de
+ *   Alibaba Cloud.
+ * - Reservados que no deberían salir a la red pública: `192.0.0.0/24` (incluye
+ *   `192.0.0.192`, la metadata de Oracle Cloud), `240.0.0.0/4` (clase E) y
+ *   `255.255.255.255` (broadcast — ya cubierto por `240.0.0.0/4`, listado aparte porque
+ *   es la dirección que de verdad aparece en un `Location:` malicioso).
  */
 function esHostInterno(hostnameCrudo: string): boolean {
   const host = normalizarHost(hostnameCrudo)
   if (host === 'localhost' || host.endsWith('.localhost')) return true
+  if (host === 'localhost.localdomain') return true
   if (host === '::' || host === '::1') return true
   if (/^fe[89ab][0-9a-f]?:/.test(host)) return true // fe80::/10
+  if (/^fe[c-f][0-9a-f]?:/.test(host)) return true // fec0::/10 (site-local, obsoleta)
   if (/^f[cd][0-9a-f]{0,2}:/.test(host)) return true // fc00::/7 (ULA)
   const octetos = host.split('.')
   if (octetos.length === 4 && octetos.every((o) => /^\d{1,3}$/.test(o) && Number(o) <= 255)) {
-    const [a, b] = octetos.map(Number)
+    const [a, b, c] = octetos.map(Number)
     if (a === 0) return true // 0.0.0.0/8
     if (a === 127) return true // 127.0.0.0/8
     if (a === 169 && b === 254) return true // 169.254.0.0/16
     if (a === 10) return true // 10.0.0.0/8
+    if (a === 100 && b >= 64 && b <= 127) return true // 100.64.0.0/10 (CGNAT)
     if (a === 172 && b >= 16 && b <= 31) return true // 172.16.0.0/12
     if (a === 192 && b === 168) return true // 192.168.0.0/16
+    if (a === 192 && b === 0 && c === 0) return true // 192.0.0.0/24
+    if (a >= 240) return true // 240.0.0.0/4 (incluye 255.255.255.255)
   }
   return false
 }
@@ -136,8 +159,13 @@ export async function descargarSeguro(url: string, etiqueta: string): Promise<Re
     if (response.status >= 300 && response.status < 400) {
       const destino = response.headers.get('location')
       // El cuerpo de un 3xx no se necesita más allá del header: sin cancelarlo, el
-      // socket queda abierto en cada salto de la cadena.
-      await response.body?.cancel()
+      // socket queda abierto en cada salto de la cadena. El `.catch` es necesario y no
+      // decorativo: si el cuerpo ya quedó "errored" (la señal compartida venció justo
+      // entre los headers y este cancel), `cancel()` devuelve la promesa rechazada con
+      // ese mismo error — la misma semántica de streams que describe el comentario de
+      // `leerConTope` en `documento.ts`. Sin el `.catch`, ese rechazo salía por encima
+      // de esta función, que promete no lanzar nunca.
+      await response.body?.cancel().catch(() => {})
       if (!destino) {
         console.error(`${etiqueta}: redirección sin destino:`, actual.slice(0, 200))
         return null
