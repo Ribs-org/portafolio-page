@@ -26,6 +26,20 @@ export type ReglaLimpia = {
   documentoUrl: string | null
 }
 
+/**
+ * Las columnas de `reglasClave` que el editor del panel (`updateScheduledPost`, en
+ * `actions.ts`) sí administra. `documentoUrl` queda fuera a propósito: esa pantalla no
+ * tiene campo de documento y no lo va a tener en esta entrega, así que su `UPDATE` no
+ * puede nombrar esa columna — nombrarla la pisaría con `null` cada vez que el dueño solo
+ * cambia la hora o el texto, borrando el PDF de una regla creada por API. Vive acá y no
+ * en `actions.ts` porque ese archivo es `'use server'` y solo puede exportar funciones
+ * async: esto necesita ser una función pura para poder probarse sin simular la base.
+ */
+export function columnasEditablesDeRegla(regla: ReglaLimpia): Omit<ReglaLimpia, 'documentoUrl'> {
+  const { palabra, mensaje, respuestaPublica } = regla
+  return { palabra, mensaje, respuestaPublica }
+}
+
 function sinTildes(texto: string): string {
   return texto.normalize('NFD').replace(/[̀-ͯ]/g, '')
 }

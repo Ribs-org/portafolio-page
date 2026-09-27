@@ -6,11 +6,38 @@ import {
   REGLA_RESPUESTA,
   RESPUESTA_PUBLICA_POR_DEFECTO,
   coincide,
+  columnasEditablesDeRegla,
   decidirAutomatica,
   enlaceMedible,
   normalizarPalabra,
   validarRegla,
 } from './reglas'
+
+describe('columnasEditablesDeRegla', () => {
+  it('no incluye documentoUrl aunque la regla lo tenga: el editor del panel no lo administra', () => {
+    // El hallazgo más grave de la revisión: antes de este arreglo, `updateScheduledPost`
+    // esparcía la regla entera en el `set` de su `onConflictDoUpdate`, y ese spread
+    // pisaba `documentoUrl` con `null` cada vez que el dueño solo cambiaba la hora o el
+    // texto de un post programado por API con su PDF.
+    const regla = {
+      palabra: 'guia',
+      mensaje: 'Toma tu guía',
+      respuestaPublica: 'Te lo mandé por privado 📩',
+      documentoUrl: 'https://media.ejemplo.com/reglas/x.pdf',
+    }
+    expect(columnasEditablesDeRegla(regla)).toEqual({
+      palabra: 'guia',
+      mensaje: 'Toma tu guía',
+      respuestaPublica: 'Te lo mandé por privado 📩',
+    })
+    expect(columnasEditablesDeRegla(regla)).not.toHaveProperty('documentoUrl')
+  })
+
+  it('con documentoUrl null (regla sin documento), el resultado es igual', () => {
+    const regla = { palabra: 'guia', mensaje: 'm', respuestaPublica: 'r', documentoUrl: null }
+    expect(columnasEditablesDeRegla(regla)).toEqual({ palabra: 'guia', mensaje: 'm', respuestaPublica: 'r' })
+  })
+})
 
 describe('normalizarPalabra', () => {
   it('minúsculas, sin tildes, sin espacios alrededor', () => {
