@@ -428,6 +428,22 @@ export async function scheduleBatch(ownerId: string, items: BatchItem[]): Promis
         continue
       }
 
+      // Todavía antes de subir nada: `validarRegla` es pura y `validateBatchItem` ya la
+      // corrió, así que la forma de `documentoUrl` está garantizada; lo que falta es
+      // traer el archivo de verdad. Va acá, junto a los demás rechazos tempranos, y no
+      // más abajo (después del bucle que sube la media) porque el PDF pesa hasta 25 MB
+      // y la media de la fila puede pesar cientos de veces más — una fila que de todos
+      // modos se va a rechazar no debe pagar esa subida primero.
+      const reglaCheck = validarRegla(item.regla)
+      let documentoUrl: string | null = null
+      if (!('error' in reglaCheck) && reglaCheck.regla?.documentoUrl) {
+        documentoUrl = await documentoToBlob(reglaCheck.regla.documentoUrl)
+        if (!documentoUrl) {
+          results.push({ index, ok: false, error: REGLA_DOCUMENTO })
+          continue
+        }
+      }
+
       const uploaded: Array<{ url: string; mediaType: 'image' | 'video' }> = []
       let mediaFailed = false
       for (const url of item.media) {
@@ -487,18 +503,6 @@ export async function scheduleBatch(ownerId: string, items: BatchItem[]): Promis
 
       const atributosCheck = validateAtributos(item.atributos)
       const atributos = 'error' in atributosCheck ? null : atributosCheck.atributos
-      const reglaCheck = validarRegla(item.regla)
-
-      // Antes de escribir la regla: un documento que no se puede traer rechaza la fila
-      // acá, no días después cuando alguien comente y el enlace apunte a nada.
-      let documentoUrl: string | null = null
-      if (!('error' in reglaCheck) && reglaCheck.regla?.documentoUrl) {
-        documentoUrl = await documentoToBlob(reglaCheck.regla.documentoUrl)
-        if (!documentoUrl) {
-          results.push({ index, ok: false, error: REGLA_DOCUMENTO })
-          continue
-        }
-      }
 
       const [post] = await db
         .insert(scheduledPosts)

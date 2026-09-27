@@ -10,6 +10,7 @@ import {
   opcionesClaveDuplicada,
   opcionesDeFila,
   mediaToBlob,
+  scheduleBatch,
   PORTADA_NEEDS_VIDEO,
   PORTADA_NOT_IMAGE,
   PORTADA_FORMAT,
@@ -20,6 +21,7 @@ import { TIKTOK_SIN_PRIVACIDAD, OPCIONES_ERROR } from './opciones'
 import { TIKTOK_MEDIA } from './validate'
 import { REGLA_PALABRA, REGLA_MENSAJE, REGLA_DOCUMENTO } from '../comentarios/reglas'
 import type { CuentaDestino } from '../cuentas'
+import { reglasClave } from '@/db'
 
 // `mediaToBlob` sube con `guardar`; sin precedente en el repo para simularlo, resuelto
 // igual que en `documento.test.ts` — lo que importa es la clave y el content-type con la
@@ -27,6 +29,49 @@ import type { CuentaDestino } from '../cuentas'
 const guardarMock = vi.fn(async (...args: [key: string, body: Blob, contentType: string]) => `https://media.ej.cl/${args[0]}`)
 vi.mock('@/lib/storage', () => ({
   guardar: (key: string, body: Blob, contentType: string) => guardarMock(key, body, contentType),
+}))
+
+// scheduleBatch es la única función de este archivo que toca la base: se mockea `@/db`
+// (patrón de `automatico.test.ts` y `storage-gc.test.ts`, con `importOriginal` para
+// conservar las tablas reales) anotando cada `insert` — tabla y valores — en `inserts`,
+// para poder afirmar tanto que una fila rechazada no escribe nada como qué URL llegó al
+// insert de `reglasClave`.
+const { inserts } = vi.hoisted(() => ({ inserts: [] as Array<{ tabla: unknown; valores: unknown }> }))
+vi.mock('@/db', async (importOriginal) => {
+  const real = await importOriginal<typeof import('@/db')>()
+  return {
+    ...real,
+    getDb: () => ({
+      insert: (tabla: unknown) => ({
+        values: (valores: unknown) => {
+          inserts.push({ tabla, valores })
+          return { returning: async () => [{ id: 'post-1' }] }
+        },
+      }),
+    }),
+  }
+})
+
+// `verificarCuentas`/`cuentaUnicaPorRed` van a la base por su cuenta (`cuentas.ts`); se
+// mockean para que `scheduleBatch` reciba un destino fijo sin pasar por `getDb()`, que
+// arriba solo sabe responder a `insert`.
+vi.mock('../cuentas', async (importOriginal) => {
+  const real = await importOriginal<typeof import('../cuentas')>()
+  return {
+    ...real,
+    verificarCuentas: vi.fn(async () => []),
+    cuentaUnicaPorRed: vi.fn(
+      async () => new Map([['threads', { id: 'threads-1', network: 'threads', handle: 'demo' }]]),
+    ),
+  }
+})
+
+// `documentoToBlob` es la puerta de esta tarea: se mockea para decidir, por test, si el
+// documento se pudo traer o no, sin tocar la red de verdad (esa protección la prueba
+// `documento.test.ts`).
+const documentoToBlobMock = vi.fn()
+vi.mock('./documento', () => ({
+  documentoToBlob: (url: string): Promise<string | null> => documentoToBlobMock(url),
 }))
 
 const now = new Date('2026-09-02T12:00:00Z')
@@ -393,5 +438,57 @@ describe('regla de palabra clave en el lote', () => {
 
   it('una regla sin documentoUrl sigue siendo válida', () => {
     expect(validateBatchItem({ ...base, regla: { palabra: 'GUIA', mensaje: 'x' } }, now)).toBeNull()
+  })
+})
+
+// scheduleBatch: la integración de esta tarea, no las funciones puras de arriba. Fecha
+// bien en el futuro porque `scheduleBatch` calcula `now` con `new Date()` real, no con el
+// `now` fijo del resto del archivo.
+describe('scheduleBatch — el documento antes de escribir la regla, y antes de subir nada', () => {
+  const itemConMedia: BatchItem = {
+    fecha: '2030-01-01 10:00',
+    texto: 'Hola',
+    cuentas: [],
+    redes: ['threads'],
+    media: ['https://ej.com/a.mp4'],
+    regla: { palabra: 'GUIA', mensaje: 'Toma', documentoUrl: 'https://origen.ej.com/g.pdf' },
+  }
+
+  afterEach(() => {
+    vi.unstubAllGlobals()
+    inserts.length = 0
+    guardarMock.mockClear()
+    documentoToBlobMock.mockReset()
+  })
+
+  it('un documento que no se puede traer rechaza la fila con REGLA_DOCUMENTO y no escribe nada', async () => {
+    documentoToBlobMock.mockResolvedValue(null)
+    // Si el orden se rompiera y la media se subiera antes del documento, esto lanzaría:
+    // la prueba de que no se llegó a tocar la red por la media, no solo que el resultado
+    // final sea null.
+    const fetchMock = vi.fn(async () => {
+      throw new Error('no debía tocar la red para la media de esta fila')
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    const resultados = await scheduleBatch('owner-1', [itemConMedia])
+
+    expect(resultados).toEqual([{ index: 0, ok: false, error: REGLA_DOCUMENTO }])
+    expect(inserts).toEqual([])
+    expect(fetchMock).not.toHaveBeenCalled()
+    expect(guardarMock).not.toHaveBeenCalled()
+  })
+
+  it('un documento que sí se trae guarda en reglasClave la URL de R2, no la del que llamó', async () => {
+    documentoToBlobMock.mockResolvedValue('https://media.ej.cl/reglas/xyz.pdf')
+    const item: BatchItem = { ...itemConMedia, media: [] }
+
+    const resultados = await scheduleBatch('owner-1', [item])
+
+    expect(resultados).toEqual([{ index: 0, ok: true, postId: 'post-1' }])
+    const reglaInsert = inserts.find((i) => i.tabla === reglasClave)
+    const valores = reglaInsert?.valores as { documentoUrl: string | null } | undefined
+    expect(valores?.documentoUrl).toBe('https://media.ej.cl/reglas/xyz.pdf')
+    expect(valores?.documentoUrl).not.toBe('https://origen.ej.com/g.pdf')
   })
 })
