@@ -220,6 +220,31 @@ copias pueden divergir sin que nada lo note. Cerrarlo pide que `crearPostProgram
 portada y atributos, o que `batch.ts` la llame para escribir destinos y solo haga sus
 propios `insert` para lo que le es propio.
 
+## `crearPostProgramado` no copia el documento de una regla
+
+**Abierto desde 2026-09-27.**
+
+`reglas_clave.documento_url` tiene que guardar una URL **nuestra**, ya copiada a R2. El
+lote lo hace: `scheduleBatch` (`src/lib/social/publish/batch.ts`) llama a
+`documentoToBlob` antes de escribir la regla, y si el PDF no se puede traer rechaza la
+fila. El otro camino que crea publicaciones, `crearPostProgramado`
+(`src/lib/social/publish/crear.ts`), inserta `...input.regla` completo — así que un
+`documentoUrl` que le llegara quedaría guardado **tal cual, apuntando al servidor de un
+tercero**.
+
+Hoy no hay ningún llamador que pueda hacerlo: el compositor del panel solo arma la regla
+con palabra, mensaje y respuesta (`reglaDesdeFormulario`, en `src/app/admin/actions.ts`), y
+la ruta del teléfono no le pasa `regla`. Se dejó así porque esta entrega es «todo por API» y
+tocar el camino del compositor no le hacía falta.
+
+El costo es que es una trampa para el siguiente, no un fallo de hoy: el tipo `ReglaLimpia` es
+compartido y ya tiene el campo, así que el día que alguien ponga un campo de documento en el
+formulario del panel, reusar `crearPostProgramado` guarda la URL ajena sin que nada avise. El
+enlace moriría cuando el tercero borre su archivo, y el barrido de R2 no protegería nada,
+porque no habría ningún objeto nuestro que proteger. Cerrarlo pide que `crearPostProgramado`
+copie el documento como hace el lote, o que rechace una regla que traiga `documentoUrl` en vez
+de guardarla a medias.
+
 ## Los `insert` del lote no van en transacción
 
 **Abierto, anterior a esta entrega.**
