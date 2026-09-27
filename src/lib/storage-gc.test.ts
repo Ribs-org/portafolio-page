@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { GRACIA_MS, keysReferenciadas, objetosABorrar } from './storage-gc'
+import { COLUMNAS_DE_ARCHIVO, GRACIA_MS, keysReferenciadas, objetosABorrar } from './storage-gc'
 import type { ObjetoAlmacenado } from './storage'
 
 const BASE = 'https://media.ejemplo.com'
@@ -10,6 +10,25 @@ const RECIEN = new Date(AHORA.getTime() - 5 * 60 * 1000) // 5 minutos
 function obj(nombre: string, uploadedAt: Date, size = 100): ObjetoAlmacenado {
   return { key: `scheduled/${nombre}`, url: `${BASE}/scheduled/${nombre}`, size, uploadedAt }
 }
+
+describe('COLUMNAS_DE_ARCHIVO', () => {
+  it('la lista de columnas de archivo cubre las seis que hay', () => {
+    // Una lista escrita a mano envejece: el día que alguien agregue una columna que guarde
+    // una URL nuestra y olvide registrarla, sus archivos se borran solos y nadie se entera
+    // hasta que un enlace da 404. Este test es lo que obliga a tocar las dos cosas juntas.
+    const nombres = COLUMNAS_DE_ARCHIVO.map((c) => `${c.tabla}.${c.columna}`).sort()
+    expect(nombres).toEqual(
+      [
+        'links.image_url',
+        'profiles.avatar_url',
+        'profiles.og_image_url',
+        'reglas_clave.documento_url',
+        'scheduled_post_media.blob_url',
+        'scheduled_posts.cover_url',
+      ].sort(),
+    )
+  })
+})
 
 describe('objetosABorrar', () => {
   it('borra lo huérfano y viejo', () => {
