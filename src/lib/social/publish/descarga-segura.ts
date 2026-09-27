@@ -112,7 +112,8 @@ export function hostPermitido(url: string): boolean {
  * `etiqueta` nombra lo que se descarga en los mensajes de log ("el documento", "la
  * media del lote"), para que cada archivo que llama vea su propia frase. Nunca lanza:
  * devuelve `null` ante cualquier fallo (esquema o host prohibido, red caída, demasiadas
- * redirecciones, respuesta no-ok), con el motivo ya registrado.
+ * redirecciones, respuesta no-ok, destino de redirección imposible de parsear), con el
+ * motivo ya registrado.
  */
 export async function descargarSeguro(url: string, etiqueta: string): Promise<Response | null> {
   let actual = url
@@ -141,7 +142,21 @@ export async function descargarSeguro(url: string, etiqueta: string): Promise<Re
         console.error(`${etiqueta}: redirección sin destino:`, actual.slice(0, 200))
         return null
       }
-      actual = new URL(destino, actual).toString()
+      // El origen es de un tercero: `Location:` puede traer cualquier cosa, incluida
+      // una que `URL` no sepa parsear (`http://[` basta). Se envuelve solo esta línea,
+      // no el resto del bucle, para no tragarse un fallo de otra naturaleza.
+      let siguiente: string
+      try {
+        siguiente = new URL(destino, actual).toString()
+      } catch (error) {
+        console.error(
+          `${etiqueta}: destino de redirección imposible de parsear:`,
+          String(error).slice(0, 200),
+          destino.slice(0, 200),
+        )
+        return null
+      }
+      actual = siguiente
       continue
     }
     if (!response.ok) {

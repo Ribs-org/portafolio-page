@@ -159,4 +159,17 @@ describe('descargarSeguro', () => {
     vi.stubGlobal('fetch', vi.fn(async () => { throw new Error('dns') }))
     expect(await descargarSeguro('https://ej.com/inalcanzable.pdf', 'la prueba')).toBeNull()
   })
+
+  it('devuelve null si el destino de la redirección no se puede parsear, sin lanzar', async () => {
+    // El origen es de un tercero: manda lo que quiera en `Location:`. `http://[` es
+    // sintácticamente un IPv6 sin cerrar — `new URL()` lanza `TypeError` al intentar
+    // parsearlo, y antes de este arreglo esa excepción salía por encima de esta función.
+    const fetchMock = vi.fn(async () =>
+      new Response(null, { status: 302, headers: { location: 'http://[' } }),
+    )
+    vi.stubGlobal('fetch', fetchMock)
+    expect(await descargarSeguro('https://ej.com/redirige.pdf', 'la prueba')).toBeNull()
+    // No hay segundo salto: el destino ni siquiera llegó a convertirse en una URL.
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
 })

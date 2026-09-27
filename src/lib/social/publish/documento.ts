@@ -13,6 +13,10 @@ const TIPO = 'application/pdf'
  * origen que sirve 500 MB los sirve igual aunque la fila termine rechazada; en una
  * función serverless eso es memoria contra el límite del proceso, no solo bytes de más
  * en el almacén.
+ *
+ * También devuelve `null`, sin lanzar, si `lector.read()` lanza a mitad del cuerpo: el
+ * presupuesto de tiempo compartido de `descargarSeguro` puede vencer (`TimeoutError`)
+ * después de que ya se leyeron algunos chunks, o la conexión puede cortarse sola.
  */
 async function leerConTope(response: Response, tope: number): Promise<Blob | null> {
   const cuerpo = response.body
@@ -21,7 +25,20 @@ async function leerConTope(response: Response, tope: number): Promise<Blob | nul
   const partes: Buffer[] = []
   let total = 0
   while (true) {
-    const { done, value } = await lector.read()
+    let resultado: ReadableStreamReadResult<Uint8Array>
+    try {
+      resultado = await lector.read()
+    } catch (error) {
+      // No hace falta `lector.cancel()` acá: cuando `read()` lanza, el stream ya quedó
+      // en estado "errored" por su cuenta (fue el timeout o el corte de red lo que lo
+      // dejó así) y el socket ya se cerró como parte de ese error, no como consecuencia
+      // de algo que hagamos después. Cancelar un stream ya "errored" solo repite la
+      // misma excepción (WHATWG Streams: `ReadableStreamCancel` devuelve la promesa
+      // rechazada con el mismo `storedError`), no libera nada nuevo.
+      console.error('El documento: la descarga se cortó a mitad del cuerpo:', String(error).slice(0, 200))
+      return null
+    }
+    const { done, value } = resultado
     if (done) break
     total += value.byteLength
     if (total > tope) {
@@ -71,5 +88,10 @@ export async function documentoToBlob(url: string): Promise<string | null> {
     console.error('El documento supera el tope de', MAX_DOCUMENTO_BYTES, 'bytes (streaming):', url.slice(0, 200))
     return null
   }
-  return guardar(`reglas/${randomUUID()}.pdf`, blob, TIPO)
+  try {
+    return await guardar(`reglas/${randomUUID()}.pdf`, blob, TIPO)
+  } catch (error) {
+    console.error('El documento: no se pudo guardar en el almacén:', String(error).slice(0, 200))
+    return null
+  }
 }

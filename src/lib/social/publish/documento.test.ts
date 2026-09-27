@@ -150,4 +150,33 @@ describe('documentoToBlob', () => {
     // Si esto fuera 2, se habría llegado a pedir la dirección de metadata.
     expect(fetchMock).toHaveBeenCalledTimes(1)
   })
+
+  it('devuelve null si el cuerpo se corta a mitad de la descarga, sin lanzar', async () => {
+    // Un stream que entrega un chunk y luego falla: mismo efecto que un `TimeoutError`
+    // a mitad del cuerpo o una conexión que se cae, sin servidor real ni temporizadores.
+    let llamadasAPull = 0
+    const cuerpo = new ReadableStream<Uint8Array>({
+      pull(controller) {
+        llamadasAPull++
+        if (llamadasAPull === 1) {
+          controller.enqueue(new Uint8Array([1, 2, 3]))
+        } else {
+          controller.error(new Error('la conexión se cortó'))
+        }
+      },
+    })
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => new Response(cuerpo, { status: 200, headers: { 'content-type': 'application/pdf' } })),
+    )
+    expect(await documentoToBlob('https://ej.com/se-corta.pdf')).toBeNull()
+    expect(guardarMock).not.toHaveBeenCalled()
+  })
+
+  it('devuelve null si guardar (R2) falla, sin lanzar', async () => {
+    stubPdf(1024)
+    guardarMock.mockRejectedValueOnce(new Error('credencial vencida'))
+    expect(await documentoToBlob('https://ej.com/g.pdf')).toBeNull()
+    expect(guardarMock).toHaveBeenCalledTimes(1)
+  })
 })
