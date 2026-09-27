@@ -147,7 +147,13 @@ export function decidirAutomatica(entrada: {
   if (entrada.esPropio) return { accion: 'ignorar' }
   if (!coincide(entrada.texto, entrada.regla.palabra)) return { accion: 'ignorar' }
 
-  const mensaje = enlaceMedible(entrada.regla.mensaje, entrada.regla.palabra, entrada.sitioHost)
+  // El documento va DESPUÉS del texto del dueño, y por eso `enlaceMedible` se aplica
+  // antes de añadirlo: esa función etiqueta solo el primer enlace del mensaje que apunte
+  // al sitio, así que un documento por delante le robaría la etiqueta al enlace que el
+  // dueño escribió. El del documento no se etiqueta nunca —vive en el subdominio de R2 y
+  // la analítica no lo ve— y eso está decidido en la spec, no olvidado.
+  const texto = enlaceMedible(entrada.regla.mensaje, entrada.regla.palabra, entrada.sitioHost)
+  const mensaje = entrada.regla.documentoUrl ? `${texto}\n\n${entrada.regla.documentoUrl}` : texto
   const dentroDelPlazo = entrada.now.getTime() - entrada.publishedAt.getTime() < DIAS_PRIVADO * 864e5
   const hayPrivado =
     entrada.privadoEncendido && REDES_CON_PRIVADO.has(entrada.network) && dentroDelPlazo

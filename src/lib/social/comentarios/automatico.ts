@@ -33,6 +33,7 @@ export async function reglasPara(accountId: string, postExternalIds: string[]): 
       palabra: reglasClave.palabra,
       mensaje: reglasClave.mensaje,
       respuestaPublica: reglasClave.respuestaPublica,
+      documentoUrl: reglasClave.documentoUrl,
     })
     .from(reglasClave)
     .innerJoin(scheduledPostTargets, eq(scheduledPostTargets.postId, reglasClave.postId))
@@ -40,9 +41,13 @@ export async function reglasPara(accountId: string, postExternalIds: string[]): 
       and(eq(scheduledPostTargets.accountId, accountId), inArray(scheduledPostTargets.externalId, postExternalIds)),
     )
   for (const f of filas) {
-    // documentoUrl: null hasta que el select de arriba traiga la columna (Tarea 4).
     if (f.externalId)
-      mapa.set(f.externalId, { palabra: f.palabra, mensaje: f.mensaje, respuestaPublica: f.respuestaPublica, documentoUrl: null })
+      mapa.set(f.externalId, {
+        palabra: f.palabra,
+        mensaje: f.mensaje,
+        respuestaPublica: f.respuestaPublica,
+        documentoUrl: f.documentoUrl,
+      })
   }
   return mapa
 }
@@ -60,14 +65,19 @@ export async function reglasDeCuenta(accountId: string): Promise<Map<string, Reg
       palabra: reglasClave.palabra,
       mensaje: reglasClave.mensaje,
       respuestaPublica: reglasClave.respuestaPublica,
+      documentoUrl: reglasClave.documentoUrl,
     })
     .from(reglasClave)
     .innerJoin(scheduledPostTargets, eq(scheduledPostTargets.postId, reglasClave.postId))
     .where(and(eq(scheduledPostTargets.accountId, accountId), isNotNull(scheduledPostTargets.externalId)))
   for (const f of filas) {
-    // documentoUrl: null por el mismo motivo que en reglasPara (Tarea 4 trae la columna).
     if (f.externalId)
-      mapa.set(f.externalId, { palabra: f.palabra, mensaje: f.mensaje, respuestaPublica: f.respuestaPublica, documentoUrl: null })
+      mapa.set(f.externalId, {
+        palabra: f.palabra,
+        mensaje: f.mensaje,
+        respuestaPublica: f.respuestaPublica,
+        documentoUrl: f.documentoUrl,
+      })
   }
   return mapa
 }

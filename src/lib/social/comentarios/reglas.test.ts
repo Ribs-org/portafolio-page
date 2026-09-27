@@ -216,4 +216,89 @@ describe('decidirAutomatica', () => {
     expect(decidirAutomatica({ ...base, network: 'youtube' })).toEqual(publicoConEnlace)
     expect(decidirAutomatica({ ...base, publishedAt: new Date('2026-09-08T11:00:00Z') })).toEqual(publicoConEnlace)
   })
+
+  it('añade el enlace del documento al final del mensaje', () => {
+    const plan = decidirAutomatica({
+      texto: 'quiero la GUIA',
+      esPropio: false,
+      yaRecibioPrivado: false,
+      network: 'instagram',
+      publishedAt: new Date('2026-09-26T10:00:00Z'),
+      now: new Date('2026-09-26T11:00:00Z'),
+      privadoEncendido: true,
+      regla: {
+        palabra: 'guia',
+        mensaje: 'Acá va 👇',
+        respuestaPublica: 'Te lo mandé 📩',
+        documentoUrl: 'https://media.ej.cl/reglas/abc.pdf',
+      },
+      sitioHost: 'ej.cl',
+    })
+    expect(plan.accion).toBe('responder')
+    if (plan.accion !== 'responder') return
+    expect(plan.privado).toContain('https://media.ej.cl/reglas/abc.pdf')
+  })
+
+  it('el enlace del dueño conserva su etiqueta: el documento va después', () => {
+    // `enlaceMedible` etiqueta SOLO el primer enlace del mensaje que apunte al sitio. Si
+    // el documento fuera primero, le robaría la etiqueta al enlace que el dueño escribió y
+    // el dueño perdería la medición que hoy tiene.
+    const plan = decidirAutomatica({
+      texto: 'GUIA',
+      esPropio: false,
+      yaRecibioPrivado: false,
+      network: 'instagram',
+      publishedAt: new Date('2026-09-26T10:00:00Z'),
+      now: new Date('2026-09-26T11:00:00Z'),
+      privadoEncendido: true,
+      regla: {
+        palabra: 'guia',
+        mensaje: 'Mira https://ej.cl/curso',
+        respuestaPublica: 'ok',
+        documentoUrl: 'https://media.ej.cl/reglas/abc.pdf',
+      },
+      sitioHost: 'ej.cl',
+    })
+    if (plan.accion !== 'responder') return
+    expect(plan.privado).toContain('https://ej.cl/curso?s=dm-guia')
+    expect(plan.privado!.indexOf('ej.cl/curso')).toBeLessThan(plan.privado!.indexOf('reglas/abc.pdf'))
+  })
+
+  it('sin documento, el mensaje queda igual que hoy', () => {
+    const plan = decidirAutomatica({
+      texto: 'GUIA',
+      esPropio: false,
+      yaRecibioPrivado: false,
+      network: 'instagram',
+      publishedAt: new Date('2026-09-26T10:00:00Z'),
+      now: new Date('2026-09-26T11:00:00Z'),
+      privadoEncendido: true,
+      regla: { palabra: 'guia', mensaje: 'Acá va', respuestaPublica: 'ok', documentoUrl: null },
+      sitioHost: 'ej.cl',
+    })
+    if (plan.accion !== 'responder') return
+    expect(plan.privado).toBe('Acá va')
+  })
+
+  it('y cuando no hay privado, el enlace va en la respuesta pública', () => {
+    // Es lo que hace que esta entrega sirva antes de que Meta apruebe el privado.
+    const plan = decidirAutomatica({
+      texto: 'GUIA',
+      esPropio: false,
+      yaRecibioPrivado: false,
+      network: 'instagram',
+      publishedAt: new Date('2026-09-26T10:00:00Z'),
+      now: new Date('2026-09-26T11:00:00Z'),
+      privadoEncendido: false,
+      regla: {
+        palabra: 'guia',
+        mensaje: 'Acá va',
+        respuestaPublica: 'ok',
+        documentoUrl: 'https://media.ej.cl/reglas/abc.pdf',
+      },
+      sitioHost: 'ej.cl',
+    })
+    if (plan.accion !== 'responder') return
+    expect(plan.publico).toContain('reglas/abc.pdf')
+  })
 })
