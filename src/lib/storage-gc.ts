@@ -68,7 +68,7 @@ export const COLUMNAS_DE_ARCHIVO = [
   { tabla: 'reglas_clave', columna: 'documento_url', ref: reglasClave.documentoUrl },
 ] as const
 
-async function urlsReferenciadas(): Promise<Set<string>> {
+export async function urlsReferenciadas(): Promise<Set<string>> {
   // A propósito sin dueño: el bucket es uno solo, así que lo referenciado por cualquier
   // usuario protege el archivo. Filtrar por dueño aquí borraría los archivos de los demás.
   const db = getDb()

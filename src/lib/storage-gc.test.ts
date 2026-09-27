@@ -1,8 +1,31 @@
-import { describe, expect, it } from 'vitest'
-import { COLUMNAS_DE_ARCHIVO, GRACIA_MS, keysReferenciadas, objetosABorrar } from './storage-gc'
+import { describe, expect, it, vi } from 'vitest'
+import { getTableName } from 'drizzle-orm'
+import { COLUMNAS_DE_ARCHIVO, GRACIA_MS, keysReferenciadas, objetosABorrar, urlsReferenciadas } from './storage-gc'
 import type { ObjetoAlmacenado } from './storage'
 
 const BASE = 'https://media.ejemplo.com'
+
+// `urlsReferenciadas` es la única parte del barrido que habla con la base, y es la que
+// decide qué archivo sobrevive: una consulta que lee de la tabla equivocada devuelve cero
+// referencias y el barrido borra lo que no debía. No hace falta una base para probarla —
+// basta un `getDb` que anote contra qué tabla se corrió cada consulta y devuelva una fila.
+const { tablasConsultadas } = vi.hoisted(() => ({ tablasConsultadas: [] as unknown[] }))
+
+vi.mock('@/db', async (original) => {
+  const real = await original<typeof import('@/db')>()
+  return {
+    ...real,
+    getDb: () => ({
+      select: () => ({
+        from: (tabla: unknown) => {
+          tablasConsultadas.push(tabla)
+          return Promise.resolve([{ valor: `${BASE}/scheduled/${tablasConsultadas.length}.bin` }])
+        },
+      }),
+    }),
+  }
+})
+
 const AHORA = new Date('2026-09-07T12:00:00Z')
 const VIEJO = new Date(AHORA.getTime() - 3 * 60 * 60 * 1000) // 3 horas
 const RECIEN = new Date(AHORA.getTime() - 5 * 60 * 1000) // 5 minutos
@@ -122,5 +145,24 @@ describe('objetosABorrar + keysReferenciadas: un cambio de base no vacía el buc
     const urls = new Set([`${BASE}/scheduled/vivo.mp4`, 'https://scontent.cdninstagram.com/v/foto.jpg'])
     const referenciadas = keysReferenciadas(urls, BASE)
     expect(objetosABorrar([protegido, huerfano], referenciadas, AHORA)).toEqual([huerfano])
+  })
+})
+
+describe('urlsReferenciadas', () => {
+  it('consulta las seis tablas de la lista y recoge el valor de cada una', async () => {
+    // La lista dejó de estar *al lado* de las consultas: ahora las genera, con la tabla
+    // sacada de `c.ref.table`. Eso quita el riesgo de que lista y consultas se
+    // desincronicen, y pone otro en su lugar: una entrada cuya `ref` no pertenezca a la
+    // tabla que dice su etiqueta haría que el barrido lea donde no hay nada. Con cero
+    // referencias encontradas la guarda de `objetosABorrar` salva el bucket entero, pero
+    // un solo grupo mal leído no la activa: se borran los archivos de esa tabla y nadie se
+    // entera hasta que un enlace da 404.
+    tablasConsultadas.length = 0
+    const urls = await urlsReferenciadas()
+    expect(tablasConsultadas.map((t) => getTableName(t as never)).sort()).toEqual(
+      COLUMNAS_DE_ARCHIVO.map((c) => c.tabla).sort(),
+    )
+    // Y que ninguna se pierda por el camino: seis consultas, seis URLs en el conjunto.
+    expect(urls.size).toBe(COLUMNAS_DE_ARCHIVO.length)
   })
 })
