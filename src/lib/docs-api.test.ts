@@ -10,6 +10,7 @@ import {
   REGLA_PALABRA,
   REGLA_RESPUESTA,
 } from './social/comentarios/reglas'
+import { MAX_BATCH_ITEMS } from './social/publish/batch'
 
 // Estas tres pruebas son la reja que impide que `public/docs/api.json` y
 // `public/docs/api-llm.md` —la documentación para un LLM que llama a la API a ciegas—
@@ -26,6 +27,9 @@ describe('la documentación para LLM no le miente al código', () => {
 
   it('cada límite del esquema es el que el validador aplica', () => {
     const esquema = JSON.parse(readFileSync('public/docs/api.json', 'utf8'))
+    // El tope de filas por lote también: la guía lo dice en su tabla de errores («Máximo 50
+    // posts por lote»), así que si la constante cambiara y el esquema no, el documento miente.
+    expect(esquema.properties.posts.maxItems).toBe(MAX_BATCH_ITEMS)
     const regla = esquema.properties.posts.items.properties.regla.properties
     expect(regla.palabra.maxLength).toBe(MAX_PALABRA)
     expect(regla.mensaje.maxLength).toBe(MAX_MENSAJE)

@@ -61,10 +61,9 @@ descarga falla o el archivo no es un PDF de hasta 25 MB, la fila entera se recha
 no tres días después dentro de un cron. `mensaje` es obligatorio junto con `palabra`;
 `documentoUrl` es opcional.
 
-**Qué pasa hoy cuando alguien comenta la palabra**, y por qué importa el orden de las
-palabras: el enlace del respuesta con el PDF sale como **respuesta pública** al comentario, no
-por mensaje privado. Ver la sección 5, «Lo que Meta no permite», para el porqué y para lo que
-cambia cuando el privado se encienda.
+**Qué pasa hoy cuando alguien comenta la palabra:** el mensaje con el enlace del PDF sale
+como **respuesta pública** al comentario, no por mensaje privado. Ver la sección 5, «Lo que
+Meta no permite», para el porqué y para lo que cambia cuando el privado se encienda.
 
 ## 3. Frases de error literales
 
