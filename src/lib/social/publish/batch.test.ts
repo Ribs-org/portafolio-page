@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   mediaTypeFromUrl,
   tipoArchivo,
@@ -9,6 +9,7 @@ import {
   opcionesClaveAmbigua,
   opcionesClaveDuplicada,
   opcionesDeFila,
+  mediaToBlob,
   PORTADA_NEEDS_VIDEO,
   PORTADA_NOT_IMAGE,
   PORTADA_FORMAT,
@@ -19,6 +20,14 @@ import { TIKTOK_SIN_PRIVACIDAD, OPCIONES_ERROR } from './opciones'
 import { TIKTOK_MEDIA } from './validate'
 import { REGLA_PALABRA, REGLA_MENSAJE } from '../comentarios/reglas'
 import type { CuentaDestino } from '../cuentas'
+
+// `mediaToBlob` sube con `guardar`; sin precedente en el repo para simularlo, resuelto
+// igual que en `documento.test.ts` — lo que importa es la clave y el content-type con la
+// que se llama, no solo que devuelva algo.
+const guardarMock = vi.fn(async (...args: [key: string, body: Blob, contentType: string]) => `https://media.ej.cl/${args[0]}`)
+vi.mock('@/lib/storage', () => ({
+  guardar: (key: string, body: Blob, contentType: string) => guardarMock(key, body, contentType),
+}))
 
 const now = new Date('2026-09-02T12:00:00Z')
 const base: BatchItem = {
@@ -214,6 +223,44 @@ describe('typeFromContentType', () => {
     expect(typeFromContentType('application/pdf')).toBeNull()
     expect(typeFromContentType('text/html; charset=utf-8')).toBeNull()
     expect(typeFromContentType('')).toBeNull()
+  })
+})
+
+describe('mediaToBlob', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals()
+    guardarMock.mockClear()
+  })
+
+  it('descarga, sube a R2 y devuelve su URL y tipo', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => new Response(new Uint8Array([1, 2, 3]), { status: 200, headers: { 'content-type': 'image/jpeg' } })),
+    )
+    const stored = await mediaToBlob('https://ej.com/foto.jpg', 'image')
+    expect(stored?.mediaType).toBe('image')
+    expect(guardarMock).toHaveBeenCalledTimes(1)
+    const [key, , contentType] = guardarMock.mock.calls[0]!
+    expect(key).toMatch(/^scheduled\/[0-9a-f-]{36}\.jpg$/)
+    expect(contentType).toBe('image/jpeg')
+    expect(stored?.url).toBe(`https://media.ej.cl/${key}`)
+  })
+
+  it('rechaza un host de red interna antes de tocar la red', async () => {
+    // Mismo hueco que documentoToBlob (documento.ts): esta media de terceros también la
+    // pide el servidor con una URL que trae el CSV. Comparten `descargarSeguro`
+    // (descarga-segura.ts), cuya propia suite prueba a fondo qué host se rechaza y por
+    // qué. La comprobación de `fetchMock` (no solo el `toBeNull()`) es la que de verdad
+    // demuestra que este archivo usa esa protección: un `fetch` que lanza también
+    // produce `null` por el `catch`, así que sin ella el test pasaría igual con la
+    // comprobación de host borrada.
+    const fetchMock = vi.fn(async () => {
+      throw new Error('no debía tocar la red')
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    expect(await mediaToBlob('http://169.254.169.254/latest/meta-data', null)).toBeNull()
+    expect(guardarMock).not.toHaveBeenCalled()
+    expect(fetchMock).not.toHaveBeenCalled()
   })
 })
 

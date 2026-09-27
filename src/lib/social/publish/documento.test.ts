@@ -1,0 +1,153 @@
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import { MAX_DOCUMENTO_BYTES } from '../comentarios/reglas'
+
+const guardarMock = vi.fn(async (...args: [key: string, body: Blob, contentType: string]) => `https://media.ej.cl/${args[0]}`)
+
+// No hay precedente en el repositorio para simular `@/lib/storage`; lo importante no es
+// que `guardar` devuelva algo, sino comprobar con qué clave y qué content-type se llamó.
+vi.mock('@/lib/storage', () => ({
+  guardar: (key: string, body: Blob, contentType: string) => guardarMock(key, body, contentType),
+}))
+
+const { documentoToBlob } = await import('./documento')
+
+afterEach(() => {
+  vi.unstubAllGlobals()
+  guardarMock.mockClear()
+})
+
+function stubPdf(declarado: number, opts: { bytesReales?: number; contentType?: string } = {}) {
+  const cuerpo = new Uint8Array(opts.bytesReales ?? declarado)
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async () =>
+      new Response(cuerpo, {
+        status: 200,
+        headers: {
+          'content-type': opts.contentType ?? 'application/pdf',
+          'content-length': String(declarado),
+        },
+      }),
+    ),
+  )
+}
+
+function stubError(status: number) {
+  vi.stubGlobal('fetch', vi.fn(async () => new Response('no', { status })))
+}
+
+/** Devuelve el mock para que el test pueda comprobar que nunca se llamó: un `fetch` que
+ * lanza también produce `null` por el `catch` de `descargarSeguro`, el mismo resultado
+ * que «rechazado antes de tocar la red» — sin comprobar la llamada en sí, el test no
+ * distingue las dos causas. */
+function nuncaLlamaFetch() {
+  const mock = vi.fn(async () => {
+    throw new Error('no debía tocar la red')
+  })
+  vi.stubGlobal('fetch', mock)
+  return mock
+}
+
+describe('documentoToBlob', () => {
+  it('guarda un PDF y devuelve la URL de R2', async () => {
+    stubPdf(1024)
+    const url = await documentoToBlob('https://ej.com/g.pdf')
+    expect(url).toBe(`https://media.ej.cl/${guardarMock.mock.calls[0]![0]}`)
+    expect(guardarMock).toHaveBeenCalledTimes(1)
+    const [key, , contentType] = guardarMock.mock.calls[0]!
+    expect(key).toMatch(/^reglas\/[0-9a-f-]{36}\.pdf$/)
+    expect(contentType).toBe('application/pdf')
+  })
+
+  it('rechaza lo que no es un PDF, aunque la URL diga .pdf', async () => {
+    // El content-type manda: es lo que atrapa la página HTML intermedia de Drive, que es
+    // el fallo real y silencioso de esta ruta.
+    stubPdf(1024, { contentType: 'text/html; charset=utf-8' })
+    expect(await documentoToBlob('https://drive.google.com/file/d/x')).toBeNull()
+    expect(guardarMock).not.toHaveBeenCalled()
+  })
+
+  it('rechaza un PDF más grande que el tope, por content-length', async () => {
+    stubPdf(MAX_DOCUMENTO_BYTES + 1, { bytesReales: 10 })
+    expect(await documentoToBlob('https://ej.com/enorme.pdf')).toBeNull()
+    expect(guardarMock).not.toHaveBeenCalled()
+  })
+
+  it('rechaza un PDF cuyo content-length mintió y el cuerpo era más grande', async () => {
+    // Un servidor puede declarar 1 MB y mandar 40: la comprobación después de descargar
+    // es la que de verdad protege el almacenamiento.
+    stubPdf(1024, { bytesReales: MAX_DOCUMENTO_BYTES + 1024 })
+    expect(await documentoToBlob('https://ej.com/miente.pdf')).toBeNull()
+    expect(guardarMock).not.toHaveBeenCalled()
+  })
+
+  it('rechaza un cuerpo de sobra aunque el content-length esté ausente, sea -1, o no sea número', async () => {
+    // Los tres dejan pasar el pre-chequeo (`Number(null)` = 0, `-1` no supera el tope,
+    // `Number('abc')` = NaN y `NaN > tope` es falso): la comprobación que de verdad
+    // protege es el streaming con tope de `leerConTope`, no el header.
+    for (const contentLength of [undefined, '-1', 'abc']) {
+      const headers: Record<string, string> = { 'content-type': 'application/pdf' }
+      if (contentLength !== undefined) headers['content-length'] = contentLength
+      vi.stubGlobal(
+        'fetch',
+        vi.fn(async () => new Response(new Uint8Array(MAX_DOCUMENTO_BYTES + 1024), { status: 200, headers })),
+      )
+      expect(await documentoToBlob('https://ej.com/miente-header.pdf')).toBeNull()
+      expect(guardarMock).not.toHaveBeenCalled()
+      vi.unstubAllGlobals()
+    }
+  })
+
+  it('devuelve null si la descarga falla, sin lanzar', async () => {
+    stubError(500)
+    expect(await documentoToBlob('https://ej.com/muerto.pdf')).toBeNull()
+  })
+
+  it('devuelve null si la red rechaza la conexión, sin lanzar', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => { throw new Error('dns') }))
+    expect(await documentoToBlob('https://ej.com/inalcanzable.pdf')).toBeNull()
+  })
+
+  // Segunda resolución del controlador: el servidor no puede pedir cualquier URL en
+  // nombre de quien programó el post. Sin esto, `documentoToBlob` es un SSRF hecho
+  // función. La cobertura a fondo de qué host se rechaza y por qué vive en
+  // `descarga-segura.test.ts`; acá solo se confirma que `documentoToBlob` de verdad usa
+  // esa comprobación — por eso cada caso comprueba que `fetch` nunca se llamó, no solo
+  // que el resultado fue `null` (que también pasaría si la red hubiera fallado sola).
+  it('rechaza un host de loopback antes de tocar la red', async () => {
+    const fetchMock = nuncaLlamaFetch()
+    expect(await documentoToBlob('https://127.0.0.1/g.pdf')).toBeNull()
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it('rechaza localhost por nombre antes de tocar la red', async () => {
+    const fetchMock = nuncaLlamaFetch()
+    expect(await documentoToBlob('http://localhost:4000/g.pdf')).toBeNull()
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it('rechaza un rango privado antes de tocar la red', async () => {
+    const fetchMock = nuncaLlamaFetch()
+    expect(await documentoToBlob('https://10.0.0.5/g.pdf')).toBeNull()
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it('rechaza la dirección de metadata de la nube antes de tocar la red', async () => {
+    const fetchMock = nuncaLlamaFetch()
+    expect(await documentoToBlob('http://169.254.169.254/latest/meta-data')).toBeNull()
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it('no sigue una redirección hacia la red interna: el segundo salto nunca se pide', async () => {
+    // Una URL pública que redirige a la dirección de metadata saltaría cualquier
+    // comprobación previa si se siguiera la redirección a ciegas.
+    const fetchMock = vi.fn(async () =>
+      new Response(null, { status: 302, headers: { location: 'http://169.254.169.254/latest/meta-data' } }),
+    )
+    vi.stubGlobal('fetch', fetchMock)
+    expect(await documentoToBlob('https://ej.com/redirige.pdf')).toBeNull()
+    expect(guardarMock).not.toHaveBeenCalled()
+    // Si esto fuera 2, se habría llegado a pedir la dirección de metadata.
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
+})
