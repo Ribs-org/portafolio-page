@@ -7,8 +7,9 @@ import { guardar } from '@/lib/storage'
 import { getDb, scheduledPosts, scheduledPostMedia, scheduledPostTargets, reglasClave } from '@/db'
 import { randomUUID } from 'node:crypto'
 import { CuentaInvalida, cuentaUnicaPorRed, verificarCuentas, type CuentaDestino } from '../cuentas'
-import { validarRegla } from '../comentarios/reglas'
+import { validarRegla, REGLA_DOCUMENTO } from '../comentarios/reglas'
 import { descargarSeguro } from './descarga-segura'
+import { documentoToBlob } from './documento'
 
 // Same derivation as SITE_TIMEZONE in lib/analytics — duplicated here because that
 // module is server-only and this one must stay importable by vitest.
@@ -488,6 +489,17 @@ export async function scheduleBatch(ownerId: string, items: BatchItem[]): Promis
       const atributos = 'error' in atributosCheck ? null : atributosCheck.atributos
       const reglaCheck = validarRegla(item.regla)
 
+      // Antes de escribir la regla: un documento que no se puede traer rechaza la fila
+      // acá, no días después cuando alguien comente y el enlace apunte a nada.
+      let documentoUrl: string | null = null
+      if (!('error' in reglaCheck) && reglaCheck.regla?.documentoUrl) {
+        documentoUrl = await documentoToBlob(reglaCheck.regla.documentoUrl)
+        if (!documentoUrl) {
+          results.push({ index, ok: false, error: REGLA_DOCUMENTO })
+          continue
+        }
+      }
+
       const [post] = await db
         .insert(scheduledPosts)
         .values({ ownerId, caption: item.texto, scheduledAt, coverUrl, atributos })
@@ -517,7 +529,9 @@ export async function scheduleBatch(ownerId: string, items: BatchItem[]): Promis
       )
 
       if (!('error' in reglaCheck) && reglaCheck.regla) {
-        await db.insert(reglasClave).values({ postId: post!.id, ...reglaCheck.regla })
+        // La URL de R2 (`documentoUrl`, del paso de arriba) manda sobre la del que llamó:
+        // `...reglaCheck.regla` la trae también, pero ya copiada, no la ajena.
+        await db.insert(reglasClave).values({ postId: post!.id, ...reglaCheck.regla, documentoUrl })
       }
 
       results.push({ index, ok: true, postId: post!.id })

@@ -237,6 +237,15 @@ agrega `?s=dm-<palabra>` y aparece como fila propia en Analítica. `palabra`: un
 palabra, hasta 30 letras. `mensaje`: 1 a 1000 caracteres. `respuestaPublica`: opcional, 1 a
 300. En el CSV es la séptima columna, después de `opciones`.
 
+`documentoUrl` (opcional): un enlace absoluto (`http://` o `https://`) a un PDF de hasta
+25 MB. Se descarga al programar el post — no tres días después, cuando alguien ya comentó
+— y se copia al almacenamiento propio, porque el enlace que mandaste puede morir antes de
+que alguien comente, o ser un enlace de Drive que sirve una página HTML y no el PDF. El
+documento **nunca se manda como adjunto**: su enlace (ya el propio, no el tuyo) se agrega
+al final de `mensaje`, separado por una línea en blanco, así que hoy sale dentro de la
+misma respuesta pública que el resto de `mensaje` — la nota del párrafo de arriba sobre el
+privado aplica igual al documento.
+
 ## Reglas por red (las que rechazan una fila)
 
 | Regla | Cuándo se rompe | Frase exacta |
@@ -284,6 +293,7 @@ Instagram acepta: 1 foto, 1 video, o 2–10 fotos (carrusel).
 | `La palabra clave es una sola palabra, sin espacios, hasta 30 letras.` | `regla.palabra` vacía con mensaje, con espacios o símbolos, o `regla` que no es objeto |
 | `El mensaje del privado va de 1 a 1000 caracteres.` | `regla.mensaje` ausente, vacío o largo |
 | `La respuesta pública va de 1 a 300 caracteres.` | `regla.respuestaPublica` larga |
+| `El documento tiene que ser una URL absoluta a un PDF de hasta 25 MB.` | `regla.documentoUrl` no es una URL absoluta http/https, o sí lo es pero al descargarla no resultó un PDF de hasta 25 MB (u otro fallo de descarga) |
 | `No se pudo guardar la fila. Inténtalo de nuevo.` | fallo transitorio de base de datos |
 
 ## Respuesta

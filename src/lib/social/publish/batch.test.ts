@@ -18,7 +18,7 @@ import {
 import { ATRIBUTOS_ERROR } from './atributos'
 import { TIKTOK_SIN_PRIVACIDAD, OPCIONES_ERROR } from './opciones'
 import { TIKTOK_MEDIA } from './validate'
-import { REGLA_PALABRA, REGLA_MENSAJE } from '../comentarios/reglas'
+import { REGLA_PALABRA, REGLA_MENSAJE, REGLA_DOCUMENTO } from '../comentarios/reglas'
 import type { CuentaDestino } from '../cuentas'
 
 // `mediaToBlob` sube con `guardar`; sin precedente en el repo para simularlo, resuelto
@@ -384,5 +384,14 @@ describe('regla de palabra clave en el lote', () => {
     expect(validateBatchItem({ ...base, regla: { palabra: 'dos palabras', mensaje: 'm' } }, now)).toBe(REGLA_PALABRA)
     expect(validateBatchItem({ ...base, regla: { palabra: 'guia' } }, now)).toBe(REGLA_MENSAJE)
     expect(validateBatchItem({ ...base, regla: 'guia' }, now)).toBe(REGLA_PALABRA)
+  })
+
+  it('una regla con documentoUrl que no es URL absoluta rechaza la fila', () => {
+    const item = { ...base, regla: { palabra: 'GUIA', mensaje: 'x', documentoUrl: '/g.pdf' } }
+    expect(validateBatchItem(item, now)).toBe(REGLA_DOCUMENTO)
+  })
+
+  it('una regla sin documentoUrl sigue siendo válida', () => {
+    expect(validateBatchItem({ ...base, regla: { palabra: 'GUIA', mensaje: 'x' } }, now)).toBeNull()
   })
 })

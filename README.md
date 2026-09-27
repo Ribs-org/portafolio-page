@@ -403,6 +403,13 @@ propia en Analítica → «Qué contenido te trae gente». Para eso el servidor 
 cuál es tu dominio: `SITE_URL=https://www.tu-dominio.cl` (si falta, usa el dominio de
 producción que Vercel inyecta).
 
+La regla puede traer además un PDF (`documentoUrl` en la API de lote, hasta 25 MB): se
+descarga y se copia al almacenamiento propio al programar, no al comentar, para que un
+enlace que muere después o una página de Drive no rompan la respuesta días más tarde. El
+documento nunca se manda como adjunto, siempre como enlace al final del mismo mensaje —así
+que hoy, igual que el resto de la regla, sale en la respuesta pública hasta que el privado
+esté encendido.
+
 ### Modo Tinder
 
 El panel puede leer los tuits nuevos de una lista de creadores que tú curas y —en las
