@@ -57,7 +57,7 @@ Content-Type: application/json
 El destino de cada post se elige con `cuentas` o con `redes` — no hace falta el campo
 `cuentas` si nombrar la red alcanza (ver la sección de cada campo, abajo).
 
-**Máximo 50 posts por request.** Más de eso: `400` con `Máximo 50 posts por lote.`
+**Máximo 50 posts por request** (el tope vive en `MAX_BATCH_ITEMS`). Más de eso: `400` con `Máximo 50 posts por lote.`
 Cuerpo que no sea `{ posts: [...] }`: `400` con
 `El cuerpo debe ser JSON con { posts: [...] }.`
 

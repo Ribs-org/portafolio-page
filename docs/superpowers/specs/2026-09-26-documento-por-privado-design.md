@@ -82,7 +82,12 @@ ver la sección 10.
 }
 ```
 
-`documentoUrl` acepta cualquier URL que el servidor pueda leer.
+`documentoUrl` acepta una URL absoluta `http` o `https` cuyo host no sea de red interna. Esa
+segunda mitad no es un detalle de implementación: el servidor va a pedir esa URL **en nombre del
+dueño**, así que sin filtro le serviría de puente hacia su propia red o hacia la dirección de
+metadata de la nube. La comprobación vive en `src/lib/social/publish/descarga-segura.ts`, se
+aplica **antes de cada salto de redirección** —no solo sobre la URL original, que es el error
+clásico— y la comparte `mediaToBlob`, que hacía el mismo `fetch` sin comprobar nada.
 
 **Sigue siendo solo PDF, y ahora por decisión de producto, no por Meta.** Un PDF se abre en
 cualquier teléfono sin pedir nada; un `.docx` o una hoja de cálculo se ven mal o piden una
@@ -126,7 +131,7 @@ esta entrega.
 ## 5. El barrido de R2 tiene que conocer el documento
 
 `src/lib/storage-gc.ts` borra de R2 todo objeto que ninguna tabla referencie, con una hora de
-gracia. Hoy construye ese conjunto con cuatro consultas: `profiles.avatar_url` y
+gracia. Hoy construye ese conjunto con cinco consultas: `profiles.avatar_url` y
 `og_image_url`, `links.image_url`, `scheduled_posts.cover_url` y
 `scheduled_post_media.blob_url`.
 
@@ -134,7 +139,7 @@ gracia. Hoy construye ese conjunto con cuatro consultas: `profiles.avatar_url` y
 la hora siguiente a subirlo, y el enlace del privado llevaría a un 404 días después, en
 silencio, exactamente cuando alguien comenta.
 
-Se suma la quinta consulta. Y se suma **una prueba que se caiga cuando aparezca una sexta
+Se suma la sexta consulta. Y se suma **una prueba que se caiga cuando aparezca una séptima
 columna de archivos y nadie la registre**: comparar las columnas que el esquema declara como
 URL de archivo contra las que el barrido consulta. Esa prueba es lo único que impide que el
 próximo la olvide igual.
@@ -168,7 +173,7 @@ Eso es más de lo que el pedido original esperaba: no depende del App Review par
 |---|---|
 | `documentoUrl` que no es un PDF | La fila falla al programar, con su frase |
 | Un PDF que no cabe | Igual: falla al programar |
-| La URL no se puede leer | Igual, y la frase dice cuál era |
+| La URL no se puede leer | Igual: la fila falla al programar, con la misma frase fija. El motivo exacto —host prohibido, no era PDF, no cabía— queda en el log del servidor, no en la respuesta |
 | `documentoUrl` ausente | La regla sigue siendo válida; se comporta como hoy |
 | La persona ya recibió el privado | No se manda de nuevo, como hoy |
 | La publicación tiene más de siete días | No hay privado: el mensaje con su enlace va en público |

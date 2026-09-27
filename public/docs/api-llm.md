@@ -115,8 +115,11 @@ fila ya programada la programa otra vez.
   pasar por un post.
 - **No manda nada de inmediato.** Todo lo que entra por `POST /api/schedule/batch` espera a su
   `fecha`; no existe una forma de publicar ahora mismo por esta vía.
-- **No publica en TikTok todavía** (revisión de la plataforma pendiente) y **TikTok no tiene
-  cola de comentarios**, así que una `regla` en un post que solo va a TikTok no hace nada.
+- **No publica en TikTok todavía** (revisión de la plataforma pendiente).
+- **Solo tres redes leen comentarios: Instagram, Facebook y YouTube.** Una `regla` en un post que
+  va únicamente a TikTok, Threads o X **no hace nada** —no falla, no avisa: nunca se dispara,
+  porque nadie lee esos comentarios—. La regla vale la pena solo si el post sale a alguna de esas
+  tres.
 
 ## 5. Lo que Meta no permite (léelo antes de proponer mandar el PDF adjunto)
 
