@@ -147,11 +147,14 @@ export function decidirAutomatica(entrada: {
   if (entrada.esPropio) return { accion: 'ignorar' }
   if (!coincide(entrada.texto, entrada.regla.palabra)) return { accion: 'ignorar' }
 
-  // El documento va DESPUÉS del texto del dueño, y por eso `enlaceMedible` se aplica
-  // antes de añadirlo: esa función etiqueta solo el primer enlace del mensaje que apunte
-  // al sitio, así que un documento por delante le robaría la etiqueta al enlace que el
-  // dueño escribió. El del documento no se etiqueta nunca —vive en el subdominio de R2 y
-  // la analítica no lo ve— y eso está decidido en la spec, no olvidado.
+  // El documento nunca pasa por `enlaceMedible`: esa función solo recibe
+  // `entrada.regla.mensaje` (el texto del dueño), y el enlace del documento se concatena
+  // después de que ya corrió. Eso es estructural, no depende del orden en que se escriba
+  // acá — y de todos modos el host de R2 no es el sitio propio, así que `mismoHost` lo
+  // habría descartado igual. Va al final por legibilidad: lo primero que se lee es lo que
+  // el dueño escribió. (Si algún día `enlaceMedible` pasara a aplicarse sobre el mensaje ya
+  // completo, con el documento adentro, el orden sí empezaría a importar para no robarle
+  // la etiqueta al enlace del dueño; hoy no es el caso.)
   const texto = enlaceMedible(entrada.regla.mensaje, entrada.regla.palabra, entrada.sitioHost)
   const mensaje = entrada.regla.documentoUrl ? `${texto}\n\n${entrada.regla.documentoUrl}` : texto
   const dentroDelPlazo = entrada.now.getTime() - entrada.publishedAt.getTime() < DIAS_PRIVADO * 864e5

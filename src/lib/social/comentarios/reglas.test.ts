@@ -239,10 +239,12 @@ describe('decidirAutomatica', () => {
     expect(plan.privado).toContain('https://media.ej.cl/reglas/abc.pdf')
   })
 
-  it('el enlace del dueño conserva su etiqueta: el documento va después', () => {
-    // `enlaceMedible` etiqueta SOLO el primer enlace del mensaje que apunte al sitio. Si
-    // el documento fuera primero, le robaría la etiqueta al enlace que el dueño escribió y
-    // el dueño perdería la medición que hoy tiene.
+  it('el texto queda en orden: el mensaje del dueño primero, el documento al final', () => {
+    // El documento se concatena después de que `enlaceMedible` ya corrió sobre
+    // `entrada.regla.mensaje`, así que el enlace del dueño llega con su etiqueta sin
+    // importar en qué orden se escriba el texto final — eso es estructural, no depende de
+    // este orden. Lo que este test fija es el orden en sí: lo que el dueño escribió se lee
+    // primero, y el documento va al final, por legibilidad.
     const plan = decidirAutomatica({
       texto: 'GUIA',
       esPropio: false,
