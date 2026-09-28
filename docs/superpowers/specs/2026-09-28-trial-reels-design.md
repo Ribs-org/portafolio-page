@@ -160,7 +160,7 @@ y sus interacciones, y eso el teléfono todavía no lo tiene.
 | `trialReel: true` en un destino que no es Instagram | Misma frase de forma: esa red no pide eso |
 | La cuenta no puede hacer trial reels | Falla **al publicar**, ese destino, con `Instagram no permite trial reels en esta cuenta.` |
 | Dos cuentas de Instagram, trial solo en una | Correcto: la opción es por destino |
-| El reel se graduó (o no) | No se sabe por API; el panel lo muestra como publicado y marcado trial reel |
+| El reel se graduó (o no) | No se sabe por API; solo la página del editor de ese post muestra «Trial reel — lo compartes tú desde Instagram» (`resumenOpciones`). El calendario y la cola siguen sin distinguirlo — ver `docs/deuda-tecnica.md` |
 | Un teléfono viejo | No manda `opciones`: reel normal |
 
 ## 7. La documentación para LLM
