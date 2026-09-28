@@ -28,6 +28,7 @@ import {
   opcionesDesdeFormularioPorCuenta,
   validarOpciones,
   validarOpcionesPorCuenta,
+  type OpcionesDestino,
 } from '@/lib/social/publish/opciones'
 import { extensionDe, validateScheduleDraft } from '@/lib/social/publish/validate'
 import { validateAtributos, ATRIBUTOS_ERROR, type Atributos } from '@/lib/social/publish/atributos'
@@ -913,6 +914,24 @@ export async function updateScheduledPost(
       { allowPast: dateUnchanged },
     )
     if (error) return { error }
+
+    // El editor no deja tocar `opciones` (spec §9), pero sí la media: un trial reel
+    // programado con un video puede terminar aquí con dos fotos si nadie repite la
+    // regla. Las opciones vienen de los targets ya existentes que siguen elegidos y
+    // todavía no publicaron — los que de verdad van a usar esta media al publicar —,
+    // tipadas con `validarOpciones` porque en la base son `unknown`/`jsonb`.
+    const opcionesDeTargets: Record<string, OpcionesDestino> = {}
+    for (const target of targets) {
+      if (target.status === 'published' || !idsElegidosSet.has(target.accountId)) continue
+      const check = validarOpciones(target.network, target.opciones)
+      if ('opciones' in check && check.opciones) opcionesDeTargets[target.id] = check.opciones
+    }
+    const mediaPorOpciones = errorDeMediaPorOpciones(opcionesDeTargets, {
+      videos: finalTypes.filter((t) => t === 'video').length,
+      fotos: finalTypes.filter((t) => t === 'image').length,
+      sinTipo: 0,
+    })
+    if (mediaPorOpciones) return { error: mediaPorOpciones }
   }
 
   // Conservar solo coteja contra lo guardado — el mismo trato que keptMedia con sus

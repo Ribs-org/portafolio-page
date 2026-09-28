@@ -433,6 +433,64 @@ describe('updateScheduledPost: el editor no pisa el documento de una regla cread
   })
 })
 
+describe('updateScheduledPost: no deja que un trial reel programado se convierta en foto o carrusel', () => {
+  /**
+   * Post con un único target de Instagram, trial reel, todavía `scheduled` (así
+   * `verificarCuentas` sí consulta `social_accounts`, el cuarto `select`). La media ya
+   * guardada trae el video del trial y dos fotos, para que el formulario pueda simular
+   * «mantener solo las fotos» con `keptMedia` — sin pasar por `guardar`/`mediaToBlob`,
+   * que este archivo no dobla.
+   */
+  function programarFilas() {
+    db.scheduledSelectQueue.push(
+      [{ id: 'post-1', ownerId: 'owner-1', scheduledAt: new Date('2026-12-01T10:00:00Z'), coverUrl: null }],
+      [
+        {
+          id: 'target-1',
+          status: 'scheduled',
+          accountId: 'acc-ig',
+          network: 'instagram',
+          opciones: { trialReel: true },
+          updatedAt: new Date(),
+        },
+      ],
+      [
+        { id: 'media-video', blobUrl: 'https://cdn.ejemplo.cl/scheduled/v.mp4', mediaType: 'video', position: 0 },
+        { id: 'media-foto1', blobUrl: 'https://cdn.ejemplo.cl/scheduled/f1.jpg', mediaType: 'image', position: 1 },
+        { id: 'media-foto2', blobUrl: 'https://cdn.ejemplo.cl/scheduled/f2.jpg', mediaType: 'image', position: 2 },
+      ],
+      [{ id: 'acc-ig', network: 'instagram', handle: '@vicente', accessToken: 'token-vivo' }],
+    )
+  }
+
+  function formularioConMedia(keptMedia: string[]) {
+    const formData = new FormData()
+    formData.set('caption', 'Texto editado')
+    formData.set('cuentas', 'acc-ig')
+    formData.set('scheduledAt', '2030-01-01T10:00')
+    for (const id of keptMedia) formData.append('keptMedia', id)
+    return formData
+  }
+
+  it('mantener solo las dos fotos se rechaza con la frase del trial reel, sin tocar la base', async () => {
+    programarFilas()
+
+    const result = await updateScheduledPost('post-1', {}, formularioConMedia(['media-foto1', 'media-foto2']))
+
+    expect(result.error).toBe(TRIAL_REEL_MEDIA)
+    expect(db.updateCalls).toHaveLength(0)
+    expect(db.insertCalls).toHaveLength(0)
+  })
+
+  it('espejo: mantener el único video guarda sin error', async () => {
+    programarFilas()
+
+    await expect(
+      updateScheduledPost('post-1', {}, formularioConMedia(['media-video'])),
+    ).rejects.toThrow(RedirectSignal)
+  })
+})
+
 describe('createScheduledPost: un trial reel con fotos se rechaza antes de crear nada', () => {
   /**
    * Único destino: la cuenta de Instagram que `verificarCuentas` resuelve vía el mismo
