@@ -220,6 +220,43 @@ copias pueden divergir sin que nada lo note. Cerrarlo pide que `crearPostProgram
 portada y atributos, o que `batch.ts` la llame para escribir destinos y solo haga sus
 propios `insert` para lo que le es propio.
 
+## Un campo nuevo en `ReglaLimpia` no llega solo a los tres caminos que la escriben
+
+**Abierto desde 2026-09-27.**
+
+`reglas_clave` se escribe desde tres sitios, y `ReglaLimpia` es el tipo que los tres comparten.
+Agregarle `documento_url` en esta entrega dejó claro que el tipo compartido no reparte nada por
+sí solo: cada camino decidió distinto, y dos de las tres decisiones estaban mal.
+
+- **`scheduleBatch`** (`src/lib/social/publish/batch.ts`) es el que lo hace bien: llama a
+  `documentoToBlob`, copia el PDF a R2 y guarda **nuestra** URL; si no puede traerlo, rechaza la
+  fila ahí mismo.
+- **`updateScheduledPost`** (`src/app/admin/actions.ts`) lo hacía mal y **se arregló en esta
+  misma rama**: su `onConflictDoUpdate` esparcía la regla entera, así que cada guardado del
+  editor escribía `documento_url = NULL` —el formulario no tiene ese campo, y el validador
+  siempre devuelve la clave puesta—. Un post programado por API con su PDF perdía el documento en
+  cuanto el dueño cambiaba la hora, y al día siguiente el barrido de R2 borraba el archivo. Ahora
+  su `set` nombra solo las columnas que ese editor administra (`columnasEditablesDeRegla`).
+- **`crearPostProgramado`** (`src/lib/social/publish/crear.ts`) **sigue abierto**: inserta
+  `...input.regla` completo, sin pasar por `documentoToBlob`, así que un `documentoUrl` que le
+  llegara quedaría guardado tal cual, apuntando al servidor de un tercero. Hoy no hay llamador
+  que pueda hacerlo —el compositor del panel solo arma palabra, mensaje y respuesta, y la ruta
+  del teléfono no le pasa `regla`— así que no es un fallo de hoy. Se dejó así porque esta entrega
+  es «todo por API» y tocar el camino del compositor no le hacía falta.
+
+Lo que cuesta y lo que enseña: **una columna de este tipo tiene dos formas de fallar, y las dos
+son silenciosas.** Guardar una URL ajena hace que el enlace muera cuando el tercero borre su
+archivo, y el barrido nunca protege nada porque no hay objeto nuestro que proteger. Pisarla con
+`null` borra el archivo que sí era nuestro. Ninguna de las dos da error, y ninguna se ve en la
+pantalla del panel, que no muestra el documento en ninguna parte.
+
+Cerrar lo que queda abierto pide una de dos: que `crearPostProgramado` copie el documento como
+hace el lote, o que rechace una regla que traiga `documentoUrl` en vez de guardarla a medias. Y
+el día que el editor del panel administre documentos de verdad, la salida buena es que los tres
+caminos compartan la escritura de la regla en vez de tener cada uno su `insert` —que es la deuda
+de más arriba, «Dos caminos que crean publicaciones, sin código compartido», de la que esta es
+una consecuencia concreta.
+
 ## Los `insert` del lote no van en transacción
 
 **Abierto, anterior a esta entrega.**

@@ -1,0 +1,1 @@
+ALTER TABLE "reglas_clave" ADD COLUMN "documento_url" text;

@@ -403,6 +403,13 @@ propia en Analítica → «Qué contenido te trae gente». Para eso el servidor 
 cuál es tu dominio: `SITE_URL=https://www.tu-dominio.cl` (si falta, usa el dominio de
 producción que Vercel inyecta).
 
+La regla puede traer además un PDF (`documentoUrl` en la API de lote, hasta 25 MB): se
+descarga y se copia al almacenamiento propio al programar, no al comentar, para que un
+enlace que muere después o una página de Drive no rompan la respuesta días más tarde. El
+documento nunca se manda como adjunto, siempre como enlace al final del mismo mensaje —así
+que hoy, igual que el resto de la regla, sale en la respuesta pública hasta que el privado
+esté encendido.
+
 ### Modo Tinder
 
 El panel puede leer los tuits nuevos de una lista de creadores que tú curas y —en las
@@ -655,6 +662,13 @@ por red, todas las frases de error y qué significa cada métrica. Se sirve tal 
 <https://www.vicente-pareja.cl/docs/api-editor.md>. No contiene secretos — la clave
 viaja aparte — pero es público: si prefieres que no lo sea, muévelo fuera de
 `public/`.
+
+Al lado, para un LLM que llama a la API a ciegas y no tiene este repositorio delante:
+`public/docs/api.json` (el JSON Schema exacto del cuerpo del lote, con los límites que
+aplica el validador) y `public/docs/api-llm.md` (la guía compacta orientada a la tarea,
+con las frases de error literales y lo que Meta no permite en el mensaje privado). Una
+prueba (`src/lib/docs-api.test.ts`) falla si cualquiera de los dos se aparta de las
+constantes reales del código.
 
 ### Carga masiva por API
 

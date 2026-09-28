@@ -33,6 +33,7 @@ export async function reglasPara(accountId: string, postExternalIds: string[]): 
       palabra: reglasClave.palabra,
       mensaje: reglasClave.mensaje,
       respuestaPublica: reglasClave.respuestaPublica,
+      documentoUrl: reglasClave.documentoUrl,
     })
     .from(reglasClave)
     .innerJoin(scheduledPostTargets, eq(scheduledPostTargets.postId, reglasClave.postId))
@@ -40,7 +41,13 @@ export async function reglasPara(accountId: string, postExternalIds: string[]): 
       and(eq(scheduledPostTargets.accountId, accountId), inArray(scheduledPostTargets.externalId, postExternalIds)),
     )
   for (const f of filas) {
-    if (f.externalId) mapa.set(f.externalId, { palabra: f.palabra, mensaje: f.mensaje, respuestaPublica: f.respuestaPublica })
+    if (f.externalId)
+      mapa.set(f.externalId, {
+        palabra: f.palabra,
+        mensaje: f.mensaje,
+        respuestaPublica: f.respuestaPublica,
+        documentoUrl: f.documentoUrl,
+      })
   }
   return mapa
 }
@@ -58,12 +65,19 @@ export async function reglasDeCuenta(accountId: string): Promise<Map<string, Reg
       palabra: reglasClave.palabra,
       mensaje: reglasClave.mensaje,
       respuestaPublica: reglasClave.respuestaPublica,
+      documentoUrl: reglasClave.documentoUrl,
     })
     .from(reglasClave)
     .innerJoin(scheduledPostTargets, eq(scheduledPostTargets.postId, reglasClave.postId))
     .where(and(eq(scheduledPostTargets.accountId, accountId), isNotNull(scheduledPostTargets.externalId)))
   for (const f of filas) {
-    if (f.externalId) mapa.set(f.externalId, { palabra: f.palabra, mensaje: f.mensaje, respuestaPublica: f.respuestaPublica })
+    if (f.externalId)
+      mapa.set(f.externalId, {
+        palabra: f.palabra,
+        mensaje: f.mensaje,
+        respuestaPublica: f.respuestaPublica,
+        documentoUrl: f.documentoUrl,
+      })
   }
   return mapa
 }

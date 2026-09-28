@@ -164,8 +164,9 @@ export default function PrivacidadPage() {
         <h2 className="font-titulo text-lg font-semibold uppercase tracking-[0.03em]">Dónde vive todo</h2>
         <p className="leading-relaxed text-fg-muted">
           El sitio está alojado en Vercel y los datos en una base de datos Postgres gestionada por
-          Supabase. Las imágenes y videos que el dueño sube se almacenan en Cloudflare R2.
-          Ninguno de esos proveedores recibe los datos para usarlos por su cuenta: los alojan.
+          Supabase. Los archivos que el dueño sube —fotos, videos y los documentos que
+          adjunta a una regla de comentarios— se almacenan en Cloudflare R2. Ninguno
+          de esos proveedores recibe los datos para usarlos por su cuenta: los alojan.
         </p>
       </section>
 

@@ -417,6 +417,9 @@ export const reglasClave = pgTable('reglas_clave', {
   palabra: text('palabra').notNull(),
   mensaje: text('mensaje').notNull(),
   respuestaPublica: text('respuesta_publica').notNull(),
+  // El PDF que acompaña al mensaje, ya copiado a R2. Nulable: la mayoría de las reglas
+  // no llevan documento. Va en `storage-gc` — si no, el barrido lo borra en una hora.
+  documentoUrl: text('documento_url'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 })

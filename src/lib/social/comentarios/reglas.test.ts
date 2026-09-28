@@ -1,15 +1,43 @@
 import { describe, expect, it } from 'vitest'
 import {
+  REGLA_DOCUMENTO,
   REGLA_MENSAJE,
   REGLA_PALABRA,
   REGLA_RESPUESTA,
   RESPUESTA_PUBLICA_POR_DEFECTO,
   coincide,
+  columnasEditablesDeRegla,
   decidirAutomatica,
   enlaceMedible,
   normalizarPalabra,
   validarRegla,
 } from './reglas'
+
+describe('columnasEditablesDeRegla', () => {
+  it('no incluye documentoUrl aunque la regla lo tenga: el editor del panel no lo administra', () => {
+    // El hallazgo más grave de la revisión: antes de este arreglo, `updateScheduledPost`
+    // esparcía la regla entera en el `set` de su `onConflictDoUpdate`, y ese spread
+    // pisaba `documentoUrl` con `null` cada vez que el dueño solo cambiaba la hora o el
+    // texto de un post programado por API con su PDF.
+    const regla = {
+      palabra: 'guia',
+      mensaje: 'Toma tu guía',
+      respuestaPublica: 'Te lo mandé por privado 📩',
+      documentoUrl: 'https://media.ejemplo.com/reglas/x.pdf',
+    }
+    expect(columnasEditablesDeRegla(regla)).toEqual({
+      palabra: 'guia',
+      mensaje: 'Toma tu guía',
+      respuestaPublica: 'Te lo mandé por privado 📩',
+    })
+    expect(columnasEditablesDeRegla(regla)).not.toHaveProperty('documentoUrl')
+  })
+
+  it('con documentoUrl null (regla sin documento), el resultado es igual', () => {
+    const regla = { palabra: 'guia', mensaje: 'm', respuestaPublica: 'r', documentoUrl: null }
+    expect(columnasEditablesDeRegla(regla)).toEqual({ palabra: 'guia', mensaje: 'm', respuestaPublica: 'r' })
+  })
+})
 
 describe('normalizarPalabra', () => {
   it('minúsculas, sin tildes, sin espacios alrededor', () => {
@@ -99,10 +127,15 @@ describe('validarRegla', () => {
 
   it('normaliza la palabra y pone la respuesta por defecto', () => {
     expect(validarRegla({ palabra: 'GUÍA', mensaje: 'Toma: https://x.cl' })).toEqual({
-      regla: { palabra: 'guia', mensaje: 'Toma: https://x.cl', respuestaPublica: RESPUESTA_PUBLICA_POR_DEFECTO },
+      regla: {
+        palabra: 'guia',
+        mensaje: 'Toma: https://x.cl',
+        respuestaPublica: RESPUESTA_PUBLICA_POR_DEFECTO,
+        documentoUrl: null,
+      },
     })
     expect(validarRegla({ palabra: 'guia', mensaje: 'm', respuestaPublica: ' Listo 📩 ' })).toEqual({
-      regla: { palabra: 'guia', mensaje: 'm', respuestaPublica: 'Listo 📩' },
+      regla: { palabra: 'guia', mensaje: 'm', respuestaPublica: 'Listo 📩', documentoUrl: null },
     })
   })
 
@@ -114,11 +147,65 @@ describe('validarRegla', () => {
     expect(validarRegla({ mensaje: 'sin palabra' })).toEqual({ error: REGLA_PALABRA })
     expect(validarRegla('guia')).toEqual({ error: REGLA_PALABRA })
   })
+
+  it('acepta una regla sin documento, como hasta ahora', () => {
+    const check = validarRegla({ palabra: 'GUIA', mensaje: 'Acá va' })
+    expect('error' in check).toBe(false)
+    if ('error' in check) return
+    expect(check.regla).toEqual({
+      palabra: 'guia',
+      mensaje: 'Acá va',
+      respuestaPublica: RESPUESTA_PUBLICA_POR_DEFECTO,
+      documentoUrl: null,
+    })
+  })
+
+  it('acepta un documentoUrl y lo devuelve tal cual', () => {
+    const check = validarRegla({ palabra: 'GUIA', mensaje: 'Acá va', documentoUrl: 'https://ej.com/g.pdf' })
+    expect('error' in check).toBe(false)
+    if ('error' in check) return
+    expect(check.regla?.documentoUrl).toBe('https://ej.com/g.pdf')
+  })
+
+  it('rechaza un documentoUrl que no es una URL absoluta', () => {
+    // Una ruta relativa no se puede descargar desde el servidor, y el error tiene que
+    // salir acá y no treinta segundos después en un fetch que falla sin explicar.
+    expect(validarRegla({ palabra: 'GUIA', mensaje: 'x', documentoUrl: '/guia.pdf' })).toEqual({
+      error: REGLA_DOCUMENTO,
+    })
+  })
+
+  it('rechaza un documentoUrl que no es texto', () => {
+    expect(validarRegla({ palabra: 'GUIA', mensaje: 'x', documentoUrl: 42 })).toEqual({
+      error: REGLA_DOCUMENTO,
+    })
+  })
+
+  it('rechaza un documentoUrl con protocolo que no es http ni https', () => {
+    // No es una lista larga: son los tres esquemas que un validador descuidado deja
+    // pasar por ser URLs válidas, y los que convierten un campo de texto en algo que
+    // el servidor ejecuta (javascript:) o lee del disco (file:) en vez de descargar
+    // (ftp: representa cualquier otro esquema de red que tampoco es el que se espera).
+    expect(validarRegla({ palabra: 'GUIA', mensaje: 'x', documentoUrl: 'javascript:alert(1)' })).toEqual({
+      error: REGLA_DOCUMENTO,
+    })
+    expect(validarRegla({ palabra: 'GUIA', mensaje: 'x', documentoUrl: 'file:///etc/passwd' })).toEqual({
+      error: REGLA_DOCUMENTO,
+    })
+    expect(validarRegla({ palabra: 'GUIA', mensaje: 'x', documentoUrl: 'ftp://ej.com/g.pdf' })).toEqual({
+      error: REGLA_DOCUMENTO,
+    })
+  })
 })
 
 describe('decidirAutomatica', () => {
   const now = new Date('2026-09-16T12:00:00Z')
-  const regla = { palabra: 'guia', mensaje: 'Toma: https://www.vicente-pareja.cl/guia', respuestaPublica: 'Te lo mandé 📩' }
+  const regla = {
+    palabra: 'guia',
+    mensaje: 'Toma: https://www.vicente-pareja.cl/guia',
+    respuestaPublica: 'Te lo mandé 📩',
+    documentoUrl: null,
+  }
   const base = {
     texto: 'GUÍA porfa',
     esPropio: false,
@@ -155,5 +242,92 @@ describe('decidirAutomatica', () => {
     expect(decidirAutomatica({ ...base, network: 'tiktok' })).toEqual(publicoConEnlace)
     expect(decidirAutomatica({ ...base, network: 'youtube' })).toEqual(publicoConEnlace)
     expect(decidirAutomatica({ ...base, publishedAt: new Date('2026-09-08T11:00:00Z') })).toEqual(publicoConEnlace)
+  })
+
+  it('añade el enlace del documento al final del mensaje', () => {
+    const plan = decidirAutomatica({
+      texto: 'quiero la GUIA',
+      esPropio: false,
+      yaRecibioPrivado: false,
+      network: 'instagram',
+      publishedAt: new Date('2026-09-26T10:00:00Z'),
+      now: new Date('2026-09-26T11:00:00Z'),
+      privadoEncendido: true,
+      regla: {
+        palabra: 'guia',
+        mensaje: 'Acá va 👇',
+        respuestaPublica: 'Te lo mandé 📩',
+        documentoUrl: 'https://media.ej.cl/reglas/abc.pdf',
+      },
+      sitioHost: 'ej.cl',
+    })
+    expect(plan.accion).toBe('responder')
+    if (plan.accion !== 'responder') return
+    expect(plan.privado).toContain('https://media.ej.cl/reglas/abc.pdf')
+  })
+
+  it('el texto queda en orden: el mensaje del dueño primero, el documento al final', () => {
+    // El documento se concatena después de que `enlaceMedible` ya corrió sobre
+    // `entrada.regla.mensaje`, así que el enlace del dueño llega con su etiqueta sin
+    // importar en qué orden se escriba el texto final — eso es estructural, no depende de
+    // este orden. Lo que este test fija es el orden en sí: lo que el dueño escribió se lee
+    // primero, y el documento va al final, por legibilidad.
+    const plan = decidirAutomatica({
+      texto: 'GUIA',
+      esPropio: false,
+      yaRecibioPrivado: false,
+      network: 'instagram',
+      publishedAt: new Date('2026-09-26T10:00:00Z'),
+      now: new Date('2026-09-26T11:00:00Z'),
+      privadoEncendido: true,
+      regla: {
+        palabra: 'guia',
+        mensaje: 'Mira https://ej.cl/curso',
+        respuestaPublica: 'ok',
+        documentoUrl: 'https://media.ej.cl/reglas/abc.pdf',
+      },
+      sitioHost: 'ej.cl',
+    })
+    if (plan.accion !== 'responder') return
+    expect(plan.privado).toContain('https://ej.cl/curso?s=dm-guia')
+    expect(plan.privado!.indexOf('ej.cl/curso')).toBeLessThan(plan.privado!.indexOf('reglas/abc.pdf'))
+  })
+
+  it('sin documento, el mensaje queda igual que hoy', () => {
+    const plan = decidirAutomatica({
+      texto: 'GUIA',
+      esPropio: false,
+      yaRecibioPrivado: false,
+      network: 'instagram',
+      publishedAt: new Date('2026-09-26T10:00:00Z'),
+      now: new Date('2026-09-26T11:00:00Z'),
+      privadoEncendido: true,
+      regla: { palabra: 'guia', mensaje: 'Acá va', respuestaPublica: 'ok', documentoUrl: null },
+      sitioHost: 'ej.cl',
+    })
+    if (plan.accion !== 'responder') return
+    expect(plan.privado).toBe('Acá va')
+  })
+
+  it('y cuando no hay privado, el enlace va en la respuesta pública', () => {
+    // Es lo que hace que esta entrega sirva antes de que Meta apruebe el privado.
+    const plan = decidirAutomatica({
+      texto: 'GUIA',
+      esPropio: false,
+      yaRecibioPrivado: false,
+      network: 'instagram',
+      publishedAt: new Date('2026-09-26T10:00:00Z'),
+      now: new Date('2026-09-26T11:00:00Z'),
+      privadoEncendido: false,
+      regla: {
+        palabra: 'guia',
+        mensaje: 'Acá va',
+        respuestaPublica: 'ok',
+        documentoUrl: 'https://media.ej.cl/reglas/abc.pdf',
+      },
+      sitioHost: 'ej.cl',
+    })
+    if (plan.accion !== 'responder') return
+    expect(plan.publico).toContain('reglas/abc.pdf')
   })
 })

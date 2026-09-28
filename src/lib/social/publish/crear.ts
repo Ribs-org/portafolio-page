@@ -49,6 +49,11 @@ export async function crearPostProgramado(
       opciones: input.opciones?.[cuenta.id] ?? null,
     })),
   )
+  // Ojo si alguna vez le llega una regla con `documentoUrl`: acá se inserta tal cual, sin
+  // copiar el archivo. El lote (`batch.ts`) sí lo copia a R2 con `documentoToBlob` antes de
+  // escribir la regla, porque `reglas_clave.documento_url` tiene que ser una URL nuestra —una
+  // ajena muere cuando el tercero borre su archivo, y el barrido no protege lo que no es
+  // nuestro—. Hoy ningún llamador de esta función arma ese campo; ver `docs/deuda-tecnica.md`.
   if (input.regla) {
     await db.insert(reglasClave).values({ postId: post!.id, ...input.regla })
   }

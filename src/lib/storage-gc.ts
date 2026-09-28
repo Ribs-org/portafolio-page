@@ -1,4 +1,4 @@
-import { getDb, links, profiles, scheduledPostMedia, scheduledPosts } from '@/db'
+import { getDb, links, profiles, reglasClave, scheduledPostMedia, scheduledPosts } from '@/db'
 import { basePublica, borrar, keyDesdeUrl, listar, type ObjetoAlmacenado } from '@/lib/storage'
 
 /**
@@ -52,28 +52,35 @@ export function keysReferenciadas(urls: Set<string>, base: string): Set<string> 
 }
 
 /**
- * Las cinco columnas que pueden guardar una URL nuestra. `social_posts.thumbnail_url`
- * no está a propósito: esa URL es de la red social, no del almacén.
+ * Toda columna que puede guardar una URL de nuestro almacén. Es la fuente de verdad del
+ * barrido: las consultas se generan de acá, así que una columna nueva sin registrar no
+ * «se olvida en el barrido», simplemente no existe para él.
+ *
+ * Lo que falta a propósito, con su motivo (y lo que hace que un test —no la memoria de
+ * quien lea esto— note una séptima columna que nadie registre): `social_posts.
+ * thumbnail_url` es el CDN de la red, no algo que copiamos; `source_posts.url` es el
+ * tuit ajeno, otra red también; `links.url` es el destino que escribe el dueño del
+ * link, no un archivo. Ver `storage-gc.test.ts`, que deriva esta lista del esquema real
+ * en vez de repetirla a mano.
  */
-async function urlsReferenciadas(): Promise<Set<string>> {
+export const COLUMNAS_DE_ARCHIVO = [
+  { tabla: 'profiles', columna: 'avatar_url', ref: profiles.avatarUrl },
+  { tabla: 'profiles', columna: 'og_image_url', ref: profiles.ogImageUrl },
+  { tabla: 'links', columna: 'image_url', ref: links.imageUrl },
+  { tabla: 'scheduled_posts', columna: 'cover_url', ref: scheduledPosts.coverUrl },
+  { tabla: 'scheduled_post_media', columna: 'blob_url', ref: scheduledPostMedia.blobUrl },
+  { tabla: 'reglas_clave', columna: 'documento_url', ref: reglasClave.documentoUrl },
+] as const
+
+export async function urlsReferenciadas(): Promise<Set<string>> {
   // A propósito sin dueño: el bucket es uno solo, así que lo referenciado por cualquier
   // usuario protege el archivo. Filtrar por dueño aquí borraría los archivos de los demás.
   const db = getDb()
-  const [perfiles, enlaces, posts, media] = await Promise.all([
-    db.select({ avatar: profiles.avatarUrl, og: profiles.ogImageUrl }).from(profiles),
-    db.select({ imagen: links.imageUrl }).from(links),
-    db.select({ portada: scheduledPosts.coverUrl }).from(scheduledPosts),
-    db.select({ blob: scheduledPostMedia.blobUrl }).from(scheduledPostMedia),
-  ])
-
+  const filas = await Promise.all(
+    COLUMNAS_DE_ARCHIVO.map((c) => db.select({ valor: c.ref }).from(c.ref.table)),
+  )
   const urls = new Set<string>()
-  for (const p of perfiles) {
-    if (p.avatar) urls.add(p.avatar)
-    if (p.og) urls.add(p.og)
-  }
-  for (const e of enlaces) if (e.imagen) urls.add(e.imagen)
-  for (const p of posts) if (p.portada) urls.add(p.portada)
-  for (const m of media) urls.add(m.blob)
+  for (const grupo of filas) for (const f of grupo) if (f.valor) urls.add(f.valor)
   return urls
 }
 

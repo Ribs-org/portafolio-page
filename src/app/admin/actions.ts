@@ -11,7 +11,7 @@ import { LINK_KINDS, type LinkKind } from '@/db/schema'
 import { SITE_TIMEZONE } from '@/lib/analytics'
 import { destroySession, requireAdmin, requireUser } from '@/lib/auth'
 import { normalizeCampaignTag } from '@/lib/social/campaign'
-import { validarRegla } from '@/lib/social/comentarios/reglas'
+import { columnasEditablesDeRegla, validarRegla } from '@/lib/social/comentarios/reglas'
 import { csvToBatchItems } from '@/lib/social/publish/csv'
 import {
   scheduleBatch,
@@ -1000,7 +1000,11 @@ export async function updateScheduledPost(
       .values({ postId, ...reglaCheck.regla })
       .onConflictDoUpdate({
         target: reglasClave.postId,
-        set: { ...reglaCheck.regla, updatedAt: new Date() },
+        // Solo las columnas que este editor administra (palabra, mensaje, respuesta
+        // pública): un `set` con la regla entera pisaría `documentoUrl` con `null` en
+        // cada guardado, aunque la regla se haya creado por API con su PDF. Ver
+        // `columnasEditablesDeRegla`.
+        set: { ...columnasEditablesDeRegla(reglaCheck.regla), updatedAt: new Date() },
       })
   } else {
     await db.delete(reglasClave).where(eq(reglasClave.postId, postId))

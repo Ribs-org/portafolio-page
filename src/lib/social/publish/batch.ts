@@ -7,7 +7,9 @@ import { guardar } from '@/lib/storage'
 import { getDb, scheduledPosts, scheduledPostMedia, scheduledPostTargets, reglasClave } from '@/db'
 import { randomUUID } from 'node:crypto'
 import { CuentaInvalida, cuentaUnicaPorRed, verificarCuentas, type CuentaDestino } from '../cuentas'
-import { validarRegla } from '../comentarios/reglas'
+import { validarRegla, REGLA_DOCUMENTO } from '../comentarios/reglas'
+import { descargarSeguro } from './descarga-segura'
+import { documentoToBlob } from './documento'
 
 // Same derivation as SITE_TIMEZONE in lib/analytics — duplicated here because that
 // module is server-only and this one must stay importable by vitest.
@@ -333,19 +335,12 @@ export async function mediaToBlob(
   url: string,
   expected: 'image' | 'video' | null,
 ): Promise<{ url: string; mediaType: 'image' | 'video' } | null> {
-  let response: Response
-  try {
-    // Third-party hosting named in a spreadsheet cell: a host that stalls must cost
-    // this row thirty seconds, not the whole batch's 240s budget.
-    response = await fetch(url, { signal: AbortSignal.timeout(30_000) })
-  } catch (error) {
-    console.error('No se pudo descargar la media del lote:', String(error).slice(0, 200), url.slice(0, 200))
-    return null
-  }
-  if (!response.ok) {
-    console.error('No se pudo descargar la media del lote:', response.status, url.slice(0, 200))
-    return null
-  }
+  // Third-party hosting named in a spreadsheet cell: a host that stalls must cost this
+  // row thirty seconds, not the whole batch's 240s budget. `descargarSeguro` es la
+  // comprobación de red interna compartida con `documentoToBlob` (documento.ts): sin
+  // ella, esta fila pedía cualquier URL que trajera el CSV en nombre del servidor.
+  const response = await descargarSeguro(url, 'la media del lote')
+  if (!response) return null
   const contentType = response.headers.get('content-type') ?? ''
   // The server's content-type is the truth: with an extension it must agree (a PDF
   // renamed .jpg would otherwise reach Meta as an "image"); without one — a Drive
@@ -433,6 +428,22 @@ export async function scheduleBatch(ownerId: string, items: BatchItem[]): Promis
         continue
       }
 
+      // Todavía antes de subir nada: `validarRegla` es pura y `validateBatchItem` ya la
+      // corrió, así que la forma de `documentoUrl` está garantizada; lo que falta es
+      // traer el archivo de verdad. Va acá, junto a los demás rechazos tempranos, y no
+      // más abajo (después del bucle que sube la media) porque el PDF pesa hasta 25 MB
+      // y la media de la fila puede pesar cientos de veces más — una fila que de todos
+      // modos se va a rechazar no debe pagar esa subida primero.
+      const reglaCheck = validarRegla(item.regla)
+      let documentoUrl: string | null = null
+      if (!('error' in reglaCheck) && reglaCheck.regla?.documentoUrl) {
+        documentoUrl = await documentoToBlob(reglaCheck.regla.documentoUrl)
+        if (!documentoUrl) {
+          results.push({ index, ok: false, error: REGLA_DOCUMENTO })
+          continue
+        }
+      }
+
       const uploaded: Array<{ url: string; mediaType: 'image' | 'video' }> = []
       let mediaFailed = false
       for (const url of item.media) {
@@ -492,7 +503,6 @@ export async function scheduleBatch(ownerId: string, items: BatchItem[]): Promis
 
       const atributosCheck = validateAtributos(item.atributos)
       const atributos = 'error' in atributosCheck ? null : atributosCheck.atributos
-      const reglaCheck = validarRegla(item.regla)
 
       const [post] = await db
         .insert(scheduledPosts)
@@ -523,7 +533,9 @@ export async function scheduleBatch(ownerId: string, items: BatchItem[]): Promis
       )
 
       if (!('error' in reglaCheck) && reglaCheck.regla) {
-        await db.insert(reglasClave).values({ postId: post!.id, ...reglaCheck.regla })
+        // La URL de R2 (`documentoUrl`, del paso de arriba) manda sobre la del que llamó:
+        // `...reglaCheck.regla` la trae también, pero ya copiada, no la ajena.
+        await db.insert(reglasClave).values({ postId: post!.id, ...reglaCheck.regla, documentoUrl })
       }
 
       results.push({ index, ok: true, postId: post!.id })

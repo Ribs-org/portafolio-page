@@ -8,16 +8,37 @@ export const RESPUESTA_PUBLICA_POR_DEFECTO = 'Te lo mandé por privado 📩'
 export const REGLA_PALABRA = 'La palabra clave es una sola palabra, sin espacios, hasta 30 letras.'
 export const REGLA_MENSAJE = 'El mensaje del privado va de 1 a 1000 caracteres.'
 export const REGLA_RESPUESTA = 'La respuesta pública va de 1 a 300 caracteres.'
+export const REGLA_DOCUMENTO = 'El documento tiene que ser una URL absoluta a un PDF de hasta 25 MB.'
 
 export const MAX_PALABRA = 30
 export const MAX_MENSAJE = 1000
 export const MAX_RESPUESTA = 300
+export const MAX_DOCUMENTO_BYTES = 25 * 1024 * 1024
 /** Cada automática son dos llamadas a la red dentro de los 120 s del sondeo. */
 export const MAX_AUTOMATICAS_POR_CORRIDA = 20
 
 const REDES_CON_PRIVADO = new Set(['instagram', 'facebook'])
 
-export type ReglaLimpia = { palabra: string; mensaje: string; respuestaPublica: string }
+export type ReglaLimpia = {
+  palabra: string
+  mensaje: string
+  respuestaPublica: string
+  documentoUrl: string | null
+}
+
+/**
+ * Las columnas de `reglasClave` que el editor del panel (`updateScheduledPost`, en
+ * `actions.ts`) sí administra. `documentoUrl` queda fuera a propósito: esa pantalla no
+ * tiene campo de documento y no lo va a tener en esta entrega, así que su `UPDATE` no
+ * puede nombrar esa columna — nombrarla la pisaría con `null` cada vez que el dueño solo
+ * cambia la hora o el texto, borrando el PDF de una regla creada por API. Vive acá y no
+ * en `actions.ts` porque ese archivo es `'use server'` y solo puede exportar funciones
+ * async: esto necesita ser una función pura para poder probarse sin simular la base.
+ */
+export function columnasEditablesDeRegla(regla: ReglaLimpia): Omit<ReglaLimpia, 'documentoUrl'> {
+  const { palabra, mensaje, respuestaPublica } = regla
+  return { palabra, mensaje, respuestaPublica }
+}
 
 function sinTildes(texto: string): string {
   return texto.normalize('NFD').replace(/[̀-ͯ]/g, '')
@@ -96,7 +117,23 @@ export function validarRegla(raw: unknown): { regla: ReglaLimpia | null } | { er
   if (mensaje.length < 1 || [...mensaje].length > MAX_MENSAJE) return { error: REGLA_MENSAJE }
   const respuestaPublica = respuestaBruta.length > 0 ? respuestaBruta : RESPUESTA_PUBLICA_POR_DEFECTO
   if ([...respuestaPublica].length > MAX_RESPUESTA) return { error: REGLA_RESPUESTA }
-  return { regla: { palabra, mensaje, respuestaPublica } }
+
+  // Solo la forma: que sea una URL absoluta que el servidor pueda intentar leer. Que de
+  // verdad sea un PDF y que quepa se comprueba al descargarlo (`documento.ts`), porque
+  // esta función es pura y no puede mirar el archivo.
+  const documentoBruto = raw.documentoUrl
+  let documentoUrl: string | null = null
+  if (documentoBruto !== undefined && documentoBruto !== null && documentoBruto !== '') {
+    if (typeof documentoBruto !== 'string') return { error: REGLA_DOCUMENTO }
+    try {
+      const url = new URL(documentoBruto)
+      if (url.protocol !== 'http:' && url.protocol !== 'https:') return { error: REGLA_DOCUMENTO }
+    } catch {
+      return { error: REGLA_DOCUMENTO }
+    }
+    documentoUrl = documentoBruto
+  }
+  return { regla: { palabra, mensaje, respuestaPublica, documentoUrl } }
 }
 
 export type Plan =
@@ -124,7 +161,16 @@ export function decidirAutomatica(entrada: {
   if (entrada.esPropio) return { accion: 'ignorar' }
   if (!coincide(entrada.texto, entrada.regla.palabra)) return { accion: 'ignorar' }
 
-  const mensaje = enlaceMedible(entrada.regla.mensaje, entrada.regla.palabra, entrada.sitioHost)
+  // El documento nunca pasa por `enlaceMedible`: esa función solo recibe
+  // `entrada.regla.mensaje` (el texto del dueño), y el enlace del documento se concatena
+  // después de que ya corrió. Eso es estructural, no depende del orden en que se escriba
+  // acá — y de todos modos el host de R2 no es el sitio propio, así que `mismoHost` lo
+  // habría descartado igual. Va al final por legibilidad: lo primero que se lee es lo que
+  // el dueño escribió. (Si algún día `enlaceMedible` pasara a aplicarse sobre el mensaje ya
+  // completo, con el documento adentro, el orden sí empezaría a importar para no robarle
+  // la etiqueta al enlace del dueño; hoy no es el caso.)
+  const texto = enlaceMedible(entrada.regla.mensaje, entrada.regla.palabra, entrada.sitioHost)
+  const mensaje = entrada.regla.documentoUrl ? `${texto}\n\n${entrada.regla.documentoUrl}` : texto
   const dentroDelPlazo = entrada.now.getTime() - entrada.publishedAt.getTime() < DIAS_PRIVADO * 864e5
   const hayPrivado =
     entrada.privadoEncendido && REDES_CON_PRIVADO.has(entrada.network) && dentroDelPlazo
