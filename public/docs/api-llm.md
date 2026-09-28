@@ -62,7 +62,7 @@ no tres días después dentro de un cron. `mensaje` es obligatorio junto con `pa
 `documentoUrl` es opcional.
 
 **Qué pasa hoy cuando alguien comenta la palabra:** el mensaje con el enlace del PDF sale
-como **respuesta pública** al comentario, no por mensaje privado. Ver la sección 5, «Lo que
+como **respuesta pública** al comentario, no por mensaje privado. Ver la sección 6, «Lo que
 Meta no permite», para el porqué y para lo que cambia cuando el privado se encienda.
 
 ## 3. Frases de error literales
@@ -89,6 +89,7 @@ no por subcadena parcial ni regex:
 | `Un contenido patrocinado no puede ser privado.` | `opciones` con `comercial: patrocinado` y `privacidad: SELF_ONLY` |
 | `Las opciones de la red no se entendieron.` | `opciones` mal formado, o para un destino que no las pide |
 | `TikTok recibe un video, o hasta 35 fotos JPG o WebP.` | `media` con dos videos, mezcla, más de 35 fotos, u otro formato |
+| `Un trial reel es un solo video, sin fotos.` | `opciones.<destino>.trialReel: true` con fotos, carrusel, dos videos o sin ningún video en `media` |
 | `Una de las cuentas elegidas no es tuya.` | `cuentas` con un identificador que no es del dueño |
 | `La cuenta <handle> no está conectada. Vuelve a conectarla en Cuentas.` | `cuentas` con un identificador válido pero desconectado |
 | `No hay una cuenta de <red> conectada.` | `redes` con un nombre sin ninguna cuenta conectada de esa red |
@@ -120,8 +121,41 @@ fila ya programada la programa otra vez.
   va únicamente a TikTok, Threads o X **no hace nada** —no falla, no avisa: nunca se dispara,
   porque nadie lee esos comentarios—. La regla vale la pena solo si el post sale a alguna de esas
   tres.
+- **No devuelve las opciones de un post ya programado.** `GET /api/schedule/posts` no trae
+  `opciones` por destino, así que un trial reel programado por esta vía no se puede verificar
+  después por API — ni que se aceptó como trial, ni si ya se graduó.
 
-## 5. Lo que Meta no permite (léelo antes de proponer mandar el PDF adjunto)
+## 5. Trial reels de Instagram
+
+```bash
+curl -X POST https://www.vicente-pareja.cl/api/schedule/batch \
+  -H "Authorization: Bearer $SCHEDULE_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "posts": [
+      {
+        "fecha": "2026-10-01 19:00",
+        "texto": "Reel de prueba.",
+        "redes": ["instagram"],
+        "media": ["https://ej.com/reel.mp4"],
+        "opciones": { "instagram": { "trialReel": true } }
+      }
+    ]
+  }'
+```
+
+Tres cosas, en orden:
+
+1. **Un video, nada más.** `media` tiene que resolver a exactamente un video y ninguna foto;
+   si no, la fila se rechaza al programar con `Un trial reel es un solo video, sin fotos.`,
+   antes de subir un byte.
+2. **La elegibilidad se descubre al publicar, no al programar.** Instagram exige la función
+   habilitada en esa cuenta (profesional, pública, con seguidores suficientes, según los
+   términos de Meta); una fila aceptada acá puede fallar después en ese destino.
+3. **No se sabe si se graduó, por API.** El dueño lo comparte con todos desde la app de
+   Instagram cuando quiera; no hay endpoint que lo dispare ni que lo consulte.
+
+## 6. Lo que Meta no permite (léelo antes de proponer mandar el PDF adjunto)
 
 El documento de `regla.documentoUrl` **nunca viaja como adjunto**. Se concatena como enlace al
 final de `mensaje`, separado por una línea en blanco. La razón es una restricción de Meta, no

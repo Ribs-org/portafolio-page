@@ -17,10 +17,10 @@ import {
   type BatchItem,
 } from './batch'
 import { ATRIBUTOS_ERROR } from './atributos'
-import { TIKTOK_SIN_PRIVACIDAD, OPCIONES_ERROR } from './opciones'
+import { TIKTOK_SIN_PRIVACIDAD, OPCIONES_ERROR, TRIAL_REEL_MEDIA } from './opciones'
 import { TIKTOK_MEDIA } from './validate'
 import { REGLA_PALABRA, REGLA_MENSAJE, REGLA_DOCUMENTO } from '../comentarios/reglas'
-import type { CuentaDestino } from '../cuentas'
+import { verificarCuentas, type CuentaDestino } from '../cuentas'
 import { reglasClave } from '@/db'
 
 // `mediaToBlob` sube con `guardar`; sin precedente en el repo para simularlo, resuelto
@@ -417,6 +417,34 @@ describe('opciones por red en el lote', () => {
     )
     expect(validateBatchItem({ ...fila, media: ['https://drive.google.com/uc?id=x'] }, now)).toBeNull()
   })
+
+  it('instagram acepta trialReel con un solo video', () => {
+    const fila: BatchItem = { ...base, redes: ['instagram'], media: ['https://ej.com/a.mp4'] }
+    expect(validateBatchItem({ ...fila, opciones: { instagram: { trialReel: true } } }, now)).toBeNull()
+    expect(validateBatchItem({ ...fila, opciones: { instagram: { trialReel: false } } }, now)).toBeNull()
+  })
+
+  it('un trial reel con fotos, con dos videos o sin video se rechaza por su frase', () => {
+    const trial = { ...base, redes: ['instagram'], opciones: { instagram: { trialReel: true } } }
+    expect(validateBatchItem({ ...trial, media: ['https://ej.com/a.jpg'] }, now)).toBe(TRIAL_REEL_MEDIA)
+    expect(validateBatchItem({ ...trial, media: ['https://ej.com/a.mp4', 'https://ej.com/b.jpg'] }, now)).toBe(
+      TRIAL_REEL_MEDIA,
+    )
+    expect(validateBatchItem({ ...trial, media: ['https://ej.com/a.mp4', 'https://ej.com/b.mp4'] }, now)).toBe(
+      TRIAL_REEL_MEDIA,
+    )
+    expect(validateBatchItem({ ...trial, media: [] }, now)).toBe(TRIAL_REEL_MEDIA)
+  })
+
+  it('un link de Drive puede ser el video del trial reel: no se rechaza antes de descargar', () => {
+    const trial = { ...base, redes: ['instagram'], opciones: { instagram: { trialReel: true } } }
+    expect(validateBatchItem({ ...trial, media: ['https://drive.google.com/uc?id=x'] }, now)).toBeNull()
+  })
+
+  it('la forma de instagram se comprueba igual que la de tiktok', () => {
+    const fila: BatchItem = { ...base, redes: ['instagram'], media: ['https://ej.com/a.mp4'] }
+    expect(validateBatchItem({ ...fila, opciones: { instagram: { trialreel: true } } }, now)).toBe(OPCIONES_ERROR)
+  })
 })
 
 describe('regla de palabra clave en el lote', () => {
@@ -490,5 +518,40 @@ describe('scheduleBatch — el documento antes de escribir la regla, y antes de 
     const valores = reglaInsert?.valores as { documentoUrl: string | null } | undefined
     expect(valores?.documentoUrl).toBe('https://media.ej.cl/reglas/xyz.pdf')
     expect(valores?.documentoUrl).not.toBe('https://origen.ej.com/g.pdf')
+  })
+})
+
+// La comprobación post-descarga de la regla de media del trial reel (errorDeMediaPorOpciones
+// con los tipos reales, ~463 de batch.ts): un Drive sin extensión pasa la comprobación
+// declarada (sinTipo no rechaza) pero al descargar resulta imagen, y ahí sí se rechaza.
+describe('scheduleBatch — trial reel, la comprobación de media después de descargar', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals()
+    inserts.length = 0
+    guardarMock.mockClear()
+  })
+
+  it('un Drive que resulta imagen tras descargar rechaza el trial reel y no inserta nada', async () => {
+    vi.mocked(verificarCuentas).mockResolvedValueOnce([{ id: 'ig-1', network: 'instagram', handle: '@uno' }])
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(
+        async () =>
+          new Response(new Uint8Array([1, 2, 3]), { status: 200, headers: { 'content-type': 'image/jpeg' } }),
+      ),
+    )
+    const item: BatchItem = {
+      fecha: '2030-01-01 10:00',
+      texto: 'Hola',
+      cuentas: ['ig-1'],
+      redes: [],
+      media: ['https://drive.google.com/uc?id=x'],
+      opciones: { instagram: { trialReel: true } },
+    }
+
+    const resultados = await scheduleBatch('owner-1', [item])
+
+    expect(resultados).toEqual([{ index: 0, ok: false, error: TRIAL_REEL_MEDIA }])
+    expect(inserts).toEqual([])
   })
 })

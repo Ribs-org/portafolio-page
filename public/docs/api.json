@@ -57,7 +57,7 @@
           },
           "opciones": {
             "type": "object",
-            "description": "Lo que cada destino exige elegir. Obligatorio si algún destino de la fila es una cuenta de TikTok (hoy la única red que pide algo). La clave del objeto es el identificador de cuenta del destino, o el nombre de la red si la fila tiene exactamente una cuenta de esa red. Forma para TikTok: { modo: 'directo'|'borrador', privacidad?: 'PUBLIC_TO_EVERYONE'|'MUTUAL_FOLLOW_FRIENDS'|'FOLLOWER_OF_CREATOR'|'SELF_ONLY' (obligatoria en 'directo'; hoy solo SELF_ONLY llega a publicarse), comentarios?: boolean, duo?: boolean, pegar?: boolean, comercial?: 'no'|'marca_propia'|'patrocinado' }.",
+            "description": "Lo que cada destino exige elegir. Obligatorio si algún destino de la fila es una cuenta de TikTok; opcional para Instagram. La clave del objeto es el identificador de cuenta del destino, o el nombre de la red si la fila tiene exactamente una cuenta de esa red. Forma para TikTok: { modo: 'directo'|'borrador', privacidad?: 'PUBLIC_TO_EVERYONE'|'MUTUAL_FOLLOW_FRIENDS'|'FOLLOWER_OF_CREATOR'|'SELF_ONLY' (obligatoria en 'directo'; hoy solo SELF_ONLY llega a publicarse), comentarios?: boolean, duo?: boolean, pegar?: boolean, comercial?: 'no'|'marca_propia'|'patrocinado' }. Forma para Instagram: { trialReel?: boolean } — un trial reel exige exactamente un video en 'media' y ninguna foto, o la fila se rechaza con 'Un trial reel es un solo video, sin fotos.'.",
             "additionalProperties": true
           },
           "regla": {

@@ -299,8 +299,10 @@ la misma red en el mismo corte.
 TikTok pide sus propias opciones por destino —privacidad, comentarios, dúo, comercial—, así
 que con dos cuentas de TikTok marcadas verás dos bloques, uno por cuenta. No se comparten a
 propósito: TikTok consulta los permisos por creador, y lo que una cuenta admite la otra
-puede no admitirlo. La app del teléfono todavía no ofrece TikTok como destino en
-absoluto: ahí no hay dónde elegir esas opciones.
+puede no admitirlo. Instagram también puede pedir una opción por destino —si el reel sale
+como trial reel—, hoy solo vía la API del lote (`public/docs/api-editor.md`): el compositor
+del panel todavía no trae ese interruptor. La app del teléfono todavía no ofrece TikTok
+como destino en absoluto: ahí no hay dónde elegir esas opciones.
 
 ### TikTok
 
@@ -689,12 +691,13 @@ taxonomía de quien crea el contenido: sirve para correlacionar decisiones creat
 con resultados. El CSV no lo lleva; el editor de un post programado lo muestra y
 permite corregirlo.
 
-Y `opciones`, obligatorio cuando algún destino de la fila es una cuenta de TikTok: el
-modo (directo o borrador), la privacidad y las casillas que TikTok exige elegir por
-publicación. Se llavea por destino: cada clave se busca primero entre los
-identificadores de cuenta de la fila, y si no coincide con ninguno se acepta como
-nombre de red — resuelta solo si la fila tiene una única cuenta de esa red, igual que
-`redes`. El detalle está en `public/docs/api-editor.md`.
+Y `opciones`, obligatorio cuando algún destino de la fila es una cuenta de TikTok (el
+modo, la privacidad y las casillas que TikTok exige elegir por publicación) y opcional
+para Instagram (`trialReel`, para que el reel salga como trial reel — solo lo ven quienes
+no siguen la cuenta, hasta que el dueño lo comparte desde la app). Se llavea por destino:
+cada clave se busca primero entre los identificadores de cuenta de la fila, y si no
+coincide con ninguno se acepta como nombre de red — resuelta solo si la fila tiene una
+única cuenta de esa red, igual que `redes`. El detalle está en `public/docs/api-editor.md`.
 
 ### Métricas por API
 

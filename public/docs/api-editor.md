@@ -164,9 +164,9 @@ que puedes descubrir qué funciona: etiqueta de forma consistente lo que decides
 Recomendación práctica: mantén un vocabulario estable entre posts. `"hook": "pregunta"`
 en unos y `"gancho": "pregunta-directa"` en otros hace imposible comparar.
 
-### `opciones` (obligatorio si algún destino de la fila es una cuenta de TikTok)
+### `opciones` (obligatorio si algún destino es una cuenta de TikTok; opcional para Instagram)
 
-Lo que cada destino exige elegir. Hoy solo TikTok pide algo. La clave del objeto **no
+Lo que cada destino exige elegir. La clave del objeto **no
 es la red**: es el identificador de la cuenta destino. Para no obligarte a conocer los
 identificadores cuando no hace falta, cada clave se resuelve con la misma regla que
 `redes`: se busca primero entre los identificadores de cuenta de los destinos de la
@@ -220,6 +220,30 @@ el JSON.
 Media de TikTok: **un solo video** (mp4, mov, webm) **o de 1 a 35 fotos** (jpg, webp),
 nunca mezcla. En el CSV, `opciones` es la sexta columna, después de `portada`, con el mismo
 JSON entre comillas dobles escapadas.
+
+**Instagram — trial reel.** Con un destino de Instagram, `opciones` acepta:
+
+```json
+"opciones": { "instagram": { "trialReel": true } }
+```
+
+Con dos cuentas de Instagram en la misma fila, `"instagram"` como clave es ambiguo, igual
+que con TikTok: hay que usar el id de cada cuenta como clave (`{ "<id de la cuenta>": {
+"trialReel": true } }`).
+
+Un trial reel solo lo ven, al principio, quienes no siguen la cuenta; **el dueño lo
+comparte con todos desde la app de Instagram** cuando quiera. No hay graduación
+automática por API — nada acá la dispara ni la consulta.
+
+**Solo aplica a un video.** Con fotos, carrusel o sin ningún video en `media`, la fila se
+rechaza con `Un trial reel es un solo video, sin fotos.`, antes de subir nada.
+
+**La elegibilidad se descubre al publicar, no al programar.** Instagram tiene que tener la
+función habilitada en esa cuenta (profesional, pública y con seguidores suficientes, según
+los términos de Meta): una fila aceptada acá puede fallar después en ese destino, con su
+propia frase.
+
+**Después no hay forma de saber por API si se graduó.** Eso se mira en la app de Instagram.
 
 ### `regla` (opcional) — respuesta automática por palabra clave
 
@@ -286,6 +310,7 @@ Instagram acepta: 1 foto, 1 video, o 2–10 fotos (carrusel).
 | `«<red>» en opciones es ambiguo: la fila tiene N cuentas de esa red (<handles>). Usa el id de cada cuenta como clave.` | la clave de `opciones` nombra una red con dos o más destinos en esta fila |
 | `«<clave1>» y «<clave2>» en opciones nombran el mismo destino. Deja una sola clave por destino.` | dos claves de `opciones` (por ejemplo el id de una cuenta y el nombre de su única red) resuelven al mismo destino |
 | `TikTok recibe un video, o hasta 35 fotos JPG o WebP.` | dos videos, mezcla, más de 35 fotos, png/gif, o video que no es mp4/mov/webm |
+| `Un trial reel es un solo video, sin fotos.` | `opciones.<destino>.trialReel: true` con fotos, carrusel, dos videos o sin ningún video en `media` |
 | `Una de las cuentas elegidas no es tuya.` | un identificador en `cuentas` que no es una cuenta del dueño (o no existe) |
 | `La cuenta <handle> no está conectada. Vuelve a conectarla en Cuentas.` | un identificador en `cuentas` que existe pero perdió la credencial — **solo con `cuentas`**: con `redes`, una cuenta desconectada da la frase de abajo |
 | `No hay una cuenta de <red> conectada.` | un nombre en `redes` sin ninguna cuenta *conectada* de esa red — no tiene ninguna, o la única que tiene está desconectada; las dos dan la misma frase |
