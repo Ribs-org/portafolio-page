@@ -3,6 +3,8 @@ import {
   OPCIONES_ERROR,
   TIKTOK_PATROCINADO_PRIVADO,
   TIKTOK_SIN_PRIVACIDAD,
+  TRIAL_REEL_MEDIA,
+  errorDeMediaPorOpciones,
   opcionesDesdeFormularioPorCuenta,
   resumenOpciones,
   validarOpciones,
@@ -80,9 +82,9 @@ describe('validarOpciones para tiktok', () => {
 
 describe('validarOpciones para otras redes', () => {
   it('sin opciones es null; con opciones es error', () => {
-    expect(validarOpciones('instagram', undefined)).toEqual({ opciones: null })
-    expect(validarOpciones('instagram', null)).toEqual({ opciones: null })
-    expect(validarOpciones('instagram', { modo: 'directo' })).toEqual({ error: OPCIONES_ERROR })
+    expect(validarOpciones('threads', undefined)).toEqual({ opciones: null })
+    expect(validarOpciones('threads', null)).toEqual({ opciones: null })
+    expect(validarOpciones('threads', { modo: 'directo' })).toEqual({ error: OPCIONES_ERROR })
   })
 })
 
@@ -228,5 +230,74 @@ describe('resumenOpciones', () => {
     expect(resumenOpciones('tiktok', null)).toBeNull()
     expect(resumenOpciones('instagram', { modo: 'directo' })).toBeNull()
     expect(resumenOpciones('tiktok', 'basura')).toBeNull()
+  })
+})
+
+describe('validarOpciones para instagram', () => {
+  it('sin opciones, o con trialReel apagado, es null: reel normal y no se guarda nada', () => {
+    expect(validarOpciones('instagram', undefined)).toEqual({ opciones: null })
+    expect(validarOpciones('instagram', null)).toEqual({ opciones: null })
+    expect(validarOpciones('instagram', { trialReel: false })).toEqual({ opciones: null })
+  })
+
+  it('trialReel: true se guarda tal cual', () => {
+    expect(validarOpciones('instagram', { trialReel: true })).toEqual({ opciones: { trialReel: true } })
+  })
+
+  it('cualquier otra forma es la frase de forma: un modelo no puede mandar algo que se ignore', () => {
+    // Un `trialreel` mal escrito, o una clave que todavía no existe (`graduacion`), no
+    // pueden pasar en silencio como reel normal: el que la manda cree que se aplicó.
+    expect(validarOpciones('instagram', { trialreel: true })).toEqual({ error: OPCIONES_ERROR })
+    expect(validarOpciones('instagram', { trialReel: 'sí' })).toEqual({ error: OPCIONES_ERROR })
+    expect(validarOpciones('instagram', { trialReel: true, graduacion: 'manual' })).toEqual({ error: OPCIONES_ERROR })
+    expect(validarOpciones('instagram', 'trial')).toEqual({ error: OPCIONES_ERROR })
+  })
+})
+
+describe('errorDeMediaPorOpciones', () => {
+  const trial = { ig: { trialReel: true as const } }
+
+  it('un trial reel exige exactamente un video, sin fotos', () => {
+    expect(errorDeMediaPorOpciones(trial, { videos: 1, fotos: 0, sinTipo: 0 })).toBeNull()
+    expect(errorDeMediaPorOpciones(trial, { videos: 0, fotos: 1, sinTipo: 0 })).toBe(TRIAL_REEL_MEDIA)
+    expect(errorDeMediaPorOpciones(trial, { videos: 1, fotos: 1, sinTipo: 0 })).toBe(TRIAL_REEL_MEDIA)
+    expect(errorDeMediaPorOpciones(trial, { videos: 2, fotos: 0, sinTipo: 0 })).toBe(TRIAL_REEL_MEDIA)
+    expect(errorDeMediaPorOpciones(trial, { videos: 0, fotos: 0, sinTipo: 0 })).toBe(TRIAL_REEL_MEDIA)
+  })
+
+  it('antes de descargar, un archivo sin tipo conocido (un link de Drive) puede ser el video', () => {
+    // La re-validación con los tipos reales da el veredicto final; acá no se rechaza
+    // lo que todavía puede ser correcto.
+    expect(errorDeMediaPorOpciones(trial, { videos: 0, fotos: 0, sinTipo: 1 })).toBeNull()
+    expect(errorDeMediaPorOpciones(trial, { videos: 0, fotos: 0, sinTipo: 2 })).toBe(TRIAL_REEL_MEDIA)
+    expect(errorDeMediaPorOpciones(trial, { videos: 1, fotos: 0, sinTipo: 1 })).toBe(TRIAL_REEL_MEDIA)
+  })
+
+  it('sin trial reel no opina, aunque haya opciones de TikTok', () => {
+    expect(errorDeMediaPorOpciones({}, { videos: 0, fotos: 3, sinTipo: 0 })).toBeNull()
+    expect(errorDeMediaPorOpciones({ tt: { modo: 'borrador' } }, { videos: 0, fotos: 3, sinTipo: 0 })).toBeNull()
+  })
+})
+
+describe('opcionesDesdeFormularioPorCuenta para instagram', () => {
+  const ig = { id: 'ig-1', network: 'instagram', handle: 'vicente' }
+
+  it('el interruptor encendido produce trialReel: true; apagado o ausente, nada', () => {
+    const encendido = new FormData()
+    encendido.set('instagramTrial:ig-1', 'on')
+    expect(opcionesDesdeFormularioPorCuenta(encendido, [ig])).toEqual({ 'ig-1': { trialReel: true } })
+
+    const apagado = new FormData()
+    apagado.set('instagramTrial:ig-1', '')
+    expect(opcionesDesdeFormularioPorCuenta(apagado, [ig])).toEqual({})
+    expect(opcionesDesdeFormularioPorCuenta(new FormData(), [ig])).toEqual({})
+  })
+})
+
+describe('resumenOpciones para instagram', () => {
+  it('un trial reel se resume en una línea que dice quién lo comparte', () => {
+    expect(resumenOpciones('instagram', { trialReel: true })).toBe('Trial reel — lo compartes tú desde Instagram')
+    expect(resumenOpciones('instagram', null)).toBeNull()
+    expect(resumenOpciones('instagram', { trialReel: false })).toBeNull()
   })
 })

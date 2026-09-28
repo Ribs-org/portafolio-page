@@ -1,5 +1,5 @@
-// Lo que cada red obliga a elegir por destino antes de publicar. Hoy solo TikTok pide
-// algo; la unión crece red por red y el resto del sistema solo transporta el objeto.
+// Lo que cada red obliga a elegir por destino antes de publicar. TikTok e Instagram piden
+// algo hoy; la unión crece red por red y el resto del sistema solo transporta el objeto.
 
 import type { CuentaDestino } from '../cuentas'
 
@@ -17,7 +17,16 @@ export type OpcionesTikTok =
       comercial: ComercialTikTok
     }
 
-export type OpcionesDestino = OpcionesTikTok
+/**
+ * Instagram: un reel puede salir como trial reel —solo lo ven quienes no siguen la cuenta,
+ * hasta que el dueño lo comparte con todos desde la app de Instagram—. La graduación no
+ * viaja: el publicador manda siempre `MANUAL` (decisión del dueño, 2026-09-28). El día
+ * que se quiera que decida Instagram, es un campo opcional acá con `manual` por defecto,
+ * y lo ya guardado sigue valiendo.
+ */
+export type OpcionesInstagram = { trialReel: true }
+
+export type OpcionesDestino = OpcionesTikTok | OpcionesInstagram
 
 export const PRIVACIDADES_TIKTOK: readonly PrivacidadTikTok[] = [
   'PUBLIC_TO_EVERYONE',
@@ -38,6 +47,7 @@ const COMERCIALES: readonly ComercialTikTok[] = ['no', 'marca_propia', 'patrocin
 export const TIKTOK_SIN_PRIVACIDAD = 'TikTok necesita que elijas la privacidad.'
 export const TIKTOK_PATROCINADO_PRIVADO = 'Un contenido patrocinado no puede ser privado.'
 export const OPCIONES_ERROR = 'Las opciones de la red no se entendieron.'
+export const TRIAL_REEL_MEDIA = 'Un trial reel es un solo video, sin fotos.'
 
 const MAX_SERIALIZED = 2000
 
@@ -87,6 +97,23 @@ function validarTikTok(raw: unknown): { opciones: OpcionesTikTok } | { error: st
 }
 
 /**
+ * Ausente o apagado es un reel normal y no se guarda nada; encendido se guarda tal cual.
+ * Cualquier otra forma se rechaza —incluida una clave desconocida—: quien manda
+ * `trialreel` mal escrito, o una `graduacion` que todavía no existe, tiene que enterarse,
+ * no recibir un reel normal creyendo que pidió otra cosa. (TikTok ignora claves de más;
+ * acá no, porque esta opción la manda sobre todo un modelo a ciegas.)
+ */
+function validarInstagram(raw: unknown): { opciones: OpcionesInstagram | null } | { error: string } {
+  if (raw === undefined || raw === null) return { opciones: null }
+  if (!esObjeto(raw)) return { error: OPCIONES_ERROR }
+  if (JSON.stringify(raw).length > MAX_SERIALIZED) return { error: OPCIONES_ERROR }
+  for (const clave of Object.keys(raw)) if (clave !== 'trialReel') return { error: OPCIONES_ERROR }
+  const trialReel = casilla(raw.trialReel)
+  if (trialReel === null) return { error: OPCIONES_ERROR }
+  return { opciones: trialReel ? { trialReel: true } : null }
+}
+
+/**
  * Las opciones de un destino, ya limpias, o la frase que explica qué falta. Una red que
  * no pide nada solo acepta no recibir nada.
  */
@@ -95,8 +122,28 @@ export function validarOpciones(
   raw: unknown,
 ): { opciones: OpcionesDestino | null } | { error: string } {
   if (network === 'tiktok') return validarTikTok(raw)
+  if (network === 'instagram') return validarInstagram(raw)
   if (raw === undefined || raw === null) return { opciones: null }
   return { error: OPCIONES_ERROR }
+}
+
+/**
+ * Un trial reel es exactamente un video, sin fotos. Depende de la opción y no de la red,
+ * por eso no vive en `validateScheduleDraft`: la aplican los cuatro caminos que crean
+ * posts (lote, compositor, chequeo y creación del teléfono) sobre las opciones ya
+ * resueltas por cuenta. `sinTipo` son los archivos cuyo tipo todavía no se conoce (una
+ * URL de Drive antes de descargarla): uno solo puede ser el video, así que no se rechaza;
+ * la re-validación con los tipos reales da el veredicto final.
+ */
+export function errorDeMediaPorOpciones(
+  opciones: Record<string, OpcionesDestino>,
+  conteos: { videos: number; fotos: number; sinTipo: number },
+): string | null {
+  const hayTrial = Object.values(opciones).some((o) => 'trialReel' in o)
+  if (!hayTrial) return null
+  if (conteos.fotos > 0 || conteos.videos > 1) return TRIAL_REEL_MEDIA
+  if (conteos.videos + conteos.sinTipo !== 1) return TRIAL_REEL_MEDIA
+  return null
 }
 
 /**
@@ -135,7 +182,8 @@ export function validarOpcionesPorCuenta(
  * de TikTok llevan el identificador de la cuenta como sufijo (`tiktokModo:<id>`) porque
  * puede haber dos bloques en el mismo formulario. Con TikTok marcado y sin campos, la
  * privacidad viaja vacía a propósito: así la validación responde con la frase de la
- * privacidad y no con la de la forma.
+ * privacidad y no con la de la forma. El interruptor de Instagram (`instagramTrial:<id>`)
+ * sigue la misma convención de sufijo por cuenta.
  */
 export function opcionesDesdeFormularioPorCuenta(
   formData: FormData,
@@ -143,6 +191,11 @@ export function opcionesDesdeFormularioPorCuenta(
 ): Record<string, unknown> {
   const raw: Record<string, unknown> = {}
   for (const cuenta of cuentas) {
+    if (cuenta.network === 'instagram') {
+      // `Toggle` con `name` manda 'on' encendido y '' apagado; apagado no produce entrada.
+      if (formData.get(`instagramTrial:${cuenta.id}`) === 'on') raw[cuenta.id] = { trialReel: true }
+      continue
+    }
     if (cuenta.network !== 'tiktok') continue
     const modo = String(formData.get(`tiktokModo:${cuenta.id}`) ?? 'directo')
     raw[cuenta.id] =
@@ -162,6 +215,10 @@ export function opcionesDesdeFormularioPorCuenta(
 
 /** Una línea para el editor y el calendario; null cuando no hay nada legible. */
 export function resumenOpciones(network: string, opciones: unknown): string | null {
+  if (network === 'instagram') {
+    const check = validarInstagram(opciones)
+    return 'error' in check || !check.opciones ? null : 'Trial reel — lo compartes tú desde Instagram'
+  }
   if (network !== 'tiktok') return null
   const check = validarTikTok(opciones)
   if ('error' in check) return null
