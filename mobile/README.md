@@ -128,8 +128,9 @@ En la pestaña **Publicar**:
    «Trial reel · @handle». Encendido, el reel sale solo para quienes no te siguen, y
    **tú lo compartes con todos desde la app de Instagram** cuando quieras. Con fotos o
    con más de un archivo el chip no aparece. Si Instagram no tiene la función habilitada
-   en esa cuenta, el destino falla al publicar con su propia frase, y se reprograma como
-   reel normal desde el panel.
+   en esa cuenta, el destino falla al publicar con su propia frase. El editor no deja
+   apagar la opción ni «Reintentar» la cambia —volvería a pedir el trial y a fallar—: la
+   forma de mandarlo como reel normal es borrar el post y programar otro sin la opción.
 5. Toca **Cuándo** para elegir día y hora, y luego **Programar**. O toca
    **Publicar ahora**: confirma, y sale en los próximos cinco minutos.
 

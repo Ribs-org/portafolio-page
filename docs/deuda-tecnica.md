@@ -314,9 +314,21 @@ comprobar:
    normal; el mapeo solo lo estrecha para el único caso que Meta deja reconocer. Cerrarlo
    pide ver el error real una vez, y entonces reconocerlo por su código y no por su texto.
 
+   El rechazo que sí reconoce por texto ya no se reintenta: `createContainer` marca ese
+   `failed` con `definitivo: true`, y `resolveOutcome` (`publisher.ts`) lo hace fallar en
+   el mismo intento en vez de esperar al tercero. Lo de arriba es justo lo que queda fuera
+   de ese reconocimiento.
+
 Cerrar las tres pide lo mismo: una cuenta de Instagram con trial reels habilitados y una
 tarde — un trial reel con portada, un trial reel sin graduar mirado desde `/api/metrics/posts`,
 y una cuenta sin la función para leer el rechazo real del log.
+
+**El calendario y la cola no marcan un trial reel.** Distinto de las tres de arriba: esto no
+falta por no haberse podido probar, falta porque no se construyó. Solo la página del editor
+de un post programado lo muestra (`resumenOpciones`, «Trial reel — lo compartes tú desde
+Instagram»); las vistas de calendario y de cola siguen leyendo la red y el handle, sin esa
+marca — spec §6 lo deja dicho así a propósito (es otra entrega). Cerrarlo es llevar
+`resumenOpciones` (o su frase) a esas dos vistas.
 
 ## Un par de restos chicos de esta entrega
 

@@ -152,7 +152,10 @@ Tres cosas, en orden:
    antes de subir un byte.
 2. **La elegibilidad se descubre al publicar, no al programar.** Instagram exige la función
    habilitada en esa cuenta (profesional, pública, con seguidores suficientes, según los
-   términos de Meta); una fila aceptada acá puede fallar después en ese destino.
+   términos de Meta); una fila aceptada acá puede fallar después en ese destino, con
+   `Instagram no permite trial reels en esta cuenta.` en el `error` de ese destino —y el
+   destino queda en fallo en esa misma corrida, sin los reintentos que sí recibe un error
+   de red normal.
 3. **No se sabe si se graduó, por API.** El dueño lo comparte con todos desde la app de
    Instagram cuando quiera; no hay endpoint que lo dispare ni que lo consulte.
 

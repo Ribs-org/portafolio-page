@@ -241,7 +241,9 @@ rechaza con `Un trial reel es un solo video, sin fotos.`, antes de subir nada.
 **La elegibilidad se descubre al publicar, no al programar.** Instagram tiene que tener la
 función habilitada en esa cuenta (profesional, pública y con seguidores suficientes, según
 los términos de Meta): una fila aceptada acá puede fallar después en ese destino, con su
-propia frase: `Instagram no permite trial reels en esta cuenta.`
+propia frase: `Instagram no permite trial reels en esta cuenta.` Ese rechazo lo reconoce
+Meta como definitivo, así que el destino queda en fallo en la misma corrida, sin reintentos
+—a diferencia de un error de red normal, que se reintenta hasta tres veces antes de fallar.
 
 **Después no hay forma de saber por API si se graduó.** Eso se mira en la app de Instagram.
 

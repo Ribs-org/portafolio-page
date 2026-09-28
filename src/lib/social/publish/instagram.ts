@@ -88,17 +88,32 @@ async function postForm(
   return { data: await response.json() }
 }
 
+/**
+ * `definitivo: true` viaja solo cuando `motivoDeRechazo` reconoció el rechazo: Meta ya
+ * decidió que no, y `resolveOutcome` lo hace fallar en este mismo intento en vez de
+ * reintentarlo. Cualquier otro `failed` —incluido el de `publishContainer`, que no pasa
+ * por acá— sigue sin la propiedad, y `resolveOutcome` lo trata exactamente como hoy.
+ */
 async function createContainer(
   input: PublishInput,
   params: Record<string, string>,
-): Promise<{ id: string } | { failed: string }> {
+): Promise<{ id: string } | { failed: string; definitivo?: true }> {
   const r = await postForm(`${GRAPH}/${input.accountExternalId}/media`, {
     ...params,
     access_token: input.token,
   })
-  if ('rechazo' in r) return { failed: motivoDeRechazo(r.rechazo, input.opciones) ?? PUBLISH_NETWORK_ERROR }
+  if ('rechazo' in r) {
+    const motivo = motivoDeRechazo(r.rechazo, input.opciones)
+    return motivo ? { failed: motivo, definitivo: true } : { failed: PUBLISH_NETWORK_ERROR }
+  }
   const id = r.data.id
   return typeof id === 'string' ? { id } : { failed: PUBLISH_NETWORK_ERROR }
+}
+
+/** El `failed` de `PublishOutcome` que corresponde a lo que devolvió `createContainer`,
+ * llevando `definitivo` solo si venía puesto. */
+function fromCreate(r: { failed: string; definitivo?: true }): PublishOutcome {
+  return r.definitivo ? { kind: 'failed', reason: r.failed, definitivo: true } : { kind: 'failed', reason: r.failed }
 }
 
 async function publishContainer(input: PublishInput, containerId: string): Promise<PublishOutcome> {
@@ -136,7 +151,7 @@ export const instagramPublisher: Publisher = {
     // once, so create-and-publish in the same run.
     if (media.length === 1 && media[0]!.mediaType === 'image') {
       const r = await createContainer(input, photoContainerParams(input.caption, media[0]!))
-      if ('failed' in r) return { kind: 'failed', reason: r.failed }
+      if ('failed' in r) return fromCreate(r)
       return publishContainer(input, r.id)
     }
 
@@ -147,7 +162,7 @@ export const instagramPublisher: Publisher = {
         input,
         reelContainerParams(input.caption, media[0]!, input.coverUrl, input.opciones),
       )
-      if ('failed' in r) return { kind: 'failed', reason: r.failed }
+      if ('failed' in r) return fromCreate(r)
       return { kind: 'processing', containerId: r.id }
     }
 
@@ -156,11 +171,11 @@ export const instagramPublisher: Publisher = {
     const childIds: string[] = []
     for (const item of media) {
       const r = await createContainer(input, carouselChildParams(item))
-      if ('failed' in r) return { kind: 'failed', reason: r.failed }
+      if ('failed' in r) return fromCreate(r)
       childIds.push(r.id)
     }
     const parent = await createContainer(input, carouselParentParams(input.caption, childIds))
-    if ('failed' in parent) return { kind: 'failed', reason: parent.failed }
+    if ('failed' in parent) return fromCreate(parent)
     return { kind: 'processing', containerId: parent.id }
   },
 }

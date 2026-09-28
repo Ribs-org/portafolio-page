@@ -24,7 +24,10 @@ export type PublishOutcome =
   // La red pidió esperar (cupo por minuto): se vuelve a intentar en la próxima corrida
   // sin gastar intento ni dejar motivo, porque nada salió mal con el post.
   | { kind: 'deferred' }
-  | { kind: 'failed'; reason: string }
+  // `definitivo` solo lo pone `createContainer` (instagram.ts), y solo cuando
+  // `motivoDeRechazo` reconoció el rechazo (Meta ya decidió que no, no es un fallo de
+  // red). Un `failed` sin `definitivo` es indistinguible del de siempre.
+  | { kind: 'failed'; reason: string; definitivo?: true }
 
 /** Adding a network in later phases is a file plus a line, same as Connector. */
 export type Publisher = {
@@ -55,7 +58,15 @@ export const STALE_PROCESSING_HOURS = 24
 /**
  * The whole state machine in one pure spot. Waiting on Meta ('processing') spends no
  * attempt — attempts are for things that went wrong. Only the last allowed failure
- * lands on 'failed', which is also what makes the alert email fire exactly once.
+ * lands on 'failed', which is also what makes the alert email fire exactly once — the
+ * `due` query in run.ts only ever selects 'scheduled' or 'publishing', so once a target
+ * reaches 'failed' this function never runs on it again for that rejection.
+ *
+ * `definitivo` short-circuits that count: a rejection Meta already decided (today, only
+ * a recognised trial-reel rejection) lands on 'failed' on this very attempt, no matter
+ * how many are left. It still goes through the same 'failed' branch as the third
+ * ordinary failure, so the email-fires-once property above holds unchanged — it is
+ * still the transition into 'failed', and only into it, that sends the alert.
  */
 export function resolveOutcome(outcome: PublishOutcome, attemptCount: number): TargetPatch {
   if (outcome.kind === 'published') {
@@ -87,7 +98,7 @@ export function resolveOutcome(outcome: PublishOutcome, attemptCount: number): T
   }
   const attempts = attemptCount + 1
   return {
-    status: attempts >= MAX_PUBLISH_ATTEMPTS ? 'failed' : 'scheduled',
+    status: outcome.definitivo || attempts >= MAX_PUBLISH_ATTEMPTS ? 'failed' : 'scheduled',
     containerId: null,
     externalId: null,
     attemptCount: attempts,

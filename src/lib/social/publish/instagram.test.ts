@@ -146,7 +146,9 @@ describe('publish: el rechazo de un trial reel', () => {
   it('en un trial reel, falla con la frase fija y no se reintenta como fallo de red', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => cuatrocientos()))
     const salida = await instagramPublisher.publish({ ...input, opciones: { trialReel: true } })
-    expect(salida).toEqual({ kind: 'failed', reason: TRIAL_REEL_NO_DISPONIBLE })
+    // `definitivo: true` es lo que hace que `resolveOutcome` no lo reintente: Meta ya
+    // contestó que no, no es un fallo de red que valga la pena repetir.
+    expect(salida).toEqual({ kind: 'failed', reason: TRIAL_REEL_NO_DISPONIBLE, definitivo: true })
   })
 
   it('en un reel normal, el mismo 400 sigue siendo el fallo de red de siempre', async () => {

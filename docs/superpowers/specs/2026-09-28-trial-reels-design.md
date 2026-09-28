@@ -103,16 +103,22 @@ puede?»: Meta dice que no al crear el contenedor. Hoy ese rechazo caería en
 `PUBLISH_NETWORK_ERROR` y se reintentaría tres veces con una frase que miente («se
 reintentará» a un servidor que ya contestó que no). Así que `postForm` deja de devolver
 `null` a secas ante un no-ok: devuelve el cuerpo del error de Graph, y `publish` lo mira. Si es
-un rechazo por trial reel, el destino falla con la frase fija
+un rechazo por trial reel, el destino falla **en ese mismo intento**, sin gastar los otros dos
+(`resolveOutcome` lo distingue con `definitivo: true`: Meta ya decidió que no, así que
+reintentarlo no cambiaría la respuesta), con la frase fija
 
 ```
 Instagram no permite trial reels en esta cuenta.
 ```
 
-y el dueño reprograma como reel normal. Todo lo demás sigue exactamente como hoy.
+Un rechazo que Graph redacte sin la palabra «trial» —Meta la cambia, o rechaza por otra razón
+que no la usa— no se reconoce como definitivo: sigue el trato genérico de siempre,
+`PUBLISH_NETWORK_ERROR` reintentado hasta tres veces. Todo lo demás sigue exactamente como hoy.
 
 **No se convierte el trial en reel normal por cuenta propia.** Eso publicaría a los seguidores
-algo que el dueño pidió esconder. Falla a la vista.
+algo que el dueño pidió esconder. Falla a la vista. El editor no deja apagar la opción, y
+«Reintentar» conserva `opciones` y vuelve a pedir el mismo trial reel: la única forma de
+mandarlo como reel normal hoy es borrar el post y programar otro sin la opción.
 
 **Una debilidad escrita, no disimulada:** Meta no documenta qué código devuelve ese rechazo.
 La detección va por el texto del error (`trial` en el mensaje). Si Meta cambia la frase, el
