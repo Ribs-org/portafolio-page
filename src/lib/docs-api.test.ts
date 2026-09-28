@@ -11,6 +11,8 @@ import {
   REGLA_RESPUESTA,
 } from './social/comentarios/reglas'
 import { MAX_BATCH_ITEMS } from './social/publish/batch'
+import { TRIAL_REEL_NO_DISPONIBLE } from './social/publish/publisher'
+import { TRIAL_REEL_MEDIA } from './social/publish/opciones'
 
 // Estas tres pruebas son la reja que impide que `public/docs/api.json` y
 // `public/docs/api-llm.md` —la documentación para un LLM que llama a la API a ciegas—
@@ -20,7 +22,14 @@ import { MAX_BATCH_ITEMS } from './social/publish/batch'
 describe('la documentación para LLM no le miente al código', () => {
   it('cada frase de error de la guía existe como constante del código', () => {
     const guia = readFileSync('public/docs/api-llm.md', 'utf8')
-    for (const frase of [REGLA_PALABRA, REGLA_MENSAJE, REGLA_RESPUESTA, REGLA_DOCUMENTO]) {
+    for (const frase of [
+      REGLA_PALABRA,
+      REGLA_MENSAJE,
+      REGLA_RESPUESTA,
+      REGLA_DOCUMENTO,
+      TRIAL_REEL_MEDIA,
+      TRIAL_REEL_NO_DISPONIBLE,
+    ]) {
       expect(guia).toContain(frase)
     }
   })

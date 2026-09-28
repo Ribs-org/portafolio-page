@@ -6,9 +6,11 @@ import {
   MAX_BYTES,
   SIN_SENAL_SUBIDA,
   TIPO_NO_PUBLICABLE,
+  cuentasConTrial,
   describirArchivo,
   etiquetaCuenta,
   etiquetaEnvio,
+  opcionesDelBorrador,
   proximaHoraEnPunto,
   puedeEnviar,
   reducirEnvio,
@@ -210,5 +212,33 @@ describe('puedeEnviar', () => {
     expect(puedeEnviar('Hola', 0, 1)).toBe(true)
     expect(puedeEnviar('', 1, 1)).toBe(true)
     expect(puedeEnviar('Hola', 0, 2)).toBe(true)
+  })
+})
+
+describe('cuentasConTrial y opcionesDelBorrador', () => {
+  const ig1: CuentaApp = { id: 'ig-1', red: 'instagram', handle: 'vicente', conectada: true }
+  const ig2: CuentaApp = { id: 'ig-2', red: 'instagram', handle: 'clips', conectada: true }
+  const yt: CuentaApp = { id: 'yt-1', red: 'youtube', handle: 'vicente', conectada: true }
+  const video = { mediaType: 'video' as const }
+  const foto = { mediaType: 'image' as const }
+
+  it('ofrece el trial solo en las cuentas de Instagram marcadas, y solo con un video', () => {
+    expect(cuentasConTrial([ig1, ig2, yt], ['ig-1', 'yt-1'], [video])).toEqual([ig1])
+    expect(cuentasConTrial([ig1, ig2, yt], ['ig-1', 'ig-2'], [video])).toEqual([ig1, ig2])
+    expect(cuentasConTrial([ig1, yt], ['ig-1'], [foto])).toEqual([])
+    expect(cuentasConTrial([ig1, yt], ['ig-1'], [video, foto])).toEqual([])
+    expect(cuentasConTrial([ig1, yt], ['ig-1'], [])).toEqual([])
+    expect(cuentasConTrial([ig1, yt], ['yt-1'], [video])).toEqual([])
+  })
+
+  it('viaja solo lo que se ofrece Y está encendido', () => {
+    expect(opcionesDelBorrador([ig1, ig2, yt], ['ig-1', 'ig-2'], ['ig-1'], [video])).toEqual({
+      'ig-1': { trialReel: true },
+    })
+    // Encendido pero ya sin video: no viaja, sin que nadie tenga que apagarlo.
+    expect(opcionesDelBorrador([ig1, yt], ['ig-1'], ['ig-1'], [video, foto])).toEqual({})
+    // Encendido pero desmarcada la cuenta: tampoco.
+    expect(opcionesDelBorrador([ig1, yt], ['yt-1'], ['ig-1'], [video])).toEqual({})
+    expect(opcionesDelBorrador([ig1, yt], ['ig-1'], [], [video])).toEqual({})
   })
 })

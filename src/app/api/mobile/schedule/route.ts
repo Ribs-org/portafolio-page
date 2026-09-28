@@ -25,6 +25,7 @@ import {
 import { crearPostProgramado } from '@/lib/social/publish/crear'
 import { CuentaInvalida } from '@/lib/social/cuentas'
 import { validateScheduleDraft } from '@/lib/social/publish/validate'
+import { errorDeMediaPorOpciones, validarOpcionesPorCuenta } from '@/lib/social/publish/opciones'
 import { basePublica, existe, keyDesdeUrl } from '@/lib/storage'
 
 export const dynamic = 'force-dynamic'
@@ -117,7 +118,9 @@ export async function GET(request: Request) {
  * El post con sus archivos ya en R2. Antes de crear: que cada URL sea del almacén
  * propio y bajo `scheduled/` (un cuerpo forjado no puede apuntar a cualquier URL de
  * internet), que se resuelva el destino real con `resolverDestinos` (compartida con
- * `check/route.ts` — ver su comentario), que `cuando` y el resto del borrador pasen las
+ * `check/route.ts` — ver su comentario), que las `opciones` de cada cuenta resuelta
+ * pasen `validarOpcionesPorCuenta` y, con ellas ya limpias, la regla de media del trial
+ * reel (`errorDeMediaPorOpciones`), que `cuando` y el resto del borrador pasen las
  * reglas de `validateScheduleDraft` sobre la red de cada destino resuelto, no una
  * declarada aparte, y por último que cada objeto exista en R2 (un HEAD es un viaje de
  * ida y vuelta, y no vale la pena pagarlo si el post ya iba a rechazarse por otra
@@ -159,13 +162,20 @@ export async function POST(request: Request) {
     throw fallo
   }
 
+  const opcionesCheck = validarOpcionesPorCuenta(cuentas, borrador.opciones)
+  if ('error' in opcionesCheck) return NextResponse.json({ error: opcionesCheck.error }, { status: 400 })
+  const fotos = media.filter((m) => m.mediaType === 'image').length
+  const videos = media.filter((m) => m.mediaType === 'video').length
+  const mediaPorOpciones = errorDeMediaPorOpciones(opcionesCheck.opciones, { videos, fotos, sinTipo: 0 })
+  if (mediaPorOpciones) return NextResponse.json({ error: mediaPorOpciones }, { status: 400 })
+
   const now = new Date()
   const scheduledAt = resolverCuando(borrador.ahora, borrador.cuando, now)
   const error = validateScheduleDraft(
     {
       caption: borrador.texto,
-      imageCount: media.filter((m) => m.mediaType === 'image').length,
-      videoCount: media.filter((m) => m.mediaType === 'video').length,
+      imageCount: fotos,
+      videoCount: videos,
       networks,
       scheduledAt,
     },
@@ -188,6 +198,7 @@ export async function POST(request: Request) {
       scheduledAt: scheduledAt!,
       media,
       cuentas,
+      opciones: opcionesCheck.opciones,
     })
     return NextResponse.json({ id, cuando: isoInZone(scheduledAt!, SITE_TIMEZONE) })
   } catch (dbError) {

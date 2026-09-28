@@ -2,7 +2,7 @@ import { env } from '@/lib/env'
 import { fromZonedInput } from '@/lib/utils'
 import { extensionDe, validateScheduleDraft } from './validate'
 import { validateAtributos } from './atributos'
-import { validarOpcionesPorCuenta, OPCIONES_ERROR, type OpcionesDestino } from './opciones'
+import { validarOpcionesPorCuenta, errorDeMediaPorOpciones, OPCIONES_ERROR, type OpcionesDestino } from './opciones'
 import { guardar } from '@/lib/storage'
 import { getDb, scheduledPosts, scheduledPostMedia, scheduledPostTargets, reglasClave } from '@/db'
 import { randomUUID } from 'node:crypto'
@@ -309,6 +309,16 @@ export function validateBatchItem(item: BatchItem, now: Date): string | null {
   const opcionesCheck = opcionesDeFila(item, destinosParaOpciones)
   if ('error' in opcionesCheck) return opcionesCheck.error
 
+  // La regla de media que depende de la opción y no de la red (un trial reel es un solo
+  // video). Con cuentas nombradas `opciones` viene vacío acá y la corre `scheduleBatch`.
+  const sinTipo = item.media.filter((url) => mediaTypeFromUrl(url) === null).length
+  const mediaPorOpciones = errorDeMediaPorOpciones(opcionesCheck.opciones, {
+    videos: videoCount,
+    fotos: imageCount - sinTipo,
+    sinTipo,
+  })
+  if (mediaPorOpciones) return mediaPorOpciones
+
   const reglaCheck = validarRegla(item.regla)
   if ('error' in reglaCheck) return reglaCheck.error
 
@@ -398,6 +408,22 @@ export async function scheduleBatch(ownerId: string, items: BatchItem[]): Promis
       }
       const opciones = opcionesCheck.opciones
 
+      // Igual de temprano: con cuentas nombradas, `validateBatchItem` solo corrió la
+      // regla de media del trial reel con `opciones` vacío (no conocía los destinos).
+      // Ahora que `opciones` está resuelto de verdad, esta es la comprobación completa
+      // con los tipos declarados — todavía antes de descargar nada.
+      const { imageCount: imageCountDeclarado, videoCount: videoCountDeclarado } = contarMedia(item.media)
+      const sinTipoDeclarado = item.media.filter((url) => mediaTypeFromUrl(url) === null).length
+      const mediaPorOpciones = errorDeMediaPorOpciones(opciones, {
+        videos: videoCountDeclarado,
+        fotos: imageCountDeclarado - sinTipoDeclarado,
+        sinTipo: sinTipoDeclarado,
+      })
+      if (mediaPorOpciones) {
+        results.push({ index, ok: false, error: mediaPorOpciones })
+        continue
+      }
+
       // Las reglas de forma por red (TikTok exige video, X no admite más de 4 fotos, …)
       // usaban `item.redes`, que con cuentas nombradas puede venir vacío: la red real
       // de cada destino solo se sabe acá. `validateScheduleDraft` se vuelve a correr
@@ -411,7 +437,6 @@ export async function scheduleBatch(ownerId: string, items: BatchItem[]): Promis
       // Con cuentas nombradas, esta es la primera vez que `networks` existe — sin este
       // chequeo, una fila con fecha pasada o sin texto se descargaba y subía entera
       // antes de rechazarse.
-      const { imageCount: imageCountDeclarado, videoCount: videoCountDeclarado } = contarMedia(item.media)
       const preUploadError = validateScheduleDraft(
         {
           caption: item.texto,
@@ -473,6 +498,19 @@ export async function scheduleBatch(ownerId: string, items: BatchItem[]): Promis
       )
       if (shapeError) {
         results.push({ index, ok: false, error: shapeError })
+        continue
+      }
+
+      // Misma regla del trial reel, ahora con los tipos reales: un Drive que resultó
+      // imagen (o video de más) se rechaza acá, con la media ya subida pero nada
+      // todavía escrito en la base.
+      const mediaReal = errorDeMediaPorOpciones(opciones, {
+        videos: uploaded.filter((m) => m.mediaType === 'video').length,
+        fotos: uploaded.filter((m) => m.mediaType === 'image').length,
+        sinTipo: 0,
+      })
+      if (mediaReal) {
+        results.push({ index, ok: false, error: mediaReal })
         continue
       }
 

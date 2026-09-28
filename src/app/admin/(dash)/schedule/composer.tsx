@@ -9,6 +9,7 @@ import { networkLabel } from '@/lib/networks'
 import { calorDelDia, type Calor } from '@/lib/parrilla'
 import { subirArchivos } from '@/lib/subida-directa'
 import { cn } from '@/lib/utils'
+import { InstagramOpciones } from './instagram-opciones'
 import { ReglaClave } from './regla-clave'
 import { RevisionMedia } from './revision-media'
 import { TikTokOpciones } from './tiktok-opciones'
@@ -31,16 +32,17 @@ export function vieneMarcada(
 }
 
 /**
- * Las cuentas de TikTok publicables que empiezan marcadas: la semilla de `cuentasTikTok`.
- * Sin esto, un dueño cuya única cuenta publicable es de TikTok ve la casilla marcada por
- * `vieneMarcada` (que sí corre en `defaultChecked`) pero ningún bloque de opciones,
- * porque `alternar` solo corre en `onChange` y eso no se dispara en el primer render —
- * queda sin poder programar nada hasta desmarcar y volver a marcar.
+ * Las cuentas publicables de una red que empiezan marcadas: la semilla de `cuentasTikTok`
+ * y `cuentasInstagram`. Sin esto, un dueño cuya única cuenta publicable es de esa red ve la
+ * casilla marcada por `vieneMarcada` (que sí corre en `defaultChecked`) pero ningún bloque
+ * de opciones, porque `alternar` solo corre en `onChange` y eso no se dispara en el primer
+ * render — queda sin poder programar nada hasta desmarcar y volver a marcar.
  */
-export function cuentasTikTokIniciales<T extends { id: string; network: string; connected: boolean }>(
+export function cuentasInicialesDe<T extends { id: string; network: string; connected: boolean }>(
   publicables: T[],
+  network: string,
 ): T[] {
-  return publicables.filter((c) => c.network === 'tiktok' && vieneMarcada(c, publicables))
+  return publicables.filter((c) => c.network === network && vieneMarcada(c, publicables))
 }
 
 /**
@@ -84,11 +86,17 @@ export function Composer({ carga, cuentas }: { carga: Record<string, number>; cu
   const publicables = cuentas.filter((c) => ENABLED.has(c.network))
 
   // Reemplaza al viejo booleano `tiktok`: con dos cuentas de TikTok marcadas, cada una
-  // necesita su propio bloque de opciones. Se siembra con `cuentasTikTokIniciales`, no
+  // necesita su propio bloque de opciones. Se siembra con `cuentasInicialesDe`, no
   // con `[]`: las casillas ya vienen marcadas según `vieneMarcada`, y `onChange` no
-  // corre en el primer render para ponerlas de acuerdo.
-  const [cuentasTikTok, setCuentasTikTok] = useState<CuentaRow[]>(() => cuentasTikTokIniciales(publicables))
+  // corre en el primer render para ponerlas de acuerdo. Instagram funciona igual.
+  const [cuentasTikTok, setCuentasTikTok] = useState<CuentaRow[]>(() => cuentasInicialesDe(publicables, 'tiktok'))
+  const [cuentasInstagram, setCuentasInstagram] = useState<CuentaRow[]>(() =>
+    cuentasInicialesDe(publicables, 'instagram'),
+  )
   const [soloFotos, setSoloFotos] = useState(false)
+  // Exactamente un video elegido: la única condición bajo la que se monta el bloque de
+  // Instagram, porque un trial reel no admite fotos ni carrusel.
+  const [unVideo, setUnVideo] = useState(false)
   const [archivos, setArchivos] = useState<File[]>([])
   const [cuando, setCuando] = useState('')
   // «Ahora» deja el campo de fecha fuera de juego: la hora la decide el servidor.
@@ -97,8 +105,10 @@ export function Composer({ carga, cuentas }: { carga: Record<string, number>; cu
   const [subiendo, setSubiendo] = useState('')
 
   function alternar(cuenta: CuentaRow, marcada: boolean) {
-    if (cuenta.network !== 'tiktok') return
-    setCuentasTikTok((prev) => (marcada ? [...prev, cuenta] : prev.filter((c) => c.id !== cuenta.id)))
+    const setCuentas =
+      cuenta.network === 'tiktok' ? setCuentasTikTok : cuenta.network === 'instagram' ? setCuentasInstagram : null
+    if (!setCuentas) return
+    setCuentas((prev) => (marcada ? [...prev, cuenta] : prev.filter((c) => c.id !== cuenta.id)))
   }
 
   /**
@@ -154,6 +164,7 @@ export function Composer({ carga, cuentas }: { carga: Record<string, number>; cu
               const files = Array.from(e.target.files ?? [])
               setArchivos(files)
               setSoloFotos(files.length > 0 && files.every((f) => f.type.startsWith('image/')))
+              setUnVideo(files.length === 1 && files[0]!.type.startsWith('video/'))
             }}
           />
         </Field>
@@ -196,6 +207,8 @@ export function Composer({ carga, cuentas }: { carga: Record<string, number>; cu
         {cuentasTikTok.map((cuenta) => (
           <TikTokOpciones key={cuenta.id} cuenta={cuenta} soloFotos={soloFotos} />
         ))}
+
+        {unVideo ? cuentasInstagram.map((cuenta) => <InstagramOpciones key={cuenta.id} cuenta={cuenta} />) : null}
 
         <ReglaClave />
 

@@ -8,6 +8,7 @@ import {
   resolverDestinos,
 } from '@/lib/mobile-api'
 import { validateScheduleDraft } from '@/lib/social/publish/validate'
+import { errorDeMediaPorOpciones, validarOpcionesPorCuenta } from '@/lib/social/publish/opciones'
 import { CuentaInvalida } from '@/lib/social/cuentas'
 
 export const dynamic = 'force-dynamic'
@@ -20,7 +21,9 @@ export const dynamic = 'force-dynamic'
  * `resolverDestinos` (compartida con el `POST` de `schedule/route.ts` — ver su
  * comentario) resuelve el destino ANTES de validar por red: las reglas de
  * `validateScheduleDraft` son de la red, pero la red que cuenta es la de la cuenta
- * real, no una que el cuerpo declare aparte.
+ * real, no una que el cuerpo declare aparte. Con el destino ya resuelto se validan las
+ * `opciones` por cuenta (`validarOpcionesPorCuenta`) y, con ellas, la regla de media
+ * del trial reel (`errorDeMediaPorOpciones`) antes de `validateScheduleDraft`.
  */
 export async function POST(request: Request) {
   const usuario = await requireMobileUser(request)
@@ -39,13 +42,23 @@ export async function POST(request: Request) {
   const conteos = parseConteos(body)
   if ('error' in conteos) return NextResponse.json({ error: conteos.error }, { status: 400 })
 
+  let cuentas: Awaited<ReturnType<typeof resolverDestinos>>['cuentas']
   let networks: string[]
   try {
-    ;({ networks } = await resolverDestinos(usuario.id, borrador))
+    ;({ cuentas, networks } = await resolverDestinos(usuario.id, borrador))
   } catch (fallo) {
     if (fallo instanceof CuentaInvalida) return NextResponse.json({ error: fallo.message }, { status: 400 })
     throw fallo
   }
+
+  const opcionesCheck = validarOpcionesPorCuenta(cuentas, borrador.opciones)
+  if ('error' in opcionesCheck) return NextResponse.json({ error: opcionesCheck.error }, { status: 400 })
+  const mediaPorOpciones = errorDeMediaPorOpciones(opcionesCheck.opciones, {
+    videos: conteos.videos,
+    fotos: conteos.fotos,
+    sinTipo: 0,
+  })
+  if (mediaPorOpciones) return NextResponse.json({ error: mediaPorOpciones }, { status: 400 })
 
   const now = new Date()
   const error = validateScheduleDraft(

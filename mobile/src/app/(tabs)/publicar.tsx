@@ -11,9 +11,11 @@ import { anotarCambio } from '../../lib/cambios'
 import {
   ENVIO_INICIAL,
   MAX_ARCHIVOS,
+  cuentasConTrial,
   describirArchivo,
   etiquetaCuenta,
   etiquetaEnvio,
+  opcionesDelBorrador,
   proximaHoraEnPunto,
   puedeEnviar,
   reducirEnvio,
@@ -23,7 +25,7 @@ import {
   type Retomar,
 } from '../../lib/publicar'
 import { clearToken } from '../../lib/session'
-import { ejecutarEnvio, type SubidaHecha } from '../../lib/subir'
+import { ejecutarEnvio, type BorradorApp, type SubidaHecha } from '../../lib/subir'
 import type { CuentaApp } from '../../lib/tipos'
 import { useToken } from '../../lib/useToken'
 
@@ -56,6 +58,12 @@ export default function Publicar() {
   const [texto, setTexto] = useState('')
   const [archivos, setArchivos] = useState<Elegido[]>([])
   const [cuentas, setCuentas] = useState<string[]>([])
+  // Solo ids de cuentas de Instagram con el interruptor de trial reel encendido. No hay
+  // que limpiarlo cuando el chip deja de ofrecerse (sin video, o cuenta desmarcada):
+  // `cuentasConTrial` y `opcionesDelBorrador` derivan lo que se ve y lo que viaja a
+  // partir de este estado y del resto, así que un id que ya no aplica no se dibuja ni
+  // se manda solo.
+  const [trial, setTrial] = useState<string[]>([])
   const [cuentasEstado, setCuentasEstado] = useState<EstadoCuentas>({ paso: 'cargando' })
   // Solo cuando ya se supo qué cuentas hay: mientras carga o si falló, no hay ninguna
   // que ofrecer — el estado de arriba es el que distingue esos dos casos de «ninguna».
@@ -71,9 +79,7 @@ export default function Publicar() {
   // Lo que ya subió en un intento anterior y el AbortController del envío en curso.
   // Refs, no estado: cambiarlos no debe redibujar, y el orquestador los lee entre awaits.
   const subidas = useRef<(SubidaHecha | null)[]>([])
-  const ultimoBorrador = useRef<{ texto: string; cuentas: string[]; cuando: string | null; ahora: boolean } | null>(
-    null,
-  )
+  const ultimoBorrador = useRef<BorradorApp | null>(null)
   const abortar = useRef<AbortController | null>(null)
 
   const salir = useCallback(async () => {
@@ -151,6 +157,10 @@ export default function Publicar() {
     setCuentas(cuentas.includes(id) ? cuentas.filter((c) => c !== id) : [...cuentas, id])
   }
 
+  function alternarTrial(id: string) {
+    setTrial(trial.includes(id) ? trial.filter((c) => c !== id) : [...trial, id])
+  }
+
   function elegirFecha() {
     // Android no tiene un selector de fecha y hora en uno: primero el día, luego la hora.
     // onValueChange (no onChange, que la versión instalada marca deprecado) solo se
@@ -178,7 +188,13 @@ export default function Publicar() {
     if (!token) return
     const borrador =
       retomar.paso === 'chequeando'
-        ? { texto: texto.trim(), cuentas, cuando: ahora ? null : fecha.toISOString(), ahora }
+        ? {
+            texto: texto.trim(),
+            cuentas,
+            cuando: ahora ? null : fecha.toISOString(),
+            ahora,
+            opciones: opcionesDelBorrador(disponibles, cuentas, trial, archivos),
+          }
         : ultimoBorrador.current
     if (!borrador) return
     ultimoBorrador.current = borrador
@@ -354,6 +370,25 @@ export default function Publicar() {
             </View>
             {cuentas.length === 0 ? (
               <Text style={{ color: COLORES.tenue, fontSize: 11 }}>Elige al menos una cuenta.</Text>
+            ) : null}
+            {cuentasConTrial(disponibles, cuentas, archivos).length > 0 ? (
+              <>
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
+                  {cuentasConTrial(disponibles, cuentas, archivos).map((c) => (
+                    <Chip
+                      key={`trial:${c.id}`}
+                      texto={`Trial reel · ${c.handle ?? 'sin nombre'}`}
+                      activo={trial.includes(c.id)}
+                      onPress={() => alternarTrial(c.id)}
+                      deshabilitado={ocupado}
+                    />
+                  ))}
+                </View>
+                <Text style={{ color: COLORES.tenue, fontSize: 11 }}>
+                  Un trial reel solo lo ven quienes no te siguen. Tú decides desde Instagram cuándo
+                  compartirlo con todos.
+                </Text>
+              </>
             ) : null}
           </>
         )}

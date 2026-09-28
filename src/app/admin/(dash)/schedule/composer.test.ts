@@ -5,7 +5,7 @@ import { describe, expect, it, vi } from 'vitest'
 // vacío para poder importar `vieneMarcada` bajo Vitest.
 vi.mock('server-only', () => ({}))
 
-const { vieneMarcada, cuentasTikTokIniciales } = await import('./composer')
+const { vieneMarcada, cuentasInicialesDe } = await import('./composer')
 
 describe('vieneMarcada', () => {
   it('con una sola cuenta conectada, viene marcada', () => {
@@ -28,23 +28,32 @@ describe('vieneMarcada', () => {
   })
 })
 
-describe('cuentasTikTokIniciales', () => {
+describe('cuentasInicialesDe', () => {
+  it('devuelve las cuentas de esa red que empiezan marcadas, y ninguna de otra red', () => {
+    const ig = { id: 'ig', network: 'instagram', connected: true }
+    const tt = { id: 'tt', network: 'tiktok', connected: true }
+    expect(cuentasInicialesDe([ig], 'instagram')).toEqual([ig])
+    expect(cuentasInicialesDe([ig], 'tiktok')).toEqual([])
+    expect(cuentasInicialesDe([ig, tt], 'instagram')).toEqual([]) // dos candidatas: ninguna marcada
+    expect(cuentasInicialesDe([tt], 'tiktok')).toEqual([tt])
+  })
+
   // Sin esto, un dueño cuya única cuenta publicable es de TikTok ve la casilla marcada
   // pero ningún bloque de opciones: `cuentasTikTok` seguía naciendo en `[]` porque
   // `onChange` no corre en el primer render.
   it('con una sola cuenta de TikTok conectada, empieza marcada', () => {
     const tt = { id: 'tt-1', network: 'tiktok', connected: true }
-    expect(cuentasTikTokIniciales([tt])).toEqual([tt])
+    expect(cuentasInicialesDe([tt], 'tiktok')).toEqual([tt])
   })
 
   it('con una sola cuenta de Instagram conectada, no hay nada de TikTok que marcar', () => {
     const ig = { id: 'ig-1', network: 'instagram', connected: true }
-    expect(cuentasTikTokIniciales([ig])).toEqual([])
+    expect(cuentasInicialesDe([ig], 'tiktok')).toEqual([])
   })
 
   it('con dos cuentas conectadas, ninguna empieza marcada', () => {
     const tt = { id: 'tt-1', network: 'tiktok', connected: true }
     const ig = { id: 'ig-1', network: 'instagram', connected: true }
-    expect(cuentasTikTokIniciales([tt, ig])).toEqual([])
+    expect(cuentasInicialesDe([tt, ig], 'tiktok')).toEqual([])
   })
 })

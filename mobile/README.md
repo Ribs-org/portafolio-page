@@ -122,13 +122,25 @@ En la pestaña **Publicar**:
 3. Marca las cuentas a las que sale (el chip lleva la red y el handle, para distinguir
    dos cuentas de una misma red). Si tienes una sola cuenta conectada viene marcada,
    porque no hay entre qué elegir; con dos o más, ninguna. TikTok no se ofrece todavía
-   como destino desde el teléfono: no hay dónde pedir sus opciones por publicación.
-4. Toca **Cuándo** para elegir día y hora, y luego **Programar**. O toca
+   como destino desde el teléfono: el bloque de TikTok necesita consultar la cuenta del
+   creador (`creator_info`) y sus interacciones, y eso el teléfono todavía no lo tiene.
+4. Con una cuenta de Instagram marcada y **un solo video** elegido aparece el chip
+   «Trial reel · @handle». Encendido, el reel sale solo para quienes no te siguen, y
+   **tú lo compartes con todos desde la app de Instagram** cuando quieras. Con fotos o
+   con más de un archivo el chip no aparece. Si Instagram no tiene la función habilitada
+   en esa cuenta, el destino falla al publicar con su propia frase. El editor no deja
+   apagar la opción ni «Reintentar» la cambia —volvería a pedir el trial y a fallar—: la
+   forma de mandarlo como reel normal es borrar el post y programar otro sin la opción.
+5. Toca **Cuándo** para elegir día y hora, y luego **Programar**. O toca
    **Publicar ahora**: confirma, y sale en los próximos cinco minutos.
 
 La subida muestra el avance de cada archivo. Si se corta la señal, **Reintentar**
 retoma desde el archivo que falló, sin volver a subir los anteriores. Al terminar, la
 app salta al Calendario con el post recién programado.
+
+El trial reel es puro JavaScript, sin cambio nativo: llega por aire a los dos canales
+con el orden de siempre (web primero), como se explica en
+[«Cómo mandar un cambio sin reinstalar»](#cómo-mandar-un-cambio-sin-reinstalar).
 
 Lo que no se puede hacer desde el teléfono, y sigue siendo del panel web: poner una
 portada, etiquetar con atributos, y editar o borrar lo ya programado.

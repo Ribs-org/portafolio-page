@@ -180,3 +180,35 @@ export function proximaHoraEnPunto(now: Date): Date {
 export function puedeEnviar(texto: string, archivos: number, cuentas: number): boolean {
   return (texto.trim().length > 0 || archivos > 0) && cuentas > 0
 }
+
+export type OpcionesApp = Record<string, { trialReel: true }>
+
+/**
+ * Las cuentas a las que se les ofrece el trial reel: las de Instagram marcadas, y solo
+ * cuando hay exactamente un video elegido — un trial reel es un solo video, sin fotos,
+ * y ofrecer el interruptor con fotos sería ofrecer algo que el servidor va a rechazar.
+ * Derivado, no guardado: si el dueño quita el video o desmarca la cuenta, desaparece solo.
+ */
+export function cuentasConTrial(
+  disponibles: CuentaApp[],
+  marcadas: string[],
+  archivos: Pick<Elegido, 'mediaType'>[],
+): CuentaApp[] {
+  const unVideo = archivos.length === 1 && archivos[0]!.mediaType === 'video'
+  if (!unVideo) return []
+  return disponibles.filter((c) => c.red === 'instagram' && marcadas.includes(c.id))
+}
+
+/** Lo que viaja en `opciones`: de las que se ofrecen, las que están encendidas. */
+export function opcionesDelBorrador(
+  disponibles: CuentaApp[],
+  marcadas: string[],
+  trial: string[],
+  archivos: Pick<Elegido, 'mediaType'>[],
+): OpcionesApp {
+  const salida: OpcionesApp = {}
+  for (const c of cuentasConTrial(disponibles, marcadas, archivos)) {
+    if (trial.includes(c.id)) salida[c.id] = { trialReel: true }
+  }
+  return salida
+}

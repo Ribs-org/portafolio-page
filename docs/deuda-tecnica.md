@@ -285,6 +285,51 @@ publicación no la tocó — programar y medir son caminos distintos.
 Cerrarlo pide que `account-stats.ts` agrupe por `accountId` en vez de por `network`, y que
 el panel y la app muestren una tarjeta por cuenta en vez de una por red.
 
+## Tres cosas de los trial reels que no se pudieron verificar
+
+**Abierto desde 2026-09-28.** Ninguna cuenta de Instagram con la función habilitada estuvo
+disponible para probar el publicador de trial reels de punta a punta, así que estos tres
+puntos de `docs/superpowers/specs/2026-09-28-trial-reels-design.md` (sección 10) quedan sin
+comprobar:
+
+1. **Si `trial_params` convive con `cover_url` en el mismo contenedor.** No está documentado
+   por Meta. `reelContainerParams` (`src/lib/social/publish/instagram.ts`) manda los dos
+   campos juntos sin problema declarado; si Graph rechazara la combinación, el síntoma sería
+   un trial reel con portada fallando siempre, indistinguible en el código de cualquier otro
+   rechazo de contenedor.
+2. **Si el sync de métricas ve un trial reel no graduado.** No aparece en el perfil hasta que
+   el dueño lo comparte, así que `GET /{ig-user-id}/media` podría no listarlo — el post
+   quedaría `published` sin números en el panel hasta la graduación, y hoy eso no está dicho
+   en ningún lado.
+3. **La forma exacta del error de rechazo.** `motivoDeRechazo` (mismo archivo) detecta el
+   rechazo por texto (`/trial/i` en el cuerpo), porque Meta no documenta el código. `postForm`
+   registra el cuerpo completo en el log del servidor (`console.error('Instagram publish:',
+   …)`) a propósito: es la única forma de aprender la frase real de Meta el día que el rechazo
+   ocurra de verdad, sin haber apostado antes a una forma adivinada.
+
+   Lo que cuesta mientras tanto, dicho sin suavizar: un rechazo definitivo que Meta redacte
+   sin la palabra —una cuenta privada, la cuota diaria— cae en «No se pudo hablar con la
+   red. Se reintentará.» y se reintenta hasta tres veces antes de fallar, prometiendo un
+   reintento que Meta ya negó. Es el mismo trato que hoy recibe cualquier no-ok en un reel
+   normal; el mapeo solo lo estrecha para el único caso que Meta deja reconocer. Cerrarlo
+   pide ver el error real una vez, y entonces reconocerlo por su código y no por su texto.
+
+   El rechazo que sí reconoce por texto ya no se reintenta: `createContainer` marca ese
+   `failed` con `definitivo: true`, y `resolveOutcome` (`publisher.ts`) lo hace fallar en
+   el mismo intento en vez de esperar al tercero. Lo de arriba es justo lo que queda fuera
+   de ese reconocimiento.
+
+Cerrar las tres pide lo mismo: una cuenta de Instagram con trial reels habilitados y una
+tarde — un trial reel con portada, un trial reel sin graduar mirado desde `/api/metrics/posts`,
+y una cuenta sin la función para leer el rechazo real del log.
+
+**El calendario y la cola no marcan un trial reel.** Distinto de las tres de arriba: esto no
+falta por no haberse podido probar, falta porque no se construyó. Solo la página del editor
+de un post programado lo muestra (`resumenOpciones`, «Trial reel — lo compartes tú desde
+Instagram»); las vistas de calendario y de cola siguen leyendo la red y el handle, sin esa
+marca — spec §6 lo deja dicho así a propósito (es otra entrega). Cerrarlo es llevar
+`resumenOpciones` (o su frase) a esas dos vistas.
+
 ## Un par de restos chicos de esta entrega
 
 **Anotado el 2026-09-24.** Ninguno tiene efecto observable hoy; quedan escritos para no

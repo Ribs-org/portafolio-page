@@ -70,6 +70,18 @@ describe('resolveOutcome', () => {
     )
     expect(statuses).toEqual(['scheduled', 'scheduled', 'failed'])
   })
+
+  it('un fallo definitivo cae en failed en el primer intento, sin esperar al tercero', () => {
+    const patch = resolveOutcome({ kind: 'failed', reason: PUBLISH_REJECTED, definitivo: true }, 0)
+    expect(patch.status).toBe('failed')
+    expect(patch.attemptCount).toBe(1)
+    expect(patch.lastError).toBe(PUBLISH_REJECTED)
+  })
+
+  it('sin definitivo, el mismo fallo en el primer intento sigue el comportamiento de siempre', () => {
+    const patch = resolveOutcome({ kind: 'failed', reason: PUBLISH_REJECTED }, 0)
+    expect(patch.status).toBe('scheduled')
+  })
 })
 
 describe('isStaleProcessing', () => {

@@ -106,6 +106,7 @@ describe('parseBorradorMovil', () => {
       cuentas: [],
       cuando: '2026-09-10T22:00:00.000Z',
       ahora: false,
+      opciones: {},
     })
   })
 
@@ -116,6 +117,7 @@ describe('parseBorradorMovil', () => {
       cuentas: [],
       cuando: null,
       ahora: true,
+      opciones: {},
     })
   })
 
@@ -162,6 +164,7 @@ describe('parseBorradorMovil', () => {
       cuentas: ['cuenta-1', 'cuenta-2'],
       cuando: null,
       ahora: true,
+      opciones: {},
     })
   })
 
@@ -178,6 +181,23 @@ describe('parseBorradorMovil', () => {
   it('rechaza cuentas que no es una lista de strings', () => {
     expect(parseBorradorMovil({ ...bueno, cuentas: 'cuenta-1' })).toEqual({ error: CUERPO_ILEGIBLE })
     expect(parseBorradorMovil({ ...bueno, cuentas: [1] })).toEqual({ error: CUERPO_ILEGIBLE })
+  })
+
+  it('acepta opciones como objeto de objetos, y ausente vale vacío', () => {
+    expect(parseBorradorMovil({ ...bueno, opciones: { 'ig-1': { trialReel: true } } })).toMatchObject({
+      opciones: { 'ig-1': { trialReel: true } },
+    })
+    expect(parseBorradorMovil(bueno)).toMatchObject({ opciones: {} })
+  })
+
+  it('opciones que no son un objeto de objetos no tienen la forma', () => {
+    expect(parseBorradorMovil({ ...bueno, opciones: 'trial' })).toEqual({ error: CUERPO_ILEGIBLE })
+    expect(parseBorradorMovil({ ...bueno, opciones: ['ig-1'] })).toEqual({ error: CUERPO_ILEGIBLE })
+    // `null` explícito no es «ausente»: la desestructuración solo aplica el `{}` a `undefined`.
+    // Un cliente que serializa null en vez de omitir recibe la frase de forma, y este test es lo
+    // que impide que un `?? {}` futuro lo cambie en silencio.
+    expect(parseBorradorMovil({ ...bueno, opciones: null })).toEqual({ error: CUERPO_ILEGIBLE })
+    expect(parseBorradorMovil({ ...bueno, opciones: { 'ig-1': true } })).toEqual({ error: CUERPO_ILEGIBLE })
   })
 })
 

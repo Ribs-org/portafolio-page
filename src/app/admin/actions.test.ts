@@ -77,6 +77,24 @@ const db = vi.hoisted(() => ({
   onConflictDoUpdateCalls: [] as { tabla: string; values: unknown; set: unknown }[],
 }))
 
+// Doble mínimo para `createScheduledPost`: `mediaYaSubida` comprueba que cada URL sea del
+// bucket bajo `scheduled/` y que el objeto exista, sin tocar R2 de verdad (mismo mock que
+// `mobile/schedule/route.test.ts`).
+vi.mock('@/lib/storage', () => ({
+  basePublica: () => 'https://cdn.ejemplo.cl',
+  keyDesdeUrl: (base: string, url: string) => (url.startsWith(`${base}/`) ? url.slice(base.length + 1) : null),
+  existe: async () => true,
+}))
+
+// Para afirmar que un rechazo antes de crear el post no llega a `crearPostProgramado`: si
+// llegara, este doble lo registraría y el test lo vería.
+const crear = vi.hoisted(() => ({ crearPostProgramadoCalls: [] as unknown[] }))
+vi.mock('@/lib/social/publish/crear', () => ({
+  crearPostProgramado: async (...args: unknown[]) => {
+    crear.crearPostProgramadoCalls.push(args)
+  },
+}))
+
 vi.mock('@/db', async (importOriginal) => {
   const real = await importOriginal<typeof import('@/db')>()
   /** Un valor esperable directamente (`await ...where()`) que además admite `.orderBy()`
@@ -160,7 +178,10 @@ vi.mock('@/db', async (importOriginal) => {
 // Import estático, después de los `vi.mock` (Vitest los sube igual al principio del
 // archivo): un import dinámico dentro de cada `it` pagaría de nuevo la transformación de
 // todo lo que `actions.ts` arrastra.
-const { updateProfile, deleteProfile, makeDefault, updateScheduledPost } = await import('./actions')
+const { updateProfile, deleteProfile, makeDefault, updateScheduledPost, createScheduledPost } = await import(
+  './actions'
+)
+const { TRIAL_REEL_MEDIA } = await import('@/lib/social/publish/opciones')
 
 beforeEach(() => {
   db.updateCalls.length = 0
@@ -175,6 +196,7 @@ beforeEach(() => {
   db.scheduledSelectQueue.length = 0
   db.insertCalls.length = 0
   db.onConflictDoUpdateCalls.length = 0
+  crear.crearPostProgramadoCalls.length = 0
 })
 
 /**
@@ -408,5 +430,100 @@ describe('updateScheduledPost: el editor no pisa el documento de una regla cread
     expect(set).not.toHaveProperty('documentoUrl')
     // Y que sí lleve lo que el editor edita, para que el test no pase por estar vacío.
     expect(set).toMatchObject({ palabra: 'guia', mensaje: 'Toma tu guía' })
+  })
+})
+
+describe('updateScheduledPost: no deja que un trial reel programado se convierta en foto o carrusel', () => {
+  /**
+   * Post con un único target de Instagram, trial reel, todavía `scheduled` (así
+   * `verificarCuentas` sí consulta `social_accounts`, el cuarto `select`). La media ya
+   * guardada trae el video del trial y dos fotos, para que el formulario pueda simular
+   * «mantener solo las fotos» con `keptMedia` — sin pasar por `guardar`/`mediaToBlob`,
+   * que este archivo no dobla.
+   */
+  function programarFilas() {
+    db.scheduledSelectQueue.push(
+      [{ id: 'post-1', ownerId: 'owner-1', scheduledAt: new Date('2026-12-01T10:00:00Z'), coverUrl: null }],
+      [
+        {
+          id: 'target-1',
+          status: 'scheduled',
+          accountId: 'acc-ig',
+          network: 'instagram',
+          opciones: { trialReel: true },
+          updatedAt: new Date(),
+        },
+      ],
+      [
+        { id: 'media-video', blobUrl: 'https://cdn.ejemplo.cl/scheduled/v.mp4', mediaType: 'video', position: 0 },
+        { id: 'media-foto1', blobUrl: 'https://cdn.ejemplo.cl/scheduled/f1.jpg', mediaType: 'image', position: 1 },
+        { id: 'media-foto2', blobUrl: 'https://cdn.ejemplo.cl/scheduled/f2.jpg', mediaType: 'image', position: 2 },
+      ],
+      [{ id: 'acc-ig', network: 'instagram', handle: '@vicente', accessToken: 'token-vivo' }],
+    )
+  }
+
+  function formularioConMedia(keptMedia: string[]) {
+    const formData = new FormData()
+    formData.set('caption', 'Texto editado')
+    formData.set('cuentas', 'acc-ig')
+    formData.set('scheduledAt', '2030-01-01T10:00')
+    for (const id of keptMedia) formData.append('keptMedia', id)
+    return formData
+  }
+
+  it('mantener solo las dos fotos se rechaza con la frase del trial reel, sin tocar la base', async () => {
+    programarFilas()
+
+    const result = await updateScheduledPost('post-1', {}, formularioConMedia(['media-foto1', 'media-foto2']))
+
+    expect(result.error).toBe(TRIAL_REEL_MEDIA)
+    expect(db.updateCalls).toHaveLength(0)
+    expect(db.insertCalls).toHaveLength(0)
+  })
+
+  it('espejo: mantener el único video guarda sin error', async () => {
+    programarFilas()
+
+    await expect(
+      updateScheduledPost('post-1', {}, formularioConMedia(['media-video'])),
+    ).rejects.toThrow(RedirectSignal)
+  })
+})
+
+describe('createScheduledPost: un trial reel con fotos se rechaza antes de crear nada', () => {
+  /**
+   * Único destino: la cuenta de Instagram que `verificarCuentas` resuelve vía el mismo
+   * doble de `@/db` que usan las demás describe de este archivo (un `select().from().where()`
+   * más, encolado igual que las filas de `updateScheduledPost`) — no hace falta un doble
+   * aparte de `@/lib/social/cuentas`.
+   */
+  function formularioConTrialYFotos() {
+    db.scheduledSelectQueue.push([
+      { id: 'acc-ig', network: 'instagram', handle: '@vicente', accessToken: 'token-vivo' },
+    ])
+
+    const formData = new FormData()
+    formData.set('caption', 'Texto del post')
+    formData.set('cuentas', 'acc-ig')
+    formData.set('scheduledAt', '2030-01-01T10:00')
+    formData.set('instagramTrial:acc-ig', 'on')
+    // Dos fotos «ya subidas» — lo que `mediaYaSubida` espera del compositor, no un
+    // archivo real: el navegador sube antes de llamar a la acción.
+    formData.set(
+      'mediaSubida',
+      JSON.stringify([
+        { url: 'https://cdn.ejemplo.cl/scheduled/foto1.jpg', mediaType: 'image' },
+        { url: 'https://cdn.ejemplo.cl/scheduled/foto2.jpg', mediaType: 'image' },
+      ]),
+    )
+    return formData
+  }
+
+  it('devuelve el error del trial reel y no llega a crearPostProgramado', async () => {
+    const result = await createScheduledPost({}, formularioConTrialYFotos())
+
+    expect(result.error).toBe(TRIAL_REEL_MEDIA)
+    expect(crear.crearPostProgramadoCalls).toHaveLength(0)
   })
 })

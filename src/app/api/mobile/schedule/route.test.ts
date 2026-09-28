@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ScheduledPost, ScheduledPostTarget, Usuario } from '@/db'
 import { CuentaInvalida, type CuentaDestino } from '@/lib/social/cuentas'
+import { OPCIONES_ERROR, TRIAL_REEL_MEDIA } from '@/lib/social/publish/opciones'
 
 // `route.ts` importa `SITE_TIMEZONE` de `@/lib/analytics`, que trae `server-only` (no
 // resuelve bajo Vitest). Mismo motivo y mismo arreglo que `aislamiento.test.ts`.
@@ -169,6 +170,60 @@ describe('POST /api/mobile/schedule', () => {
     const res = await POST(peticion({ texto: 'Hola', cuentas: [], ahora: true, media: [] }))
     expect(res.status).toBe(400)
     expect(await res.json()).toEqual({ error: 'Elige al menos una plataforma.' })
+    expect(crearPostProgramado).not.toHaveBeenCalled()
+  })
+
+  it('un trial reel con un solo video crea el post con las opciones de la cuenta resuelta', async () => {
+    const IG_TRIAL: CuentaDestino = { id: 'ig-1', network: 'instagram', handle: '@vicente' }
+    resolverDestinos.mockResolvedValueOnce({ cuentas: [IG_TRIAL], networks: ['instagram'] })
+    crearPostProgramado.mockResolvedValueOnce('post-1')
+    const res = await POST(
+      peticion({
+        texto: 'Hola',
+        cuentas: ['ig-1'],
+        ahora: true,
+        media: [{ url: 'https://cdn.ejemplo.cl/scheduled/a.mp4', mediaType: 'video' }],
+        opciones: { 'ig-1': { trialReel: true } },
+      }),
+    )
+    expect(res.status).toBe(200)
+    expect(crearPostProgramado).toHaveBeenCalledWith(
+      'owner-1',
+      expect.objectContaining({ opciones: { 'ig-1': { trialReel: true } } }),
+    )
+  })
+
+  it('un trial reel con una foto se rechaza por la regla de media y no crea nada', async () => {
+    const IG_TRIAL: CuentaDestino = { id: 'ig-1', network: 'instagram', handle: '@vicente' }
+    resolverDestinos.mockResolvedValueOnce({ cuentas: [IG_TRIAL], networks: ['instagram'] })
+    const res = await POST(
+      peticion({
+        texto: 'Hola',
+        cuentas: ['ig-1'],
+        ahora: true,
+        media: [{ url: 'https://cdn.ejemplo.cl/scheduled/a.jpg', mediaType: 'image' }],
+        opciones: { 'ig-1': { trialReel: true } },
+      }),
+    )
+    expect(res.status).toBe(400)
+    expect(await res.json()).toEqual({ error: TRIAL_REEL_MEDIA })
+    expect(crearPostProgramado).not.toHaveBeenCalled()
+  })
+
+  it('opciones con forma inválida para la cuenta resuelta se rechaza con OPCIONES_ERROR y no crea nada', async () => {
+    const IG_TRIAL: CuentaDestino = { id: 'ig-1', network: 'instagram', handle: '@vicente' }
+    resolverDestinos.mockResolvedValueOnce({ cuentas: [IG_TRIAL], networks: ['instagram'] })
+    const res = await POST(
+      peticion({
+        texto: 'Hola',
+        cuentas: ['ig-1'],
+        ahora: true,
+        media: [{ url: 'https://cdn.ejemplo.cl/scheduled/a.mp4', mediaType: 'video' }],
+        opciones: { 'ig-1': { trialReel: 'sí' } },
+      }),
+    )
+    expect(res.status).toBe(400)
+    expect(await res.json()).toEqual({ error: OPCIONES_ERROR })
     expect(crearPostProgramado).not.toHaveBeenCalled()
   })
 })
