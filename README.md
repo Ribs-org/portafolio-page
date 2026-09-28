@@ -461,6 +461,20 @@ pestaña **Cuentas**) y aprieta *Conectar* en cada red; con varias páginas o cu
 cuáles. El `vercel.json` del repo declara una corrida diaria a las 9:00 UTC; Vercel inyecta
 `CRON_SECRET` solo. También puedes apretar *Sincronizar ahora* cuando quieras.
 
+**Si una cuenta aparece dos veces —una «Sin credencial» y otra viva—, no es un error tuyo.**
+TikTok, Instagram y Facebook le dan a la misma persona un identificador distinto por cada
+app: al pasar del sandbox a la app real (o al crear una app nueva) la misma cuenta vuelve
+a conectarse como una fila nueva, y la vieja queda muerta para siempre, con sus posts, sus
+métricas y su historial de publicaciones. Esa tarjeta ofrece **«Es la misma cuenta →»**:
+elige la viva y todo lo de la vieja pasa a ella —posts, métricas por día, historial y
+comentarios; ante un mismo video sincronizado bajo las dos, gana la viva y se completan sus
+días—, y la vieja desaparece. No se puede deshacer, y solo se ofrece en tarjetas sin
+credencial: una cuenta viva se desconecta primero, a propósito.
+
+Y una nota sobre TikTok: su tarjeta nunca avisa «la conexión vence mañana», aunque su
+token dure 24 horas. Se renueva solo con uno de refresco de un año; lo que sí la enfría es
+quedarse sin credencial o que falle una sincronización.
+
 Después de sincronizar, cada post trae su etiqueta `?s=` lista. Copia el link de la fila,
 pégalo en el post, y de ahí en adelante el cruce es automático.
 

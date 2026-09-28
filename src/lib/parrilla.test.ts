@@ -138,6 +138,18 @@ describe('estadoDelFierro', () => {
     expect(estadoDelFierro({ ...sano, expiraEn: en(3) }, AHORA)).toBe('enfriandose')
   })
 
+  it('TikTok no se mide por su token de 24 horas: conectada y sin error, está al rojo', () => {
+    // Su token corto se renueva solo con el de refresco, que dura un año. Sin esto, toda
+    // cuenta de TikTok decía «vence mañana» desde el día que se conectaba.
+    expect(estadoDelFierro({ ...sano, red: 'tiktok', expiraEn: en(0.5) }, AHORA)).toBe('al-rojo')
+    expect(estadoDelFierro({ ...sano, red: 'tiktok', expiraEn: en(-1) }, AHORA)).toBe('al-rojo')
+    // Lo que sí la enfría sigue enfriándola: sin credencial, o con la sincronización rota.
+    expect(estadoDelFierro({ ...sano, red: 'tiktok', connected: false }, AHORA)).toBe('frio')
+    expect(estadoDelFierro({ ...sano, red: 'tiktok', ultimoError: 'x' }, AHORA)).toBe('frio')
+    // Y las demás redes no cambian.
+    expect(estadoDelFierro({ ...sano, red: 'instagram', expiraEn: en(3) }, AHORA)).toBe('enfriandose')
+  })
+
   // Los dos bordes explícitos: mover el aviso es una decisión, no un ajuste.
   it('el aviso empieza justo en el día siete', () => {
     expect(estadoDelFierro({ ...sano, expiraEn: en(7) }, AHORA)).toBe('enfriandose')

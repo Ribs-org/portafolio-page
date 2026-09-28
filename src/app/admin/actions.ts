@@ -12,6 +12,7 @@ import { SITE_TIMEZONE } from '@/lib/analytics'
 import { destroySession, requireAdmin, requireUser } from '@/lib/auth'
 import { normalizeCampaignTag } from '@/lib/social/campaign'
 import { columnasEditablesDeRegla, validarRegla } from '@/lib/social/comentarios/reglas'
+import { FUSION_FALLO, FUSION_NO_ES_TUYA, decidirFusion, pasosDeFusion } from '@/lib/social/fusion'
 import { csvToBatchItems } from '@/lib/social/publish/csv'
 import {
   scheduleBatch,
@@ -462,6 +463,47 @@ export async function disconnectAccount(accountId: string): Promise<void> {
     .set({ accessToken: null, refreshToken: null, expiresAt: null, lastSyncError: null })
     .where(and(eq(socialAccounts.id, accountId), eq(socialAccounts.ownerId, usuario.id)))
   revalidatePath('/admin/accounts')
+}
+
+/**
+ * «Es la misma cuenta que…»: absorbe una fila sin credencial en una viva de la misma red.
+ * TikTok, Instagram y Facebook dan un identificador distinto por app, así que al pasar
+ * del sandbox a la app real la misma cuenta vuelve como fila nueva y la vieja queda muerta
+ * con su historial colgando. La decisión y los pasos son puros (`social/fusion.ts`); acá
+ * solo se leen las dos filas atadas al dueño y se corre la transacción. Nunca lanza: la
+ * tarjeta muestra la frase.
+ */
+export async function fusionarCuenta(muertaId: string, vivaId: string): Promise<{ ok: true } | { error: string }> {
+  const usuario = await requireUser()
+  const db = getDb()
+  const filas = await db
+    .select({
+      id: socialAccounts.id,
+      ownerId: socialAccounts.ownerId,
+      network: socialAccounts.network,
+      accessToken: socialAccounts.accessToken,
+    })
+    .from(socialAccounts)
+    .where(and(inArray(socialAccounts.id, [muertaId, vivaId]), eq(socialAccounts.ownerId, usuario.id)))
+  const muerta = filas.find((f) => f.id === muertaId)
+  const viva = filas.find((f) => f.id === vivaId)
+  if (!muerta || !viva) return { error: FUSION_NO_ES_TUYA }
+  const decision = decidirFusion(
+    { id: muerta.id, ownerId: muerta.ownerId, network: muerta.network, conectada: muerta.accessToken !== null },
+    { id: viva.id, ownerId: viva.ownerId, network: viva.network, conectada: viva.accessToken !== null },
+    usuario.id,
+  )
+  if ('error' in decision) return decision
+  try {
+    await db.transaction(async (tx) => {
+      for (const paso of pasosDeFusion(muertaId, vivaId, usuario.id)) await tx.execute(paso)
+    })
+  } catch (error) {
+    console.error('Fusionar cuentas:', String(error).slice(0, 300))
+    return { error: FUSION_FALLO }
+  }
+  revalidatePath('/admin/accounts')
+  return { ok: true }
 }
 
 /**

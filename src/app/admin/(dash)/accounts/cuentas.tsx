@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useTransition } from 'react'
 import { AlertTriangle, Check, Copy, RefreshCw } from 'lucide-react'
-import { disconnectAccount, syncSocialNow } from '@/app/admin/actions'
+import { disconnectAccount, fusionarCuenta, syncSocialNow } from '@/app/admin/actions'
 import { NEGATIVE, POSITIVE } from '@/components/charts/theme'
 import { SOCIAL_NETWORKS } from '@/db/schema'
 import type { CuentaRow } from '@/lib/posts-kpis'
@@ -87,7 +87,12 @@ export function Cuentas({ rows }: { rows: CuentaRow[] }) {
             ) : (
               <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
                 {cuentas.map((row) => (
-                  <Tarjeta key={row.id} row={row} network={network} />
+                  <Tarjeta
+                    key={row.id}
+                    row={row}
+                    network={network}
+                    vivas={cuentas.filter((c) => c.connected && c.id !== row.id)}
+                  />
                 ))}
               </div>
             )}
@@ -119,10 +124,18 @@ export function Cuentas({ rows }: { rows: CuentaRow[] }) {
  * Cada tarjeta lleva su propio pendiente: desconectar una cuenta no tiene por qué
  * apagar los botones de las otras siete.
  */
-function Tarjeta({ row, network }: { row: CuentaRow; network: string }) {
+/**
+ * `vivas` son las otras cuentas conectadas de la misma red: con ellas una tarjeta sin
+ * credencial ofrece fusionarse. Es el caso de la identidad que dio otra app —TikTok, Meta
+ * y compañía dan un id distinto por app—: al pasar del sandbox a la app real la misma
+ * cuenta vuelve como fila nueva, y esta queda muerta con su historial colgando.
+ */
+function Tarjeta({ row, network, vivas }: { row: CuentaRow; network: string; vivas: CuentaRow[] }) {
   const [pending, startTransition] = useTransition()
   const [desconectada, setDesconectada] = useState(false)
   const [idCopiado, setIdCopiado] = useState(false)
+  const [destino, setDestino] = useState(vivas[0]?.id ?? '')
+  const [fusion, setFusion] = useState<{ texto: string; ok: boolean } | null>(null)
   const nombre = nombreDe(row)
 
   useEffect(() => {
@@ -162,8 +175,21 @@ function Tarjeta({ row, network }: { row: CuentaRow; network: string }) {
     })
   }
 
+  function fusionar() {
+    const viva = vivas.find((v) => v.id === destino)
+    if (!viva) return
+    const seguir = window.confirm(
+      `«${nombre}» se fusiona en «${nombreDe(viva)}»: sus posts, sus métricas y su historial de publicaciones pasan a esa cuenta, y esta tarjeta desaparece. No se puede deshacer. ¿Seguir?`,
+    )
+    if (!seguir) return
+    startTransition(async () => {
+      const resultado = await fusionarCuenta(row.id, viva.id)
+      setFusion('error' in resultado ? { texto: resultado.error, ok: false } : { texto: `Fusionada en «${nombreDe(viva)}».`, ok: true })
+    })
+  }
+
   const fierro = estadoDelFierro(
-    { connected: row.connected, expiraEn: row.expiresAt, ultimoError: row.lastSyncError },
+    { connected: row.connected, expiraEn: row.expiresAt, ultimoError: row.lastSyncError, red: network },
     new Date(),
   )
 
@@ -237,7 +263,46 @@ function Tarjeta({ row, network }: { row: CuentaRow; network: string }) {
       ) : null}
       <div role="status">
         {desconectada ? <p className="mt-2 text-[0.72rem] text-fg-muted">Desconectada.</p> : null}
+        {fusion ? (
+          <p className={cn('mt-2 text-[0.72rem]', fusion.ok ? 'text-fg-muted' : 'text-caution')}>{fusion.texto}</p>
+        ) : null}
       </div>
+      {/*
+        Sin credencial y con otra cuenta viva de esta red: casi siempre es la misma persona
+        con el id que le dio otra app (al salir del sandbox, por ejemplo). Fusionar es lo que
+        conserva sus números en vez de empezar de cero; se ofrece solo aquí, donde ya no hay
+        nada que reconectar.
+      */}
+      {!row.connected && !fusion?.ok && vivas.length > 0 ? (
+        <div className="mt-3 space-y-1.5">
+          <p className="text-[0.72rem] text-fg-muted">
+            ¿Es la misma cuenta con otro identificador? Fusiónala y su historial pasa a la viva.
+          </p>
+          <div className="flex flex-wrap items-center gap-2">
+            <select
+              value={destino}
+              onChange={(e) => setDestino(e.target.value)}
+              disabled={pending}
+              aria-label="Cuenta en la que se fusiona"
+              className="chapa rounded-lg bg-transparent px-2 py-1 text-[0.75rem] text-fg"
+            >
+              {vivas.map((v) => (
+                <option key={v.id} value={v.id}>
+                  {nombreDe(v)}
+                </option>
+              ))}
+            </select>
+            <button
+              type="button"
+              onClick={fusionar}
+              disabled={pending}
+              className="text-[0.75rem] text-fg-muted transition-colors hover:text-fg disabled:opacity-50"
+            >
+              {pending ? 'Fusionando…' : 'Es la misma cuenta →'}
+            </button>
+          </div>
+        </div>
+      ) : null}
       <div className="mt-3 flex items-center gap-3">
         <a
           href={`/api/social/${network}/connect`}

@@ -1,4 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { PgDialect } from 'drizzle-orm/pg-core'
+import type { SQL } from 'drizzle-orm'
 import { getTableName } from 'drizzle-orm'
 
 // `usuarios.ts`, que este archivo importa por debajo de `actions.ts`, trae `server-only`,
@@ -65,6 +67,9 @@ const db = vi.hoisted(() => ({
   // 0 = nunca falla. N = la N-ésima escritura dentro de la transacción de `makeDefault`
   // lanza en vez de aplicarse (1 = degradar, 2 = promover).
   makeDefaultErrorAtCall: 0 as number,
+  // Lo que `fusionarCuenta` mandó a `tx.execute` dentro de su transacción, en orden.
+  executeCalls: [] as unknown[],
+  executeError: null as unknown,
   // Para `updateScheduledPost`: filas programadas para los `select().from().where()`
   // sucesivos, en el orden real en que la función los hace (post, targets, media) — no
   // por tabla, por orden, como en `aislamiento.test.ts`. Vacío = el `select` de siempre
@@ -152,6 +157,7 @@ vi.mock('@/db', async (importOriginal) => {
           select: typeof select
           delete: typeof del
           update: () => { set: (values: unknown) => { where: () => Promise<void> } }
+          execute: (consulta: unknown) => Promise<void>
         }) => Promise<unknown>,
       ) => {
         const buffer: unknown[] = []
@@ -167,7 +173,11 @@ vi.mock('@/db', async (importOriginal) => {
             },
           }),
         })
-        const resultado = await fn({ select, delete: del, update })
+        const execute = async (consulta: unknown) => {
+          if (db.executeError) throw db.executeError
+          db.executeCalls.push(consulta)
+        }
+        const resultado = await fn({ select, delete: del, update, execute })
         db.makeDefaultCalls.push(...buffer)
         return resultado
       },
@@ -178,10 +188,11 @@ vi.mock('@/db', async (importOriginal) => {
 // Import estático, después de los `vi.mock` (Vitest los sube igual al principio del
 // archivo): un import dinámico dentro de cada `it` pagaría de nuevo la transformación de
 // todo lo que `actions.ts` arrastra.
-const { updateProfile, deleteProfile, makeDefault, updateScheduledPost, createScheduledPost } = await import(
+const { updateProfile, deleteProfile, makeDefault, updateScheduledPost, createScheduledPost, fusionarCuenta } = await import(
   './actions'
 )
 const { TRIAL_REEL_MEDIA } = await import('@/lib/social/publish/opciones')
+const { FUSION_DISTINTA_RED, FUSION_NO_ES_TUYA, FUSION_FALLO } = await import('@/lib/social/fusion')
 
 beforeEach(() => {
   db.updateCalls.length = 0
@@ -197,6 +208,8 @@ beforeEach(() => {
   db.insertCalls.length = 0
   db.onConflictDoUpdateCalls.length = 0
   crear.crearPostProgramadoCalls.length = 0
+  db.executeCalls.length = 0
+  db.executeError = null
 })
 
 /**
@@ -525,5 +538,39 @@ describe('createScheduledPost: un trial reel con fotos se rechaza antes de crear
 
     expect(result.error).toBe(TRIAL_REEL_MEDIA)
     expect(crear.crearPostProgramadoCalls).toHaveLength(0)
+  })
+})
+
+describe('fusionarCuenta: una tarjeta muerta se absorbe en la viva de su red', () => {
+  const muerta = { id: 'muerta', ownerId: USUARIO.id, network: 'tiktok', accessToken: null }
+  const viva = { id: 'viva', ownerId: USUARIO.id, network: 'tiktok', accessToken: 'cifrado' }
+
+  it('corre los nueve pasos dentro de la transacción, con la muerta atada al dueño al final', async () => {
+    db.scheduledSelectQueue.push([muerta, viva])
+    expect(await fusionarCuenta('muerta', 'viva')).toEqual({ ok: true })
+    expect(db.executeCalls).toHaveLength(9)
+    const ultimo = new PgDialect().sqlToQuery(db.executeCalls[8] as SQL)
+    expect(ultimo.sql).toMatch(/delete from "?social_accounts"?/i)
+    expect(ultimo.params).toEqual(['muerta', USUARIO.id])
+  })
+
+  it('si la decisión dice que no, no toca la base', async () => {
+    db.scheduledSelectQueue.push([muerta, { ...viva, network: 'instagram' }])
+    expect(await fusionarCuenta('muerta', 'viva')).toEqual({ error: FUSION_DISTINTA_RED })
+    expect(db.executeCalls).toHaveLength(0)
+  })
+
+  it('una cuenta que la consulta atada al dueño no trae es «no es tuya», sin decir más', async () => {
+    // La consulta filtra por dueño: una cuenta ajena simplemente no aparece, y la frase no
+    // distingue «no existe» de «es de otro» a propósito.
+    db.scheduledSelectQueue.push([viva])
+    expect(await fusionarCuenta('muerta', 'viva')).toEqual({ error: FUSION_NO_ES_TUYA })
+    expect(db.executeCalls).toHaveLength(0)
+  })
+
+  it('un fallo dentro de la transacción vuelve como frase, no como excepción', async () => {
+    db.scheduledSelectQueue.push([muerta, viva])
+    db.executeError = new Error('la base no responde')
+    expect(await fusionarCuenta('muerta', 'viva')).toEqual({ error: FUSION_FALLO })
   })
 })
