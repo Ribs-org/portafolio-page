@@ -90,6 +90,7 @@ no por subcadena parcial ni regex:
 | `Las opciones de la red no se entendieron.` | `opciones` mal formado, o para un destino que no las pide |
 | `TikTok recibe un video, o hasta 35 fotos JPG o WebP.` | `media` con dos videos, mezcla, más de 35 fotos, u otro formato |
 | `Un trial reel es un solo video, sin fotos.` | `opciones.<destino>.trialReel: true` con fotos, carrusel, dos videos o sin ningún video en `media` |
+| `Instagram no permite trial reels en esta cuenta.` | no es un error de fila — la fila con `trialReel: true` se acepta al programar; esta frase aparece después, como el `error` de ese destino en `GET /api/schedule/posts`, porque Instagram solo revela la elegibilidad al publicar |
 | `Una de las cuentas elegidas no es tuya.` | `cuentas` con un identificador que no es del dueño |
 | `La cuenta <handle> no está conectada. Vuelve a conectarla en Cuentas.` | `cuentas` con un identificador válido pero desconectado |
 | `No hay una cuenta de <red> conectada.` | `redes` con un nombre sin ninguna cuenta conectada de esa red |

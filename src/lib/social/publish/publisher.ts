@@ -12,7 +12,7 @@ export type PublishInput = {
   accountExternalId: string
   /** Imagen de portada (URL del Blob) para los caminos de video; null si no hay. */
   coverUrl: string | null
-  /** Lo que la red exigió elegir por destino (TikTok); null en las redes que no piden nada. */
+  /** Lo que la red exigió elegir por destino (TikTok, Instagram); null en las redes que no piden nada. */
   opciones: OpcionesDestino | null
 }
 
@@ -44,6 +44,7 @@ export type TargetPatch = {
 
 // Every sentence the owner can see. Upstream detail goes to the server log only.
 export const PUBLISH_REJECTED = 'Instagram rechazó la publicación.'
+export const TRIAL_REEL_NO_DISPONIBLE = 'Instagram no permite trial reels en esta cuenta.'
 export const PUBLISH_NETWORK_ERROR = 'No se pudo hablar con la red. Se reintentará.'
 export const NO_PUBLISH_TOKEN = 'La cuenta no está conectada. Reconéctala y reprograma.'
 export const STALE_PROCESSING = 'La red no terminó de procesar el video.'

@@ -240,7 +240,8 @@ rechaza con `Un trial reel es un solo video, sin fotos.`, antes de subir nada.
 
 **La elegibilidad se descubre al publicar, no al programar.** Instagram tiene que tener la
 función habilitada en esa cuenta (profesional, pública y con seguidores suficientes, según
-los términos de Meta): una fila aceptada acá puede fallar después en ese destino.
+los términos de Meta): una fila aceptada acá puede fallar después en ese destino, con su
+propia frase: `Instagram no permite trial reels en esta cuenta.`
 
 **Después no hay forma de saber por API si se graduó.** Eso se mira en la app de Instagram.
 
@@ -310,6 +311,7 @@ Instagram acepta: 1 foto, 1 video, o 2–10 fotos (carrusel).
 | `«<clave1>» y «<clave2>» en opciones nombran el mismo destino. Deja una sola clave por destino.` | dos claves de `opciones` (por ejemplo el id de una cuenta y el nombre de su única red) resuelven al mismo destino |
 | `TikTok recibe un video, o hasta 35 fotos JPG o WebP.` | dos videos, mezcla, más de 35 fotos, png/gif, o video que no es mp4/mov/webm |
 | `Un trial reel es un solo video, sin fotos.` | `opciones.<destino>.trialReel: true` con fotos, carrusel, dos videos o sin ningún video en `media` |
+| `Instagram no permite trial reels en esta cuenta.` | **no es un error de fila:** la fila con `trialReel: true` se acepta al programar; esta frase aparece después, en el `error` del destino que ya publicó (panel y `GET /api/schedule/posts`), porque Instagram solo revela la elegibilidad al crear el contenedor |
 | `Una de las cuentas elegidas no es tuya.` | un identificador en `cuentas` que no es una cuenta del dueño (o no existe) |
 | `La cuenta <handle> no está conectada. Vuelve a conectarla en Cuentas.` | un identificador en `cuentas` que existe pero perdió la credencial — **solo con `cuentas`**: con `redes`, una cuenta desconectada da la frase de abajo |
 | `No hay una cuenta de <red> conectada.` | un nombre en `redes` sin ninguna cuenta *conectada* de esa red — no tiene ninguna, o la única que tiene está desconectada; las dos dan la misma frase |
