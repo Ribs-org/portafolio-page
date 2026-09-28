@@ -50,12 +50,31 @@ Ninguno es largo para una app como esta.
 
 ### Política de privacidad
 
-Pide una **URL pública**. Tu sitio ya tiene páginas legales, así que probablemente ya existe;
-si no, hay que publicar una. Tiene que decir qué datos recoge la app y qué se hace con ellos.
+Pide una **URL pública**. Usa esta:
 
-En tu caso la respuesta honesta y corta es: la app no recoge datos de nadie más que de ti,
-guarda tu sesión en el almacenamiento seguro del teléfono, y habla únicamente con tu propio
-sitio.
+```
+https://tu-parrilla.cl/privacidad
+```
+
+Es el dominio del producto y el mismo que ya usa la revisión de TikTok. El sitio responde
+también en `www.vicente-pareja.cl`, pero a Google dale una sola y no la cambies después: un
+formulario que apunta a una URL que dejó de abrir es otra forma de perder la cuenta.
+**Ábrela en el teléfono antes de pegarla.**
+
+Esa página tiene una sección propia, «La aplicación del teléfono», que dice lo que Google
+quiere leer: que la app no recoge datos de nadie más que de ti, que pide acceso a fotos y
+videos solo para que elijas los archivos que vas a publicar, que la sesión vive en el
+almacenamiento seguro del teléfono, y con qué servidores habla.
+
+**Y son dos, no uno.** El de tu sitio, y el de Expo: la app le pregunta en cada apertura si hay
+una versión nueva de sí misma, y así llegan las actualizaciones por aire sin pasar por la tienda.
+Expo ve en esa pregunta la IP del teléfono, su sistema operativo y qué versión tiene instalada.
+Eso **no se puede omitir en el formulario de Google**: es un tercero, y es justo el servicio del
+que depende que las actualizaciones lleguen solas. Declararlo cuesta una casilla.
+
+Si algún día cambia lo que la app hace, esa sección tiene que cambiar con ella: **mentir en
+el formulario de Google cuesta la cuenta, no la app**, y el formulario tiene que coincidir
+con lo que dice esa URL.
 
 ### Seguridad de los datos
 
@@ -63,7 +82,10 @@ Un cuestionario sobre qué recoge la app y si lo comparte. Para esta app:
 
 - **¿Recoge o comparte datos de usuarios?** Sí, pero solo los que tú mismo produces.
 - **Tipos de datos:** archivos y documentos, por las fotos y videos que eliges para publicar.
-- **¿Se comparten con terceros?** No. Van a tu propio servidor.
+- **¿Se comparten con terceros?** Tu contenido no: va solo a tu propio servidor. Lo que sí sale
+  hacia un tercero es el **identificador del dispositivo y su IP**, hacia Expo, en la consulta de
+  actualizaciones que la app hace al abrirse. Google tiene una categoría para eso
+  («identificadores del dispositivo», con la finalidad «funcionalidad de la app»): márcala.
 - **¿Se cifran en tránsito?** Sí, todo va por HTTPS.
 - **¿Puede el usuario pedir que se borren?** Sí, tú controlas la base.
 
@@ -102,7 +124,20 @@ Esto es lo que le permite a EAS subir binarios sin que tú entres a la consola c
 
 **Ese archivo JSON es una credencial.** No lo guardes en el repositorio, no lo pegues en un
 chat y no lo mandes por correo. Cuando lo tengas, avísame y lo subimos al almacén de
-credenciales de EAS, que es donde tiene que vivir.
+credenciales de EAS, que es donde tiene que vivir. `eas.json` ya declara la pista —interna—
+y no nombra el archivo: lo toma de ahí.
+
+### Y un secreto en GitHub
+
+Para que el flujo de la Parte 6 funcione sin computador, el repositorio necesita un token de
+Expo:
+
+1. En [expo.dev](https://expo.dev), tu cuenta → **Access tokens** → crea uno.
+2. En GitHub, en este repositorio: **Settings → Secrets and variables → Actions → New
+   repository secret**.
+3. Nombre exacto: `EXPO_TOKEN`. Valor: el token.
+
+Sin ese secreto el flujo falla en el primer paso, con un error de autenticación.
 
 ---
 
@@ -141,11 +176,19 @@ cambio es solo JavaScript, que es la mayoría.
 
 De aquí en adelante casi nunca vas a volver a esta consola.
 
-- **Cambio de JavaScript**, que es casi todo: se fusiona el pull request y la actualización
-  llega sola al teléfono. No toca la tienda.
-- **Cambio nativo**, que es raro: lanzas el flujo de la tienda desde la app de GitHub en el
-  teléfono, con dos toques. EAS construye el binario, lo envía a la pista interna, y Google
-  lo distribuye.
+- **Cambio de JavaScript**, que es casi todo: se publica la actualización por aire y llega
+  sola al teléfono, sin pasar por Google. **Ojo con el canal**: la app de la Play Store
+  escucha `production` y el APK a mano escucha `preview`, así que mientras tengas las dos
+  instaladas hay que publicar a las dos. Está explicado, con los comandos, en
+  `mobile/README.md`.
+- **Cambio nativo**, que es raro: en la app de GitHub, **Actions → «App a la tienda» →
+  Run**. GitHub corre las pruebas de la app, EAS construye el binario, lo envía a la pista interna,
+  y Google lo distribuye. El flujo vive en `.github/workflows/app-tienda.yml` y tiene una
+  casilla por si alguna vez quieres construir sin enviar.
+
+**El número de versión lo lleva EAS**, no un archivo: `eas.json` declara `autoIncrement` y
+el proyecto guarda la cuenta en el servidor. Por eso el error de abajo no debería aparecer
+nunca.
 
 ---
 
