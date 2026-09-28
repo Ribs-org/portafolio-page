@@ -193,6 +193,10 @@ describe('parseBorradorMovil', () => {
   it('opciones que no son un objeto de objetos no tienen la forma', () => {
     expect(parseBorradorMovil({ ...bueno, opciones: 'trial' })).toEqual({ error: CUERPO_ILEGIBLE })
     expect(parseBorradorMovil({ ...bueno, opciones: ['ig-1'] })).toEqual({ error: CUERPO_ILEGIBLE })
+    // `null` explícito no es «ausente»: la desestructuración solo aplica el `{}` a `undefined`.
+    // Un cliente que serializa null en vez de omitir recibe la frase de forma, y este test es lo
+    // que impide que un `?? {}` futuro lo cambie en silencio.
+    expect(parseBorradorMovil({ ...bueno, opciones: null })).toEqual({ error: CUERPO_ILEGIBLE })
     expect(parseBorradorMovil({ ...bueno, opciones: { 'ig-1': true } })).toEqual({ error: CUERPO_ILEGIBLE })
   })
 })
