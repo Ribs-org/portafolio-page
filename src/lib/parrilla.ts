@@ -138,11 +138,17 @@ export const DIAS_AVISO_FIERRO = 7
  * por ejemplo— y para el caso da lo mismo, hay que reconectar.
  */
 export function estadoDelFierro(
-  cuenta: { connected: boolean; expiraEn: string | null; ultimoError: string | null },
+  cuenta: { connected: boolean; expiraEn: string | null; ultimoError: string | null; red?: string },
   ahora: Date,
 ): Fierro {
   if (!cuenta.connected) return 'frio'
   if (cuenta.ultimoError) return 'frio'
+  // TikTok entrega tokens de acceso de 24 horas y los renueva solo con uno de refresco
+  // que dura un año (`ensureCredential`, `social/tiktok.ts`): `expiraEn` guarda el corto.
+  // Medirlo por ahí hacía que toda cuenta de TikTok dijera «vence mañana» siempre, recién
+  // conectada o no. Lo que de verdad dice si vive es que tenga credencial y que la última
+  // sincronización no haya fallado — y eso ya se comprobó arriba.
+  if (cuenta.red === 'tiktok') return 'al-rojo'
   if (!cuenta.expiraEn) return 'al-rojo'
 
   const faltan = new Date(cuenta.expiraEn).getTime() - ahora.getTime()
