@@ -121,9 +121,13 @@ algo que el dueño pidió esconder. Falla a la vista. El editor no deja apagar l
 mandarlo como reel normal hoy es borrar el post y programar otro sin la opción.
 
 **Una debilidad escrita, no disimulada:** Meta no documenta qué código devuelve ese rechazo.
-La detección va por el texto del error (`trial` en el mensaje). Si Meta cambia la frase, el
-fallo vuelve a verse como el genérico: no se pierde nada, se explica peor. El intento de
-aprendizaje queda en el log del servidor, que registra el cuerpo completo.
+La detección va por el texto del error (`trial` en el mensaje). Si Meta cambia la frase, o
+rechaza por una razón que redacta sin ella —una cuenta privada, la cuota diaria—, el fallo
+vuelve al trato genérico: se reintenta hasta tres veces prometiendo un reintento que Meta ya
+negó, y recién entonces falla. No es inofensivo; es el mismo trato que hoy recibe cualquier
+no-ok en un reel normal, y el mapeo solo lo estrecha para el único caso reconocible. El
+cuerpo completo del error queda en el log del servidor: verlo una vez es lo que permite pasar
+a reconocerlo por su código (`docs/deuda-tecnica.md`).
 
 ## 5. Las superficies
 
