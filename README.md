@@ -300,9 +300,13 @@ TikTok pide sus propias opciones por destino —privacidad, comentarios, dúo, c
 que con dos cuentas de TikTok marcadas verás dos bloques, uno por cuenta. No se comparten a
 propósito: TikTok consulta los permisos por creador, y lo que una cuenta admite la otra
 puede no admitirlo. Instagram también puede pedir una opción por destino —si el reel sale
-como trial reel—, hoy solo vía la API del lote (`public/docs/api-editor.md`): el compositor
-del panel todavía no trae ese interruptor. La app del teléfono todavía no ofrece TikTok
-como destino en absoluto: ahí no hay dónde elegir esas opciones.
+como trial reel—, y el compositor del panel la ofrece igual: un bloque por cuenta de
+Instagram marcada, con el interruptor «Publicar como trial reel», pero solo cuando hay
+exactamente un video elegido —con fotos, carrusel o sin archivo el bloque ni se dibuja, y
+como el interruptor no está montado, no manda nada—. Un trial reel es exactamente un video,
+sin fotos: si eliges otra cosa con la opción marcada, el compositor lo rechaza antes de
+subir nada. La app del teléfono todavía no ofrece TikTok como destino en absoluto: ahí no
+hay dónde elegir esas opciones.
 
 ### TikTok
 

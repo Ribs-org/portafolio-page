@@ -24,6 +24,7 @@ import {
   PORTADA_NEEDS_VIDEO,
 } from '@/lib/social/publish/batch'
 import {
+  errorDeMediaPorOpciones,
   opcionesDesdeFormularioPorCuenta,
   validarOpciones,
   validarOpcionesPorCuenta,
@@ -691,6 +692,15 @@ export async function createScheduledPost(_prev: FormState, formData: FormData):
   // quede huérfano en el bucket lo borra el barrido diario.
   const opcionesCheck = validarOpcionesPorCuenta(cuentas, opcionesDesdeFormularioPorCuenta(formData, cuentas))
   if ('error' in opcionesCheck) return { error: opcionesCheck.error }
+
+  // Un trial reel es un solo video: la opción ya está resuelta por cuenta y los tipos
+  // son reales (el navegador subió antes de enviar), así que no hay `sinTipo`.
+  const mediaPorOpciones = errorDeMediaPorOpciones(opcionesCheck.opciones, {
+    videos: videoCount,
+    fotos: uploaded.length - videoCount,
+    sinTipo: 0,
+  })
+  if (mediaPorOpciones) return { error: mediaPorOpciones }
 
   const reglaCheck = validarRegla(reglaDesdeFormulario(formData))
   if ('error' in reglaCheck) return { error: reglaCheck.error }
