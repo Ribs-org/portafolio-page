@@ -30,9 +30,13 @@ export function reelContainerParams(
 /**
  * Meta does not document which code a trial-reel rejection carries, so this matches on
  * the message text — and only when a trial reel was asked for, so an unrelated error
- * that happens to say "trial" on a normal reel keeps its usual treatment. If Meta
- * changes the wording, the failure falls back to the generic sentence: nothing is
- * lost, it is just explained worse. See the spec, section 4.
+ * that happens to say "trial" on a normal reel keeps its usual treatment. The cost
+ * when the wording does not match (Meta changes it, or rejects for a reason it phrases
+ * without the word — a private account, the daily quota): the rejection is treated as
+ * a network failure and retried up to MAX_PUBLISH_ATTEMPTS times before the target
+ * fails, with a sentence that promises a retry Meta already refused. That is the same
+ * treatment every non-ok gets on a normal reel today; this function only narrows it
+ * for the one case Meta lets us recognise. Tracked in docs/deuda-tecnica.md.
  */
 export function motivoDeRechazo(cuerpo: string, opciones: OpcionesDestino | null): string | null {
   if (!opciones || !('trialReel' in opciones)) return null

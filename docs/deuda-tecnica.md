@@ -307,6 +307,13 @@ comprobar:
    …)`) a propósito: es la única forma de aprender la frase real de Meta el día que el rechazo
    ocurra de verdad, sin haber apostado antes a una forma adivinada.
 
+   Lo que cuesta mientras tanto, dicho sin suavizar: un rechazo definitivo que Meta redacte
+   sin la palabra —una cuenta privada, la cuota diaria— cae en «No se pudo hablar con la
+   red. Se reintentará.» y se reintenta hasta tres veces antes de fallar, prometiendo un
+   reintento que Meta ya negó. Es el mismo trato que hoy recibe cualquier no-ok en un reel
+   normal; el mapeo solo lo estrecha para el único caso que Meta deja reconocer. Cerrarlo
+   pide ver el error real una vez, y entonces reconocerlo por su código y no por su texto.
+
 Cerrar las tres pide lo mismo: una cuenta de Instagram con trial reels habilitados y una
 tarde — un trial reel con portada, un trial reel sin graduar mirado desde `/api/metrics/posts`,
 y una cuenta sin la función para leer el rechazo real del log.
