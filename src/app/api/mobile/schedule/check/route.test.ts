@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Usuario } from '@/db'
-import { CuentaInvalida } from '@/lib/social/cuentas'
+import { CuentaInvalida, type CuentaDestino } from '@/lib/social/cuentas'
+import { OPCIONES_ERROR, TRIAL_REEL_MEDIA } from '@/lib/social/publish/opciones'
 
 const USUARIO: Usuario = {
   id: 'owner-1',
@@ -84,5 +85,39 @@ describe('POST /api/mobile/schedule/check', () => {
     const res = await POST(peticion({ texto: 'Hola', cuentas: [], ahora: true, fotos: 0, videos: 0 }))
     expect(res.status).toBe(400)
     expect(await res.json()).toEqual({ error: 'Elige al menos una plataforma.' })
+  })
+
+  it('un trial reel con una foto en el chequeo se rechaza por la regla de media, con los conteos del cuerpo', async () => {
+    const IG: CuentaDestino = { id: 'ig-1', network: 'instagram', handle: '@vicente' }
+    resolverDestinos.mockResolvedValueOnce({ cuentas: [IG], networks: ['instagram'] })
+    const res = await POST(
+      peticion({
+        texto: 'Hola',
+        cuentas: ['ig-1'],
+        ahora: true,
+        fotos: 1,
+        videos: 0,
+        opciones: { 'ig-1': { trialReel: true } },
+      }),
+    )
+    expect(res.status).toBe(400)
+    expect(await res.json()).toEqual({ error: TRIAL_REEL_MEDIA })
+  })
+
+  it('opciones con forma inválida para la cuenta resuelta se rechaza con OPCIONES_ERROR', async () => {
+    const IG: CuentaDestino = { id: 'ig-1', network: 'instagram', handle: '@vicente' }
+    resolverDestinos.mockResolvedValueOnce({ cuentas: [IG], networks: ['instagram'] })
+    const res = await POST(
+      peticion({
+        texto: 'Hola',
+        cuentas: ['ig-1'],
+        ahora: true,
+        fotos: 0,
+        videos: 1,
+        opciones: { 'ig-1': { trialReel: 'sí' } },
+      }),
+    )
+    expect(res.status).toBe(400)
+    expect(await res.json()).toEqual({ error: OPCIONES_ERROR })
   })
 })

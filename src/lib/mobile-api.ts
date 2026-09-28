@@ -1,10 +1,11 @@
 import { PUBLISHABLE, typeFromContentType } from './social/publish/batch'
 import { CuentaInvalida, cuentaUnicaPorRed, verificarCuentas, type CuentaDestino } from './social/cuentas'
 
-// El teléfono todavía no tiene dónde pedir las opciones que TikTok exige por
-// destino (privacidad, interacciones, comercial), así que esa red se rechaza aquí
-// aunque el lote y el compositor ya la publiquen. Quitar esta exclusión cuando la
-// app móvil traiga el bloque de TikTok.
+// El teléfono ya manda `opciones` por cuenta (Tarea 5), pero TikTok todavía exige
+// consultar `creator_info` por creador antes de ofrecer privacidad, comentarios, dúo
+// y demás — el teléfono no hace esa consulta ni resuelve esas interacciones, así que
+// esa red se rechaza aquí aunque el lote y el compositor ya la publiquen. Quitar esta
+// exclusión cuando la app móvil traiga ese bloque.
 //
 // Exportada: `resolverDestinos` (más abajo) también la usa para filtrar destinos
 // elegidos por cuenta, y `GET /api/mobile/schedule/accounts` para no ofrecer un chip
@@ -86,7 +87,15 @@ export function prepararSubida(
 // nueva elige destino por cuenta, no por red. `redes` se queda para una app vieja
 // instalada que todavía no la manda — se resuelve sola mientras no haya dos cuentas
 // conectadas en esa red, la regla de siempre (`cuentaUnicaPorRed`).
-export type BorradorMovil = { texto: string; redes: string[]; cuentas: string[]; cuando: string | null; ahora: boolean }
+export type BorradorMovil = {
+  texto: string
+  redes: string[]
+  cuentas: string[]
+  cuando: string | null
+  ahora: boolean
+  /** Lo que cada cuenta pidió, crudo: lo valida el servidor después de resolver los destinos. */
+  opciones: Record<string, unknown>
+}
 export type MediaMovil = { url: string; mediaType: 'image' | 'video' }
 
 function esObjeto(value: unknown): value is Record<string, unknown> {
@@ -96,7 +105,7 @@ function esObjeto(value: unknown): value is Record<string, unknown> {
 /** La parte del borrador que comparten el chequeo y la creación. */
 export function parseBorradorMovil(body: unknown): BorradorMovil | { error: string } {
   if (!esObjeto(body)) return { error: CUERPO_ILEGIBLE }
-  const { texto = '', redes = [], cuentas = [], cuando = null, ahora = false } = body
+  const { texto = '', redes = [], cuentas = [], cuando = null, ahora = false, opciones = {} } = body
   if (typeof texto !== 'string') return { error: CUERPO_ILEGIBLE }
   if (!Array.isArray(redes) || !redes.every((r) => typeof r === 'string')) return { error: CUERPO_ILEGIBLE }
   if (!Array.isArray(cuentas) || !cuentas.every((c) => typeof c === 'string')) return { error: CUERPO_ILEGIBLE }
@@ -108,7 +117,17 @@ export function parseBorradorMovil(body: unknown): BorradorMovil | { error: stri
   for (const red of unicas) {
     if (!REDES_MOVIL.has(red)) return { error: fraseRedNoPublicable(red) }
   }
-  return { texto: texto.trim(), redes: unicas, cuentas: [...new Set(cuentas as string[])], cuando, ahora }
+  // Un objeto de objetos, nada más: lo que hay dentro lo decide `validarOpcionesPorCuenta`
+  // cuando ya se sabe la red de cada cuenta. Acá solo se rechaza lo que no tiene forma.
+  if (!esObjeto(opciones) || !Object.values(opciones).every(esObjeto)) return { error: CUERPO_ILEGIBLE }
+  return {
+    texto: texto.trim(),
+    redes: unicas,
+    cuentas: [...new Set(cuentas as string[])],
+    cuando,
+    ahora,
+    opciones,
+  }
 }
 
 /**
