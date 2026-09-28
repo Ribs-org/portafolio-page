@@ -53,13 +53,13 @@ Ninguno es largo para una app como esta.
 Pide una **URL pública**. Usa esta:
 
 ```
-https://www.vicente-pareja.cl/privacidad
+https://tu-parrilla.cl/privacidad
 ```
 
-**Comprueba que esa URL abre antes de pegarla.** Es la que sirve el sitio hoy. `tu-parrilla.cl`
-está comprado desde el 2026-09-16 y es el dominio al que el producto va a mudarse; el día que
-sirva el sitio, esta URL cambia y **hay que cambiarla también en el formulario de Google**, no
-solo acá. Un formulario que apunta a una URL muerta es otra forma de perder la cuenta.
+Es el dominio del producto y el mismo que ya usa la revisión de TikTok. El sitio responde
+también en `www.vicente-pareja.cl`, pero a Google dale una sola y no la cambies después: un
+formulario que apunta a una URL que dejó de abrir es otra forma de perder la cuenta.
+**Ábrela en el teléfono antes de pegarla.**
 
 Esa página tiene una sección propia, «La aplicación del teléfono», que dice lo que Google
 quiere leer: que la app no recoge datos de nadie más que de ti, que pide acceso a fotos y
