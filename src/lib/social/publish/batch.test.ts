@@ -555,3 +555,41 @@ describe('scheduleBatch — trial reel, la comprobación de media después de de
     expect(inserts).toEqual([])
   })
 })
+
+// La comprobación pre-subida de la regla de media del trial reel (errorDeMediaPorOpciones
+// con los tipos declarados, antes del bucle que sube media): con `redes` nombradas,
+// `validateBatchItem` ya la corre y la fila nunca llega a `scheduleBatch`. El único caso que
+// ejercita el chequeo de `scheduleBatch` es `cuentas` nombradas, donde `validateBatchItem`
+// no pudo resolver las opciones por cuenta. Si ese chequeo se moviera después del bucle de
+// subida, esta fila (un video + una foto, sin Drive: los tipos ya se conocen sin descargar)
+// tendría que gastar la descarga y la subida antes de rechazarse — exactamente lo que el
+// chequeo existe para evitar. `fetch` nunca llamado es la prueba de que no llegó a intentarlo.
+describe('scheduleBatch — trial reel, la comprobación de media antes de subir nada', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals()
+    inserts.length = 0
+    guardarMock.mockClear()
+  })
+
+  it('con cuentas nombradas, fotos con un trial reel se rechazan sin descargar ni insertar nada', async () => {
+    vi.mocked(verificarCuentas).mockResolvedValueOnce([{ id: 'ig-1', network: 'instagram', handle: '@uno' }])
+    const fetchMock = vi.fn(async () => {
+      throw new Error('no debía tocar la red: la fila se rechaza antes de subir')
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    const item: BatchItem = {
+      fecha: '2030-01-01 10:00',
+      texto: 'Hola',
+      cuentas: ['ig-1'],
+      redes: [],
+      media: ['https://ej.com/a.mp4', 'https://ej.com/b.jpg'],
+      opciones: { 'ig-1': { trialReel: true } },
+    }
+
+    const resultados = await scheduleBatch('owner-1', [item])
+
+    expect(resultados).toEqual([{ index: 0, ok: false, error: TRIAL_REEL_MEDIA }])
+    expect(fetchMock).not.toHaveBeenCalled()
+    expect(inserts).toEqual([])
+  })
+})

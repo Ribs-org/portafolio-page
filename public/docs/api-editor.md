@@ -171,7 +171,8 @@ es la red**: es el identificador de la cuenta destino. Para no obligarte a conoc
 identificadores cuando no hace falta, cada clave se resuelve con la misma regla que
 `redes`: se busca primero entre los identificadores de cuenta de los destinos de la
 fila, y si no coincide con ninguno se acepta como **nombre de red**, resuelta a su
-destino solo si la fila tiene exactamente uno de esa red.
+destino solo si la fila tiene exactamente uno de esa red. En el CSV, `opciones` es la
+sexta columna, después de `portada`, con el mismo JSON entre comillas dobles escapadas.
 
 Con una sola cuenta de TikTok en la fila (el caso normal), seguir escribiendo `"tiktok"`
 como clave funciona igual que siempre:
@@ -218,8 +219,7 @@ el JSON.
   (etiqueta «Colaboración pagada»; no puede ir con `SELF_ONLY`).
 
 Media de TikTok: **un solo video** (mp4, mov, webm) **o de 1 a 35 fotos** (jpg, webp),
-nunca mezcla. En el CSV, `opciones` es la sexta columna, después de `portada`, con el mismo
-JSON entre comillas dobles escapadas.
+nunca mezcla.
 
 **Instagram — trial reel.** Con un destino de Instagram, `opciones` acepta:
 
@@ -240,8 +240,7 @@ rechaza con `Un trial reel es un solo video, sin fotos.`, antes de subir nada.
 
 **La elegibilidad se descubre al publicar, no al programar.** Instagram tiene que tener la
 función habilitada en esa cuenta (profesional, pública y con seguidores suficientes, según
-los términos de Meta): una fila aceptada acá puede fallar después en ese destino, con su
-propia frase.
+los términos de Meta): una fila aceptada acá puede fallar después en ese destino.
 
 **Después no hay forma de saber por API si se graduó.** Eso se mira en la app de Instagram.
 
