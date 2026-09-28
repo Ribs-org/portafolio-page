@@ -1,7 +1,7 @@
 import { PUBLISHABLE, typeFromContentType } from './social/publish/batch'
 import { CuentaInvalida, cuentaUnicaPorRed, verificarCuentas, type CuentaDestino } from './social/cuentas'
 
-// El teléfono ya manda `opciones` por cuenta (Tarea 5), pero TikTok todavía exige
+// El teléfono ya manda `opciones` por cuenta, pero TikTok todavía exige
 // consultar `creator_info` por creador antes de ofrecer privacidad, comentarios, dúo
 // y demás — el teléfono no hace esa consulta ni resuelve esas interacciones, así que
 // esa red se rechaza aquí aunque el lote y el compositor ya la publiquen. Quitar esta
