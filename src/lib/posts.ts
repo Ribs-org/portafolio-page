@@ -301,7 +301,7 @@ export async function getPostSeries(f: Filters): Promise<PostSeriesPoint[]> {
   }))
 }
 
-/** Todas las cuentas, en el orden en que se conectaron; la pestaña Cuentas las agrupa por red. */
+/** Todas las cuentas, en el orden en que se conectaron; Los Fierros (en Ajustes) las agrupa por red. */
 export async function getCuentas(ownerId: string): Promise<CuentaRow[]> {
   const cuentas = await getDb()
     .select()

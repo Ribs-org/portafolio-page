@@ -1,4 +1,4 @@
-import { existsSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { PANTALLAS, ajustes, pantallaDe, pestanas } from './vocabulario'
@@ -46,5 +46,21 @@ describe('el vocabulario del panel', () => {
 
   it('todas llevan subtítulo en llano: es la red de seguridad de los nombres', () => {
     for (const p of PANTALLAS) expect(p.subtitulo.length).toBeGreaterThan(8)
+  })
+
+  it('el <Encabezado ruta="…"> de cada page.tsx coincide con la carpeta que lo contiene', () => {
+    // El inverso de la primera prueba: ahí se comprueba que la tabla apunta a una carpeta
+    // real; acá que la carpeta, a su vez, pega su `<Encabezado>` a la ruta correcta. Un
+    // `<Encabezado ruta="/admin/content">` pegado en otra pantalla renderizaría el título
+    // equivocado sin que nada más lo viera — ni el typecheck, ni la prueba de arriba.
+    const base = join(process.cwd(), 'src', 'app', 'admin', '(dash)')
+    for (const p of PANTALLAS) {
+      const carpeta = p.ruta === '/admin' ? base : join(base, p.ruta.replace('/admin/', ''))
+      const archivo = join(carpeta, 'page.tsx')
+      const texto = readFileSync(archivo, 'utf8')
+      const match = texto.match(/<Encabezado\s+ruta="([^"]+)"/)
+      expect(match, `${archivo} no tiene <Encabezado ruta="…">`).not.toBeNull()
+      expect(match?.[1], archivo).toBe(p.ruta)
+    }
   })
 })
