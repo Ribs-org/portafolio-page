@@ -8,33 +8,12 @@ import { cn } from '@/lib/utils'
 import { Encabezado } from '@/components/ui'
 import { Composer } from './composer'
 import { BatchUpload } from './batch-upload'
+import { scheduleHref } from './enlace'
 import { ordenarCola } from './orden'
 import { Queue } from './queue'
 import { WeekCalendar } from './calendar'
 
 export const dynamic = 'force-dynamic'
-
-/**
- * Rebuilds the page URL flipping one key, carrying the rest — the content page's
- * `contentHref` mold. `mensaje` and `componer` never carry over (both one-shot: the
- * OAuth outcome, and the order to open the composer).
- */
-function scheduleHref(
-  params: Record<string, string | string[] | undefined>,
-  changes: Record<string, string | null>,
-): string {
-  const next = new URLSearchParams()
-  for (const [key, value] of Object.entries(params)) {
-    if (key in changes || key === 'mensaje' || key === 'componer') continue
-    if (typeof value === 'string') next.set(key, value)
-    else if (Array.isArray(value)) for (const v of value) next.append(key, v)
-  }
-  for (const [key, value] of Object.entries(changes)) {
-    if (value !== null) next.set(key, value)
-  }
-  const query = next.toString()
-  return query ? `/admin/schedule?${query}` : '/admin/schedule'
-}
 
 export default async function SchedulePage({
   searchParams,
