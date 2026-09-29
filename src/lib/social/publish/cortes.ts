@@ -9,6 +9,7 @@ import {
   socialAccounts,
   socialPosts,
 } from '@/db'
+import { miradasDe } from '@/lib/fuego'
 import { addDays, dayKey } from '@/lib/schedule-week'
 import { fromZonedInput } from '@/lib/utils'
 
@@ -110,7 +111,11 @@ export async function servidosAyer(
   const hasta = fromZonedInput(`${hoy}T00:00`, zone)!
 
   const destinos = await db
-    .select({ externalId: scheduledPostTargets.externalId })
+    .select({
+      postId: scheduledPostTargets.postId,
+      network: scheduledPostTargets.network,
+      externalId: scheduledPostTargets.externalId,
+    })
     .from(scheduledPostTargets)
     .innerJoin(scheduledPosts, eq(scheduledPosts.id, scheduledPostTargets.postId))
     .where(
@@ -122,47 +127,30 @@ export async function servidosAyer(
       ),
     )
 
-  const servidos = destinos.length
-  const externalIds = destinos
-    .map((destino) => destino.externalId)
-    .filter((externalId): externalId is string => externalId !== null)
-  if (externalIds.length === 0) return { servidos, miradas: null }
+  // Cortes, no destinos: un corte a tres redes salió una vez, y el pie dice «cortes».
+  const servidos = new Set(destinos.map((destino) => destino.postId)).size
+  // Mismo cruce que `attributesFor` en `post-attributes.ts`: un id externo solo es único
+  // dentro de su red, así que la llave es `red:externalId` y no el id a secas.
+  const conId = destinos.filter((d): d is typeof d & { externalId: string } => d.externalId !== null)
+  if (conId.length === 0) return { servidos, miradas: null }
+  const llaves = new Set(conId.map((d) => `${d.network}:${d.externalId}`))
 
-  // Mismo cruce que `attributesFor` en `post-attributes.ts`: por `external_id`, sin
-  // filtrar por red en la consulta — acá alcanza con acotar al dueño y cruzar por id.
   const posts = await db
-    .select({ id: socialPosts.id })
+    .select({ id: socialPosts.id, network: socialPosts.network, externalId: socialPosts.externalId })
     .from(socialPosts)
-    .where(and(inArray(socialPosts.externalId, externalIds), eq(socialPosts.ownerId, ownerId)))
-  if (posts.length === 0) return { servidos, miradas: null }
+    .where(
+      and(
+        inArray(socialPosts.externalId, [...new Set(conId.map((d) => d.externalId))]),
+        eq(socialPosts.ownerId, ownerId),
+      ),
+    )
+  const postIds = posts.filter((post) => llaves.has(`${post.network}:${post.externalId}`)).map((post) => post.id)
+  if (postIds.length === 0) return { servidos, miradas: null }
 
-  const postIds = posts.map((post) => post.id)
   const metricas = await db
     .select({ postId: postMetrics.postId, day: postMetrics.day, views: postMetrics.views })
     .from(postMetrics)
     .where(inArray(postMetrics.postId, postIds))
-  if (metricas.length === 0) return { servidos, miradas: null }
 
-  // El último día disponible por post, agrupado en JS y no con `DISTINCT ON`: mismo
-  // motivo que `contarPorDia` en `schedule-week.ts`, comparar fechas es más simple acá
-  // que duplicar esa lógica en SQL. `day` es un `date` de Postgres, que Drizzle entrega
-  // como texto `YYYY-MM-DD` — comparable con `>` tal cual, como ya hace `social/delta.ts`.
-  const ultimoPorPost = new Map<string, { day: string; views: number | null }>()
-  for (const fila of metricas) {
-    const actual = ultimoPorPost.get(fila.postId)
-    if (!actual || fila.day > actual.day) ultimoPorPost.set(fila.postId, { day: fila.day, views: fila.views })
-  }
-
-  // Un cero inventado es distinto de «no se sabe»: solo cuenta si al menos un post
-  // trajo un número de verdad (la red puede no reportar vistas y dejarlo en null).
-  let miradas = 0
-  let algunaMetrica = false
-  for (const { views } of ultimoPorPost.values()) {
-    if (views !== null) {
-      miradas += views
-      algunaMetrica = true
-    }
-  }
-
-  return { servidos, miradas: algunaMetrica ? miradas : null }
+  return { servidos, miradas: miradasDe(metricas) }
 }

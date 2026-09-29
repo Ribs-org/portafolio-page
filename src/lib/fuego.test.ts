@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { formatNumber } from './utils'
-import { cortesDeHoy, pieDeAyer, quemados, siguienteCorte, type Corte } from './fuego'
+import { cortesDeHoy, miradasDe, pieDeAyer, quemados, siguienteCorte, type Corte } from './fuego'
 
 const ZONE = 'America/Santiago'
 // 29 de septiembre de 2026, 15:00 en Chile (UTC-3 en horario de verano).
@@ -59,5 +59,25 @@ describe('pieDeAyer', () => {
     expect(pieDeAyer(6, 12345)).toBe(`Ayer: 6 cortes servidos · ${formatNumber(12345)} miradas`)
     expect(pieDeAyer(1, null)).toBe('Ayer: 1 corte servido')
     expect(pieDeAyer(0, null)).toBe('Ayer no salió nada.')
+  })
+})
+
+describe('miradasDe', () => {
+  it('suma el último día de cada post, y un post cuyo último día no trae número no aporta', () => {
+    expect(
+      miradasDe([
+        { postId: 'a', day: '2026-09-27', views: 100 },
+        { postId: 'a', day: '2026-09-28', views: 150 },
+        { postId: 'b', day: '2026-09-28', views: 20 },
+        { postId: 'b', day: '2026-09-27', views: 999 },
+        { postId: 'c', day: '2026-09-28', views: null },
+      ]),
+    ).toBe(170)
+  })
+
+  it('un cero de verdad se distingue de «no se sabe»', () => {
+    expect(miradasDe([{ postId: 'a', day: '2026-09-28', views: 0 }])).toBe(0)
+    expect(miradasDe([{ postId: 'a', day: '2026-09-28', views: null }])).toBeNull()
+    expect(miradasDe([])).toBeNull()
   })
 })

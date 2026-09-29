@@ -325,11 +325,12 @@ describe('aislamiento por dueño (SQL generado, sin base)', () => {
    */
   it('social/publish/cortes: servidosAyer ata sus tres consultas al dueño, directo o por el id que ya filtró la anterior', async () => {
     // Cada fila es un arreglo de valores en el orden del `select`, no un objeto: la
-    // primera consulta selecciona una sola columna (`externalId`), igual que la
-    // segunda (`id`) — mismo formato que `filaPost` más abajo.
+    // primera consulta selecciona `postId, network, externalId` y la segunda
+    // `id, network, externalId` — mismo formato que `filaPost` más abajo. La red tiene
+    // que coincidir, o el cruce `red:externalId` descarta el post y no hay tercera.
     const consultas = await consultasEncadenadas(
       () => servidosAyer(DUENO, new Date('2026-01-02T12:00:00Z'), 'America/Santiago'),
-      [[['ext-1']], [['social-post-1']]],
+      [[['post-1', 'instagram', 'ext-1']], [['social-post-1', 'instagram', 'ext-1']]],
     )
     expect(consultas).toHaveLength(3)
     const [destinos, posts, metricas] = consultas as [Captura, Captura, Captura]

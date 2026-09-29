@@ -51,12 +51,10 @@ export default async function SchedulePage({
   const { id: ownerId } = await requireUser()
   const cuentas = await getCuentas(ownerId)
   // La misma lectura que usa El Fuego (`social/publish/cortes.ts`): posts, destinos con
-  // handle y media. Sin ventana: el calendario siempre mostró todo lo del dueño.
+  // handle y media. Sin ventana: el calendario siempre mostró todo lo del dueño. Vienen
+  // por hora ascendente, como el calendario los necesita; la lista los reordena aparte.
   const cortes = await todosLosCortes(ownerId)
 
-  // Ordenados por fecha ascendente, que es lo que el calendario necesita dentro de
-  // cada día. La lista los reordena aparte: ahí lo próximo va arriba.
-  const items = cortes
   // `volver` carries the exact view to return to after editing — list or a given week.
   const volver = scheduleHref(params, {})
 
@@ -65,7 +63,7 @@ export default async function SchedulePage({
   // contradicen. Solo lo que viene: no se puede programar en el pasado.
   const ahora = new Date()
   const carga = contarPorDia(
-    items.map(({ post }) => post).filter((post) => post.scheduledAt >= ahora),
+    cortes.map(({ post }) => post).filter((post) => post.scheduledAt >= ahora),
     SITE_TIMEZONE,
   )
 
@@ -99,14 +97,14 @@ export default async function SchedulePage({
           {calendarView ? (
             <WeekCalendar
               monday={monday}
-              items={items}
+              items={cortes}
               zone={SITE_TIMEZONE}
               volver={volver}
               prevHref={scheduleHref(params, { vista: 'calendario', semana: addDays(monday, -7) })}
               nextHref={scheduleHref(params, { vista: 'calendario', semana: addDays(monday, 7) })}
             />
           ) : (
-            <Queue items={ordenarCola(items)} volver={volver} />
+            <Queue items={ordenarCola(cortes)} volver={volver} />
           )}
         </div>
       </div>

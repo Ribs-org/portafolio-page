@@ -49,3 +49,27 @@ export function pieDeAyer(servidos: number, miradas: number | null): string {
   const cortes = servidos === 1 ? '1 corte servido' : `${servidos} cortes servidos`
   return miradas === null ? `Ayer: ${cortes}` : `Ayer: ${cortes} · ${formatNumber(miradas)} miradas`
 }
+
+/**
+ * Las miradas de ayer a partir de las filas de `post_metrics` de esos posts: el último
+ * día disponible por post, sumado. `day` es un `date` de Postgres, que Drizzle entrega
+ * como texto `YYYY-MM-DD` — comparable con `>` tal cual, como ya hace `social/delta.ts`.
+ * Un cero inventado es distinto de «no se sabe»: solo hay número si al menos un post trajo
+ * uno de verdad (la red puede no reportar vistas y dejarlo en null).
+ */
+export function miradasDe(metricas: Array<{ postId: string; day: string; views: number | null }>): number | null {
+  const ultimoPorPost = new Map<string, { day: string; views: number | null }>()
+  for (const fila of metricas) {
+    const actual = ultimoPorPost.get(fila.postId)
+    if (!actual || fila.day > actual.day) ultimoPorPost.set(fila.postId, { day: fila.day, views: fila.views })
+  }
+  let miradas = 0
+  let algunaMetrica = false
+  for (const { views } of ultimoPorPost.values()) {
+    if (views !== null) {
+      miradas += views
+      algunaMetrica = true
+    }
+  }
+  return algunaMetrica ? miradas : null
+}
