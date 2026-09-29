@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { RANGO_ERROR } from './metrics-api'
-import { armarProgramados, parseVentana } from './schedule-api'
+import { armarProgramados, impideBorrar, parseVentana } from './schedule-api'
 
 const ZONE = 'America/Santiago'
 // 20 de junio de 2026, 11:00 en Chile (UTC-4 en invierno).
@@ -101,5 +101,14 @@ describe('armarProgramados', () => {
 
   it('respeta el orden de llegada de las filas: el query ya ordena por fecha', () => {
     expect(armarProgramados(filas, medias, ZONE).map((p) => p.id)).toEqual(['p1', 'p2'])
+  })
+})
+
+describe('impideBorrar', () => {
+  it('basta un destino publicado o publicando; fallidos y programados no impiden', () => {
+    expect(impideBorrar([{ status: 'scheduled' }, { status: 'failed' }])).toBe(false)
+    expect(impideBorrar([{ status: 'scheduled' }, { status: 'published' }])).toBe(true)
+    expect(impideBorrar([{ status: 'publishing' }])).toBe(true)
+    expect(impideBorrar([])).toBe(false)
   })
 })

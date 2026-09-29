@@ -12,6 +12,7 @@ import {
 } from './social/comentarios/reglas'
 import { MAX_BATCH_ITEMS } from './social/publish/batch'
 import { TRIAL_REEL_NO_DISPONIBLE } from './social/publish/publisher'
+import { BORRADO_YA_PUBLICADO } from './schedule-api'
 import { TRIAL_REEL_MEDIA } from './social/publish/opciones'
 
 // Estas tres pruebas son la reja que impide que `public/docs/api.json` y
@@ -29,6 +30,7 @@ describe('la documentación para LLM no le miente al código', () => {
       REGLA_DOCUMENTO,
       TRIAL_REEL_MEDIA,
       TRIAL_REEL_NO_DISPONIBLE,
+      BORRADO_YA_PUBLICADO,
     ]) {
       expect(guia).toContain(frase)
     }

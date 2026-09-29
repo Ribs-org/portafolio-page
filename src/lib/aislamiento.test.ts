@@ -368,8 +368,10 @@ describe('aislamiento por dueño, escrituras (SQL generado, sin base)', () => {
   })
 
   it('admin/actions: deleteScheduledPost ata su lectura y su DELETE al dueño', async () => {
+    // La lectura es una sola (post + estado de cada destino, por leftJoin): con un
+    // destino programado sigue al DELETE. Cero filas sería «no existe» y no borraría.
     const consultas = await consultasEncadenadas(() => deleteScheduledPost('post-x'), [
-      [], // sin targets publicados: sigue al DELETE.
+      [{ postId: 'post-x', status: 'scheduled' }],
     ])
     expect(consultas).toHaveLength(2)
     for (const c of consultas) esperarFiltradoPorDueno(c)

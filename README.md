@@ -327,7 +327,14 @@ el subdominio de R2 (`R2_PUBLIC_BASE`), de donde TikTok descarga los archivos. N
 archivo de firma dentro del bucket: el barrido diario lo borraría.
 
 Mientras TikTok no apruebe la app, solo el **sandbox** deja autorizar cuentas: créalo en
-la pestaña Sandbox, agrega tu usuario como *target user*, y usa **sus** credenciales:
+la pestaña Sandbox, agrega tu usuario como *target user*, y usa **sus** credenciales.
+(La app se aprobó el 2026-09-28: producción usa desde entonces las llaves de la app real
+y cualquier cuenta puede autorizar. El sandbox queda solo para grabar una revisión futura.)
+Lo que la aprobación **no** incluye es la auditoría de Direct Post: hasta que se pida y
+pase, la publicación directa sale solo como «Solo yo» en cuentas privadas. Y ojo al cambiar
+de app: TikTok da un id distinto por app, así que cada cuenta vuelve como tarjeta nueva y
+la vieja se fusiona desde Cuentas («Es la misma cuenta →»).
+
 
 ```
 TIKTOK_CLIENT_KEY=
@@ -651,7 +658,7 @@ Vercel y bajan con `vercel env pull .env.local`.
 | `X_CLIENT_SECRET` | El secreto de esa app | Junto con el anterior |
 | `CRON_SECRET` | Autoriza las corridas programadas (sync diario y publicación cada 5 minutos) | No — la pone Vercel solo, al declarar el cron |
 | `MIGRAR_PREVIEWS` | Que los previews migren la base | Solo cuando el preview tenga una base propia; contra la de producción, no |
-| `SCHEDULE_API_KEY` | Autoriza `POST /api/schedule/batch` (carga masiva), `GET /api/schedule/posts` (calendario) y `GET /api/metrics/posts` (métricas) | Sin ella los tres endpoints quedan cerrados; genérala igual que `CRON_SECRET` |
+| `SCHEDULE_API_KEY` | Autoriza `POST /api/schedule/batch` (carga masiva), `DELETE /api/schedule/posts/{id}` (sacar lo programado), `GET /api/schedule/posts` (calendario) y `GET /api/metrics/posts` (métricas) | Sin ella los cuatro endpoints quedan cerrados; genérala igual que `CRON_SECRET` |
 | `RESEND_API_KEY` | Manda los códigos de ingreso y el aviso de publicación fallida | Sí — sin ella nadie puede entrar al panel |
 | `PUBLISH_ALERT_TO` | A qué correo llega el aviso de fallo | Sin ella no se envía ningún email; el calendario sigue mostrando el fallo |
 | `PUBLISH_ALERT_FROM` | Remitente del aviso | Opcional; default `onboarding@resend.dev` |
@@ -753,6 +760,13 @@ algún destino programado. Para una cuenta recién conectada, que todavía no ti
 ninguno, el id está en su tarjeta en **Cuentas** del panel, con un botón para
 copiarlo: es la única superficie que no pide llave de API, solo la sesión de quien
 entra al panel.
+
+`DELETE /api/schedule/posts/{id}` con el mismo `Authorization` saca un post programado
+entero —destinos, media y regla— con la regla del panel, que comparten en
+`borrarPostProgramado`: si algún destino ya se publicó o está publicando, responde `409`
+con `Ya se publicó (o está publicando): elimínalo en la red.`, porque borrar la fila no
+despublica nada; si el id no existe (o no es del dueño), `404`; borrado, `200`. No hay
+edición por API: para cambiar algo se borra y se programa de nuevo.
 
 ## Estructura
 

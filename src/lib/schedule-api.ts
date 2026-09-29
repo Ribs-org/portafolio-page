@@ -4,6 +4,21 @@ import { isoInZone, parseRango } from '@/lib/metrics-api'
 import { addDays, dayKey } from '@/lib/schedule-week'
 import type { Atributos } from '@/lib/social/publish/atributos'
 
+/**
+ * La frase con la que el panel y `DELETE /api/schedule/posts/{id}` rechazan borrar un post
+ * que ya salió. Borrar la fila no despublica nada en la red: se rechaza en vez de mentir.
+ */
+export const BORRADO_YA_PUBLICADO = 'Ya se publicó (o está publicando): elimínalo en la red.'
+
+/**
+ * Si los destinos de un post impiden borrarlo: basta uno publicado o publicando. Un
+ * `failed` no impide nada —no salió—, y un post sin destinos tampoco. Compartida por el
+ * panel y la API para que nunca se desacuerden.
+ */
+export function impideBorrar(targets: ReadonlyArray<{ status: string }>): boolean {
+  return targets.some((t) => t.status === 'published' || t.status === 'publishing')
+}
+
 /** Un calendario mira hacia adelante: sin parámetros, de hoy a 30 días. */
 const DIAS_ADELANTE = 30
 
