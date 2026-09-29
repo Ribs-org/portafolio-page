@@ -81,7 +81,7 @@ Cinco pestañas y un engranaje. Las pestañas, con los nombres de la dirección 
 |---|---|---|
 | El Fuego | `/admin` | qué se está cocinando ahora |
 | La Parrilla | `/admin/schedule` | lo que viene y cómo salió lo que ya se fue |
-| Los Cortes | `/admin/content` | cada publicación y lo que trajo |
+| Los Cortes | `/admin/content` | cada publicación, lo que hizo en la red y lo que trajo |
 | La Mesa | `/admin/comments` | lo que te responden y tus respuestas |
 | Los Números | `/admin/analytics` | visitas, clics y de dónde vienen |
 

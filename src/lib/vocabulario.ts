@@ -19,7 +19,7 @@ export type Pantalla = {
 export const PANTALLAS: readonly Pantalla[] = [
   { ruta: '/admin', nombre: 'Resumen', subtitulo: 'tus números de un vistazo', grupo: 'pestana' },
   { ruta: '/admin/schedule', nombre: 'La Parrilla', subtitulo: 'lo que viene y cómo salió lo que ya se fue', grupo: 'pestana' },
-  { ruta: '/admin/content', nombre: 'Los Cortes', subtitulo: 'cada publicación y lo que trajo', grupo: 'pestana' },
+  { ruta: '/admin/content', nombre: 'Los Cortes', subtitulo: 'cada publicación, lo que hizo en la red y lo que trajo', grupo: 'pestana' },
   { ruta: '/admin/comments', nombre: 'La Mesa', subtitulo: 'lo que te responden y tus respuestas', grupo: 'pestana' },
   { ruta: '/admin/analytics', nombre: 'Los Números', subtitulo: 'visitas, clics y de dónde vienen', grupo: 'pestana' },
   { ruta: '/admin/accounts', nombre: 'Los Fierros', subtitulo: 'tus redes conectadas', grupo: 'ajustes' },
