@@ -34,10 +34,15 @@ export function Redes({ targets, detalle = false }: { targets: Destino[]; detall
           >
             <Icon name={t.network} className="h-3.5 w-3.5 shrink-0" />
             {detalle ? (
-              <span className="text-xs">
+              {/*
+                El texto va al color pleno y solo el icono lleva el tinte: el fondo del chip
+                ya dice el estado, y un handle de 12 px en rojo sobre ese fondo se quedaba
+                en 4.28:1 (medido), bajo el 4.5:1 de texto; el «· Falló» atenuado, en 2.75:1.
+              */}
+              <span className="text-xs text-fg">
                 <span className="sr-only">{networkLabel(t.network)} · </span>
                 {t.handle ?? nombreDestino(t)}
-                <span className="text-fg-faint"> · {etiquetaDestino(t)}</span>
+                <span> · {etiquetaDestino(t)}</span>
               </span>
             ) : null}
           </span>
