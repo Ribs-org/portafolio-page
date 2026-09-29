@@ -95,8 +95,9 @@ cada una con su nombre y su subtítulo en la misma línea:
 | Los Maestros | `/admin/usuarios` | quién puede entrar — solo el admin la ve |
 
 El menú es un `<details>` con un `<summary>` (el engranaje), no un componente con estado:
-funciona sin JavaScript, se cierra al navegar, y el teclado lo abre con Enter. Una ruta de
-Ajustes activa marca el engranaje, no una pestaña.
+funciona sin JavaScript, se cierra al navegar porque se remonta con la ruta (`key={pathname}`,
+no porque la página cambie — el layout no se remonta solo al navegar entre rutas hijas), y el
+teclado lo abre con Enter. Una ruta de Ajustes activa marca el engranaje, no una pestaña.
 
 **La red de seguridad de la dirección visual, obligatoria:** cada pantalla lleva su subtítulo
 en llano en `--color-fg-faint` bajo el título; las rutas no cambian; el vocabulario vive en

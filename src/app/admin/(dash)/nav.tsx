@@ -38,17 +38,25 @@ export function AdminNav({ esAdmin }: { esAdmin?: boolean }) {
       </div>
 
       {/*
-        Un `<details>`: sin estado, con teclado (Enter abre; Escape cierra, ver abajo). Se cierra solo al navegar
-        porque la página cambia. Una ruta de Ajustes activa marca el engranaje, no una
-        pestaña — el usuario tiene que poder ver dónde está aunque el menú esté cerrado.
+        Un `<details>`: sin estado, con teclado (Enter abre; Escape cierra, ver abajo). Se cierra
+        al navegar porque se remonta con la ruta (`key={pathname}`), no porque la página cambie:
+        `AdminNav` vive en el layout, y el layout no se remonta solo al navegar entre rutas
+        hijas — el `open` es estado del DOM que React no toca por su cuenta. Una ruta de
+        Ajustes activa marca el engranaje, no una pestaña — el usuario tiene que poder ver
+        dónde está aunque el menú esté cerrado.
       */}
       <details
+        key={pathname}
         className="relative ml-auto"
         // Escape no cierra un <details> por sí solo (comprobado en Chromium): es la única
         // tecla que el elemento no trae, y un menú que no se cierra con Escape es un menú
-        // roto para el teclado. Sigue sin estado: se quita el atributo y ya.
+        // roto para el teclado. Sigue sin estado: se quita el atributo y ya. El foco vuelve
+        // al `summary`: si estaba en un enlace del menú, ese enlace desaparece al cerrar y
+        // el foco caería al `body` si no lo devolviéramos.
         onKeyDown={(e) => {
-          if (e.key === 'Escape') e.currentTarget.removeAttribute('open')
+          if (e.key !== 'Escape') return
+          e.currentTarget.removeAttribute('open')
+          e.currentTarget.querySelector('summary')?.focus()
         }}
       >
         <summary
