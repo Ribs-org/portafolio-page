@@ -6,6 +6,7 @@ import { dayLabel, dayKey, groupByDay, hourLabel, weekDays, weekLabel } from '@/
 import { calorDelDia, coccionDe, type Coccion } from '@/lib/parrilla'
 import { cn } from '@/lib/utils'
 import { nombreDestino } from './etiqueta'
+import { Redes } from './redes'
 
 type Item = {
   post: ScheduledPost
@@ -169,6 +170,7 @@ export function WeekCalendar({
                               <span className="humo ml-1.5 inline-block">saliendo</span>
                             ) : null}
                           </p>
+                          <Redes targets={targets} />
                           {media[0] ? (
                             <span className="corte-media mt-1 block">
                               {media[0].mediaType === 'image' ? (
@@ -209,12 +211,11 @@ export function WeekCalendar({
                           {/*
                             El estado en palabras, una sola vez. El `title` no sirve para
                             esto: sobre un enlace con contenido es descripción y no
-                            nombre, así que un lector de pantalla puede no leerlo.
+                            nombre, así que un lector de pantalla puede no leerlo. Los
+                            destinos ya no van aquí: `Redes` trae su propio `sr-only`, y
+                            decirlos dos veces sería un lector de pantalla repitiéndose.
                           */}
-                          <span className="sr-only">
-                            {NOMBRE_COCCION[coccion]} en{' '}
-                            {targets.map((t) => nombreDestino(t)).join(', ') || 'ninguna red'}
-                          </span>
+                          <span className="sr-only">{NOMBRE_COCCION[coccion]}</span>
                         </Link>
                       )
                     })
