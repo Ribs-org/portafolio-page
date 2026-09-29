@@ -6,7 +6,7 @@ El esquema formal está en `api.json` — léelo una vez y sabrás la forma exac
 sus tipos y sus límites numéricos; esta guía es la tarea: qué mandar, qué falla y cómo, y qué
 no existe.
 
-Un solo endpoint de escritura: `POST /api/schedule/batch`. Autenticación en todos los
+Dos endpoints de escritura: `POST /api/schedule/batch` programa, y `DELETE /api/schedule/posts/{id}` saca lo programado (sección 3b). Autenticación en todos los
 endpoints:
 
 ```
@@ -107,17 +107,40 @@ no por subcadena parcial ni regex:
 fallo del endpoint. Corrige y reenvía solo las filas malas: no hay deduplicación, reenviar una
 fila ya programada la programa otra vez.
 
+## 3b. Sacar un post programado
+
+```bash
+curl -X DELETE https://www.vicente-pareja.cl/api/schedule/posts/<id> \
+  -H "Authorization: Bearer $SCHEDULE_API_KEY"
+```
+
+`<id>` es el del post: el `postId` que `POST /api/schedule/batch` devolvió en esa fila, o el
+`id` que lista `GET /api/schedule/posts`. Se borra el post **entero** —todos sus destinos, su
+media y su regla—; no hay forma de sacar una sola cuenta de un post con varias.
+
+| Respuesta | Cuándo |
+|---|---|
+| `200` `{ "ok": true, "id": "<id>" }` | Se borró. |
+| `404` `{ "error": "Ese post no existe." }` | No hay un post con ese id para este dueño. No distingue «no existe» de «no es tuyo». |
+| `409` `{ "error": "Ya se publicó (o está publicando): elimínalo en la red." }` | Algún destino ya salió o está saliendo. Borrar la fila no lo despublicaría, así que se rechaza en vez de mentir; se elimina desde la red. |
+
+Un post en `failed` (algún destino falló y agotó sus intentos) **sí** se puede borrar: nada
+salió. Un post con un destino publicado y otro programado **no**: el publicado manda. Los
+archivos que subió quedan en el almacén hasta el barrido del día siguiente; no hay que
+hacer nada con ellos.
 ## 4. Lo que esta API no hace
 
-- **No edita ni borra un post programado.** Una vez programado, no hay endpoint para
-  cambiarlo ni cancelarlo. La corrección, si hace falta, la hace el dueño a mano en
-  `/admin/schedule`.
+- **No edita un post programado.** Para cambiar texto, hora, destinos o media hay que
+  borrarlo (sección 3b) y programarlo de nuevo, o corregirlo a mano en `/admin/schedule`.
 - **No lista cuentas.** Para eso está `GET /api/schedule/posts`: cada destino de un post ya
   programado trae `cuentaId` y `handle`. No hay un endpoint que liste cuentas sueltas sin
   pasar por un post.
 - **No manda nada de inmediato.** Todo lo que entra por `POST /api/schedule/batch` espera a su
   `fecha`; no existe una forma de publicar ahora mismo por esta vía.
-- **No publica en TikTok todavía** (revisión de la plataforma pendiente).
+- **En TikTok, la publicación directa sale solo como «Solo yo»** hasta que TikTok audite
+  Direct Post (la app ya está aprobada; esa auditoría es aparte). Cualquier otra
+  `privacidad` se acepta al programar y falla al publicar. El borrador a la bandeja
+  (`modo: borrador`) no tiene esa limitación.
 - **Solo tres redes leen comentarios: Instagram, Facebook y YouTube.** Una `regla` en un post que
   va únicamente a TikTok, Threads o X **no hace nada** —no falla, no avisa: nunca se dispara,
   porque nadie lee esos comentarios—. La regla vale la pena solo si el post sale a alguna de esas

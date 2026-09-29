@@ -13,6 +13,8 @@ import { destroySession, requireAdmin, requireUser } from '@/lib/auth'
 import { normalizeCampaignTag } from '@/lib/social/campaign'
 import { columnasEditablesDeRegla, validarRegla } from '@/lib/social/comentarios/reglas'
 import { FUSION_FALLO, FUSION_NO_ES_TUYA, decidirFusion, pasosDeFusion } from '@/lib/social/fusion'
+import { BORRADO_YA_PUBLICADO } from '@/lib/schedule-api'
+import { borrarPostProgramado } from '@/lib/social/publish/borrar'
 import { csvToBatchItems } from '@/lib/social/publish/csv'
 import {
   scheduleBatch,
@@ -1125,26 +1127,11 @@ export async function rescheduleTarget(targetId: string, localDatetime: string):
 
 export async function deleteScheduledPost(postId: string): Promise<FormState> {
   const { id: ownerId } = await requireUser()
-
-  const db = getDb()
-  const targets = await db
-    .select()
-    .from(scheduledPostTargets)
-    .where(
-      and(
-        eq(scheduledPostTargets.postId, postId),
-        inArray(
-          scheduledPostTargets.postId,
-          db.select({ id: scheduledPosts.id }).from(scheduledPosts).where(eq(scheduledPosts.ownerId, ownerId)),
-        ),
-      ),
-    )
-  // Deleting the row cannot unpublish the post on the network — refuse instead of lying.
-  if (targets.some((t) => t.status === 'published' || t.status === 'publishing')) {
-    return { error: 'Ya se publicó (o está publicando): elimínalo en la red.' }
-  }
-
-  await db.delete(scheduledPosts).where(and(eq(scheduledPosts.id, postId), eq(scheduledPosts.ownerId, ownerId)))
+  // La regla —no borrar lo que ya salió— vive en `borrarPostProgramado`, compartida con
+  // `DELETE /api/schedule/posts/{id}` para que el panel y la API no puedan divergir.
+  const resultado = await borrarPostProgramado(ownerId, postId)
+  if (resultado === 'publicado') return { error: BORRADO_YA_PUBLICADO }
+  if (resultado === 'no-existe') return { error: 'El post ya no existe.' }
   revalidatePath('/admin/schedule')
   return { ok: true }
 }
