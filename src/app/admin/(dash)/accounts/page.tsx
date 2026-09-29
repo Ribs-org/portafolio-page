@@ -1,5 +1,6 @@
 import { requireUser } from '@/lib/auth'
 import { getCuentas } from '@/lib/posts'
+import { Encabezado } from '@/components/ui'
 import { Cuentas } from './cuentas'
 
 export const dynamic = 'force-dynamic'
@@ -17,7 +18,7 @@ export default async function AccountsPage({
   return (
     <>
       <header className="mb-6">
-        <h1 className="font-titulo text-2xl font-semibold uppercase tracking-[0.03em]">Cuentas</h1>
+        <Encabezado ruta="/admin/accounts" />
       </header>
       {mensaje ? (
         <p role="status" className="mb-4 rounded-xl bg-white/[0.04] px-4 py-2 text-sm text-fg-muted">

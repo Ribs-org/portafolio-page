@@ -10,6 +10,7 @@ import { dominioProducto, esDominioDelProducto } from '@/lib/dominios'
 import { getAllLinks, getAllProfiles } from '@/lib/profiles'
 import { adminId } from '@/lib/usuarios'
 import { enlacePublicoDe, toZonedInput, urlPublicaDe } from '@/lib/utils'
+import { nombreDe } from '@/lib/vocabulario'
 import { ProfileEditor } from './editor'
 import type { DraftLink } from './link-row'
 
@@ -68,7 +69,7 @@ export default async function EditProfilePage({ params }: { params: Promise<{ id
         <Link
           href="/admin/profiles"
           className="rounded-lg p-1.5 text-fg-faint transition-colors hover:text-fg"
-          aria-label="Volver a perfiles"
+          aria-label={`Volver a ${nombreDe('/admin/profiles')}`}
         >
           <ArrowLeft className="h-4 w-4" aria-hidden />
         </Link>

@@ -3,10 +3,11 @@ import { StatTileSkeleton } from '@/components/charts/stat-tile'
 
 /**
  * Dentro del grupo `(dash)` este archivo envuelve en `<Suspense>` a todas las páginas
- * del panel, así que una sola pantalla de carga sirve para las seis pestañas. Es un
- * esqueleto genérico: aproxima la forma más común — título, cifras y paneles — y no la
- * de cada pestaña en particular. Cuentas, Calendario y Perfiles abren sin cifras, y ahí
- * las cuatro casillas de arriba sobran por un segundo.
+ * del panel, así que una sola pantalla de carga sirve para las cinco pestañas y las
+ * entradas de Ajustes. Es un esqueleto genérico: aproxima la forma más común — título,
+ * cifras y paneles — y no la de cada pantalla en particular. La Parrilla, La Mesa, Los
+ * Fierros, La Vitrina y Los Maestros abren sin cifras, y ahí las cuatro casillas de
+ * arriba sobran por un segundo.
  *
  * Sin texto a propósito. El esqueleto ocupa el lugar de lo que viene; explicarlo sería
  * pedirle al ojo que lea algo que desaparece en un segundo.

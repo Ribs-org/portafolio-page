@@ -121,9 +121,17 @@ Abre el sitio: ahora se ve un perfil de ejemplo.
 ### 6. Hazlo tuyo
 
 Entra en `/ingresar` con tu correo (el de `ADMIN_EMAIL`): te llega un código de seis
-dígitos que vale diez minutos. Solo entran los correos invitados; desde la pestaña
-**Usuarios** del panel, visible para el admin, invitas a más gente. Ya adentro cambias
-foto, bio, colores, links y slugs.
+dígitos que vale diez minutos.
+
+El panel tiene cinco pestañas —Resumen (los números de un vistazo, hasta que lo
+reemplace El Fuego), La Parrilla (Calendario), Los Cortes (Contenido), La Mesa
+(Comentarios) y Los Números (Analítica)— y el engranaje de Ajustes, con Los Fierros
+(Cuentas), La Vitrina (Perfiles) y Los Maestros (Usuarios, solo el admin). Las rutas no
+cambiaron. Cada pantalla lleva su subtítulo en llano por si el nombre no dice nada.
+
+Solo entran los correos invitados; desde **Los Maestros** (Usuarios, dentro de Ajustes),
+visible para el admin, invitas a más gente. Ya adentro cambias foto, bio, colores, links y
+slugs.
 
 Cada usuario nace con su página, en el mismo momento en que lo invitas: la dirección sale
 de su correo —`juanito@gmail.com` da `/juanito`—, y si esa ya está tomada se numera
@@ -203,7 +211,7 @@ El panel puede traer las métricas de tus posts desde Instagram, TikTok y YouTub
 cruzarlas con el tráfico que cada uno te trajo. La columna que importa es **arrastre**:
 de cada mil personas que vieron el post, cuántas llegaron efectivamente a tu página.
 
-Sin configurar nada, la pestaña *Contenido* aparece vacía y el resto del sitio funciona
+Sin configurar nada, **Los Cortes** (Contenido) aparece vacía y el resto del sitio funciona
 igual. Cada red se activa por separado.
 
 ### YouTube — sin trámite
@@ -218,7 +226,7 @@ YOUTUBE_CHANNEL_ID=UC...
 ```
 
 Cambiar el id ahora no reemplaza la cuenta: crea una segunda fila de YouTube. La vieja
-queda en la pestaña **Cuentas** y sigue sincronizando con la API key —ahí se ve su fecha,
+queda en **Los Fierros** (Cuentas, en Ajustes) y sigue sincronizando con la API key —ahí se ve su fecha,
 marcada **Sin credencial**, porque nunca pasó por un login—, así que no tiene botón
 *Desconectar*: para que deje de traer posts hay que borrar la fila a mano.
 
@@ -261,7 +269,7 @@ El token de Facebook dura unos 60 días. El cron intenta extenderlo una semana a
 venza, pero **no está garantizado que eso funcione** sobre un token que ya es de larga
 duración: la vía documentada por Meta para uno que se está muriendo es volver a pasar por
 el login. Si el intento no sirve, la credencial caduca y la tarjeta de esa cuenta en
-**Cuentas** se pone roja con el error de la API.
+**Los Fierros** se pone roja con el error de la API.
 
 Cuando pase, entra al panel y pulsa **Reconectar** en la tarjeta de esa cuenta. El
 historial de métricas ya recogido no se toca. Cuenta con hacerlo cada dos meses más o menos.
@@ -333,7 +341,7 @@ y cualquier cuenta puede autorizar. El sandbox queda solo para grabar una revisi
 Lo que la aprobación **no** incluye es la auditoría de Direct Post: hasta que se pida y
 pase, la publicación directa sale solo como «Solo yo» en cuentas privadas. Y ojo al cambiar
 de app: TikTok da un id distinto por app, así que cada cuenta vuelve como tarjeta nueva y
-la vieja se fusiona desde Cuentas («Es la misma cuenta →»).
+la vieja se fusiona desde Los Fierros («Es la misma cuenta →»).
 
 
 ```
@@ -342,7 +350,7 @@ TIKTOK_CLIENT_SECRET=
 ```
 
 Al pasar de solo lectura a publicar, las cuentas ya conectadas deben **reconectarse una
-vez** desde Cuentas para otorgar los scopes nuevos; el compositor lo pide con «Reconecta
+vez** desde Los Fierros para otorgar los scopes nuevos; el compositor lo pide con «Reconecta
 TikTok para autorizar la publicación». Hasta la auditoría de Content Posting, TikTok solo
 permite publicar como «Solo yo».
 
@@ -359,8 +367,9 @@ Después de fusionar, la migración se aplica sola al desplegar: las tablas de c
 ajustes son nuevas, y sin ellas el sondeo no tiene dónde guardar nada.
 
 Para que funcione hay que **reconectar una vez cada red**, porque el permiso se concede
-en el consentimiento: entra a **Cuentas** y pulsa *Reconectar* en cada tarjeta de
-Instagram, Facebook y YouTube. Mientras no lo hagas, esa red simplemente no trae
+en el consentimiento: entra a **Los Fierros** (Cuentas, dentro de Ajustes) y pulsa
+*Reconectar* en cada tarjeta de Instagram, Facebook y YouTube. Mientras no lo hagas, esa
+red simplemente no trae
 comentarios; nada más se rompe.
 
 Los permisos que se agregan son `instagram_manage_comments`, `pages_manage_engagement` y,
@@ -388,7 +397,7 @@ métricas, ni tus otros comentarios, ni datos de la persona.
 Si el campo de instrucciones queda vacío rigen las de la casa: responder en español, en
 primera persona, breve y cálido, sin inventar datos ni dar precios.
 
-La cola vive en **Comentarios**, en el panel. Cada comentario nuevo llega con el borrador que
+La cola vive en **La Mesa** (Comentarios), en el panel. Cada comentario nuevo llega con el borrador que
 escribió el modelo; lo corriges si quieres y lo mandas con **Enviar**, o lo descartas. Si el
 modelo no pudo redactar, la tarjeta lo dice y tiene **Reintentar borrador**. Arriba está el
 campo con las instrucciones que sigue el modelo: las editas ahí y rigen desde el siguiente
@@ -416,7 +425,7 @@ y el mensaje por DM, en Instagram y Facebook) llega en la próxima entrega, y va
 de que Meta apruebe `pages_messaging` con acceso avanzado y de `COMENTARIOS_DM=1`. TikTok
 todavía no tiene cola de comentarios, así que una regla en un post que solo va a TikTok no
 hace nada. Si el enlace es de tu sitio, se le agrega `?s=dm-<palabra>` y aparece como fila
-propia en Analítica → «Qué contenido te trae gente». Para eso el servidor necesita saber
+propia en **Los Números** (Analítica) → «Qué contenido te trae gente». Para eso el servidor necesita saber
 cuál es tu dominio: `SITE_URL=https://www.tu-dominio.cl` (si falta, usa el dominio de
 producción que Vercel inyecta).
 
@@ -463,10 +472,11 @@ Antes que nada, la migración se aplica sola al desplegar: la analítica de post
 tablas nuevas. La migración corre antes del build, así que ese peligro no existe:
 `/admin/analytics` y el cron nunca corren contra un esquema viejo.
 
-Con eso hecho, las variables puestas y un redeploy encima, entra a `/admin/accounts` (la
-pestaña **Cuentas**) y aprieta *Conectar* en cada red; con varias páginas o cuentas, elige
-cuáles. El `vercel.json` del repo declara una corrida diaria a las 9:00 UTC; Vercel inyecta
-`CRON_SECRET` solo. También puedes apretar *Sincronizar ahora* cuando quieras.
+Con eso hecho, las variables puestas y un redeploy encima, entra a `/admin/accounts`
+(**Los Fierros**, Cuentas, dentro de Ajustes) y aprieta *Conectar* en cada red; con varias
+páginas o cuentas, elige cuáles. El `vercel.json` del repo declara una corrida diaria a las
+9:00 UTC; Vercel inyecta `CRON_SECRET` solo. También puedes apretar *Sincronizar ahora*
+cuando quieras.
 
 **Si una cuenta aparece dos veces —una «Sin credencial» y otra viva—, no es un error tuyo.**
 TikTok, Instagram y Facebook le dan a la misma persona un identificador distinto por cada
@@ -533,7 +543,7 @@ tudominio.com/?s=reel-agosto
 tudominio.com/?s=tiktok-rutina
 ```
 
-Cada etiqueta aparece por separado en **Analítica → Qué contenido te trae gente**, con sus
+Cada etiqueta aparece por separado en **Los Números** (Analítica) → Qué contenido te trae gente, con sus
 visitas, únicos, clicks y CTR. Es el mecanismo principal de atribución porque Instagram y
 TikTok abren los links en su navegador interno y borran el referrer.
 
@@ -757,7 +767,7 @@ en la ventana, salido o no: texto, `fecha` (ISO con offset), portada, media en o
 `failed`), el `externalId` si ya salió, los intentos, la frase de error si falló, y
 `cuentaId`/`handle` de la cuenta — útil para recuperar el id de una cuenta que ya tiene
 algún destino programado. Para una cuenta recién conectada, que todavía no tiene
-ninguno, el id está en su tarjeta en **Cuentas** del panel, con un botón para
+ninguno, el id está en su tarjeta en **Los Fierros** (Cuentas, en Ajustes) del panel, con un botón para
 copiarlo: es la única superficie que no pide llave de API, solo la sesión de quien
 entra al panel.
 
