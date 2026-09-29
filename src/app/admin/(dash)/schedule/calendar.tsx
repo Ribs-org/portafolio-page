@@ -1,11 +1,11 @@
 import Image from 'next/image'
 import Link from 'next/link'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
-import type { ScheduledPost, ScheduledPostTarget, TargetStatus } from '@/db/schema'
+import type { ScheduledPost, ScheduledPostTarget } from '@/db/schema'
 import { dayLabel, dayKey, groupByDay, hourLabel, weekDays, weekLabel } from '@/lib/schedule-week'
 import { calorDelDia, coccionDe, type Coccion } from '@/lib/parrilla'
 import { cn } from '@/lib/utils'
-import { nombreDestino } from './etiqueta'
+import { etiquetaDestino, nombreDestino } from './etiqueta'
 import { Redes } from './redes'
 
 type Item = {
@@ -38,13 +38,6 @@ const NOMBRE_COCCION: Record<Coccion, string> = {
   sellada: 'Saliendo ahora',
   punto: 'Publicada',
   quemada: 'Falló',
-}
-
-const NOMBRE_ESTADO: Record<TargetStatus, string> = {
-  scheduled: 'programada',
-  publishing: 'saliendo',
-  published: 'publicada',
-  failed: 'falló',
 }
 
 export function WeekCalendar({
@@ -149,7 +142,7 @@ export function WeekCalendar({
                           // punto de color. La cocción dice que algo falló; esto dice
                           // cuál, sin tener que entrar al editor.
                           title={targets
-                            .map((t) => `${nombreDestino(t)}: ${NOMBRE_ESTADO[t.status]}`)
+                            .map((t) => `${nombreDestino(t)}: ${etiquetaDestino(t)}`)
                             .join(' · ')}
                           className={cn(
                             'corte block p-2 transition-transform hover:-translate-y-0.5',
