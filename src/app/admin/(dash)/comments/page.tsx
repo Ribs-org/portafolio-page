@@ -11,6 +11,7 @@ import {
 import { privadoActivo } from '@/lib/social/comentarios/privado'
 import { networkLabel } from '@/lib/networks'
 import { cn } from '@/lib/utils'
+import { Encabezado } from '@/components/ui'
 import { Cola } from './cola'
 import { Instrucciones } from './instrucciones'
 
@@ -60,7 +61,7 @@ export default async function CommentsPage({
   return (
     <>
       <header className="mb-6">
-        <h1 className="font-titulo text-2xl font-semibold uppercase tracking-[0.03em]">Comentarios</h1>
+        <Encabezado ruta="/admin/comments" />
         <p className="mt-1 text-sm text-fg-muted">
           {pendientes === 0
             ? 'No hay nada esperando respuesta.'

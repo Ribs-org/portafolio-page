@@ -6,6 +6,7 @@ import { requireUser } from '@/lib/auth'
 import { getCuentas } from '@/lib/posts'
 import { addDays, contarPorDia, normalizeWeekParam } from '@/lib/schedule-week'
 import { cn } from '@/lib/utils'
+import { Encabezado } from '@/components/ui'
 import { Composer } from './composer'
 import { BatchUpload } from './batch-upload'
 import { ordenarCola } from './orden'
@@ -107,7 +108,7 @@ export default async function SchedulePage({
   return (
     <>
       <header className="mb-6">
-        <h1 className="font-titulo text-2xl font-semibold uppercase tracking-[0.03em]">Calendario</h1>
+        <Encabezado ruta="/admin/schedule" />
         <p className="mt-1 text-sm text-fg-muted">
           Programa lo que viene y revisa cómo salió lo que ya se fue.
         </p>

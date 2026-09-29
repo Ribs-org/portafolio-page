@@ -1,7 +1,7 @@
 import { headers } from 'next/headers'
 import Link from 'next/link'
 import { ExternalLink, Plus, Star } from 'lucide-react'
-import { Submit } from '@/components/ui'
+import { Encabezado, Submit } from '@/components/ui'
 import { requireUser } from '@/lib/auth'
 import { dominioProducto, esDominioDelProducto } from '@/lib/dominios'
 import { getAllLinks, getAllProfiles } from '@/lib/profiles'
@@ -27,19 +27,18 @@ export default async function ProfilesPage() {
 
   return (
     <>
-      <header className="mb-6 flex items-end gap-4">
-        <div>
-          <h1 className="font-titulo text-2xl font-semibold uppercase tracking-[0.03em]">Perfiles</h1>
-          <p className="mt-1 text-sm text-fg-muted">
-            El perfil principal se sirve en <code className="font-mono">/</code>. El resto vive en
-            su propia URL.
-          </p>
-        </div>
-        <form action={createProfile} className="ml-auto">
-          <Submit pendingLabel="Creando…" icono={<Plus className="h-4 w-4" aria-hidden />}>
-            Nuevo perfil
-          </Submit>
-        </form>
+      <header className="mb-6">
+        <Encabezado ruta="/admin/profiles">
+          <form action={createProfile} className="ml-auto">
+            <Submit pendingLabel="Creando…" icono={<Plus className="h-4 w-4" aria-hidden />}>
+              Nuevo perfil
+            </Submit>
+          </form>
+        </Encabezado>
+        <p className="mt-1 text-sm text-fg-muted">
+          El perfil principal se sirve en <code className="font-mono">/</code>. El resto vive en
+          su propia URL.
+        </p>
       </header>
 
       <ul className="grid gap-3 sm:grid-cols-2">

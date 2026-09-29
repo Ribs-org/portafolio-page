@@ -19,6 +19,7 @@ import {
 } from '@/lib/posts-kpis'
 import { getAllProfiles } from '@/lib/profiles'
 import { cn, formatNumber, formatPercent } from '@/lib/utils'
+import { Encabezado } from '@/components/ui'
 import { PostTable } from './post-table'
 
 export const dynamic = 'force-dynamic'
@@ -148,7 +149,7 @@ export default async function ContentPage({
   return (
     <>
       <header className="mb-6">
-        <h1 className="font-titulo text-2xl font-semibold uppercase tracking-[0.03em]">Contenido</h1>
+        <Encabezado ruta="/admin/content" />
         <p className="mt-1 text-sm text-fg-muted">
           Cada post con lo que hizo en la red y lo que trajo a tu página.
         </p>

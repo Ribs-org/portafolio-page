@@ -10,6 +10,7 @@ import { seriesColor } from '@/components/charts/theme'
 import { TrafficChart } from '@/components/charts/traffic-chart'
 import { Termometro } from './termometro'
 import { FilterBar } from '@/components/filter-bar'
+import { Encabezado } from '@/components/ui'
 import {
   getCampaigns,
   getFunnel,
@@ -64,7 +65,7 @@ export default async function OverviewPage({
   return (
     <>
       <header className="mb-6">
-        <h1 className="font-titulo text-2xl font-semibold uppercase tracking-[0.03em]">Resumen</h1>
+        <Encabezado ruta="/admin" />
         <p className="mt-1 text-sm text-fg-muted">Lo esencial de un vistazo.</p>
       </header>
 

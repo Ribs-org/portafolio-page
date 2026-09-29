@@ -121,9 +121,17 @@ Abre el sitio: ahora se ve un perfil de ejemplo.
 ### 6. Hazlo tuyo
 
 Entra en `/ingresar` con tu correo (el de `ADMIN_EMAIL`): te llega un código de seis
-dígitos que vale diez minutos. Solo entran los correos invitados; desde la pestaña
-**Usuarios** del panel, visible para el admin, invitas a más gente. Ya adentro cambias
-foto, bio, colores, links y slugs.
+dígitos que vale diez minutos.
+
+El panel tiene cinco pestañas —El Resumen (los números de un vistazo, hasta que lo
+reemplace El Fuego), La Parrilla (Calendario), Los Cortes (Contenido), La Mesa
+(Comentarios) y Los Números (Analítica)— y el engranaje de Ajustes, con Los Fierros
+(Cuentas), La Vitrina (Perfiles) y Los Maestros (Usuarios, solo el admin). Las rutas no
+cambiaron. Cada pantalla lleva su subtítulo en llano por si el nombre no dice nada.
+
+Solo entran los correos invitados; desde **Los Maestros** (Usuarios, dentro de Ajustes),
+visible para el admin, invitas a más gente. Ya adentro cambias foto, bio, colores, links y
+slugs.
 
 Cada usuario nace con su página, en el mismo momento en que lo invitas: la dirección sale
 de su correo —`juanito@gmail.com` da `/juanito`—, y si esa ya está tomada se numera
@@ -359,8 +367,9 @@ Después de fusionar, la migración se aplica sola al desplegar: las tablas de c
 ajustes son nuevas, y sin ellas el sondeo no tiene dónde guardar nada.
 
 Para que funcione hay que **reconectar una vez cada red**, porque el permiso se concede
-en el consentimiento: entra a **Cuentas** y pulsa *Reconectar* en cada tarjeta de
-Instagram, Facebook y YouTube. Mientras no lo hagas, esa red simplemente no trae
+en el consentimiento: entra a **Los Fierros** (Cuentas, dentro de Ajustes) y pulsa
+*Reconectar* en cada tarjeta de Instagram, Facebook y YouTube. Mientras no lo hagas, esa
+red simplemente no trae
 comentarios; nada más se rompe.
 
 Los permisos que se agregan son `instagram_manage_comments`, `pages_manage_engagement` y,
@@ -463,10 +472,11 @@ Antes que nada, la migración se aplica sola al desplegar: la analítica de post
 tablas nuevas. La migración corre antes del build, así que ese peligro no existe:
 `/admin/analytics` y el cron nunca corren contra un esquema viejo.
 
-Con eso hecho, las variables puestas y un redeploy encima, entra a `/admin/accounts` (la
-pestaña **Cuentas**) y aprieta *Conectar* en cada red; con varias páginas o cuentas, elige
-cuáles. El `vercel.json` del repo declara una corrida diaria a las 9:00 UTC; Vercel inyecta
-`CRON_SECRET` solo. También puedes apretar *Sincronizar ahora* cuando quieras.
+Con eso hecho, las variables puestas y un redeploy encima, entra a `/admin/accounts`
+(**Los Fierros**, Cuentas, dentro de Ajustes) y aprieta *Conectar* en cada red; con varias
+páginas o cuentas, elige cuáles. El `vercel.json` del repo declara una corrida diaria a las
+9:00 UTC; Vercel inyecta `CRON_SECRET` solo. También puedes apretar *Sincronizar ahora*
+cuando quieras.
 
 **Si una cuenta aparece dos veces —una «Sin credencial» y otra viva—, no es un error tuyo.**
 TikTok, Instagram y Facebook le dan a la misma persona un identificador distinto por cada
