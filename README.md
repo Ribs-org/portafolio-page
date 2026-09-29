@@ -301,9 +301,11 @@ texto aparte; en el teléfono, sin poder tocarse y con «reconéctala» al lado 
 donde antes se leía solo la red —el calendario, la cola, el editor, y en el teléfono el
 Calendario y el Resumen— ahora se leen la red **y** el handle: `Instagram · @vicenteclips`.
 Las dos cosas, porque casi ninguna de esas pantallas dibuja un icono de la red —el
-calendario del panel es la excepción, con un logo por destino bajo la hora del corte y el
-handle en su `title`—, así que en el resto el handle sigue siendo lo que distingue cada
-destino, y la red sola no distingue dos cuentas de la misma red en el mismo corte.
+calendario y la cola del panel son la excepción: el calendario con un logo por destino bajo
+la hora del corte, la cola con ese mismo logo junto al handle y el estado, y en las dos el
+handle en el `title` o al lado del icono—, así que en el resto (el editor, y en el teléfono
+el Calendario y el Resumen) el handle sigue siendo lo que distingue cada destino, y la red
+sola no distingue dos cuentas de la misma red en el mismo corte.
 
 TikTok pide sus propias opciones por destino —privacidad, comentarios, dúo, comercial—, así
 que con dos cuentas de TikTok marcadas verás dos bloques, uno por cuenta. No se comparten a

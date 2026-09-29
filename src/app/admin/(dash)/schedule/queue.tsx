@@ -6,8 +6,8 @@ import { deleteScheduledPost, rescheduleTarget, subirAhora } from '@/app/admin/a
 import { Button, Input } from '@/components/ui'
 import type { ScheduledPost, ScheduledPostTarget } from '@/db/schema'
 import { cn } from '@/lib/utils'
-import { etiquetaDestino, nombreDestino } from './etiqueta'
 import { cortarCola } from './orden'
+import { Redes } from './redes'
 
 // El mismo corte que la tabla de contenido: de entrada solo las primeras veinte, que
 // casi siempre alcanzan para todo lo pendiente. El resto espera detrás del botón.
@@ -129,7 +129,7 @@ export function Queue({
                     'bg-white/[0.08] text-fg-muted',
                 )}
               >
-                {nombreDestino(target)}: {etiquetaDestino(target)}
+                <Redes targets={[target]} detalle />
                 {target.status === 'failed' && target.lastError && ` — ${target.lastError}`}
                 {target.status === 'failed' && (
                   <button
