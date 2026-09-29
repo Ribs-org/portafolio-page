@@ -109,12 +109,15 @@ letra.
 
 Un componente `Redes` (`src/app/admin/(dash)/schedule/redes.tsx`): recibe los destinos de un
 corte y dibuja una fila de iconos de 14 px, uno por destino, en el orden de los destinos. El
-color base es el del texto atenuado; **el color del corte lo sigue poniendo la cocción**. Un
+color base es el del texto, a opacidad plena: sobre la carne cruda el atenuado no llega al
+mínimo de contraste. **El color del corte lo sigue poniendo la cocción**. Un
 destino en `failed` tiñe su icono de `negative`; uno en `published`, de `positive`; los demás
 quedan en gris. Con dos cuentas de la misma red, dos iconos iguales. Cada icono lleva el
-handle y el estado en `title`, y la fila entera un `sr-only` con «Instagram · vicente:
-programado, TikTok · clips: servido» — el texto que hoy vive en el chip no se pierde, cambia
-de sitio.
+handle y el estado en `title`; el `sr-only` que dice «Instagram · vicente: programado,
+TikTok · clips: servido» va en la fila entera cuando los iconos son la única lectura (la
+parrilla, El Fuego), y delante de cada icono cuando el texto visible ya dice el handle y el
+estado (la cola, con `detalle`) — ahí un `sr-only` de fila repetiría los dos y solo falta
+decir la red. El texto que hoy vive en el chip no se pierde, cambia de sitio.
 
 Dónde va:
 

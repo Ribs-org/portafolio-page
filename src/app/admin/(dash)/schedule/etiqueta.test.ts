@@ -1,13 +1,14 @@
 import { describe, expect, it } from 'vitest'
 import { networkLabel } from '@/lib/networks'
-import { etiquetaDestino, nombreDestino } from './etiqueta'
+import { colorDeDestino, etiquetaDestino, nombreDestino } from './etiqueta'
 
 describe('nombreDestino', () => {
   it('nombra la red y el handle, para que dos destinos de la misma red se distingan', () => {
     const texto = nombreDestino({ network: 'instagram', handle: '@vicenteclips' })
     expect(texto).toContain('@vicenteclips')
-    // La red también: en el calendario y en la cola no hay icono que la diga, así que
-    // el handle solo obligaba a adivinar de qué red era cada destino.
+    // La red también: aunque el calendario y la cola ya dibujan un icono de la red
+    // (`Redes`), este nombre sigue haciendo falta para el `title`, el `sr-only` y el
+    // editor, donde no hay icono.
     expect(texto).toContain(networkLabel('instagram'))
   })
 
@@ -32,5 +33,15 @@ describe('etiquetaDestino', () => {
     expect(
       etiquetaDestino({ network: 'tiktok', status: 'published', externalId: null, opciones: { modo: 'directo', privacidad: 'SELF_ONLY' } }),
     ).toBe('Publicado')
+  })
+})
+
+describe('colorDeDestino', () => {
+  it('solo el fallo y el éxito tiñen; lo demás queda en gris y deja hablar a la cocción', () => {
+    expect(colorDeDestino('failed')).toBe('negativo')
+    expect(colorDeDestino('published')).toBe('positivo')
+    expect(colorDeDestino('scheduled')).toBe('gris')
+    expect(colorDeDestino('publishing')).toBe('gris')
+    expect(colorDeDestino('lo-que-sea')).toBe('gris')
   })
 })

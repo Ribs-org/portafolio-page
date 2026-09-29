@@ -10,10 +10,11 @@ const ESTADO: Record<string, string> = {
 }
 
 /**
- * Quién es el destino: su red y su handle. Las dos cosas, porque ni el calendario ni la
- * cola dibujan un icono de la red —se dio por supuesto que sí, y no lo hay—, así que el
- * handle solo obligaba a adivinar de qué red era cada destino. Y la red sola no distingue
- * dos cuentas de la misma red en el mismo corte, que es la lectura que importa.
+ * Quién es el destino: su red y su handle. Las dos cosas: el calendario y la cola ya
+ * dibujan un icono de la red (`Redes`, en `redes.tsx`), pero este nombre sigue haciendo
+ * falta para el `title` de cada icono, el `sr-only` y el editor, donde no hay icono. Y la
+ * red sola no distingue dos cuentas de la misma red en el mismo corte, que es la lectura
+ * que importa.
  *
  * Sin handle queda el nombre de la red, que ahí no es ambiguo: una cuenta sin handle es
  * una que todavía no sincronizó.
@@ -43,4 +44,18 @@ export function etiquetaDestino(target: {
 
 function esBorrador(opciones: unknown): boolean {
   return typeof opciones === 'object' && opciones !== null && (opciones as { modo?: unknown }).modo === 'borrador'
+}
+
+/**
+ * Qué tiñe el icono de un destino. Solo dos cosas: que se quemó (rojo) o que ya salió
+ * (verde). Programado y publicando quedan sin teñir a propósito —el color del corte lo
+ * pone la cocción, y un icono de colores encima competiría con ella—, y siguen devolviendo
+ * `'gris'` como nombre del caso aunque el icono no pinte gris: sobre la carne cruda el
+ * atenuado no llega al mínimo de contraste, así que ese caso pinta con el color del texto
+ * a opacidad plena (`redes.tsx` decide la clase).
+ */
+export function colorDeDestino(status: string): 'gris' | 'positivo' | 'negativo' {
+  if (status === 'failed') return 'negativo'
+  if (status === 'published') return 'positivo'
+  return 'gris'
 }
