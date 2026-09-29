@@ -2,7 +2,8 @@ import { dayKey } from '@/lib/schedule-week'
 import { formatNumber } from '@/lib/utils'
 
 // Lo que El Fuego decide, sin tocar la base: qué es «hoy», cuál es el siguiente corte, qué
-// se quemó, y qué dice el pie. La página solo compone; esto se prueba con fixtures.
+// se quemó, y qué dice el pie (cuántos cortes y cuántas miradas). La página solo compone;
+// esto se prueba con fixtures.
 
 export type Corte = {
   post: { id: string; caption: string; scheduledAt: Date }

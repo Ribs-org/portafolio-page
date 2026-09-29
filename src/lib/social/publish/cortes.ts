@@ -131,16 +131,16 @@ export async function servidosAyer(
   const servidos = new Set(destinos.map((destino) => destino.postId)).size
   // Mismo cruce que `attributesFor` en `post-attributes.ts`: un id externo solo es único
   // dentro de su red, así que la llave es `red:externalId` y no el id a secas.
-  const conId = destinos.filter((d): d is typeof d & { externalId: string } => d.externalId !== null)
+  const conId = destinos.filter((destino): destino is typeof destino & { externalId: string } => destino.externalId !== null)
   if (conId.length === 0) return { servidos, miradas: null }
-  const llaves = new Set(conId.map((d) => `${d.network}:${d.externalId}`))
+  const llaves = new Set(conId.map((destino) => `${destino.network}:${destino.externalId}`))
 
   const posts = await db
     .select({ id: socialPosts.id, network: socialPosts.network, externalId: socialPosts.externalId })
     .from(socialPosts)
     .where(
       and(
-        inArray(socialPosts.externalId, [...new Set(conId.map((d) => d.externalId))]),
+        inArray(socialPosts.externalId, [...new Set(conId.map((destino) => destino.externalId))]),
         eq(socialPosts.ownerId, ownerId),
       ),
     )
