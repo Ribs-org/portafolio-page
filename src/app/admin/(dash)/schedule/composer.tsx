@@ -79,7 +79,17 @@ const CLASE_CALOR: Record<Calor, string> = {
   llena: 'grilla-llena',
 }
 
-export function Composer({ carga, cuentas }: { carga: Record<string, number>; cuentas: CuentaRow[] }) {
+export function Composer({
+  carga,
+  cuentas,
+  abierto,
+}: {
+  carga: Record<string, number>
+  cuentas: CuentaRow[]
+  // Nace desplegado cuando la URL lo pidió (`?componer=1`), que es como llega el que
+  // viene de «Poner al fuego». Después el `<details>` se abre y se cierra solo.
+  abierto?: boolean
+}) {
   const captionId = useId()
   // Cuentas cuya red todavía publica desde aquí. Una cuenta de una red que no está en
   // `ENABLED` no se ofrece, esté o no conectada.
@@ -140,6 +150,7 @@ export function Composer({ carga, cuentas }: { carga: Record<string, number>; cu
 
   return (
     <details
+      open={abierto}
       className="rounded-xl bg-white/[0.03] p-4"
       onToggle={(event) => {
         // `Textarea` solo acepta las props del `<textarea>`, así que no hay `ref` que

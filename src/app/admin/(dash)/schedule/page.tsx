@@ -16,7 +16,8 @@ export const dynamic = 'force-dynamic'
 
 /**
  * Rebuilds the page URL flipping one key, carrying the rest — the content page's
- * `contentHref` mold. `mensaje` never carries over (one-shot OAuth outcome).
+ * `contentHref` mold. `mensaje` and `componer` never carry over (both one-shot: the
+ * OAuth outcome, and the order to open the composer).
  */
 function scheduleHref(
   params: Record<string, string | string[] | undefined>,
@@ -24,7 +25,7 @@ function scheduleHref(
 ): string {
   const next = new URLSearchParams()
   for (const [key, value] of Object.entries(params)) {
-    if (key in changes || key === 'mensaje') continue
+    if (key in changes || key === 'mensaje' || key === 'componer') continue
     if (typeof value === 'string') next.set(key, value)
     else if (Array.isArray(value)) for (const v of value) next.append(key, v)
   }
@@ -42,6 +43,8 @@ export default async function SchedulePage({
 }) {
   const params = await searchParams
   const calendarView = params.vista === 'calendario'
+  // El compositor nace abierto si lo pidió la URL: así llega «Poner al fuego» de El Fuego.
+  const componer = params.componer === '1'
   const monday = normalizeWeekParam(
     typeof params.semana === 'string' ? params.semana : undefined,
     new Date(),
@@ -74,7 +77,7 @@ export default async function SchedulePage({
       </header>
 
       <div className="space-y-6">
-        <Composer carga={carga} cuentas={cuentas} />
+        <Composer carga={carga} cuentas={cuentas} abierto={componer} />
         <BatchUpload />
         <div>
           <div className="mb-3 flex items-center gap-1.5">
