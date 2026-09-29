@@ -1116,10 +1116,16 @@ export async function rescheduleTarget(targetId: string, localDatetime: string):
 
   await db.update(scheduledPosts).set({ scheduledAt, updatedAt: new Date() }).where(eq(scheduledPosts.id, target.postId))
   // Back to square one: attempts spent against the old hour say nothing about the new one.
+  //
+  // `status = 'failed'` en el `where` —como el rearm del editor— es la reja contra la
+  // carrera con «Subir ahora»: entre la lectura de arriba y esta escritura el destino
+  // puede haber salido publicado, y devolverlo a `scheduled` con `containerId` en null lo
+  // haría publicar de nuevo en la vuelta siguiente del cron. Si ya no está quemado no casa
+  // ninguna fila, y el `revalidatePath` de abajo repinta lo que de verdad pasó.
   await db
     .update(scheduledPostTargets)
     .set({ status: 'scheduled', attemptCount: 0, lastError: null, containerId: null, updatedAt: new Date() })
-    .where(eq(scheduledPostTargets.id, targetId))
+    .where(and(eq(scheduledPostTargets.id, targetId), eq(scheduledPostTargets.status, 'failed')))
 
   revalidatePath('/admin/schedule')
   return { ok: true }
