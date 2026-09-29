@@ -44,3 +44,14 @@ export function etiquetaDestino(target: {
 function esBorrador(opciones: unknown): boolean {
   return typeof opciones === 'object' && opciones !== null && (opciones as { modo?: unknown }).modo === 'borrador'
 }
+
+/**
+ * Qué tiñe el icono de un destino. Solo dos cosas: que se quemó (rojo) o que ya salió
+ * (verde). Programado y publicando quedan en gris a propósito: el color del corte lo pone
+ * la cocción, y un icono de colores encima competiría con ella.
+ */
+export function colorDeDestino(status: string): 'gris' | 'positivo' | 'negativo' {
+  if (status === 'failed') return 'negativo'
+  if (status === 'published') return 'positivo'
+  return 'gris'
+}
