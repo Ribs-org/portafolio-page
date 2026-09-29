@@ -45,6 +45,17 @@ export function ajustes(esAdmin: boolean): Pantalla[] {
  * pantallas, incluida la de admin, porque decide qué se marca activo, no qué se muestra.
  */
 export function pantallaDe(pathname: string): Pantalla | null {
-  if (pathname === '/admin') return PANTALLAS[0]!
+  if (pathname === '/admin') return PANTALLAS.find((p) => p.ruta === '/admin') ?? null
   return PANTALLAS.find((p) => p.ruta !== '/admin' && (pathname === p.ruta || pathname.startsWith(`${p.ruta}/`))) ?? null
+}
+
+/**
+ * El nombre de una pantalla por su ruta exacta, para la prosa que necesita nombrarla sin
+ * escribir «Los Fierros» a mano en otro archivo. Lanza si la ruta no está en la tabla: un
+ * nombre mal escrito debe romper en desarrollo, no aparecer vacío en producción.
+ */
+export function nombreDe(ruta: string): string {
+  const pantalla = PANTALLAS.find((p) => p.ruta === ruta)
+  if (!pantalla) throw new Error(`nombreDe: ${ruta} no está en el vocabulario`)
+  return pantalla.nombre
 }

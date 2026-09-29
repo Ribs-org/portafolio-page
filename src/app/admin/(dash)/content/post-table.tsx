@@ -9,6 +9,7 @@ import { useSortedRows } from '@/components/charts/use-sorted-rows'
 import { networkLabel } from '@/lib/networks'
 import { hasNoPlatformMetrics, type PostRow } from '@/lib/posts-kpis'
 import { cn, formatNumber } from '@/lib/utils'
+import { nombreDe } from '@/lib/vocabulario'
 
 type Column = 'views' | 'likes' | 'comments' | 'shares' | 'visits' | 'clicks' | 'ctr' | 'pull'
 
@@ -57,8 +58,11 @@ export function PostTable({ rows }: { rows: PostRow[] }) {
       <div className="py-8 text-center">
         <p className="text-sm text-fg-faint">Todavía no hay posts sincronizados.</p>
         <p className="mx-auto mt-2 max-w-sm text-[0.8rem] leading-relaxed text-fg-faint">
-          Conecta una red en <span className="text-fg-muted">Cuentas</span> y aprieta{' '}
-          <span className="text-fg-muted">Sincronizar ahora</span> ahí mismo.
+          Conecta una red en{' '}
+          <span className="text-fg-muted">
+            {nombreDe('/admin/accounts')} (Ajustes)
+          </span>{' '}
+          y aprieta <span className="text-fg-muted">Sincronizar ahora</span> ahí mismo.
         </p>
       </div>
     )

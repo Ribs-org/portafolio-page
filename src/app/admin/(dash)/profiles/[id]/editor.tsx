@@ -24,6 +24,7 @@ import { ProfileView } from '@/components/profile-view'
 import { Button, Field, Input, Select, Textarea, Toggle } from '@/components/ui'
 import type { Profile } from '@/db'
 import { cn } from '@/lib/utils'
+import { nombreDe } from '@/lib/vocabulario'
 import {
   createLink,
   deleteProfile,
@@ -376,7 +377,7 @@ export function ProfileEditor({ profile, initialLinks, origin, publicUrl, soloPe
             Para saber qué contenido te trae tráfico, agrega{' '}
             <code className="font-mono text-fg">?s=lo-que-sea</code> al final:{' '}
             <code className="font-mono text-fg-muted">{publicUrl}?s=reel-agosto</code>. Cada
-            etiqueta aparece por separado en Analítica.
+            etiqueta aparece por separado en {nombreDe('/admin/analytics')}.
           </p>
         </Panel>
 

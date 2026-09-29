@@ -345,3 +345,15 @@ perderlos.
   `redes` solo queda cubierta contra la función real en `mobile-api.test.ts`. División
   razonable —ver el ledger de la entrega— pero vale saber dónde vive esa cobertura antes
   de tocar `resolverDestinos`.
+
+## Dos frases de error siguen nombrando «Perfiles», no «La Vitrina»
+
+**Anotado el 2026-09-29**, durante la revisión final del panel con poco a priori (entrega 1
+de navegación). `profiles/[id]/editor.tsx:419` y `src/app/admin/actions.ts:221` comparten,
+letra por letra, «No puedes borrar tu página principal: primero haz principal a otra página,
+desde «Perfiles».» — el nombre viejo de la pestaña que hoy es **La Vitrina**. Las demás cinco
+frases visibles que nombraban pestañas por su nombre viejo se corrigieron en esta misma
+entrega usando `nombreDe` de `src/lib/vocabulario.ts`; estas dos no, porque las dos tienen
+tests que comparan el texto letra por letra (el mensaje de error de `deleteProfile` y su
+reflejo en el editor). Cerrarlo cuesta actualizar esos tests junto con la frase — un cambio
+chico, pero deliberadamente fuera de esta entrega, que no tocaba tests de otras.

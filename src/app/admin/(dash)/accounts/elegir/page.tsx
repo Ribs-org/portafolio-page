@@ -7,6 +7,7 @@ import { getDb, socialAccounts } from '@/db'
 import { requireUser } from '@/lib/auth'
 import { networkLabel } from '@/lib/networks'
 import { COOKIE_PENDIENTE, LOGIN_VENCIDO, leerPendiente } from '@/lib/social/pendiente'
+import { nombreDe } from '@/lib/vocabulario'
 
 export const dynamic = 'force-dynamic'
 
@@ -30,7 +31,7 @@ export default async function Elegir({
       <section className="chapa rounded-xl p-6">
         <p className="text-sm">{LOGIN_VENCIDO}</p>
         <Link href="/admin/accounts" className="mt-3 inline-block text-sm text-fg-muted hover:text-fg">
-          ← Volver a Cuentas
+          ← Volver a {nombreDe('/admin/accounts')}
         </Link>
       </section>
     )
