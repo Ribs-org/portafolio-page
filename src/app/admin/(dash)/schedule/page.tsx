@@ -109,9 +109,6 @@ export default async function SchedulePage({
     <>
       <header className="mb-6">
         <Encabezado ruta="/admin/schedule" />
-        <p className="mt-1 text-sm text-fg-muted">
-          Programa lo que viene y revisa cómo salió lo que ya se fue.
-        </p>
       </header>
 
       <div className="space-y-6">

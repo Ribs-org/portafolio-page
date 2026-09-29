@@ -150,9 +150,6 @@ export default async function ContentPage({
     <>
       <header className="mb-6">
         <Encabezado ruta="/admin/content" />
-        <p className="mt-1 text-sm text-fg-muted">
-          Cada post con lo que hizo en la red y lo que trajo a tu página.
-        </p>
       </header>
 
       <FilterBar profiles={profiles} />

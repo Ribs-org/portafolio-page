@@ -66,7 +66,6 @@ export default async function OverviewPage({
     <>
       <header className="mb-6">
         <Encabezado ruta="/admin" />
-        <p className="mt-1 text-sm text-fg-muted">Lo esencial de un vistazo.</p>
       </header>
 
       <FilterBar profiles={profiles} />
