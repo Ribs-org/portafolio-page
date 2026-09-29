@@ -20,6 +20,9 @@ const CLASE_COLOR: Record<ReturnType<typeof colorDeDestino>, string> = {
  * handle y el estado y solo falta la red; un `sr-only` de fila repetiría los dos.
  */
 export function Redes({ targets, detalle = false }: { targets: Destino[]; detalle?: boolean }) {
+  // En modo detalle el texto va al color pleno y solo el icono lleva el tinte: el fondo del
+  // chip ya dice el estado, y un handle de 12 px en rojo sobre ese fondo se quedaba en 4.28:1
+  // (medido), bajo el 4.5:1 de texto; el «· Falló» atenuado, en 2.75:1.
   if (targets.length === 0) return null
   return (
     <span className="inline-flex flex-wrap items-center gap-x-2 gap-y-1">
@@ -34,11 +37,6 @@ export function Redes({ targets, detalle = false }: { targets: Destino[]; detall
           >
             <Icon name={t.network} className="h-3.5 w-3.5 shrink-0" />
             {detalle ? (
-              {/*
-                El texto va al color pleno y solo el icono lleva el tinte: el fondo del chip
-                ya dice el estado, y un handle de 12 px en rojo sobre ese fondo se quedaba
-                en 4.28:1 (medido), bajo el 4.5:1 de texto; el «· Falló» atenuado, en 2.75:1.
-              */}
               <span className="text-xs text-fg">
                 <span className="sr-only">{networkLabel(t.network)} · </span>
                 {t.handle ?? nombreDestino(t)}
