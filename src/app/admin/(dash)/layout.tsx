@@ -17,7 +17,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
         <div className="mx-auto flex max-w-6xl items-center gap-4 px-4 py-3 sm:px-6">
           <span className="font-titulo text-sm font-semibold uppercase tracking-[0.1em]">Panel</span>
           <AdminNav esAdmin={usuario.rol === 'admin'} />
-          <form action={logout} className="ml-auto">
+          <form action={logout}>
             <button
               type="submit"
               className="rounded-lg px-3 py-1.5 text-xs font-titulo uppercase tracking-[0.1em] text-fg-faint transition-colors hover:text-fg"
