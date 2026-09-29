@@ -38,11 +38,19 @@ export function AdminNav({ esAdmin }: { esAdmin?: boolean }) {
       </div>
 
       {/*
-        Un `<details>`: sin estado, sin JavaScript, con teclado. Se cierra solo al navegar
+        Un `<details>`: sin estado, con teclado (Enter abre; Escape cierra, ver abajo). Se cierra solo al navegar
         porque la página cambia. Una ruta de Ajustes activa marca el engranaje, no una
         pestaña — el usuario tiene que poder ver dónde está aunque el menú esté cerrado.
       */}
-      <details className="relative ml-auto">
+      <details
+        className="relative ml-auto"
+        // Escape no cierra un <details> por sí solo (comprobado en Chromium): es la única
+        // tecla que el elemento no trae, y un menú que no se cierra con Escape es un menú
+        // roto para el teclado. Sigue sin estado: se quita el atributo y ya.
+        onKeyDown={(e) => {
+          if (e.key === 'Escape') e.currentTarget.removeAttribute('open')
+        }}
+      >
         <summary
           className={cn(
             'flex cursor-pointer list-none items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-sm transition-colors [&::-webkit-details-marker]:hidden',
