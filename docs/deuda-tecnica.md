@@ -188,19 +188,19 @@ La lección operativa, para la próxima vez que haya que reconocer un error de P
 
 `aislamiento.test.ts` importa funciones de `src/lib` y comprueba que cada una ate su
 consulta al dueño. Eso deja sin protección cualquier consulta escrita **fuera de
-`src/lib`**: `schedule/page.tsx` arma su propio `leftJoin` inline, no una función de
-`src/lib`, así que el arnés no la alcanza. Esta rama sumó tres más con el mismo patrón,
-las tres en rutas de API: `api/schedule/posts/route.ts`, `api/mobile/schedule/route.ts` y
+`src/lib`**. La del calendario (`schedule/page.tsx`) lo estuvo hasta el 2026-09-29, cuando
+El Fuego necesitó la misma lectura y se movió a `src/lib/social/publish/cortes.ts`, donde
+el arnés sí la ve. Quedan tres con el mismo patrón, las tres en rutas de API:
+`api/schedule/posts/route.ts`, `api/mobile/schedule/route.ts` y
 `api/mobile/overview/route.ts` (esta última con dos, una por cada ventana que arma —
-«hoy» y «próximos»). Las cuatro son correctas hoy —el filtro del dueño sigue en el
-`WHERE` de cada una, verificado a mano— pero nada impide que mañana alguien mueva uno al
-`ON` del join sin que ninguna prueba chille.
+«hoy» y «próximos»). Son correctas hoy —el filtro del dueño sigue en el `WHERE` de cada
+una, verificado a mano— pero nada impide que mañana alguien mueva uno al `ON` del join sin
+que ninguna prueba chille.
 
-Extraer solo una de esas consultas para cubrirla arreglaría un caso de varios sin
-criterio: el patrón real del repositorio es que el arnés llega a `src/lib` y no a las
-páginas ni a las rutas de API que arman su propio SQL. Cerrarlo de verdad pide decidir
-qué páginas y rutas arman SQL inline y trasladar esas consultas a `src/lib`, o extender
-el arnés para que también las alcance ahí donde viven.
+El calendario no se extrajo por criterio sino porque otra pantalla la pedía; el patrón
+real del repositorio sigue siendo que el arnés llega a `src/lib` y no a las rutas de API
+que arman su propio SQL. Cerrarlo de verdad pide trasladar esas tres consultas a
+`src/lib`, o extender el arnés para que también las alcance ahí donde viven.
 
 ## Dos caminos que crean publicaciones, sin código compartido
 
