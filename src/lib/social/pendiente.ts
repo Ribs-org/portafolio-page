@@ -41,7 +41,9 @@ export function leerPendiente(raw: string | undefined): ConexionPendiente | null
     if (p.refreshToken !== null && typeof p.refreshToken !== 'string') return null
     if (p.expiresAt !== null && typeof p.expiresAt !== 'string') return null
     if (!Array.isArray(p.candidatas) || !p.candidatas.every(esCandidata)) return null
-    if (p.metaUserId !== null && typeof p.metaUserId !== 'string') return null
+    // Ausente (cookie emitida antes de que existiera el campo) vale como null: rechazarla
+    // diría «el login venció» a quien estaba eligiendo cuentas justo durante un despliegue.
+    if (p.metaUserId != null && typeof p.metaUserId !== 'string') return null
     // El maxAge de la cookie lo hace cumplir el navegador, y un navegador no es de fiar:
     // el reloj del servidor es lo que de verdad vence un login a medias.
     if (typeof p.emitidoEn !== 'number' || !Number.isFinite(p.emitidoEn)) return null
@@ -53,7 +55,7 @@ export function leerPendiente(raw: string | undefined): ConexionPendiente | null
       refreshToken: p.refreshToken,
       expiresAt: p.expiresAt,
       candidatas: p.candidatas,
-      metaUserId: p.metaUserId,
+      metaUserId: typeof p.metaUserId === 'string' ? p.metaUserId : null,
       emitidoEn: p.emitidoEn,
       sub: p.sub,
     }

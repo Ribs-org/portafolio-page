@@ -38,9 +38,10 @@ describe('serializarPendiente / leerPendiente', () => {
   it('un payload cifrado con otra forma también da null', () => {
     expect(leerPendiente(encryptToken(JSON.stringify({ network: 'x' })))).toBeNull()
     expect(leerPendiente(encryptToken(JSON.stringify({ ...pendiente, candidatas: [{ handle: 'sin id' }] })))).toBeNull()
-    // Una cookie de antes de que existiera el id de usuario de Meta tampoco pasa: son
-    // diez minutos de vida, y el dueño vuelve a conectar.
-    expect(leerPendiente(encryptToken(JSON.stringify({ ...pendiente, metaUserId: undefined })))).toBeNull()
+    // Una cookie de antes de que existiera el id de usuario de Meta (2026-09-30) sí pasa,
+    // con null: rechazarla diría «el login venció» en mitad de un despliegue.
+    expect(leerPendiente(encryptToken(JSON.stringify({ ...pendiente, metaUserId: undefined })))).toMatchObject({ metaUserId: null })
+    expect(leerPendiente(encryptToken(JSON.stringify({ ...pendiente, metaUserId: 7 })))).toBeNull()
   })
 
   it('una cookie de hace más de diez minutos ya venció', () => {
