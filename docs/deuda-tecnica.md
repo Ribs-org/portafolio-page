@@ -213,6 +213,18 @@ acciones ni las rutas de API que arman su propio SQL. Cerrarlo de verdad pide de
 cuáles de esas doce se trasladan a `src/lib`, o extender el arnés para que también las
 alcance ahí donde viven.
 
+Y hay una excepción al revés, dentro de `src/lib`: `src/lib/social/meta-bajas.ts`
+(`darDeBaja`, `pasosDeBorrado`, `borrarDatosDe`) busca por `social_accounts.meta_user_id` y
+**no** filtra por dueño, a propósito. Quien pide ahí no es un dueño con sesión sino Meta,
+que no sabe quién es nuestro dueño: el callback de baja o de borrado llega como un `POST`
+público cuya única credencial es el `signed_request` firmado con el app secret. Exigirle un
+`owner_id` a esas consultas sería pedir un dato que la petición no trae. Lo que sostiene el
+aislamiento acá es la firma, no el `WHERE`: por eso nada de ese módulo se llama desde una
+acción con sesión ni desde otra ruta sin haber pasado antes por `leerSignedRequest`
+(`src/lib/social/meta-firma.ts`), y por eso tampoco está en la lista de `aislamiento.test.ts`
+—el arnés lo daría por roto, y no lo está—. Si alguien lo importa desde el panel, el filtro
+por dueño hay que ponerlo en el llamador.
+
 ## Dos caminos que crean publicaciones, sin código compartido
 
 **Abierto desde 2026-09-24.**
