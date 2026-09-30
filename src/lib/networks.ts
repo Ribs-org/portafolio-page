@@ -1,3 +1,5 @@
+import type { SocialNetwork } from '@/db/schema'
+
 /**
  * Maps a referrer hostname to a normalised traffic source.
  *
@@ -91,4 +93,30 @@ export function detectNetwork(
     if (pattern.test(hostname)) return network
   }
   return 'other'
+}
+
+/**
+ * Lo que cada red exige o limita hoy, dicho junto al botón de conectar y no después del
+ * error. Frases fijas: cada una tiene test letra por letra. La de Meta en revisión va
+ * aparte porque se apaga sola al quitar `META_EN_REVISION` cuando la app pase a Live.
+ *
+ * Las de YouTube y TikTok caducan por su cuenta: cuando pasen la auditoría de cuota de
+ * Google y la de Direct Post de TikTok (pendientes al 2026-09-30), esas dos líneas se
+ * quitan de acá.
+ */
+export const AVISO_ANTES_DE_CONECTAR: Partial<Record<SocialNetwork, string>> = {
+  instagram: 'Cuenta Business o Creator, enlazada a una página de Facebook. Una cuenta personal no puede conectar.',
+  facebook: 'Una página, no un perfil personal.',
+  youtube: 'Hasta que Google apruebe la cuota de la app, lo que publiques sale privado.',
+  tiktok: 'Hasta que TikTok apruebe la publicación directa, lo que publiques sale como “Solo yo”.',
+}
+export const AVISO_META_EN_REVISION =
+  'Mientras Meta revisa la app, solo pueden conectar las cuentas que invitamos como testers. Si Facebook dice que la función no está disponible, escríbenos.'
+
+export function avisosDe(network: SocialNetwork, metaEnRevision: boolean): string[] {
+  const avisos: string[] = []
+  const fijo = AVISO_ANTES_DE_CONECTAR[network]
+  if (fijo) avisos.push(fijo)
+  if (metaEnRevision && (network === 'instagram' || network === 'facebook')) avisos.push(AVISO_META_EN_REVISION)
+  return avisos
 }

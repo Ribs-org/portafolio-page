@@ -9,9 +9,9 @@ export const dynamic = 'force-dynamic'
 // Instagram goes through Facebook Login, so the Pages scopes are not optional extras:
 // the Instagram user id only exists as a field on the Page that owns it, and without
 // `pages_show_list` and `pages_read_engagement` the callback has nothing to read it from.
-// `instagram_content_publish` buys nothing today — it is requested now because scopes are
-// granted once, at authorization, and a publishing feature added later would otherwise
-// mean sending the owner back through the consent screen.
+// `instagram_content_publish` is what the publisher uses (`social/publish/instagram.ts`);
+// it is requested together with the rest because scopes are granted once, at
+// authorization, and adding one later means sending the owner back through consent.
 const SCOPES: Record<string, string> = {
   instagram:
     // `business_management` is what lets `me/accounts` enumerate Pages owned by a business

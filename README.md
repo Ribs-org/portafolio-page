@@ -290,8 +290,9 @@ https://TU-DOMINIO/api/social/instagram/callback
 ```
 
 Los permisos que pide la app son `instagram_basic`, `instagram_manage_insights`,
-`pages_show_list`, `pages_read_engagement` e `instagram_content_publish`. El último no se
-usa todavía: se pide ahora porque los permisos se conceden una sola vez, al autorizar.
+`pages_show_list`, `pages_read_engagement` e `instagram_content_publish`. El último es el
+que usa la publicación (reels, fotos, carruseles y trial reels); se pide junto con los demás
+porque los permisos se conceden una sola vez, al autorizar.
 
 Copia el app id y el secret. Mientras la app esté en **modo desarrollo** y tú seas su
 dueño, no necesitas App Review.
@@ -300,6 +301,12 @@ dueño, no necesitas App Review.
 INSTAGRAM_APP_ID=
 INSTAGRAM_APP_SECRET=
 ```
+
+Mientras la app siga en modo desarrollo, solo conectan las cuentas que tienen un rol en
+ella (testers): a cualquier otra, Facebook le dice que la función no está disponible, y
+ese error no vuelve a nuestro callback, así que no hay forma de interceptarlo. Pon
+`META_EN_REVISION=1` para que Los Fierros lo avisen junto al botón de Instagram y de
+Facebook, y quítala al pasar la app a Live.
 
 Al conectar se guarda tu **id de usuario de Meta**, que es lo que Meta manda cuando quitas
 la app desde tu cuenta de Facebook: sin él no hay forma de saber a qué cuentas se refiere.
@@ -750,6 +757,7 @@ Vercel y bajan con `vercel env pull .env.local`.
 | `INSTAGRAM_APP_SECRET` | Conectar Instagram, y verificar la firma de los callbacks de baja y borrado de Meta | No — sin ella esa red aparece como no conectada y esos dos callbacks responden `400` |
 | `TIKTOK_CLIENT_KEY` | Conectar TikTok | No — sin ella esa red aparece como no conectada |
 | `TIKTOK_CLIENT_SECRET` | Conectar TikTok | No — sin ella esa red aparece como no conectada |
+| `META_EN_REVISION` | Enciende en Los Fierros el aviso de que, mientras la app de Meta esté en revisión, solo conectan las cuentas invitadas como testers | No — solo mientras la app de Meta esté en modo desarrollo |
 | `THREADS_APP_ID` | Conectar Threads para publicar | El Threads App ID del caso de uso «API de Threads» de la app de Meta |
 | `THREADS_APP_SECRET` | El secreto de ese caso de uso | Junto con el anterior |
 | `X_CLIENT_ID` | Conectar X para publicar (OAuth 2.0 + PKCE) | El Client ID de la app en developer.x.com |
