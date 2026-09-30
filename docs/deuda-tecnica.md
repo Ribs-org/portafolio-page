@@ -407,16 +407,19 @@ mueve el borde, no lo quita.
 `quemadosDe` (`src/lib/social/publish/cortes.ts`) trae **todo** destino en `failed` del
 dueño, sin mirar la fecha, y El Fuego los lista enteros. Es a propósito: un fallo viejo
 sigue pidiendo la acción hasta que alguien lo reprograma, y esconderlo a los siete días
-sería perderlo en silencio. Desde esta ronda la lista va del más reciente al más viejo y
-cada fila que no es de hoy lleva su día delante, así que al menos se sabe qué es qué.
+sería perderlo en silencio. Desde esta entrega la lista va del más reciente al más viejo y
+cada fila que no es de hoy lleva su día y su mes delante, así que al menos se sabe qué es
+qué — que es lo mínimo en una lista sin ventana, donde un fallo puede ser de agosto.
 
-Lo que no tiene es salida propia. Un destino quemado sale de la lista de dos maneras:
-reprogramándolo, o borrando el corte entero desde la cola (`borrarPostProgramado`, que lo
-permite mientras ningún destino haya alcanzado a publicarse). No hay «descartar», ni
-caducidad, ni poda. Un dueño que acumule cuarenta
-fallos de hace meses —una cuenta que se desconectó y nadie reconectó— abre la pantalla de
-entrada y ve cuarenta filas, que es exactamente lo contrario de «solo lo que pide una acción
-hoy».
+Lo que no tiene es salida propia. Un destino quemado sale de la lista cuando algo lo
+devuelve a la cola —reprogramarlo, «Subir ahora» (`subirAhora`, que rearma todo destino
+`failed` del corte), guardar el corte en su editor (los `rearmIds` de `diffTargets`, que
+rearman cualquier destino `failed` que siga elegido)— o cuando se borra el corte entero
+(`borrarPostProgramado`, que lo permite mientras ningún destino haya alcanzado a
+publicarse). Las cuatro son efectos de otra cosa: no hay «descartar», ni caducidad, ni
+poda. Un dueño que acumule cuarenta fallos de hace meses —una cuenta que se desconectó y
+nadie reconectó— abre la pantalla de entrada y ve cuarenta filas, que es exactamente lo
+contrario de «solo lo que pide una acción hoy».
 
 Cerrarlo pide una decisión de producto antes que código: qué significa «ya no me importa»
 —una columna `descartado_en` en `scheduled_post_targets`, o un estado nuevo en el enum—, un
