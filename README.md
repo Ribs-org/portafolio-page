@@ -143,9 +143,21 @@ tuya ahora mismo, calculada en el servidor. El correo con el que entras no se ca
 ahí. Tu zona manda en el panel —El Fuego, el calendario, la cola, el editor de un corte y
 las ventanas de los links— y en lo que guardas desde ahí: si escribes «19:00», son las
 19:00 tuyas. También manda por dentro: Los Números y Los Cortes agrupan los días en tu
-zona, y la API (`/api/schedule/posts`, `/api/metrics/posts`, la app móvil y el lote) lee y
-devuelve sus horas en la del dueño. `SITE_TIMEZONE` solo queda como la zona con la que
-naces y la del sitio público.
+zona.
+
+Fuera del panel, «el dueño» no siempre eres tú, así que conviene el detalle:
+
+- La **API con llave** (`/api/schedule/posts`, `/api/metrics/posts`) habla en la zona del
+  dueño de la llave, que hoy es siempre el admin del despliegue: la llave es del sitio, no
+  de una persona. Lo que el editor-LLM escribe como «19:00» son las 19:00 del admin, y los
+  días de `desde`/`hasta` son sus días.
+- El **lote de publicación** hace las dos cosas en la zona del dueño del lote: lee la
+  `fecha` que le mandas como hora de pared suya y devuelve en la misma.
+- La **app móvil** solo lee horas en la zona del dueño. Lo que manda al programar es un
+  instante absoluto (ISO con offset), así que el selector del teléfono no depende de
+  `users.zona` — y ahí queda una costura anotada en `docs/deuda-tecnica.md`.
+
+`SITE_TIMEZONE` solo queda como la zona con la que naces y la del sitio público.
 
 **El Fuego es la entrada**, y muestra solo lo que pide una acción hoy: los próximos siete
 días con su carga, los cortes de hoy —hora, logos de sus redes, el texto en una línea y
@@ -729,7 +741,7 @@ Vercel y bajan con `vercel env pull .env.local`.
 | `R2_BUCKET` | Nombre del bucket de R2 | No — sin ella no puedes subir media |
 | `R2_PUBLIC_BASE` | URL pública del bucket de R2 | No — sin ella no puedes subir media |
 | `DOMINIO_PRODUCTO` | El dominio donde vive la landing del producto. Ese dominio sirve las páginas de todos; los demás, solo las de su dueño | No — sin ella ningún dominio es el del producto y todos sirven solo lo del dueño |
-| `SITE_TIMEZONE` | Zona por defecto de los usuarios nuevos y del sitio público; cada usuario cambia la suya en Tu Cuenta | No — por defecto `America/Santiago` |
+| `SITE_TIMEZONE` | Zona por defecto de los usuarios nuevos y del sitio público; cada usuario cambia la suya en Tu Cuenta. Si no es una zona IANA conocida, se avisa por consola y se usa `America/Santiago` | No — por defecto `America/Santiago` |
 | `YOUTUBE_API_KEY` | Métricas de YouTube | No — sin ella esa red aparece como no conectada |
 | `YOUTUBE_CHANNEL_ID` | Métricas de YouTube | No — sin ella esa red aparece como no conectada |
 | `GOOGLE_CLIENT_ID` | Conectar YouTube para publicar (OAuth de Google) | El OAuth Client tipo Web del mismo proyecto de la API key |

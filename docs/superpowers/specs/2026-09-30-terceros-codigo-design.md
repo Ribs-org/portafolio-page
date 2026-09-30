@@ -144,8 +144,10 @@ Nueva pantalla del grupo Ajustes: ruta **`/admin/cuenta`**, nombre **«Tu Cuenta
 subtítulo **«tu nombre y tu hora»**. Un formulario con el nombre (el que ya existe en
 `users.nombre`) y la zona: un `<select>` con `Intl.supportedValuesOf('timeZone')`, la
 actual seleccionada, y debajo «Ahora son las {hora} en esa zona» calculado en el servidor
-al guardar. Acción `guardarCuenta(formData)`: valida, actualiza `users` por `id`, revalida
-`/admin`. La fila entra en `src/lib/vocabulario.ts` (grupo `ajustes`, después de Los
+al guardar. Acción `guardarCuenta(prev, formData)`: valida, actualiza `users` por `id`,
+revalida `/admin`. La firma lleva el estado previo —y no solo el `FormData`— porque el
+formulario tiene que funcionar sin JavaScript, y `useActionState` es lo que devuelve la
+frase de error a la pantalla cuando el navegador hace el POST por su cuenta. La fila entra en `src/lib/vocabulario.ts` (grupo `ajustes`, después de Los
 Maestros; `vocabulario.test.ts` comprueba que la página existe) y en el engranaje.
 
 ### 3.4 Por dónde pasa la zona
@@ -157,14 +159,24 @@ Maestros; `vocabulario.test.ts` comprueba que la página existe) y en el engrana
   `profiles/[id]/page.tsx` (ventanas de los links), `analytics/page.tsx`: `usuario.zona`.
 - Acciones (`admin/actions.ts`): los cuatro `fromZonedInput(…, SITE_TIMEZONE)` pasan a la
   zona del usuario de la sesión.
-- API: `api/schedule/posts` (zona del dueño de la llave), `api/mobile/*`
+- API: `api/schedule/posts` y `api/metrics/posts` (zona del dueño de la llave, que hoy es
+  siempre el admin: la llave es del despliegue, no de una persona), `api/mobile/*`
   (`usuario.zona`), `social/publish/batch.ts` (la zona del dueño, leída con `buscarPorId`;
   su `ZONE` local desaparece).
-- `lib/analytics.ts`: `Filters` gana `zone` (obligatoria); `localDay`, `describe`,
-  `granularityFor`, `getTimeSeries`, `getHeatmap` la reciben en vez de leer la constante.
-  Quien arma `Filters` pasa la del dueño. `lib/posts.ts` y `posts-kpis.ts` igual.
+- `lib/analytics.ts`: `Filters` gana `zone` (obligatoria); `localDay`, `getTimeSeries` y
+  `getHeatmap` la reciben en vez de leer la constante. `describe` y `granularityFor` no:
+  la primera formatea una clave de bucket que ya viene en hora de pared, y la segunda solo
+  mide cuánto dura la ventana. Quien arma `Filters` pasa la del dueño. `lib/posts.ts` y
+  `posts-kpis.ts` igual.
+- `social/sync.ts`: el `day` de cada snapshot se escribe en la zona del dueño de la
+  cuenta, porque es la zona con la que `getPostRows` lo lee. Es el único sitio donde una
+  zona equivocada ensucia el historial en vez de mostrar mal una hora.
 - Lo que no cambia: los crons (trabajan con instantes), la cola de comentarios (ventanas
-  en horas), y la baliza de visitas (guarda instantes; el día se calcula al leer).
+  en horas), la baliza de visitas (guarda instantes; el día se calcula al leer) y el POST
+  de la app móvil (manda un ISO con offset, que no necesita zona ninguna).
+
+`SITE_TIMEZONE` gobierna de verdad a los usuarios nuevos: los cuatro `insert into users`
+pasan `ZONA_POR_DEFECTO`, y el default de la columna queda como red de seguridad.
 
 README: la tabla de variables (`SITE_TIMEZONE` pasa a «zona por defecto de los usuarios
 nuevos y del sitio público»), la sección del panel (Tu Cuenta), la tabla de URLs.

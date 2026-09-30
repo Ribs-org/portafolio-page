@@ -498,3 +498,27 @@ Cerrarlo cuesta una de dos: reescribir los `day` del dueño al cambiar de zona (
 migración de datos por usuario, dentro de `guardarCuenta`), o guardar el instante del
 snapshot y calcular el día al leer, que es un cambio de esquema y de todas las lecturas.
 
+
+## El teléfono programa en la zona del aparato y lee en la del dueño
+
+**Abierto desde 2026-09-30.**
+
+La entrega B le dio a cada usuario su zona horaria, y `api/mobile/*` la respeta al
+devolver: la app trocea la cadena que recibe (`cuando.slice(11, 16)`) en vez de volver a
+formatearla, así que lo que muestra ya viene en `users.zona`. Al revés no: el selector de
+fecha de `mobile/src/app/(tabs)/publicar.tsx` corre en la zona del teléfono y manda
+`fecha.toISOString()`, un instante absoluto. `POST /api/mobile/schedule` lo acepta tal
+cual, y hace bien —un ISO con offset no necesita zona ninguna—.
+
+El resultado es que, con el teléfono y Tu Cuenta en zonas distintas, uno elige «19:00» y la
+app se lo confirma a otra hora. Ninguna pantalla de la app dice en qué zona vive la cuenta,
+así que no hay dónde darse cuenta. Con el dueño y su teléfono en el mismo sitio —el caso de
+hoy— no se nota, y por eso quedó fuera del alcance de la entrega, que nombraba `api/mobile/*`
+y no la app.
+
+Cerrarlo es barato y son dos decisiones, no una: que `GET /api/mobile/overview` devuelva
+`zona` junto a los kpis, y después o bien el selector compone la hora en esa zona (lo
+correcto: «19:00» es 19:00 del dueño en los dos lados), o bien la app solo la muestra junto
+al selector («se publicará a las 19:00 de Europe/Madrid») y deja que el dueño traduzca. Lo
+segundo es una tarde; lo primero pide aritmética de zonas en el cliente, que es justo lo
+que `fromZonedInput` ya resuelve en el servidor.

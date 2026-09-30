@@ -194,10 +194,13 @@ Ordenado por lo que bloquea un trámite primero.
    Cuenta (`/admin/cuenta`), y la zona pasa por el panel entero (El Fuego, el calendario,
    la cola, el editor de un corte, las ventanas de los links), por las acciones que
    guardan horas —quien está en Madrid escribe «19:00» y salen las 19:00 de Madrid— y por
-   dentro: Los Números y Los Cortes agrupan en ella, y la API (`/api/schedule/posts`,
-   `/api/metrics/posts`, `api/mobile/*`) y el lote de publicación leen y devuelven sus
-   horas en la del dueño. `SITE_TIMEZONE` se queda como la zona con la que nace un usuario
-   y la del sitio público.
+   dentro: Los Números y Los Cortes agrupan en ella. La API con llave
+   (`/api/schedule/posts`, `/api/metrics/posts`) y el lote leen y devuelven en la zona del
+   dueño —la de la llave es la del admin, porque la llave es del despliegue—; `api/mobile/*`
+   solo devuelve en ella, porque la app manda instantes absolutos. `SITE_TIMEZONE` se queda
+   como la zona con la que nace un usuario (los cuatro `insert into users` la pasan) y la
+   del sitio público. Lo que la app móvil no hace es *componer* la hora en la zona del
+   dueño: eso quedó anotado en `docs/deuda-tecnica.md`.
 3. **Avisos honestos antes de conectar.** En Los Fierros, junto a cada botón: Instagram
    pide cuenta Business/Creator con página de Facebook; TikTok publica en privado hasta la
    auditoría (ya está); YouTube publica en privado hasta la auditoría de cuota. Y en el
