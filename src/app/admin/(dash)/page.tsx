@@ -87,6 +87,13 @@ async function Fuego({ ownerId }: { ownerId: string }) {
   const enLaParrilla = cortesDeHoy(deHoy, now, zone)
   const seQuemaron = quemados(conFallo)
 
+  // La columna de hoy cuenta el día de calendario entero, no lo que falta. `cargaPorDia`
+  // mira solo hacia adelante —es lo que el aviso del compositor necesita, porque en el
+  // pasado no se puede programar— y acá eso dejaba «HOY —», y hasta «la semana entera está
+  // apagada», justo encima de la lista de los cortes de hoy que ya salieron. La cuenta la
+  // pone esa misma lista, para que las dos tarjetas no puedan contradecirse.
+  const cargaDelTermometro = { ...carga, [hoy]: enLaParrilla.length }
+
   // El siguiente corte es una segunda lectura y no un filtro de la primera: la ventana de
   // hoy, por definición, no contiene ninguno de mañana. Solo se pide cuando hace falta —
   // si hoy hay algo puesto, esta frase no se dibuja.
@@ -105,7 +112,7 @@ async function Fuego({ ownerId }: { ownerId: string }) {
 
   return (
     <div className="space-y-4">
-      <Termometro carga={carga} zone={zone} />
+      <Termometro carga={cargaDelTermometro} zone={zone} />
 
       <section className="chapa rounded-xl p-4">
         <h2 className="mb-3 font-titulo text-sm font-semibold uppercase tracking-[0.03em]">
@@ -126,8 +133,14 @@ async function Fuego({ ownerId }: { ownerId: string }) {
                 >
                   <span className="font-mono text-[0.8rem]">{hourLabel(post.scheduledAt, zone)}</span>
                   <Redes targets={targets} />
-                  {/* Una línea y no dos como en el calendario: acá la fila es la unidad. */}
-                  <span className="line-clamp-1 min-w-0 flex-1 text-[0.85rem] text-fg">
+                  {/*
+                    Una línea y no dos como en el calendario: acá la fila es la unidad.
+                    `basis-full` a ancho de teléfono lo baja a su propia línea: es el único
+                    de los cuatro trozos que puede encogerse, así que compartiendo línea no
+                    se envolvía, se estrechaba — medido, 131 px a 360 px con dos destinos,
+                    unos quince caracteres de lo único que distingue un corte de otro.
+                  */}
+                  <span className="line-clamp-1 min-w-0 basis-full text-[0.85rem] text-fg sm:flex-1 sm:basis-auto">
                     {post.caption || '(sin texto)'}
                   </span>
                   <span className="font-titulo text-[0.62rem] uppercase tracking-[0.12em]">
@@ -156,14 +169,17 @@ async function Fuego({ ownerId }: { ownerId: string }) {
                   {horaConDia(corte.post.scheduledAt, now, zone)}
                 </span>
                 <Redes targets={[destino]} />
+                {/* Mismo reparto que arriba, y acá aprieta más: la hora lleva día y mes. */}
                 <Link
                   href={`/admin/schedule/${corte.post.id}`}
-                  className="line-clamp-1 min-w-0 flex-1 text-[0.85rem] text-fg hover:underline"
+                  className="line-clamp-1 min-w-0 basis-full text-[0.85rem] text-fg hover:underline sm:flex-1 sm:basis-auto"
                 >
                   {corte.post.caption || '(sin texto)'}
                 </Link>
-                {/* El motivo tal como llegó de la red: `w-full` lo baja a su propia línea,
-                    que a 360 px es la única forma de que se lea entero. */}
+                {/* El motivo del fallo, una de nuestras frases fijas —`lastError` nunca
+                    trae texto de la red; ver el comentario de `scheduledPostTargets` en
+                    `db/schema.ts`—. `w-full` lo baja a su propia línea, que a 360 px es la
+                    única forma de que se lea entero. */}
                 {destino.lastError ? (
                   <span className="w-full text-[0.78rem] text-negative">{destino.lastError}</span>
                 ) : null}

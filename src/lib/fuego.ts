@@ -1,4 +1,4 @@
-import { addDays, dayKey, dayLabelConMes, dayLabelDe, hourLabel } from '@/lib/schedule-week'
+import { addDays, dayKey, dayLabelConMes, hourLabel } from '@/lib/schedule-week'
 import { formatNumber } from '@/lib/utils'
 
 // Lo que El Fuego decide, sin tocar la base: qué es «hoy», cuál es el siguiente corte, qué
@@ -71,16 +71,19 @@ export function avisoDelSiguiente(scheduledAt: Date, now: Date, zone: string): s
 }
 
 /**
- * La hora de un corte, con su día delante si no es de hoy: «vie 25 · 09:15».
+ * La hora de un corte, con su día y su mes delante si no es de hoy: «vie 25 de sep · 09:15».
  *
- * Lo pide «Se quemó», que no tiene ventana de fecha: sin el día, un fallo de la semana
- * pasada se lee «09:15», idéntico a uno de esta mañana. Lo de hoy lleva la hora sola
- * porque el día ya lo dice la pantalla entera.
+ * Lo pide «Se quemó», que no tiene ventana de fecha ninguna: sin el día, un fallo de la
+ * semana pasada se lee «09:15», idéntico a uno de esta mañana. Y el mes va **siempre** que
+ * no sea de hoy, sin regla de «si cae fuera de esta semana»: es la única lista de la
+ * pantalla que puede traer algo de hace dos meses, así que «mié 12» a secas sería otra vez
+ * el problema que el mes vino a resolver — con la agravante de que acá no hay ventana que
+ * acote cuánto puede alejarse.
  */
 export function horaConDia(scheduledAt: Date, now: Date, zone: string): string {
   const dia = dayKey(scheduledAt, zone)
   const hora = hourLabel(scheduledAt, zone)
-  return dia === dayKey(now, zone) ? hora : `${dayLabelDe(dia)} · ${hora}`
+  return dia === dayKey(now, zone) ? hora : `${dayLabelConMes(dia)} · ${hora}`
 }
 
 /**

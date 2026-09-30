@@ -85,20 +85,15 @@ function dowDe(key: string): string {
 }
 
 /**
- * El rótulo de un día suelto, «mar 30», sin saber su posición en ninguna semana. Lo
- * necesita El Fuego para nombrar el siguiente corte, que cae en cualquier día.
- */
-export function dayLabelDe(key: string): string {
-  return `${dowDe(key)} ${Number(key.slice(8))}`
-}
-
-/**
- * El mismo rótulo con su mes: «vie 2 de oct». Hace falta cuando el día suelto puede caer
- * lejos —El Fuego mira treinta días hacia adelante— y «mar 3» solo no dice de qué mes es.
- * El mes va abreviado y en minúscula, como en `weekLabel`.
+ * El rótulo de un día suelto, «vie 2 de oct», sin saber su posición en ninguna semana.
+ *
+ * Lo necesita El Fuego, que nombra días que caen en cualquier parte: el siguiente corte
+ * —hasta treinta días adelante— y los quemados, que no tienen ventana ninguna. El mes no
+ * es opcional por eso mismo: «mar 3» a secas no dice de qué mes es. Va abreviado y en
+ * minúscula, como en `weekLabel` («7 – 13 sep»).
  */
 export function dayLabelConMes(key: string): string {
-  return `${dayLabelDe(key)} de ${MONTHS[Number(key.slice(5, 7)) - 1]}`
+  return `${dowDe(key)} ${Number(key.slice(8))} de ${MONTHS[Number(key.slice(5, 7)) - 1]}`
 }
 
 /**

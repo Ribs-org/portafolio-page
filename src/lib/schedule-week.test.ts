@@ -4,7 +4,6 @@ import {
   dayKey,
   dayLabel,
   dayLabelConMes,
-  dayLabelDe,
   groupByDay,
   hourLabel,
   mondayOf,
@@ -86,17 +85,12 @@ describe('weekLabel y dayLabel', () => {
     expect(dayLabel('2026-09-13', 6)).toBe('dom 13')
   })
 
-  it('un día suelto se rotula igual sin saber su posición en la semana', () => {
-    // El Fuego nombra el siguiente corte, que cae en cualquier día: no hay arreglo del
-    // que sacar el índice, y el rótulo tiene que decir lo mismo que la columna.
-    expect(dayLabelDe('2026-09-07')).toBe('lun 7')
-    expect(dayLabelDe('2026-09-13')).toBe('dom 13')
-    expect(dayLabelDe('2026-10-01')).toBe('jue 1')
-  })
-
-  it('con mes, para cuando el día suelto puede caer a cinco semanas', () => {
-    // El mes abreviado y en minúscula, el mismo que ya usa `weekLabel`: «7 – 13 sep».
+  it('un día suelto se rotula sin saber su posición en la semana, y con su mes', () => {
+    // El Fuego nombra días que caen en cualquier parte —el siguiente corte, un fallo de
+    // hace meses—: no hay arreglo del que sacar el índice, y el día de la semana sale de
+    // la clave. El mes va abreviado y en minúscula, el mismo que ya usa `weekLabel`.
     expect(dayLabelConMes('2026-09-07')).toBe('lun 7 de sep')
+    expect(dayLabelConMes('2026-09-13')).toBe('dom 13 de sep')
     expect(dayLabelConMes('2026-10-01')).toBe('jue 1 de oct')
     expect(dayLabelConMes('2027-01-04')).toBe('lun 4 de ene')
   })

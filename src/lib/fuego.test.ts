@@ -69,11 +69,16 @@ describe('avisoDelSiguiente', () => {
 })
 
 describe('horaConDia', () => {
-  it('lo de hoy lleva solo la hora; lo de otro día, su día delante', () => {
+  it('lo de hoy lleva solo la hora; lo de otro día, su día y su mes delante', () => {
     // «Se quemó» no tiene ventana de fecha: sin el día, un fallo de la semana pasada se
     // lee igual que uno de esta mañana en la pantalla que dice qué pide una acción hoy.
     expect(horaConDia(new Date('2026-09-29T22:00:00Z'), AHORA, ZONE)).toBe('19:00')
-    expect(horaConDia(new Date('2026-09-25T12:15:00Z'), AHORA, ZONE)).toBe('vie 25 · 09:15')
+    expect(horaConDia(new Date('2026-09-25T12:15:00Z'), AHORA, ZONE)).toBe('vie 25 de sep · 09:15')
+  })
+
+  it('el mes va siempre, porque un fallo puede ser de hace dos meses', () => {
+    // Justamente la lista sin ventana: «mié 12» no dice si es de agosto o de este mes.
+    expect(horaConDia(new Date('2026-08-12T22:30:00Z'), AHORA, ZONE)).toBe('mié 12 de ago · 18:30')
   })
 })
 
