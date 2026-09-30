@@ -3,6 +3,7 @@ import {
   addDays,
   dayKey,
   dayLabel,
+  dayLabelConMes,
   dayLabelDe,
   groupByDay,
   hourLabel,
@@ -91,6 +92,13 @@ describe('weekLabel y dayLabel', () => {
     expect(dayLabelDe('2026-09-07')).toBe('lun 7')
     expect(dayLabelDe('2026-09-13')).toBe('dom 13')
     expect(dayLabelDe('2026-10-01')).toBe('jue 1')
+  })
+
+  it('con mes, para cuando el día suelto puede caer a cinco semanas', () => {
+    // El mes abreviado y en minúscula, el mismo que ya usa `weekLabel`: «7 – 13 sep».
+    expect(dayLabelConMes('2026-09-07')).toBe('lun 7 de sep')
+    expect(dayLabelConMes('2026-10-01')).toBe('jue 1 de oct')
+    expect(dayLabelConMes('2027-01-04')).toBe('lun 4 de ene')
   })
 })
 

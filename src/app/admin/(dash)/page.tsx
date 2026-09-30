@@ -1,11 +1,12 @@
 import Link from 'next/link'
+import { ENLACE_BOTON } from '@/components/boton'
 import { Encabezado } from '@/components/ui'
 import { SITE_TIMEZONE } from '@/lib/analytics'
 import { requireUser } from '@/lib/auth'
-import { cortesDeHoy, pieDeAyer, quemados, siguienteCorte } from '@/lib/fuego'
+import { avisoDelSiguiente, cortesDeHoy, horaConDia, pieDeAyer, quemados, siguienteCorte } from '@/lib/fuego'
 import { NOMBRE_COCCION, coccionDe } from '@/lib/parrilla'
 import { cargaPorDia, getCuentas } from '@/lib/posts'
-import { addDays, dayKey, dayLabelDe, hourLabel } from '@/lib/schedule-week'
+import { addDays, dayKey, hourLabel } from '@/lib/schedule-week'
 import { cortesEntre, quemadosDe, servidosAyer } from '@/lib/social/publish/cortes'
 import { fromZonedInput } from '@/lib/utils'
 import { nombreDe } from '@/lib/vocabulario'
@@ -28,10 +29,6 @@ export const dynamic = 'force-dynamic'
 
 /** Hasta dónde se mira hacia adelante para nombrar el siguiente corte cuando hoy no hay. */
 const DIAS_ADELANTE = 30
-
-/** El estilo del botón primario, en un enlace: `Button` es un `<button>` y esto navega. */
-const BOTON_PRIMARIO =
-  'inline-flex items-center justify-center rounded-lg bg-brasa px-3.5 py-2 text-sm font-medium text-acero-950 transition-[filter] hover:brightness-110'
 
 export default async function FuegoPage() {
   const { id: ownerId } = await requireUser()
@@ -59,7 +56,7 @@ function PrimerDia() {
         Conecta tu primera red
       </h2>
       <p className="mt-2 text-sm text-fg-muted">Sin una red conectada no hay nada que poner al fuego.</p>
-      <Link href="/admin/accounts" className={`mt-5 ${BOTON_PRIMARIO}`}>
+      <Link href="/admin/accounts" className={`mt-5 ${ENLACE_BOTON}`}>
         Ir a {nombreDe('/admin/accounts')} →
       </Link>
     </section>
@@ -77,9 +74,11 @@ async function Fuego({ ownerId }: { ownerId: string }) {
   const inicioDeHoy = fromZonedInput(`${hoy}T00:00`, zone)!
   const inicioDeManana = fromZonedInput(`${manana}T00:00`, zone)!
 
+  // `media: false` en las dos: esta pantalla no dibuja miniaturas (spec §3.2), y la media
+  // es una segunda consulta por lectura.
   const [deHoy, conFallo, ayer, carga] = await Promise.all([
-    cortesEntre(ownerId, inicioDeHoy, inicioDeManana),
-    quemadosDe(ownerId),
+    cortesEntre(ownerId, inicioDeHoy, inicioDeManana, { media: false }),
+    quemadosDe(ownerId, { media: false }),
     servidosAyer(ownerId, now, zone),
     // Sin ventana de fechas: el termómetro mira lo que viene.
     cargaPorDia(ownerId, zone, now),
@@ -99,6 +98,7 @@ async function Fuego({ ownerId }: { ownerId: string }) {
             ownerId,
             inicioDeManana,
             fromZonedInput(`${addDays(manana, DIAS_ADELANTE)}T00:00`, zone)!,
+            { media: false },
           ),
           now,
         )
@@ -114,13 +114,7 @@ async function Fuego({ ownerId }: { ownerId: string }) {
         {enLaParrilla.length === 0 ? (
           <p className="text-[0.85rem] text-fg-muted">
             La parrilla está fría hoy.
-            {siguiente ? (
-              <>
-                {' '}
-                El siguiente sale el {dayLabelDe(dayKey(siguiente.post.scheduledAt, zone))} a las{' '}
-                {hourLabel(siguiente.post.scheduledAt, zone)}.
-              </>
-            ) : null}
+            {siguiente ? <> {avisoDelSiguiente(siguiente.post.scheduledAt, now, zone)}</> : null}
           </p>
         ) : (
           <ul className="divide-y divide-white/[0.06]">
@@ -156,8 +150,10 @@ async function Fuego({ ownerId }: { ownerId: string }) {
           <ul className="divide-y divide-white/[0.06]">
             {seQuemaron.map(({ corte, destino }) => (
               <li key={destino.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 py-2">
+                {/* Con el día delante si no es de hoy: esta lista no tiene ventana de
+                    fecha y un fallo viejo se leería igual que uno de esta mañana. */}
                 <span className="font-mono text-[0.8rem] text-fg-muted">
-                  {hourLabel(corte.post.scheduledAt, zone)}
+                  {horaConDia(corte.post.scheduledAt, now, zone)}
                 </span>
                 <Redes targets={[destino]} />
                 <Link
@@ -179,7 +175,7 @@ async function Fuego({ ownerId }: { ownerId: string }) {
       ) : null}
 
       <div>
-        <Link href="/admin/schedule?componer=1" className={BOTON_PRIMARIO}>
+        <Link href="/admin/schedule?componer=1" className={ENLACE_BOTON}>
           Poner al fuego
         </Link>
       </div>

@@ -93,6 +93,15 @@ export function dayLabelDe(key: string): string {
 }
 
 /**
+ * El mismo rótulo con su mes: «vie 2 de oct». Hace falta cuando el día suelto puede caer
+ * lejos —El Fuego mira treinta días hacia adelante— y «mar 3» solo no dice de qué mes es.
+ * El mes va abreviado y en minúscula, como en `weekLabel`.
+ */
+export function dayLabelConMes(key: string): string {
+  return `${dayLabelDe(key)} de ${MONTHS[Number(key.slice(5, 7)) - 1]}`
+}
+
+/**
  * Los próximos `cuantos` días a partir de hoy, con su rótulo.
  *
  * El calendario reparte lunes a domingo; el termómetro de El Fuego mira hacia adelante

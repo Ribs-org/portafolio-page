@@ -1,4 +1,4 @@
-import { dayKey } from '@/lib/schedule-week'
+import { addDays, dayKey, dayLabelConMes, dayLabelDe, hourLabel } from '@/lib/schedule-week'
 import { formatNumber } from '@/lib/utils'
 
 // Lo que El Fuego decide, sin tocar la base: qué es «hoy», cuál es el siguiente corte, qué
@@ -41,11 +41,46 @@ export function siguienteCorte<T extends Corte>(cortes: T[], now: Date): T | nul
   return futuros[0] ?? null
 }
 
-/** Cada destino que se quemó, con su corte: es lo único de El Fuego que pide una acción. */
+/**
+ * Cada destino que se quemó, con su corte: es lo único de El Fuego que pide una acción.
+ *
+ * Del más reciente al más viejo, y el orden es la información: esta lectura no tiene
+ * ventana de fecha —un fallo viejo sigue pidiendo la acción hasta que alguien lo
+ * reprograma—, así que sin ordenarla lo de la semana pasada quedaría arriba de lo de hoy
+ * en la pantalla que promete decir qué pide una acción **hoy**. Se ordena acá y no en la
+ * página para no depender del orden en que la base los entregue.
+ */
 export function quemados<T extends Corte>(cortes: T[]): Array<{ corte: T; destino: T['targets'][number] }> {
-  return cortes.flatMap((corte) =>
-    corte.targets.filter((t) => t.status === 'failed').map((destino) => ({ corte, destino })),
-  )
+  return cortes
+    .flatMap((corte) => corte.targets.filter((t) => t.status === 'failed').map((destino) => ({ corte, destino })))
+    .sort((a, b) => b.corte.post.scheduledAt.getTime() - a.corte.post.scheduledAt.getTime())
+}
+
+/**
+ * Cuándo sale el siguiente corte, en una frase.
+ *
+ * Mañana se dice «mañana»: es el caso más común y «mar 30» obliga a mirar un calendario
+ * para entenderlo. Más allá va el día con su mes, porque la ventana que alimenta esta
+ * frase es de treinta días y «mar 3» a secas puede ser dentro de cuatro días o dentro de
+ * cinco semanas.
+ */
+export function avisoDelSiguiente(scheduledAt: Date, now: Date, zone: string): string {
+  const dia = dayKey(scheduledAt, zone)
+  const cuando = dia === addDays(dayKey(now, zone), 1) ? 'mañana' : `el ${dayLabelConMes(dia)}`
+  return `El siguiente sale ${cuando} a las ${hourLabel(scheduledAt, zone)}.`
+}
+
+/**
+ * La hora de un corte, con su día delante si no es de hoy: «vie 25 · 09:15».
+ *
+ * Lo pide «Se quemó», que no tiene ventana de fecha: sin el día, un fallo de la semana
+ * pasada se lee «09:15», idéntico a uno de esta mañana. Lo de hoy lleva la hora sola
+ * porque el día ya lo dice la pantalla entera.
+ */
+export function horaConDia(scheduledAt: Date, now: Date, zone: string): string {
+  const dia = dayKey(scheduledAt, zone)
+  const hora = hourLabel(scheduledAt, zone)
+  return dia === dayKey(now, zone) ? hora : `${dayLabelDe(dia)} · ${hora}`
 }
 
 /**

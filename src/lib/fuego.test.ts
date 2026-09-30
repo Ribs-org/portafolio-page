@@ -1,6 +1,15 @@
 import { describe, expect, it } from 'vitest'
 import { formatNumber } from './utils'
-import { cortesDeHoy, miradasDe, pieDeAyer, quemados, siguienteCorte, type Corte } from './fuego'
+import {
+  avisoDelSiguiente,
+  cortesDeHoy,
+  horaConDia,
+  miradasDe,
+  pieDeAyer,
+  quemados,
+  siguienteCorte,
+  type Corte,
+} from './fuego'
 
 const ZONE = 'America/Santiago'
 // 29 de septiembre de 2026, 15:00 en Chile (UTC-3 en horario de verano).
@@ -39,6 +48,35 @@ describe('siguienteCorte', () => {
   })
 })
 
+describe('avisoDelSiguiente', () => {
+  it('mañana se dice «mañana»; más allá, el día con su mes', () => {
+    // «mar 30» obliga a mirar un calendario para entender que es mañana, y la ventana de
+    // El Fuego llega a treinta días: sin el mes, «mar 3» no dice de cuál.
+    expect(avisoDelSiguiente(new Date('2026-09-30T13:00:00Z'), AHORA, ZONE)).toBe(
+      'El siguiente sale mañana a las 10:00.',
+    )
+    expect(avisoDelSiguiente(new Date('2026-10-23T12:15:00Z'), AHORA, ZONE)).toBe(
+      'El siguiente sale el vie 23 de oct a las 09:15.',
+    )
+  })
+
+  it('el día es el de la zona del sitio, no el del servidor', () => {
+    // 02:30 UTC del 1 de octubre son las 23:30 del 30 de septiembre en Chile: mañana.
+    expect(avisoDelSiguiente(new Date('2026-10-01T02:30:00Z'), AHORA, ZONE)).toBe(
+      'El siguiente sale mañana a las 23:30.',
+    )
+  })
+})
+
+describe('horaConDia', () => {
+  it('lo de hoy lleva solo la hora; lo de otro día, su día delante', () => {
+    // «Se quemó» no tiene ventana de fecha: sin el día, un fallo de la semana pasada se
+    // lee igual que uno de esta mañana en la pantalla que dice qué pide una acción hoy.
+    expect(horaConDia(new Date('2026-09-29T22:00:00Z'), AHORA, ZONE)).toBe('19:00')
+    expect(horaConDia(new Date('2026-09-25T12:15:00Z'), AHORA, ZONE)).toBe('vie 25 · 09:15')
+  })
+})
+
 describe('quemados', () => {
   it('cada destino fallido con su corte, y nada más', () => {
     const conFallo = corte('f', '2026-09-28T12:00:00Z', [destino('published'), destino('failed', 'Instagram rechazó la publicación.')])
@@ -47,6 +85,14 @@ describe('quemados', () => {
     expect(q).toHaveLength(1)
     expect(q[0]!.corte.post.id).toBe('f')
     expect(q[0]!.destino.status).toBe('failed')
+  })
+
+  it('el más reciente arriba: lo de hoy pide la acción antes que lo de la semana pasada', () => {
+    const viejo = corte('v', '2026-09-22T12:00:00Z', [destino('failed', 'Falló.')])
+    const hoy = corte('h', '2026-09-29T12:00:00Z', [destino('failed', 'Falló.')])
+    const medio = corte('m', '2026-09-25T12:00:00Z', [destino('failed', 'Falló.')])
+    // Entran en el orden en que los da la base, que es ascendente por hora.
+    expect(quemados([viejo, medio, hoy]).map((q) => q.corte.post.id)).toEqual(['h', 'm', 'v'])
   })
 })
 
