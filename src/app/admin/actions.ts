@@ -1325,12 +1325,17 @@ export async function cerrarSesionesUsuario(id: string): Promise<{ error?: strin
  * Escribe su propia fila de `users`, así que el filtro por dueño acá es `users.id` y no un
  * `owner_id`: el id sale de la sesión (`requireUser`), nunca del formulario. La zona se
  * valida contra `Intl` antes de escribir, porque un `<select>` se edita en el navegador.
+ *
+ * `(prev, formData)` es la firma que pide `useActionState`, y por eso la llevan todas las
+ * acciones de formulario del panel: pasada así, directa y sin envolver en una función del
+ * cliente, React puede plantar los campos ocultos que hacen que el formulario siga
+ * guardando sin JavaScript.
  */
-export async function guardarCuenta(formData: FormData): Promise<{ ok: true } | { ok: false; error: string }> {
+export async function guardarCuenta(_prev: FormState, formData: FormData): Promise<FormState> {
   const usuario = await requireUser()
   const nombre = String(formData.get('nombre') ?? '').trim() || null
   const zona = String(formData.get('zona') ?? '')
-  if (!esZonaValida(zona)) return { ok: false, error: ZONA_INVALIDA }
+  if (!esZonaValida(zona)) return { error: ZONA_INVALIDA }
 
   await getDb().update(users).set({ nombre, zona }).where(eq(users.id, usuario.id))
 

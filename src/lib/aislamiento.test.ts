@@ -437,7 +437,7 @@ describe('aislamiento por dueño, escrituras (SQL generado, sin base)', () => {
     const formData = new FormData()
     formData.set('nombre', 'Ana')
     formData.set('zona', 'Europe/Madrid')
-    const consultas = await consultasEncadenadas(() => guardarCuenta(formData))
+    const consultas = await consultasEncadenadas(() => guardarCuenta({}, formData))
     expect(consultas).toHaveLength(1)
 
     const { sql, params } = consultas[0]!

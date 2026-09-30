@@ -16,14 +16,10 @@ export function FormularioCuenta({
   /** «HH:MM» en `zona`, calculada en el servidor al pintar la página. */
   ahora: string
 }) {
-  // `guardarCuenta` recibe solo el `FormData` —así la puede llamar cualquiera, no solo este
-  // formulario— y `useActionState` pide `(anterior, formData)`. El envoltorio corre en el
-  // cliente y no hace nada más que traducir la respuesta: quien valida y escribe sigue
-  // siendo el server action.
-  const [state, action] = useActionState<FormState, FormData>(async (_prev, formData) => {
-    const resultado = await guardarCuenta(formData)
-    return resultado.ok ? { ok: true } : { error: resultado.error }
-  }, {})
+  // La acción va directa, sin envolverla en una función de este archivo: envuelta, React
+  // ya no la reconoce como server action y deja de plantar los campos ocultos que hacen
+  // que el formulario se envíe sin JavaScript. Mismo molde que «Invitar» en Los Maestros.
+  const [state, action] = useActionState<FormState, FormData>(guardarCuenta, {})
 
   return (
     <form action={action} className="max-w-md space-y-4">

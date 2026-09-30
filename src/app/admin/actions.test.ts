@@ -655,7 +655,7 @@ describe('guardarCuenta: el nombre y la zona horaria de quien está en la sesió
     // opciones que se ofrecieron.
     formData.set('zona', 'Marte/Olympus')
 
-    expect(await guardarCuenta(formData)).toEqual({ ok: false, error: ZONA_INVALIDA })
+    expect(await guardarCuenta({}, formData)).toEqual({ error: ZONA_INVALIDA })
     expect(db.updateCalls).toHaveLength(0)
     expect(revalidados).toEqual([])
   })
@@ -665,7 +665,7 @@ describe('guardarCuenta: el nombre y la zona horaria de quien está en la sesió
     formData.set('nombre', '  Ana Pérez  ')
     formData.set('zona', 'Europe/Madrid')
 
-    expect(await guardarCuenta(formData)).toEqual({ ok: true })
+    expect(await guardarCuenta({}, formData)).toEqual({ ok: true })
     expect(db.updateCalls).toEqual([{ nombre: 'Ana Pérez', zona: 'Europe/Madrid' }])
     // La hora de abajo se calcula en el servidor: sin este revalidado seguiría siendo la
     // de la zona vieja.
@@ -677,7 +677,7 @@ describe('guardarCuenta: el nombre y la zona horaria de quien está en la sesió
     formData.set('nombre', '   ')
     formData.set('zona', 'America/Santiago')
 
-    expect(await guardarCuenta(formData)).toEqual({ ok: true })
+    expect(await guardarCuenta({}, formData)).toEqual({ ok: true })
     expect(db.updateCalls).toEqual([{ nombre: null, zona: 'America/Santiago' }])
   })
 })
