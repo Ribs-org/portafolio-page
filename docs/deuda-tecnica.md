@@ -410,8 +410,10 @@ sigue pidiendo la acción hasta que alguien lo reprograma, y esconderlo a los si
 sería perderlo en silencio. Desde esta ronda la lista va del más reciente al más viejo y
 cada fila que no es de hoy lleva su día delante, así que al menos se sabe qué es qué.
 
-Lo que no tiene es salida. Un destino quemado sale de la lista de una sola manera:
-reprogramándolo. No hay «descartar», ni caducidad, ni poda. Un dueño que acumule cuarenta
+Lo que no tiene es salida propia. Un destino quemado sale de la lista de dos maneras:
+reprogramándolo, o borrando el corte entero desde la cola (`borrarPostProgramado`, que lo
+permite mientras ningún destino haya alcanzado a publicarse). No hay «descartar», ni
+caducidad, ni poda. Un dueño que acumule cuarenta
 fallos de hace meses —una cuenta que se desconectó y nadie reconectó— abre la pantalla de
 entrada y ve cuarenta filas, que es exactamente lo contrario de «solo lo que pide una acción
 hoy».
