@@ -15,6 +15,7 @@ import {
   VENTANA_MS,
   VIGENCIA_MS,
   codigoCoincide,
+  codigoDeRevision,
   generarCodigo,
   hashCodigo,
   normalizarCorreo,
@@ -224,7 +225,11 @@ export async function pedir(correo: string): Promise<boolean> {
     .update(codigosIngreso)
     .set({ usadoEn: now })
     .where(and(eq(codigosIngreso.userId, usuario.id), isNull(codigosIngreso.usadoEn)))
-  const codigo = generarCodigo()
+  // El revisor de Meta: mientras estén puestas las dos variables, ese correo recibe un
+  // código fijo y no se le manda nada (no puede leer nuestro correo). Cualquier otro
+  // correo sigue el camino de siempre.
+  const fijo = codigoDeRevision(correo)
+  const codigo = fijo ?? generarCodigo()
   const [nueva] = await db
     .insert(codigosIngreso)
     .values({
@@ -238,6 +243,7 @@ export async function pedir(correo: string): Promise<boolean> {
   if (process.env.NODE_ENV !== 'production') {
     console.log(`[ingreso] código para ${usuario.correo}: ${codigo}`)
   }
+  if (fijo !== null) return true
   const enviado = await enviarCorreo({
     to: usuario.correo,
     subject: `${codigo} es tu código para entrar a Parrilla`,

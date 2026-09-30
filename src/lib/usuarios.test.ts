@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 // `usuarios.ts` importa `server-only`, que solo entiende el bundler de Next: se sustituye
 // por un módulo vacío para poder importarlo bajo Vitest (mismo motivo que en
@@ -23,6 +23,16 @@ const db = vi.hoisted(() => ({
   // llegar crudo a quien llama.
   transaccionBorrados: [] as unknown[],
   transaccionError: null as unknown,
+  // Para `pedir()` (vía `asegurarAdmin()` y `pedidosRecientes()`): el admin ya tiene su
+  // página por defecto, así que `asegurarAdmin()` no cae en `crearPaginaDe` —esa rama no es
+  // lo que este archivo prueba— y no hay pedidos recientes salvo que un test los cargue.
+  tienePagina: [{ id: 'profile-admin' }] as unknown[],
+  adminRow: [{ id: 'admin-id' }] as unknown[],
+  pedidosRecientes: [] as unknown[],
+  insertCodigo: [{ id: 'codigo-nuevo' }] as unknown[],
+  actualizados: [] as unknown[],
+  // Lo que `pedir()` de verdad escribió al insertar el código: acá se comprueba el hash.
+  valoresCodigo: [] as { hash: string }[],
 }))
 
 vi.mock('@/db', async (importOriginal) => {
@@ -30,16 +40,35 @@ vi.mock('@/db', async (importOriginal) => {
   return {
     ...real,
     getDb: () => ({
-      select: () => ({ from: () => ({ where: () => ({ limit: async () => db.buscar }) }) }),
+      select: () => ({
+        from: (tabla: unknown) => ({
+          where: () => ({
+            // `buscarPorCorreo` (users) y el chequeo de página de `asegurarAdmin`
+            // (profiles) llegan hasta acá sin pasar por `orderBy`.
+            limit: async () => (tabla === real.profiles ? db.tienePagina : db.buscar),
+            // Solo `pedidosRecientes` (codigosIngreso) ordena antes de limitar.
+            orderBy: () => ({ limit: async () => db.pedidosRecientes }),
+          }),
+        }),
+      }),
       insert: (tabla: unknown) => ({
-        values: (v: { slug?: string }) => {
+        values: (v: { slug?: string; hash?: string }) => {
           if (tabla === real.profiles) {
             db.slugsIntentados.push(v.slug!)
             return db.insertProfile(v.slug!)
           }
-          return { returning: async () => db.insertUser }
+          if (tabla === real.codigosIngreso) {
+            db.valoresCodigo.push(v as { hash: string })
+            return { returning: async () => db.insertCodigo }
+          }
+          return {
+            returning: async () => db.insertUser,
+            // El upsert del admin dentro de `asegurarAdmin()`.
+            onConflictDoUpdate: () => ({ returning: async () => db.adminRow }),
+          }
         },
       }),
+      update: (tabla: unknown) => ({ set: () => ({ where: async () => void db.actualizados.push(tabla) }) }),
       delete: (tabla: unknown) => ({ where: async () => void db.borrados.push(tabla) }),
       // No intenta parecerse a una transacción real (no hay rollback): solo corre el
       // callback con un `tx` que anota, en orden, qué tabla borró cada `delete`, y que
@@ -59,6 +88,16 @@ vi.mock('@/db', async (importOriginal) => {
   }
 })
 
+// Doble de `enviarCorreo`: anota cada mensaje que `pedir()` intentó mandar y responde según
+// lo que el test dejó cargado, sin llamar a Resend de verdad.
+const correo = vi.hoisted(() => ({ enviado: true, mandados: [] as { to: string; subject: string; text: string }[] }))
+vi.mock('./correo', () => ({
+  enviarCorreo: async (mensaje: { to: string; subject: string; text: string }) => {
+    correo.mandados.push(mensaje)
+    return correo.enviado
+  },
+}))
+
 // Solo para que el test de más abajo pueda comprobar que el `delete` fue acotado por el id
 // del usuario recién creado, sin tener que decodificar el SQL que arma Drizzle.
 vi.mock('drizzle-orm', async (importOriginal) => {
@@ -71,10 +110,10 @@ vi.mock('drizzle-orm', async (importOriginal) => {
 // de cada `it` sí importa —cada uno paga otra vez la transformación de `usuarios.ts` y de
 // lo que arrastra (drizzle-orm, postgres, …), y en esta máquina eso solo alcanza a tiempo
 // la primera vez que corre.
-const { esChoqueDeUnicidad, invitar, quitar } = await import('./usuarios')
+const { claveCodigos, esChoqueDeUnicidad, invitar, pedir, quitar } = await import('./usuarios')
 const { users, profiles } = await import('@/db')
 const { eq } = await import('drizzle-orm')
-const { USUARIO_CON_INGRESOS } = await import('./ingreso')
+const { USUARIO_CON_INGRESOS, codigoCoincide } = await import('./ingreso')
 
 // La forma real de un error de unicidad del driver de este proyecto (`postgres`, no
 // `node-postgres`): mapea el campo a `constraint_name`, no a `constraint` — ver
@@ -216,5 +255,53 @@ describe('quitar', () => {
     const resultado = await quitar('no-existe')
     expect(resultado).toEqual({ ok: true })
     expect(db.transaccionBorrados).toEqual([])
+  })
+})
+
+describe('pedir', () => {
+  const usuarioRevision = { id: 'id-revision', correo: 'revision@tu-parrilla.cl', nombre: null, rol: 'usuario' as const }
+
+  beforeEach(() => {
+    vi.stubEnv('ADMIN_EMAIL', 'admin@example.com')
+    vi.stubEnv('AUTH_SECRET', 'una-clave-larga-de-prueba')
+    db.buscar = [usuarioRevision]
+    db.tienePagina = [{ id: 'profile-admin' }]
+    db.pedidosRecientes = []
+    db.valoresCodigo = []
+    db.actualizados = []
+    db.borrados = []
+    correo.enviado = true
+    correo.mandados = []
+  })
+
+  afterEach(() => vi.unstubAllEnvs())
+
+  // La puerta del revisor de Meta (§4b de la spec): con las dos variables puestas y ese
+  // correo exacto, `pedir()` guarda el código fijo en vez de uno al azar y no manda nada —
+  // el revisor no puede leer nuestro correo, así que no hay nada que mandarle.
+  it('con las dos variables puestas, el correo de revisión guarda el código fijo y no manda nada', async () => {
+    vi.stubEnv('REVISION_CORREO', 'revision@tu-parrilla.cl')
+    vi.stubEnv('REVISION_CODIGO', '123456')
+    const ok = await pedir(usuarioRevision.correo)
+    expect(ok).toBe(true)
+    expect(db.valoresCodigo).toHaveLength(1)
+    expect(codigoCoincide('123456', db.valoresCodigo[0]!.hash, claveCodigos())).toBe(true)
+    expect(correo.mandados).toEqual([])
+  })
+
+  // Con las mismas variables puestas, un correo distinto del de revisión sigue su camino de
+  // siempre: código al azar y correo mandado. La puerta es para un solo correo, no para
+  // todos mientras dure el App Review.
+  it('con las variables puestas, otro correo sigue recibiendo un código al azar por correo', async () => {
+    vi.stubEnv('REVISION_CORREO', 'revision@tu-parrilla.cl')
+    vi.stubEnv('REVISION_CODIGO', '123456')
+    const otraPersona = { ...usuarioRevision, id: 'id-otra', correo: 'otra@tu-parrilla.cl' }
+    db.buscar = [otraPersona]
+    const ok = await pedir(otraPersona.correo)
+    expect(ok).toBe(true)
+    expect(db.valoresCodigo).toHaveLength(1)
+    expect(codigoCoincide('123456', db.valoresCodigo[0]!.hash, claveCodigos())).toBe(false)
+    expect(correo.mandados).toHaveLength(1)
+    expect(correo.mandados[0]!.to).toBe(otraPersona.correo)
   })
 })

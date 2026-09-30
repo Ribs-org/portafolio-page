@@ -2,6 +2,7 @@
 // código, cuándo sigue vivo y cuántos se pueden pedir. Quien toca la base y Resend está en
 // lib/usuarios.ts y en las acciones de /ingresar.
 import { createHash, randomInt, timingSafeEqual } from 'node:crypto'
+import { env } from './env'
 
 export const CORREO_INVALIDO = 'Ese correo no se ve bien.'
 export const CODIGO_ENVIADO = 'Si tu correo está invitado, te llegará un código en un minuto.'
@@ -24,6 +25,23 @@ export function normalizarCorreo(bruto: string): string | null {
   const limpio = bruto.trim().toLowerCase()
   if (limpio.length === 0 || limpio.length > MAX_CORREO) return null
   return CORREO.test(limpio) ? limpio : null
+}
+
+/**
+ * El revisor de Meta tiene que poder entrar sin leer nuestro correo: para un solo correo,
+ * mientras estén puestas las dos variables, el código que vale es fijo y no se manda nada.
+ * Se quita el día que la app pase a Live. Sin variables, esto no existe.
+ */
+export function codigoDeRevision(correo: string): string | null {
+  const revision = env('REVISION_CORREO')
+  const codigo = env('REVISION_CODIGO')
+  if (!revision || !codigo) return null
+  if (normalizarCorreo(revision) !== correo) return null
+  if (!/^\d{6}$/.test(codigo)) {
+    console.warn('REVISION_CODIGO tiene que ser de seis dígitos; se ignora.')
+    return null
+  }
+  return codigo
 }
 
 export function generarCodigo(): string {
