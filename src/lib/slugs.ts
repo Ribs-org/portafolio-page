@@ -15,6 +15,7 @@ export const RESERVADOS: ReadonlySet<string> = new Set([
   // Rutas de `src/app`
   'admin',
   'api',
+  'borrado',
   'ingresar',
   'landing',
   'privacidad',

@@ -11,6 +11,9 @@ quede con tus números.
 | `/` | La página principal del dueño del dominio. Cada usuario tiene una principal, pero solo la del admin se sirve en la raíz |
 | `/<slug>` | La página de un usuario. Cada dominio sirve solo las de su dueño; el del producto las sirve todas |
 | `/admin` | Tu panel: El Fuego, lo que pide una acción hoy; adentro, la parrilla, los números y el editor |
+| `/borrado/<código>` | El estado de un borrado que pidió Meta: cuándo fue y cuántas cuentas. Pública, sin sesión; el código es la llave |
+| `/api/social/meta/baja` | `POST` de Meta cuando alguien quita la app desde Facebook: deja sin credencial sus cuentas de Instagram y Facebook |
+| `/api/social/meta/borrado` | `POST` de Meta cuando alguien pide borrar sus datos: borra lo que vino de esas dos redes y devuelve el código de estado |
 
 Corre en planes gratis: Next.js 16 en Vercel, Postgres en Supabase y la media en Cloudflare R2
 (10 GB gratis, egress $0).
@@ -171,9 +174,10 @@ segundo recibe un aviso, no la cuenta de otro. Eso es entre dos usuarios distint
 mismo dueño sí puede conectar varias cuentas suyas de la misma red y elegir a cuáles sale
 cada publicación — ver «Varias cuentas de una misma red», más abajo.
 
-La única tabla sin dueño es `solicitudes_borrado`, donde quedará constancia de cada borrado
-que Meta pida: cuando se escriba una fila, ese dueño ya no tendrá cuentas de Meta y Meta no
-sabe quién es. Hoy la tabla está creada y vacía; todavía no hay quien la escriba.
+La única tabla sin dueño es `solicitudes_borrado`, donde queda constancia de cada borrado
+que Meta pide: cuando se escribe una fila, ese dueño ya no tiene cuentas de Meta y Meta no
+sabe quién es. La escribe `/api/social/meta/borrado`, y `/borrado/<código>` la lee por el
+código —tampoco por dueño, por la misma razón—.
 
 > El segundo perfil nace con un slug aleatorio (`circulo-a1b2c3d4`) y con `noindex`, para
 > que exista una versión que solo compartes a mano. Cámbialo por lo que quieras.
@@ -278,6 +282,30 @@ Al conectar se guarda tu **id de usuario de Meta**, que es lo que Meta manda cua
 la app desde tu cuenta de Facebook: sin él no hay forma de saber a qué cuentas se refiere.
 Las cuentas conectadas antes del 2026-09-30 lo tienen vacío hasta que vuelvas a conectar
 Instagram y Facebook.
+
+#### Las dos URLs que Meta exige
+
+En **App Settings → Basic**, al final del formulario, hay dos campos que el App Review pide
+llenos. Los dos apuntan a este sitio y los dos ya están implementados:
+
+```
+Deauthorize callback URL:    https://TU-DOMINIO/api/social/meta/baja
+Data deletion request URL:   https://TU-DOMINIO/api/social/meta/borrado
+```
+
+Meta les hace `POST` con un `signed_request` firmado con `INSTAGRAM_APP_SECRET`; sin ese
+secreto configurado, o con una firma que no calza, las rutas responden `400` y no tocan
+nada. La **baja** deja sin credencial tus cuentas de Instagram y Facebook, igual que
+*Desconectar* en Los Fierros, y la tarjeta queda con «Quitaste la app desde Facebook:
+vuelve a conectar.»; el historial de métricas se conserva. El **borrado** sí borra lo que
+vino de esas dos redes —posts, comentarios, métricas y los destinos programados de esas
+cuentas— y devuelve a Meta un código y la dirección `https://TU-DOMINIO/borrado/<código>`,
+una página pública donde ese código confirma cuándo fue y cuántas cuentas se borraron. Lo
+que escribiste tú —el texto y la media de una publicación programada— no es de Meta y no
+se toca: un post que se quede sin destinos sigue en la parrilla como borrador.
+
+Si tu cuenta se conectó antes del 2026-09-30 y no la has reconectado, su `meta_user_id`
+está vacío: el callback responde igual, pero con cero cuentas afectadas.
 
 Si administras **más de una cuenta de Instagram**, al conectar el panel te muestra la
 lista y marcas cuáles quieres ver. Cada una queda como una cuenta aparte, con sus
@@ -687,7 +715,7 @@ Vercel y bajan con `vercel env pull .env.local`.
 | `GOOGLE_CLIENT_ID` | Conectar YouTube para publicar (OAuth de Google) | El OAuth Client tipo Web del mismo proyecto de la API key |
 | `GOOGLE_CLIENT_SECRET` | El secreto de ese OAuth Client | Junto con el anterior; el sync de solo lectura sigue usando `YOUTUBE_API_KEY` |
 | `INSTAGRAM_APP_ID` | Conectar Instagram | No — sin ella esa red aparece como no conectada |
-| `INSTAGRAM_APP_SECRET` | Conectar Instagram | No — sin ella esa red aparece como no conectada |
+| `INSTAGRAM_APP_SECRET` | Conectar Instagram, y verificar la firma de los callbacks de baja y borrado de Meta | No — sin ella esa red aparece como no conectada y esos dos callbacks responden `400` |
 | `TIKTOK_CLIENT_KEY` | Conectar TikTok | No — sin ella esa red aparece como no conectada |
 | `TIKTOK_CLIENT_SECRET` | Conectar TikTok | No — sin ella esa red aparece como no conectada |
 | `THREADS_APP_ID` | Conectar Threads para publicar | El Threads App ID del caso de uso «API de Threads» de la app de Meta |

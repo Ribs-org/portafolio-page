@@ -225,6 +225,13 @@ acción con sesión ni desde otra ruta sin haber pasado antes por `leerSignedReq
 —el arnés lo daría por roto, y no lo está—. Si alguien lo importa desde el panel, el filtro
 por dueño hay que ponerlo en el llamador.
 
+La misma excepción alcanza a la página `/borrado/[codigo]`
+(`src/app/(legal)/borrado/[codigo]/page.tsx`), que lee `solicitudes_borrado` por el código y
+no por dueño: esa tabla no tiene `owner_id` a propósito —cuando la fila se escribe, ese
+dueño ya no tiene cuentas de Meta—, y quien consulta la URL es Meta o quien pidió el
+borrado, ninguno con sesión. Ahí la llave es el código aleatorio de 16 caracteres, y por eso
+la página no muestra nada que necesite más: ni nombre, ni correo, ni handle.
+
 ## Dos caminos que crean publicaciones, sin código compartido
 
 **Abierto desde 2026-09-24.**
