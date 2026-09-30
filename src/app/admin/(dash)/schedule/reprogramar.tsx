@@ -1,6 +1,6 @@
 'use client'
 
-import { useRef, useState, useTransition } from 'react'
+import { useId, useRef, useState, useTransition } from 'react'
 import { rescheduleTarget } from '@/app/admin/actions'
 import { Button, Input } from '@/components/ui'
 
@@ -31,6 +31,7 @@ import { Button, Input } from '@/components/ui'
  */
 export function Reprogramar({ targetId, titulo }: { targetId: string; titulo?: string }) {
   const panel = useRef<HTMLDialogElement>(null)
+  const rotulo = useId()
   const [when, setWhen] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [pending, start] = useTransition()
@@ -71,6 +72,8 @@ export function Reprogramar({ targetId, titulo }: { targetId: string; titulo?: s
       </button>
       <dialog
         ref={panel}
+        // Modal sin nombre, el lector lo anuncia sin decir de qué destino es la hora.
+        aria-labelledby={titulo ? rotulo : undefined}
         // `close` llega por cualquier salida, también por la Esc que maneja el navegador.
         onClose={limpiar}
         // Un clic en el velo tiene al diálogo por destino; uno en el contenido, al hijo.
@@ -80,7 +83,7 @@ export function Reprogramar({ targetId, titulo }: { targetId: string; titulo?: s
         className="m-auto w-[20rem] max-w-[calc(100vw-2rem)] rounded-xl border border-white/10 bg-acero-900/95 text-fg shadow-xl backdrop-blur backdrop:bg-acero-950/80"
       >
         <div className="p-3">
-          {titulo ? <p className="mb-2 text-xs text-fg-faint">{titulo}</p> : null}
+          {titulo ? <p id={rotulo} className="mb-2 text-xs text-fg-faint">{titulo}</p> : null}
           <div className="flex flex-wrap items-center gap-2">
             <Input
               type="datetime-local"
