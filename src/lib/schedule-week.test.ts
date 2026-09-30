@@ -3,6 +3,7 @@ import {
   addDays,
   dayKey,
   dayLabel,
+  dayLabelDe,
   groupByDay,
   hourLabel,
   mondayOf,
@@ -82,6 +83,14 @@ describe('weekLabel y dayLabel', () => {
   it('la columna dice el día de la semana y el número', () => {
     expect(dayLabel('2026-09-07', 0)).toBe('lun 7')
     expect(dayLabel('2026-09-13', 6)).toBe('dom 13')
+  })
+
+  it('un día suelto se rotula igual sin saber su posición en la semana', () => {
+    // El Fuego nombra el siguiente corte, que cae en cualquier día: no hay arreglo del
+    // que sacar el índice, y el rótulo tiene que decir lo mismo que la columna.
+    expect(dayLabelDe('2026-09-07')).toBe('lun 7')
+    expect(dayLabelDe('2026-09-13')).toBe('dom 13')
+    expect(dayLabelDe('2026-10-01')).toBe('jue 1')
   })
 })
 

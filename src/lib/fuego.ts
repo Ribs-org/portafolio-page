@@ -5,6 +5,13 @@ import { formatNumber } from '@/lib/utils'
 // se quemó, y qué dice el pie (cuántos cortes y cuántas miradas). La página solo compone;
 // esto se prueba con fixtures.
 
+/**
+ * Lo mínimo que estas funciones necesitan de un corte. Las tres que seleccionan son
+ * genéricas sobre esta forma y devuelven lo que recibieron: la lectura real
+ * (`CorteCargado`, en `social/publish/cortes.ts`) trae además la media y el handle de cada
+ * destino, y la pantalla los pinta. Estrechar a `Corte` en la salida obligaría a la página
+ * a volver a ensanchar con un cast.
+ */
 export type Corte = {
   post: { id: string; caption: string; scheduledAt: Date }
   targets: Array<{
@@ -19,7 +26,7 @@ export type Corte = {
 }
 
 /** Lo programado para hoy en la zona del sitio, salido o no, en orden de hora. */
-export function cortesDeHoy(cortes: Corte[], now: Date, zone: string): Corte[] {
+export function cortesDeHoy<T extends Corte>(cortes: T[], now: Date, zone: string): T[] {
   const hoy = dayKey(now, zone)
   return cortes
     .filter((c) => dayKey(c.post.scheduledAt, zone) === hoy)
@@ -27,7 +34,7 @@ export function cortesDeHoy(cortes: Corte[], now: Date, zone: string): Corte[] {
 }
 
 /** El primer corte después de ahora, o null: «la parrilla está fría» hacia adelante. */
-export function siguienteCorte(cortes: Corte[], now: Date): Corte | null {
+export function siguienteCorte<T extends Corte>(cortes: T[], now: Date): T | null {
   const futuros = cortes
     .filter((c) => c.post.scheduledAt.getTime() > now.getTime())
     .sort((a, b) => a.post.scheduledAt.getTime() - b.post.scheduledAt.getTime())
@@ -35,7 +42,7 @@ export function siguienteCorte(cortes: Corte[], now: Date): Corte | null {
 }
 
 /** Cada destino que se quemó, con su corte: es lo único de El Fuego que pide una acción. */
-export function quemados(cortes: Corte[]): Array<{ corte: Corte; destino: Corte['targets'][number] }> {
+export function quemados<T extends Corte>(cortes: T[]): Array<{ corte: T; destino: T['targets'][number] }> {
   return cortes.flatMap((corte) =>
     corte.targets.filter((t) => t.status === 'failed').map((destino) => ({ corte, destino })),
   )

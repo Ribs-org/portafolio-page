@@ -8,7 +8,13 @@ import { getTableName } from 'drizzle-orm'
 // importar el módulo real bajo Vitest (mismo motivo que en `usuarios.test.ts`).
 vi.mock('server-only', () => ({}))
 
-vi.mock('next/cache', () => ({ revalidatePath: () => {} }))
+/** Las rutas que cada acción mandó a repintar, en orden: lo único que delata un revalidado. */
+const revalidados = vi.hoisted(() => [] as string[])
+vi.mock('next/cache', () => ({
+  revalidatePath: (ruta: string) => {
+    revalidados.push(ruta)
+  },
+}))
 
 /** Marca distinguible de un `redirect()` real, para comprobar que ocurrió sin simular a Next. */
 class RedirectSignal extends Error {
@@ -221,6 +227,7 @@ beforeEach(() => {
   crear.crearPostProgramadoCalls.length = 0
   db.executeCalls.length = 0
   db.executeError = null
+  revalidados.length = 0
 })
 
 /**
@@ -608,6 +615,16 @@ describe('rescheduleTarget: la hora nueva solo alcanza a un destino todavía que
     expect(db.updateCalls).toHaveLength(2)
     const where = new PgDialect().sqlToQuery(db.updateWheres[1] as SQL)
     expect(where.params).toEqual(['target-1', 'failed'])
+  })
+
+  it('repinta las dos pantallas que muestran lo quemado, no solo la parrilla', async () => {
+    leeraQuemado([quemado])
+
+    await rescheduleTarget('target-1', futuro)
+
+    // El Fuego («Se quemó») vive en `/admin` y su botón de reprogramar es el mismo que el
+    // de la cola: sin este revalidado, la fila que se acaba de arreglar sigue ahí.
+    expect(revalidados).toEqual(['/admin/schedule', '/admin'])
   })
 
   it('una hora pasada no escribe nada y devuelve la frase de siempre', async () => {

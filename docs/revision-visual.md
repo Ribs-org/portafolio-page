@@ -28,61 +28,66 @@ nombre del panel en `font-titulo uppercase`, y la única reja del panel justo de
 cabecera. Verifica esa reja una vez por pantalla (punto 3) y confirma que ninguna pantalla
 agrega una segunda.
 
-### 1. Resumen — `/admin` — `page.tsx`
+### 1. El Fuego — `/admin` — `page.tsx`
 
-Título en pantalla: **Resumen**. Tiene los ocho componentes de `src/components/charts/`
-(`Panel`, `StatTile`, `BarList`/«Links más clickeados», `Donut`, `Funnel`/«Embudo»,
-`Heatmap`, `TrafficChart`/«Tráfico», `CampaignTable`) con datos reales — es la pantalla más
-densa en gráficos, mira ahí el punto 5 con cuidado. Sin desplegables ni interruptor propios.
+Título en pantalla: **El Fuego**. Desde la entrega 3 de «el panel con poco a priori» no
+tiene gráficos: el termómetro de los próximos siete días, las filas de hoy y de lo quemado,
+el botón «Poner al fuego» y el pie de ayer en mono. Los puntos 5–7 no aplican. Mira acá que
+las filas se lean a 400 px —la hora, los logos de `Redes` y el texto en una línea caben o
+se envuelven sin cortar— y que el rojo de «Se quemó» y el motivo del fallo se lean sobre la
+chapa. Con una cuenta desconectada en el entorno de prueba se ve la otra cara: la tarjeta
+«Conecta tu primera red», sola.
 
-### 2. Analítica — `/admin/analytics` — `analytics/page.tsx`
+### 2. Los Números — `/admin/analytics` — `analytics/page.tsx`
 
-Título en pantalla: **Analítica**. La más larga: trece paneles (tráfico, cuentas, contenido,
+Título en pantalla: **Los Números**. La más larga, y la que se quedó con los ocho
+componentes de `src/components/charts/` (`Panel`, `StatTile`, `BarList`, `Donut`, `Funnel`,
+`Heatmap`, `TrafficChart`, `CampaignTable`): trece paneles (tráfico, cuentas, contenido,
 links, países, ciudades, dispositivo, sistema, navegador, hora local, embudo, idioma,
 últimas visitas). Repite varios de los mismos ocho componentes de gráficos con series
 distintas — confirma que los colores de serie no se repiten entre paneles vecinos.
 
-### 3. Contenido — `/admin/content` — `content/page.tsx`
+### 3. Los Cortes — `/admin/content` — `content/page.tsx`
 
-Título en pantalla: **Contenido**. Tabla de posts (`post-table.tsx`) con columnas
+Título en pantalla: **Los Cortes**. Tabla de posts (`post-table.tsx`) con columnas
 ordenables y un gráfico de «Views ganadas por día». Revisa que los encabezados de columna
 ordenables mantengan foco visible al tabular (punto 2) y que la tabla se lea a 400 px
 (scroll horizontal propio, no de la página).
 
-### 4. Comentarios — `/admin/comments` — `comments/page.tsx`
+### 4. La Mesa — `/admin/comments` — `comments/page.tsx`
 
-Título en pantalla: **Comentarios**. Panel de «Instrucciones para el modelo»
+Título en pantalla: **La Mesa**. Panel de «Instrucciones para el modelo»
 (`instrucciones.tsx`) más la cola (`cola.tsx`). Sin gráficos ni interruptor; revisa sobre
 todo el contraste del texto largo de instrucciones sobre la chapa.
 
-### 5. Cuentas — `/admin/accounts` — `accounts/page.tsx`
+### 5. Los Fierros — `/admin/accounts` — `accounts/page.tsx`
 
-Título en pantalla: **Cuentas**. Un bloque por red social con tarjetas de cuenta
+Título en pantalla: **Los Fierros**. Un bloque por red social con tarjetas de cuenta
 (`cuentas.tsx`): conectar, reconectar, desconectar, sincronizar. Sin gráficos.
 
-### 6. Calendario — `/admin/schedule` — `schedule/page.tsx`
+### 6. La Parrilla — `/admin/schedule` — `schedule/page.tsx`
 
-Título en pantalla: **Calendario**. Compositor (`composer.tsx`) y carga masiva arriba,
+Título en pantalla: **La Parrilla**. Compositor (`composer.tsx`) y carga masiva arriba,
 pestañas Lista/Calendario abajo. **Acá viven el interruptor y los desplegables reales de
 esta lista**: las opciones de TikTok (`tiktok-opciones.tsx`, dentro del compositor) usan
 `Select` y `Switch`/`Toggle` — pon ahí el foco de los puntos 6 y 7. Revisa también la vista
 de calendario en sí (semanas, celdas de día) a 400 px, donde suele apretar más.
 
-### 7. Calendario de un post — `/admin/schedule/[id]` — `schedule/[id]/page.tsx` + `editor.tsx`
+### 7. Un corte — `/admin/schedule/[id]` — `schedule/[id]/page.tsx` + `editor.tsx`
 
 Título en pantalla: **Editar post**. Editor de un post programado: guardar, eliminar,
 reordenar media, agregar archivos, copiar URL. Entra a esta pantalla abriendo cualquier
-post programado desde Calendario.
+post programado desde La Parrilla o desde una fila de El Fuego.
 
-### 8. Perfiles — `/admin/profiles` — `profiles/page.tsx`
+### 8. La Vitrina — `/admin/profiles` — `profiles/page.tsx`
 
-Título en pantalla: **Perfiles**. Grilla de tarjetas de perfil, con «Servir este perfil en
+Título en pantalla: **La Vitrina**. Grilla de tarjetas de perfil, con «Servir este perfil en
 /» como acción destacada — confirma que solo esa acción (o el estado activo) lleva brasa,
 sin brasa de adorno en el resto de la tarjeta.
 
-### 9. Usuarios — `/admin/usuarios` — `usuarios/page.tsx`
+### 9. Los Maestros — `/admin/usuarios` — `usuarios/page.tsx`
 
-Título en pantalla: **Usuarios**. Paneles «Invitar» e «Invitados», con formularios
+Título en pantalla: **Los Maestros**. Paneles «Invitar» e «Invitados», con formularios
 (`formularios.tsx`). Revisa el campo de invitar y su botón de submit.
 
 ## La puerta (`src/app/ingresar/`)
@@ -136,10 +141,10 @@ que ambos se vean consistentes entre sí.
 
 Título en pantalla: **¿Qué cuentas de [red] conectar?** (el nombre de la red se interpola,
 por ejemplo «¿Qué cuentas de Facebook conectar?»). Solo aparece **a mitad de una conexión
-de cuentas de Meta o Google**: entra a Cuentas, arranca «Conectar» en una red que use ese
+de cuentas de Meta o Google**: entra a Los Fierros, arranca «Conectar» en una red que use ese
 flujo (Facebook o Google), y complétalo hasta que la red devuelva la lista de páginas o
 canales disponibles — ahí aparece esta pantalla con casillas para marcar cuáles conectar.
-Si no hay una conexión pendiente, esta ruta redirige de vuelta a Cuentas con un aviso, así
+Si no hay una conexión pendiente, esta ruta redirige de vuelta a Los Fierros con un aviso, así
 que hay que estar realmente a mitad del flujo para verla. Revisa que la lista de casillas
 se lea sobre su tarjeta y que el estado «ya conectada» de cada fila sea legible.
 

@@ -3,7 +3,7 @@ import Link from 'next/link'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import type { ScheduledPost, ScheduledPostTarget } from '@/db/schema'
 import { dayLabel, dayKey, groupByDay, hourLabel, weekDays, weekLabel } from '@/lib/schedule-week'
-import { calorDelDia, coccionDe, type Coccion } from '@/lib/parrilla'
+import { NOMBRE_COCCION, calorDelDia, coccionDe, type Coccion } from '@/lib/parrilla'
 import { cn } from '@/lib/utils'
 import { etiquetaDestino, nombreDestino } from './etiqueta'
 import { Redes } from './redes'
@@ -26,18 +26,6 @@ const CLASE_COCCION: Record<Coccion, string> = {
   sellada: 'corte-sellada',
   punto: 'corte-punto',
   quemada: 'corte-quemada',
-}
-
-/**
- * Para el `title` y el lector de pantalla. La cocción es la segunda señal, no la única:
- * antes el estado vivía en puntos de color de 8 px que había que aprenderse, y el nombre
- * en palabras tiene que sobrevivir al cambio.
- */
-const NOMBRE_COCCION: Record<Coccion, string> = {
-  cruda: 'Programada',
-  sellada: 'Saliendo ahora',
-  punto: 'Publicada',
-  quemada: 'Falló',
 }
 
 export function WeekCalendar({

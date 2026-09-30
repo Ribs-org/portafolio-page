@@ -76,9 +76,26 @@ export function dayLabel(key: string, index: number): string {
 }
 
 /**
+ * El día de la semana de una clave, en tres letras. Leer la clave en UTC no la corre de
+ * día: ya es una fecha de calendario, sin zona adentro.
+ */
+function dowDe(key: string): string {
+  const dow = new Date(`${key}T00:00:00Z`).getUTCDay() // 0 = domingo
+  return DOW[(dow + 6) % 7]!
+}
+
+/**
+ * El rótulo de un día suelto, «mar 30», sin saber su posición en ninguna semana. Lo
+ * necesita El Fuego para nombrar el siguiente corte, que cae en cualquier día.
+ */
+export function dayLabelDe(key: string): string {
+  return `${dowDe(key)} ${Number(key.slice(8))}`
+}
+
+/**
  * Los próximos `cuantos` días a partir de hoy, con su rótulo.
  *
- * El calendario reparte lunes a domingo; el termómetro del Resumen mira hacia adelante
+ * El calendario reparte lunes a domingo; el termómetro de El Fuego mira hacia adelante
  * desde hoy, que es lo que sirve para decidir dónde poner lo próximo. Por eso el día de
  * la semana no puede venir de la posición en el arreglo como en `dayLabel`, y se saca
  * de la clave: es una fecha de calendario, así que leerla en UTC no la corre de día.
@@ -91,8 +108,7 @@ export function proximosDias(
   const hoy = dayKey(desde, zone)
   return Array.from({ length: cuantos }, (_, i) => {
     const clave = addDays(hoy, i)
-    const dow = new Date(`${clave}T00:00:00Z`).getUTCDay() // 0 = domingo
-    return { clave, dia: DOW[(dow + 6) % 7]!, numero: Number(clave.slice(8)) }
+    return { clave, dia: dowDe(clave), numero: Number(clave.slice(8)) }
   })
 }
 
@@ -100,7 +116,7 @@ export function proximosDias(
  * Cuántos hay por día. El mismo reparto que `groupByDay`, solo que contando.
  *
  * Es una función y no dos líneas repetidas en cada pantalla porque la usan el
- * termómetro del Resumen, el aviso del compositor y el calendario, y tres maneras de
+ * termómetro de El Fuego, el aviso del compositor y el calendario, y tres maneras de
  * decidir a qué día pertenece una hora es como se llega a que se contradigan entre
  * ellas.
  */

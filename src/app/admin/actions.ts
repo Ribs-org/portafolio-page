@@ -1128,6 +1128,9 @@ export async function rescheduleTarget(targetId: string, localDatetime: string):
     .where(and(eq(scheduledPostTargets.id, targetId), eq(scheduledPostTargets.status, 'failed')))
 
   revalidatePath('/admin/schedule')
+  // El Fuego («Se quemó») muestra los mismos destinos quemados con el mismo botón: sin
+  // esto, la fila que se acaba de arreglar sigue pidiendo una acción que ya se hizo.
+  revalidatePath('/admin')
   return { ok: true }
 }
 

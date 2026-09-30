@@ -17,7 +17,7 @@ const DIAS = 7
  *
  * Existe porque saber dónde está floja la semana obligaba a irse al calendario y contar
  * tarjetas columna por columna. Acá la respuesta es la forma: los días apagados se ven
- * apagados desde el Resumen, que es la primera pantalla que se abre.
+ * apagados desde El Fuego, que es la primera pantalla que se abre.
  *
  * Mira hacia adelante desde hoy y no de lunes a domingo, porque la pregunta que contesta
  * es dónde poner lo próximo, y el lunes que ya pasó no es un lugar posible.

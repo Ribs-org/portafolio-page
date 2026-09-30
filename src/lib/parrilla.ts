@@ -1,10 +1,9 @@
 /**
  * Las reglas de la parrilla: cuánto fuego tiene un día y qué tan cocido está un post.
  *
- * Están acá y no dentro de `calendar.tsx` porque son reglas, no estilos. El escalón de
- * calor lo va a querer también el resumen en la entrega siguiente, y un umbral mágico
- * escrito dentro de un `className` es exactamente el tipo de decisión que después nadie
- * encuentra.
+ * Están acá y no dentro de `calendar.tsx` porque son reglas, no estilos: las miran el
+ * calendario, el termómetro de El Fuego y el compositor, y un umbral mágico escrito dentro
+ * de un `className` es exactamente el tipo de decisión que después nadie encuentra.
  *
  * Ver `docs/superpowers/specs/2026-09-18-parrilla-de-verdad-design.md`.
  */
@@ -37,6 +36,21 @@ export const COCCION: Record<Coccion, { claro: string; oscuro: string }> = {
  * aplica la opacidad ahí; acá vive el color pleno, que es lo que se puede comprobar.
  */
 export const GRASA = '#e8d7b8'
+
+/**
+ * La cocción en palabras.
+ *
+ * El color es la primera señal y esto la segunda, que es la que no depende de ver: el
+ * calendario la pone en un `sr-only` bajo cada corte y El Fuego la pinta al final de la
+ * fila. Vive acá y no en `calendar.tsx` porque ya son dos pantallas las que la dicen, y
+ * dos tablas de nombres para la misma cocción es como se llega a que digan distinto.
+ */
+export const NOMBRE_COCCION: Record<Coccion, string> = {
+  cruda: 'Programada',
+  sellada: 'Saliendo ahora',
+  punto: 'Publicada',
+  quemada: 'Falló',
+}
 
 /** De claro a oscuro. El test de luminosidad recorre este orden. */
 export const ORDEN_COCCION: readonly Coccion[] = ['cruda', 'sellada', 'punto', 'quemada']

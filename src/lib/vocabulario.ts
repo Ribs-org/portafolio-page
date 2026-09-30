@@ -3,9 +3,6 @@
 // asado y le exigió un subtítulo en llano debajo, para que a los seis meses se siga
 // encontrando todo. Las rutas no cambian nunca: son las de siempre, y esta tabla solo les
 // pone nombre. Nadie fuera de este archivo escribe «Los Fierros».
-//
-// `/admin` se llama Resumen mientras sea la página de números que es hoy; la entrega 3 de
-// «el panel con poco a priori» la reemplaza por El Fuego y cambia esta fila, no otra cosa.
 
 export type Pantalla = {
   ruta: string
@@ -17,7 +14,7 @@ export type Pantalla = {
 }
 
 export const PANTALLAS: readonly Pantalla[] = [
-  { ruta: '/admin', nombre: 'Resumen', subtitulo: 'tus números de un vistazo', grupo: 'pestana' },
+  { ruta: '/admin', nombre: 'El Fuego', subtitulo: 'qué se está cocinando ahora', grupo: 'pestana' },
   { ruta: '/admin/schedule', nombre: 'La Parrilla', subtitulo: 'lo que viene y cómo salió lo que ya se fue', grupo: 'pestana' },
   { ruta: '/admin/content', nombre: 'Los Cortes', subtitulo: 'cada publicación, lo que hizo en la red y lo que trajo', grupo: 'pestana' },
   { ruta: '/admin/comments', nombre: 'La Mesa', subtitulo: 'lo que te responden y tus respuestas', grupo: 'pestana' },
