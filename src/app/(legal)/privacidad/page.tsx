@@ -1,5 +1,7 @@
 import type { Metadata } from 'next'
 
+import { nombreDe } from '@/lib/vocabulario'
+
 export const metadata: Metadata = {
   title: 'Privacidad',
   description: 'Qué datos guarda este sitio y qué no.',
@@ -115,6 +117,32 @@ export default function PrivacidadPage() {
         <p className="leading-relaxed text-fg-muted">
           Desconectar una cuenta desde el panel borra sus credenciales. El historial de métricas
           ya recogido se conserva.
+        </p>
+        <p className="leading-relaxed text-fg-muted">
+          El uso que hace este sitio de la información que recibe de las APIs de Google se ajusta
+          a la{' '}
+          <a
+            href="https://developers.google.com/terms/api-services-user-data-policy"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-fg underline decoration-white/20 underline-offset-4 transition-colors hover:decoration-white/50"
+          >
+            Google API Services User Data Policy
+          </a>
+          , incluidos los requisitos de <span className="text-fg">Limited Use</span>. De YouTube
+          se guardan el identificador, el título, la miniatura y los contadores de{' '}
+          <span className="text-fg">tus propios videos</span>, y los comentarios de esos videos.
+          Se refrescan a diario, y se borran al desconectar la cuenta —las credenciales— o si lo
+          pides. Puedes revocarlo desde {nombreDe('/admin/accounts')} o desde{' '}
+          <a
+            href="https://myaccount.google.com/permissions"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-fg underline decoration-white/20 underline-offset-4 transition-colors hover:decoration-white/50"
+          >
+            myaccount.google.com/permissions
+          </a>
+          .
         </p>
       </section>
 
