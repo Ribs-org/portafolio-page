@@ -31,7 +31,7 @@ export const users = pgTable('users', {
   primerIngresoEn: timestamp('primer_ingreso_en', { withTimezone: true }),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
-})
+}).enableRLS()
 
 /** Un código de ingreso por correo: nunca el código, solo su hash. Diez minutos, un uso. */
 export const codigosIngreso = pgTable(
@@ -48,7 +48,7 @@ export const codigosIngreso = pgTable(
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [index('codigos_ingreso_user_idx').on(t.userId, t.createdAt)],
-)
+).enableRLS()
 
 /**
  * A public page. Every owner has exactly one default profile; the rest live at `/<slug>`.
@@ -81,7 +81,7 @@ export const profiles = pgTable(
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [index('profiles_owner_idx').on(t.ownerId)],
-)
+).enableRLS()
 
 /** `featured` renders as a large image card, `social` as an icon in the top row. */
 export const LINK_KINDS = ['featured', 'standard', 'social', 'booking'] as const
@@ -107,7 +107,7 @@ export const links = pgTable(
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [index('links_profile_position_idx').on(t.profileId, t.position)],
-)
+).enableRLS()
 
 /**
  * One row per page view. `visitorHash` is SHA-256 over IP + user agent + a secret
@@ -149,7 +149,7 @@ export const visits = pgTable(
     index('visits_campaign_idx').on(t.campaign),
     index('visits_hash_idx').on(t.visitorHash),
   ],
-)
+).enableRLS()
 
 /**
  * `profileId` is denormalised so dashboard queries never need a join to `visits`.
@@ -180,7 +180,7 @@ export const clicks = pgTable(
     index('clicks_link_idx').on(t.linkId),
     index('clicks_visit_idx').on(t.visitId),
   ],
-)
+).enableRLS()
 
 export const SOCIAL_NETWORKS = ['instagram', 'tiktok', 'youtube', 'facebook', 'threads', 'x'] as const
 export type SocialNetwork = (typeof SOCIAL_NETWORKS)[number]
@@ -209,7 +209,7 @@ export const socialAccounts = pgTable(
     unique('social_accounts_network_external_key').on(t.network, t.externalId),
     index('social_accounts_owner_idx').on(t.ownerId),
   ],
-)
+).enableRLS()
 
 /**
  * A published piece of content.
@@ -251,7 +251,7 @@ export const socialPosts = pgTable(
     index('social_posts_published_idx').on(t.publishedAt),
     index('social_posts_owner_idx').on(t.ownerId),
   ],
-)
+).enableRLS()
 
 /**
  * One cumulative snapshot per post per local day — cumulative because that is what
@@ -280,7 +280,7 @@ export const postMetrics = pgTable(
     capturedAt: timestamp('captured_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [unique('post_metrics_post_day_key').on(t.postId, t.day), index('post_metrics_day_idx').on(t.day)],
-)
+).enableRLS()
 
 /**
  * Cómo va la cuenta, no cada publicación. Dos clases de columna conviven acá y no
@@ -314,7 +314,7 @@ export const accountMetrics = pgTable(
     unique('account_metrics_account_day_key').on(t.day, t.accountId),
     index('account_metrics_day_idx').on(t.day),
   ],
-)
+).enableRLS()
 
 export const TARGET_STATUSES = ['scheduled', 'publishing', 'published', 'failed'] as const
 export type TargetStatus = (typeof TARGET_STATUSES)[number]
@@ -339,7 +339,7 @@ export const scheduledPosts = pgTable(
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [index('scheduled_posts_owner_idx').on(t.ownerId)],
-)
+).enableRLS()
 
 /**
  * One row per destination network, each living its own publish cycle: if Instagram
@@ -386,7 +386,7 @@ export const scheduledPostTargets = pgTable(
     // cuenta + external_id que hace `aplicarReglas`/`reglasPara` en cada sondeo.
     index('scheduled_post_targets_account_external_idx').on(t.accountId, t.externalId),
   ],
-)
+).enableRLS()
 
 /** One row per file, already living in Cloudflare R2; `position` orders the carousel. */
 export const scheduledPostMedia = pgTable(
@@ -401,7 +401,7 @@ export const scheduledPostMedia = pgTable(
     position: integer('position').notNull(),
   },
   (t) => [index('scheduled_post_media_post_idx').on(t.postId)],
-)
+).enableRLS()
 
 /**
  * La palabra clave de un post programado y qué responder cuando alguien la comenta. Una
@@ -422,7 +422,7 @@ export const reglasClave = pgTable('reglas_clave', {
   documentoUrl: text('documento_url'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
-})
+}).enableRLS()
 
 export const COMMENT_STATES = ['pendiente', 'enviado', 'descartado', 'propio', 'fallido'] as const
 export type CommentState = (typeof COMMENT_STATES)[number]
@@ -478,7 +478,7 @@ export const postComments = pgTable(
     index('post_comments_state_idx').on(t.state),
     index('post_comments_published_idx').on(t.publishedAt),
   ],
-)
+).enableRLS()
 
 export const SOURCE_POST_STATES = ['cruda', 'lista', 'aprobada', 'rechazada', 'fallida'] as const
 export type SourcePostState = (typeof SOURCE_POST_STATES)[number]
@@ -510,7 +510,7 @@ export const sourceAuthors = pgTable(
     unique('source_authors_network_username_key').on(t.network, t.username),
     index('source_authors_owner_idx').on(t.ownerId),
   ],
-)
+).enableRLS()
 
 /**
  * Una ficha por tuit traído. `author_handle` y `url` van copiados para que la baraja se
@@ -549,7 +549,7 @@ export const sourcePosts = pgTable(
     index('source_posts_state_idx').on(t.state),
     index('source_posts_published_idx').on(t.publishedAt),
   ],
-)
+).enableRLS()
 
 /**
  * Preferencias del panel, una fila por clave. Tabla de clave y valor y no columnas en otra
@@ -569,7 +569,7 @@ export const ajustes = pgTable(
   // misma clave. `owner_id` sigue nulable hasta la entrega 3, y en Postgres dos NULL no
   // chocan entre sí, cosa que el paso de adopción del despliegue resuelve enseguida.
   (t) => [unique('ajustes_owner_clave_key').on(t.ownerId, t.clave), index('ajustes_owner_idx').on(t.ownerId)],
-)
+).enableRLS()
 
 export type Profile = typeof profiles.$inferSelect
 export type Link = typeof links.$inferSelect
