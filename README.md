@@ -346,6 +346,23 @@ de uso «API de Threads» de la misma app, que tiene su propio par de campos —
 la app o pida el borrado desde Threads no llega a ninguna parte. Está anotado en
 `docs/deuda-tecnica.md`.
 
+#### Dejar entrar al revisor de Meta
+
+El App Review de Meta lo hace una persona que entra al panel por su cuenta, y el ingreso es
+solo por correo con un código de seis dígitos que esa persona no puede leer (no tiene
+acceso a nuestro correo). Para dejarla entrar:
+
+1. Invítala en **Los Maestros** (Usuarios, dentro de Ajustes) con el correo que va a usar
+   Meta para revisar.
+2. En Vercel, pon `REVISION_CORREO` con ese mismo correo y `REVISION_CODIGO` con un código
+   fijo de seis dígitos. Mientras las dos estén puestas, ese correo recibe siempre ese
+   código —no se le manda nada— y cualquier otro correo sigue como siempre.
+3. Quita las dos variables el día que la app pase a Live: la puerta es solo para la
+   revisión.
+
+El guion completo del video y de los pasos que el revisor sigue en el panel está en
+`docs/meta-revision-guion.md`.
+
 Si administras **más de una cuenta de Instagram**, al conectar el panel te muestra la
 lista y marcas cuáles quieres ver. Cada una queda como una cuenta aparte, con sus
 posts y sus métricas. Volver a conectar una que ya está solo renueva su acceso.
@@ -758,6 +775,8 @@ Vercel y bajan con `vercel env pull .env.local`.
 | `TIKTOK_CLIENT_KEY` | Conectar TikTok | No — sin ella esa red aparece como no conectada |
 | `TIKTOK_CLIENT_SECRET` | Conectar TikTok | No — sin ella esa red aparece como no conectada |
 | `META_EN_REVISION` | Enciende en Los Fierros el aviso de que, mientras la app de Meta esté en revisión, solo conectan las cuentas invitadas como testers | No — solo mientras la app de Meta esté en modo desarrollo |
+| `REVISION_CORREO` | El único correo (ya invitado en Los Maestros) que, mientras dure el App Review de Meta, recibe un código de ingreso fijo en vez de uno mandado por correo | No — solo durante el App Review de Meta |
+| `REVISION_CODIGO` | El código fijo de seis dígitos que vale para ese correo | No — solo durante el App Review de Meta |
 | `THREADS_APP_ID` | Conectar Threads para publicar | El Threads App ID del caso de uso «API de Threads» de la app de Meta |
 | `THREADS_APP_SECRET` | El secreto de ese caso de uso | Junto con el anterior |
 | `X_CLIENT_ID` | Conectar X para publicar (OAuth 2.0 + PKCE) | El Client ID de la app en developer.x.com |

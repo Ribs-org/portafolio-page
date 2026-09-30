@@ -1,10 +1,11 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   MAX_CODIGOS_POR_VENTANA,
   MAX_INTENTOS,
   VENTANA_MS,
   VIGENCIA_MS,
   codigoCoincide,
+  codigoDeRevision,
   generarCodigo,
   hashCodigo,
   normalizarCorreo,
@@ -50,6 +51,26 @@ describe('vigente', () => {
     expect(vigente({ ...fila, expiraEn: new Date(now.getTime() - 1) }, now)).toBe(false)
     expect(vigente({ ...fila, usadoEn: now }, now)).toBe(false)
     expect(vigente({ ...fila, intentos: MAX_INTENTOS }, now)).toBe(false)
+  })
+})
+
+describe('codigoDeRevision', () => {
+  afterEach(() => vi.unstubAllEnvs())
+  it('sin variables no hay código de revisión', () => {
+    expect(codigoDeRevision('revision@tu-parrilla.cl')).toBeNull()
+  })
+  it('con las dos variables, solo ese correo (normalizado) recibe el código fijo', () => {
+    vi.stubEnv('REVISION_CORREO', 'Revision@Tu-Parrilla.cl')
+    vi.stubEnv('REVISION_CODIGO', '123456')
+    expect(codigoDeRevision('revision@tu-parrilla.cl')).toBe('123456')
+    expect(codigoDeRevision('otra@tu-parrilla.cl')).toBeNull()
+  })
+  it('un código que no son seis dígitos se ignora', () => {
+    vi.stubEnv('REVISION_CORREO', 'revision@tu-parrilla.cl')
+    vi.stubEnv('REVISION_CODIGO', 'abc')
+    vi.spyOn(console, 'warn').mockImplementation(() => {})
+    expect(codigoDeRevision('revision@tu-parrilla.cl')).toBeNull()
+    vi.restoreAllMocks()
   })
 })
 
