@@ -100,6 +100,9 @@ vi.mock('postgres', () => ({
 }))
 
 process.env.DATABASE_URL = 'postgres://usuario:clave@host/base'
+// `guardarCuenta` cifra el token antes de escribirlo, y `encryptToken` deriva su llave de
+// `AUTH_SECRET`. Sin esto, la función revienta antes de construir ninguna consulta.
+process.env.AUTH_SECRET = 'secreto-de-prueba-para-el-arnes'
 
 // Import estático, después de los `vi.mock`: Vitest los sube al principio del archivo al
 // transformarlo, así que el orden de las líneas no importa, pero un import dinámico dentro
@@ -115,6 +118,7 @@ const { verificarCuentas, cuentaUnicaPorRed } = await import('./social/cuentas')
 const { todosLosCortes, cortesEntre, quemadosDe, servidosAyer } = await import('./social/publish/cortes')
 const { leerAjuste } = await import('./ajustes')
 const { makeDefault, updateProfile, deleteScheduledPost } = await import('@/app/admin/actions')
+const { guardarCuenta } = await import('./social/conectar')
 
 beforeEach(() => {
   capturas.length = 0
@@ -428,6 +432,45 @@ describe('aislamiento por dueño, escrituras (SQL generado, sin base)', () => {
     ])
     expect(consultas).toHaveLength(2)
     for (const c of consultas) esperarFiltradoPorDueno(c)
+  })
+
+  /**
+   * `guardarCuenta` es por donde pasa toda cuenta conectada, y la entrega de Meta le tocó
+   * el `insert` y el `set` del `onConflictDoUpdate`. No usa `esperarFiltradoPorDueno`
+   * porque ninguna de sus dos consultas tiene —ni puede tener— un `owner_id` en el WHERE:
+   *
+   * - La lectura busca por `(network, external_id)` **a propósito**: es justamente el
+   *   guardia que descubre que esa cuenta ya es de otro dueño. Filtrar por el dueño de
+   *   turno la dejaría ciega y el `insert` pisaría el token del primero.
+   * - El `insert` no lleva WHERE, y su `onConflictDoUpdate` apunta a `(network,
+   *   external_id)` porque esa es hoy la única de la tabla. Lo que sí tiene que ser cierto
+   *   —y es lo que este caso fija— es que el `owner_id` que se escribe sea el que llegó
+   *   por parámetro, y no uno derivado de la fila que ya estaba.
+   */
+  it('social/conectar: guardarCuenta escribe con el dueño que recibió', async () => {
+    const consultas = await consultasEncadenadas(
+      () =>
+        guardarCuenta(DUENO, 'instagram', {
+          externalId: '17841400000000000',
+          handle: 'cuenta',
+          accessToken: 'token',
+          refreshToken: null,
+          expiresAt: null,
+          metaUserId: '10201234567890',
+        }),
+      [[]], // nadie tiene esa cuenta todavía: sigue al insert.
+    )
+    expect(consultas).toHaveLength(2)
+
+    const [lectura, escritura] = consultas as [Captura, Captura]
+    // La lectura mira la cuenta, no al dueño: ese es el guardia de choque.
+    expect(lectura.sql).toMatch(/from "social_accounts"/i)
+    expect(lectura.params).toContain('17841400000000000')
+
+    expect(escritura.sql).toMatch(/insert into "social_accounts"/i)
+    expect(escritura.params).toContain(DUENO)
+    // Y el dueño va como parámetro ligado, nunca escrito en el texto de la consulta.
+    expect(escritura.sql).not.toContain(DUENO)
   })
 
   it('api/mobile/schedule/accounts: lista solo las cuentas del dueño', async () => {
