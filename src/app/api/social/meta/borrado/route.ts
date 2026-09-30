@@ -36,8 +36,9 @@ export async function POST(request: Request) {
   try {
     ;({ codigo } = await borrarDatosDe(firmado.userId))
   } catch (error) {
-    // Sin el id de usuario en el registro: es de Meta, y el 500 basta para que reintente.
-    console.error('meta/borrado: no se pudo borrar', error)
+    // Solo el mensaje, acotado: el error crudo del driver arrastra los parámetros de la
+    // consulta, y ahí iría el id de usuario de Meta. El 500 basta para que Meta reintente.
+    console.error('meta/borrado: no se pudo borrar', String(error).slice(0, 300))
     return new NextResponse(null, { status: 500 })
   }
 
