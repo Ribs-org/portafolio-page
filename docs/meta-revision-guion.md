@@ -123,7 +123,7 @@ permisos si cada uno tiene su tramo claro.
 | 6 | **Facebook → Conectar →**, mismo diálogo, misma página. Tarjeta de Facebook. | 6 |
 | 7 | Pulsar **Sincronizar**. Pestaña **Los Cortes**: las tres publicaciones con sus números. | 7 |
 | 8 | Pestaña **Los Números**: alcance, seguidores, la serie por día. | 8 |
-| 9 | Pestaña **La Parrilla** → «Poner al fuego»: subir el video, marcar **Instagram**, elegir «Ahora», **Programar**. Mostrar el corte en la parrilla y, en El Fuego, pasar a publicado. Abrir Instagram y mostrar el reel. | 9 |
+| 9 | **El Fuego → «Poner al fuego»** (abre el compositor en La Parrilla): subir el video, marcar **Instagram**, elegir «Ahora», **Programar**. Mostrar el corte en la parrilla y, de vuelta en El Fuego, pasar a publicado. Abrir Instagram y mostrar el reel. | 9 |
 | 10 | Lo mismo con la foto marcando **Facebook**; mostrar la publicación en la página. | 10 |
 | 11 | Desde otra cuenta, comentar «GUÍA» en el reel recién publicado. Esperar la corrida (hasta cinco minutos). | |
 | 12 | Pestaña **La Mesa**: el comentario en la cola, la respuesta propuesta, **Aprobar**; y la regla de palabra clave que ya respondió sola. Abrir Instagram y mostrar las dos respuestas. | 11 |

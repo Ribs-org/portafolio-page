@@ -263,7 +263,7 @@ POST /v2/post/publish/video/init/ (Direct Post, source PULL_FROM_URL from our ve
 POST /v2/post/publish/status/fetch/ — status, publicaly_available_post_id, fail_reason.
 POST /v2/post/publish/inbox/video/init/ — for drafts.
 GET /v2/video/list/ — id, title, cover_image_url, share_url, view_count, like_count, comment_count, share_count (the creator's own videos, for the Content tab).
-GET /v2/user/info/ — open_id, display_name, avatar_url (to label the connected account).
+GET /v2/user/info/ — open_id, display_name (to label the connected account).
 ```
 
 **Explain how you determined the daily usage estimate:**
@@ -285,7 +285,7 @@ las opciones.
 | 1 | Portal de TikTok: la app **en producción** (no sandbox), Content Posting API con Direct Post. | 1 |
 | 2 | `/ingresar`, código, entrar. | 2 |
 | 3 | Los Fierros → TikTok, el aviso bajo el título, **Conectar →**; pantalla de permisos con los cuatro scopes; autorizar. | 3 |
-| 4 | **La Parrilla → Poner al fuego**: subir el video, marcar TikTok. Mostrar el bloque **sin tocar**: privacidad sin elegir (las opciones vienen de `creator_info`), comentarios/dúo/pegar apagados, contenido comercial, el aviso de TikTok. | 4 |
+| 4 | **El Fuego → «Poner al fuego»** (abre el compositor en La Parrilla): subir el video, marcar TikTok. Mostrar el bloque **sin tocar**: privacidad sin elegir (las opciones vienen de `creator_info`), comentarios/dúo/pegar apagados, contenido comercial, el aviso de TikTok. | 4 |
 | 5 | Intentar **Programar** sin privacidad: se bloquea. | 5 |
 | 6 | Elegir **«Público»** (o la más abierta que devuelva la cuenta), encender comentarios, marcar «Contenido comercial → Tu marca». | 6 |
 | 7 | «Ahora», **Programar**. Sin esperar: el carrusel de tres fotos, TikTok, «Amigos», Programar. | 7 |
@@ -304,5 +304,5 @@ and revoke.» 10 «Privacy policy.»
 
 - El cupo de 5 usuarios/día desaparece y la privacidad elegida se respeta.
 - Quitar la frase de TikTok de `AVISO_ANTES_DE_CONECTAR` (`src/lib/networks.ts`) y su test,
-  y la nota del compositor «Mientras TikTok no apruebe la app…» (`schedule/composer.tsx`),
+  y la nota del bloque de TikTok «Mientras TikTok no apruebe la app…» (`schedule/tiktok-opciones.tsx`),
   y las frases correspondientes del README.
