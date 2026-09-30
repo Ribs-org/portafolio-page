@@ -32,12 +32,29 @@ agrega una segunda.
 
 Título en pantalla: **El Fuego**. Desde la entrega 3 de «el panel con poco a priori» no
 tiene gráficos: el termómetro de los próximos siete días, las filas de hoy y de lo quemado,
-el botón «Poner al fuego» y el pie de ayer en mono. Los puntos 5–7 no aplican. Mira acá que
-las filas se lean a 400 px —la hora, los logos de `Redes` y el texto en una línea caben o
-se envuelven sin cortar— y que el rojo de «Se quemó» y el motivo del fallo se lean sobre la
-chapa. Con **todas** las cuentas desconectadas en el entorno de prueba se ve la otra cara:
-la tarjeta «Conecta tu primera red», sola. Con una desconectada y otra viva sigue saliendo
-El Fuego entero: la tarjeta pide que no quede ninguna con credencial.
+el botón «Poner al fuego» y el pie de ayer en mono. De los siete puntos de arriba, el 5 y
+el 6 no aplican; el 7 tampoco, pero esta pantalla trae un control que ninguna otra de la
+lista tiene, y va al final.
+
+Mira acá que las filas se lean a 360 y a 400 px: hasta `sm` (640 px) **el texto del corte
+baja a su propia línea**, debajo de la hora, los logos de `Redes` y la cocción, porque
+compartiendo línea se quedaba en unos quince caracteres; de `sm` en adelante los cuatro
+trozos van en una sola línea y el texto ocupa el resto. Confirma que el rojo de «Se quemó»
+y el motivo del fallo se lean sobre la chapa, y que la hora de un fallo que no es de hoy
+diga también su día y su mes («lun 28 de sep · 09:15»).
+
+Con **todas** las cuentas desconectadas en el entorno de prueba se ve la otra cara: la
+tarjeta «Conecta tu primera red», sola. Con una desconectada y otra viva sigue saliendo El
+Fuego entero: la tarjeta pide que no quede ninguna con credencial.
+
+**El diálogo de hora nueva** (`schedule/reprogramar.tsx`, el botón «Reprogramar» de cada
+fila quemada) es el único control interactivo propio de esta pantalla y el que más rondas
+costó, así que se mira aparte: que nazca **centrado en la ventana** y no colgando del botón,
+que el velo atenúe lo de atrás y se trague los clics —un clic fuera cierra, y no debe
+activar nada de lo que hay debajo—, que **Esc** cierre, que el foco no se escape del diálogo
+al tabular, que arriba se lea de qué destino es la hora («TikTok · @handle») y que al
+reabrirlo nazca limpio, sin el error de la vez anterior y con el campo vacío. A 360 px tiene
+que caber entero, sin desbordar a los lados.
 
 ### 2. Los Números — `/admin/analytics` — `analytics/page.tsx`
 
