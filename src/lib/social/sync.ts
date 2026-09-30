@@ -5,7 +5,8 @@ import { accountMetrics, getDb, postMetrics, socialAccounts, socialPosts } from 
 import type { SocialAccount } from '@/db'
 import { localDay } from '../analytics'
 import { env } from '../env'
-import { adminId } from '../usuarios'
+import { adminId, buscarPorId } from '../usuarios'
+import { ZONA_POR_DEFECTO } from '../zona'
 import { postsToArchive } from './archive'
 import { campaignTagFor, type CuentaTag } from './campaign'
 import type { FetchedPost } from './connector'
@@ -153,7 +154,14 @@ export async function syncAccount(account: SocialAccount, primaria: boolean): Pr
 
     const { posts: fetched, windowWasCapped } = await connector.fetchPosts(account, token)
 
-    const day = localDay(new Date())
+    // El día del dueño, no el del servidor: `getPostRows` compara estas llaves contra
+    // `localDay(…, f.zone)`, así que una captura escrita en otra zona se leería un día
+    // corrida —o fuera de la ventana— para quien la mira.
+    // `owner_id` es nullable en el esquema (filas anteriores a los usuarios), y por eso
+    // el default del sitio sigue siendo la última palabra acá.
+    const dueno = account.ownerId ? await buscarPorId(account.ownerId) : null
+    const zona = dueno?.zona ?? ZONA_POR_DEFECTO
+    const day = localDay(new Date(), zona)
     for (const post of fetched) {
       const id = await upsertPost(post, account, cuenta)
       await writeSnapshot(id, post, day)

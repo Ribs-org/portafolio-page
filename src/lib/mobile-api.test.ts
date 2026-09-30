@@ -15,6 +15,10 @@ import {
 } from './mobile-api'
 import { CuentaInvalida, type CuentaDestino } from './social/cuentas'
 
+// `batch.ts` importa `@/lib/usuarios` (la zona del dueño del lote), que trae
+// `server-only` y no resuelve bajo Vitest. Mismo arreglo que en `aislamiento.test.ts`.
+vi.mock('server-only', () => ({}))
+
 const now = new Date('2026-06-15T18:00:00Z')
 
 describe('parseRango', () => {

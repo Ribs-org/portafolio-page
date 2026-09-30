@@ -26,6 +26,7 @@ export const users = pgTable('users', {
   correo: text('correo').notNull().unique(),
   nombre: text('nombre'),
   rol: text('rol').$type<Rol>().notNull().default('usuario'),
+  zona: text('zona').notNull().default('America/Santiago'),
   sesionVersion: integer('sesion_version').notNull().default(1),
   invitadoEn: timestamp('invitado_en', { withTimezone: true }).notNull().defaultNow(),
   primerIngresoEn: timestamp('primer_ingreso_en', { withTimezone: true }),

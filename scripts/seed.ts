@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto'
 import postgres from 'postgres'
 import { drizzle } from 'drizzle-orm/postgres-js'
 import { links, profiles, users } from '../src/db/schema'
+import { ZONA_POR_DEFECTO } from '../src/lib/zona'
 
 /**
  * Creates the two starter profiles so the site is never empty on first load.
@@ -34,9 +35,11 @@ async function main() {
   // por correo (crea al admin si todavía no existe).
   const correo = process.env.ADMIN_EMAIL?.replace(/^﻿/, '').trim().toLowerCase()
   if (!correo) throw new Error('ADMIN_EMAIL is not set')
+  // `zona` explícita, igual que `invitar` y `migrar.ts`: la variable manda al crear a
+  // alguien, y el default de la columna queda solo como red de seguridad.
   const [admin] = await db
     .insert(users)
-    .values({ correo, rol: 'admin' })
+    .values({ correo, rol: 'admin', zona: ZONA_POR_DEFECTO })
     .onConflictDoUpdate({ target: users.correo, set: { rol: 'admin' } })
     .returning({ id: users.id })
   const ownerId = admin!.id

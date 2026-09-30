@@ -478,3 +478,47 @@ usuario de Threads vive en la misma columna `meta_user_id` (son espacios de ids 
 así que compartir columna pide también mirar la red al filtrar) o en una propia. La página
 de estado y `solicitudes_borrado` sirven igual, que para eso `red` es una columna y no una
 constante.
+
+## Cambiar de zona horaria deja el historial de métricas en la zona vieja
+
+**Abierto desde 2026-09-30.**
+
+Cada snapshot de `post_metrics` y `account_metrics` lleva un `day`, y desde la entrega B
+del panel para terceros `sync.ts` lo escribe en la zona del dueño de la cuenta (con
+`ZONA_POR_DEFECTO` si la cuenta no tiene dueño), que es la misma zona con la que
+`getPostRows` y las series de Los Números lo leen. Mientras el dueño no cambie su zona,
+todo cuadra.
+
+Si la cambia en Tu Cuenta, los `day` ya escritos se quedan en la zona vieja y los nuevos
+salen en la nueva: cerca de la fecha del cambio una fila puede correrse un día en la
+serie —ni pérdida ni duplicación, un artefacto de un día, una sola vez—. No se avisa en
+Tu Cuenta a propósito: alarmaría por algo que casi nadie va a notar.
+
+Cerrarlo cuesta una de dos: reescribir los `day` del dueño al cambiar de zona (una
+migración de datos por usuario, dentro de `guardarCuenta`), o guardar el instante del
+snapshot y calcular el día al leer, que es un cambio de esquema y de todas las lecturas.
+
+
+## El teléfono programa en la zona del aparato y lee en la del dueño
+
+**Abierto desde 2026-09-30.**
+
+La entrega B le dio a cada usuario su zona horaria, y `api/mobile/*` la respeta al
+devolver: la app trocea la cadena que recibe (`cuando.slice(11, 16)`) en vez de volver a
+formatearla, así que lo que muestra ya viene en `users.zona`. Al revés no: el selector de
+fecha de `mobile/src/app/(tabs)/publicar.tsx` corre en la zona del teléfono y manda
+`fecha.toISOString()`, un instante absoluto. `POST /api/mobile/schedule` lo acepta tal
+cual, y hace bien —un ISO con offset no necesita zona ninguna—.
+
+El resultado es que, con el teléfono y Tu Cuenta en zonas distintas, uno elige «19:00» y la
+app se lo confirma a otra hora. Ninguna pantalla de la app dice en qué zona vive la cuenta,
+así que no hay dónde darse cuenta. Con el dueño y su teléfono en el mismo sitio —el caso de
+hoy— no se nota, y por eso quedó fuera del alcance de la entrega, que nombraba `api/mobile/*`
+y no la app.
+
+Cerrarlo es barato y son dos decisiones, no una: que `GET /api/mobile/overview` devuelva
+`zona` junto a los kpis, y después o bien el selector compone la hora en esa zona (lo
+correcto: «19:00» es 19:00 del dueño en los dos lados), o bien la app solo la muestra junto
+al selector («se publicará a las 19:00 de Europe/Madrid») y deja que el dueño traduzca. Lo
+segundo es una tarde; lo primero pide aritmética de zonas en el cliente, que es justo lo
+que `fromZonedInput` ya resuelve en el servidor.

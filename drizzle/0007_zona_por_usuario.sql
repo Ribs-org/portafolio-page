@@ -1,0 +1,1 @@
+ALTER TABLE "users" ADD COLUMN "zona" text DEFAULT 'America/Santiago' NOT NULL;

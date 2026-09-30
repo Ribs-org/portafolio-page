@@ -3,11 +3,16 @@ import type { Usuario } from '@/db'
 import { CuentaInvalida, type CuentaDestino } from '@/lib/social/cuentas'
 import { OPCIONES_ERROR, TRIAL_REEL_MEDIA } from '@/lib/social/publish/opciones'
 
+// `batch.ts` importa `@/lib/usuarios` (la zona del dueño del lote), que trae
+// `server-only` y no resuelve bajo Vitest. Mismo arreglo que en `aislamiento.test.ts`.
+vi.mock('server-only', () => ({}))
+
 const USUARIO: Usuario = {
   id: 'owner-1',
   correo: 'dueno@example.com',
   nombre: null,
   rol: 'usuario',
+  zona: 'America/Santiago',
   sesionVersion: 1,
   invitadoEn: new Date('2026-01-01'),
   primerIngresoEn: new Date('2026-01-01'),

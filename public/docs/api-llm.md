@@ -25,7 +25,8 @@ Sin ella, o con una incorrecta: `401` con el cuerpo `No autorizado`.
 }
 ```
 
-`fecha` es siempre obligatoria (`YYYY-MM-DD HH:MM`, hora de `America/Santiago`, futura). Cada
+`fecha` es siempre obligatoria (`YYYY-MM-DD HH:MM`, en la zona horaria del dueño —la de Tu
+Cuenta—, futura). Cada
 fila necesita además: `texto` o al menos un elemento en `media`, y `redes` o `cuentas` con al
 menos un elemento. `redes` solo resuelve la cuenta a nombrar la red si hay exactamente una
 conectada de esa red; con dos, hay que usar `cuentas` con el identificador exacto (se leen en

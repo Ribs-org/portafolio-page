@@ -36,6 +36,7 @@ const USUARIO = {
   correo: 'ana@example.com',
   nombre: null,
   rol: 'usuario' as const,
+  zona: 'America/Santiago',
   sesionVersion: 1,
   invitadoEn: new Date('2026-01-01'),
   primerIngresoEn: new Date('2026-01-01'),
@@ -206,7 +207,9 @@ const {
   createScheduledPost,
   fusionarCuenta,
   rescheduleTarget,
+  guardarCuenta,
 } = await import('./actions')
+const { ZONA_INVALIDA } = await import('@/lib/zona')
 const { TRIAL_REEL_MEDIA } = await import('@/lib/social/publish/opciones')
 const { FUSION_DISTINTA_RED, FUSION_NO_ES_TUYA, FUSION_FALLO } = await import('@/lib/social/fusion')
 
@@ -641,5 +644,61 @@ describe('rescheduleTarget: la hora nueva solo alcanza a un destino todavía que
 
     expect(await rescheduleTarget('target-ajeno', futuro)).toEqual({ error: 'Ese destino ya no existe.' })
     expect(db.updateCalls).toHaveLength(0)
+  })
+
+  it('la hora local se lee en la zona del usuario, no en la del sitio', async () => {
+    leeraQuemado([quemado])
+    const zonaDeAntes = USUARIO.zona
+    USUARIO.zona = 'Europe/Madrid'
+    // El reloj queda fijo antes del instante que se programa: si no, este test caducaría
+    // el día que 2026-10-01 deje de ser futuro y la acción lo rechazaría por pasado.
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-09-30T12:00:00Z'))
+    try {
+      expect(await rescheduleTarget('target-1', '2026-10-01T19:00')).toEqual({ ok: true })
+    } finally {
+      vi.useRealTimers()
+      USUARIO.zona = zonaDeAntes
+    }
+
+    // Las 19:00 de Madrid en octubre (CEST, UTC+2) son las 17:00Z. En Santiago habrían
+    // sido las 22:00Z: es la diferencia que este test sujeta.
+    const values = db.updateCalls[0] as Record<string, unknown>
+    expect(values.scheduledAt).toEqual(new Date('2026-10-01T17:00:00Z'))
+  })
+})
+
+describe('guardarCuenta: el nombre y la zona horaria de quien está en la sesión', () => {
+  it('una zona que Intl no conoce no escribe nada y devuelve la frase de siempre', async () => {
+    const formData = new FormData()
+    formData.set('nombre', 'Ana')
+    // Un `<select>` se edita en el navegador: lo que llega no es necesariamente una de las
+    // opciones que se ofrecieron.
+    formData.set('zona', 'Marte/Olympus')
+
+    expect(await guardarCuenta({}, formData)).toEqual({ error: ZONA_INVALIDA })
+    expect(db.updateCalls).toHaveLength(0)
+    expect(revalidados).toEqual([])
+  })
+
+  it('con una zona válida escribe el nombre recortado y la zona, y repinta el panel', async () => {
+    const formData = new FormData()
+    formData.set('nombre', '  Ana Pérez  ')
+    formData.set('zona', 'Europe/Madrid')
+
+    expect(await guardarCuenta({}, formData)).toEqual({ ok: true })
+    expect(db.updateCalls).toEqual([{ nombre: 'Ana Pérez', zona: 'Europe/Madrid' }])
+    // La hora de abajo se calcula en el servidor: sin este revalidado seguiría siendo la
+    // de la zona vieja.
+    expect(revalidados).toEqual(['/admin', '/admin/cuenta'])
+  })
+
+  it('un nombre en blanco se guarda como nulo, no como cadena vacía', async () => {
+    const formData = new FormData()
+    formData.set('nombre', '   ')
+    formData.set('zona', 'America/Santiago')
+
+    expect(await guardarCuenta({}, formData)).toEqual({ ok: true })
+    expect(db.updateCalls).toEqual([{ nombre: null, zona: 'America/Santiago' }])
   })
 })

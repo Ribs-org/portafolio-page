@@ -1,7 +1,6 @@
 import { notFound } from 'next/navigation'
 import { and, asc, eq } from 'drizzle-orm'
 import { getDb, scheduledPosts, scheduledPostTargets, scheduledPostMedia, reglasClave } from '@/db'
-import { SITE_TIMEZONE } from '@/lib/analytics'
 import { requireUser } from '@/lib/auth'
 import { getCuentas } from '@/lib/posts'
 import { toZonedInput } from '@/lib/utils'
@@ -24,7 +23,10 @@ export default async function EditScheduledPostPage({
       ? query.volver
       : '/admin/schedule'
 
-  const { id: ownerId } = await requireUser()
+  // `zona` pinta la hora del campo en la zona del dueño, que es la misma en la que
+  // `updateScheduledPost` la vuelve a leer: si no coincidieran, guardar sin tocar la hora
+  // la movería.
+  const { id: ownerId, zona } = await requireUser()
   const db = getDb()
   const [post] = await db
     .select()
@@ -48,7 +50,7 @@ export default async function EditScheduledPostPage({
       postId={id}
       volver={volver}
       caption={post.caption}
-      scheduledAtLocal={toZonedInput(post.scheduledAt, SITE_TIMEZONE)}
+      scheduledAtLocal={toZonedInput(post.scheduledAt, zona)}
       cuentas={cuentas}
       targets={targets.map((t) => ({
         accountId: t.accountId,

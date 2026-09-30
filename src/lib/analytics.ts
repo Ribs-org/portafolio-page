@@ -1,22 +1,26 @@
 import 'server-only'
 import { and, desc, eq, gte, inArray, lte, sql, type AnyColumn, type SQL } from 'drizzle-orm'
 import { clicks, getDb, links, profiles, visits } from '@/db'
-import { env } from './env'
 
-/** Dashboard days are bucketed in this zone, not UTC. Override per deployment. */
-export const SITE_TIMEZONE = env('SITE_TIMEZONE') ?? 'America/Santiago'
+// Reexported, not defined here: this file drags in `server-only`, and `lib/zona.ts` (a pure
+// module, covered by its own vitest suite) needs the same derivation without that import.
+// Nada de este archivo la lee ya: cada consulta agrupa en la zona que trae `Filters`.
+export { SITE_TIMEZONE } from './zona'
 
 /**
- * The `YYYY-MM-DD` a moment falls on in SITE_TIMEZONE.
+ * The `YYYY-MM-DD` a moment falls on in `zone` — the owner's, never the runtime's.
  *
  * Shared rather than copied: the sync writes a snapshot's `day` with it and the query
  * layer buckets by it, so the two agreeing is what keeps a metric on the day it was
  * actually captured. Two identical copies under two names are one careless edit away
  * from silently disagreeing.
+ *
+ * Sin valor por defecto a propósito: la zona es de quien mira, y un default la haría
+ * fácil de olvidar en el sitio donde más se nota.
  */
-export function localDay(date: Date): string {
+export function localDay(date: Date, zone: string): string {
   return new Intl.DateTimeFormat('en-CA', {
-    timeZone: SITE_TIMEZONE,
+    timeZone: zone,
     year: 'numeric',
     month: '2-digit',
     day: '2-digit',
@@ -29,6 +33,8 @@ export type Filters = {
   from: Date
   to: Date
   includeBots: boolean
+  /** La zona del dueño: dónde empieza y termina cada día de esta consulta. */
+  zone: string
 }
 
 const int = (fragment: SQL) => sql<number>`${fragment}`.mapWith(Number)
@@ -98,7 +104,7 @@ export async function getKpis(f: Filters): Promise<Kpis> {
 
 export type SeriesPoint = {
   bucket: string
-  /** Axis tick, already formatted in SITE_TIMEZONE. */
+  /** Axis tick, already formatted in the owner's zone. */
   label: string
   /** Tooltip heading. */
   fullLabel: string
@@ -123,8 +129,9 @@ const MONTHS_LONG = [
 
 /**
  * Formats a bucket key without ever constructing a zoned Date: the key already
- * holds wall-clock time in SITE_TIMEZONE, so re-parsing it as an instant would
- * shift it a second time.
+ * holds wall-clock time in the owner's zone, so re-parsing it as an instant would
+ * shift it a second time. That is also why this one takes no zone: by the time a
+ * bucket gets here the zone has already done its work.
  */
 export function describe(
   bucket: string,
@@ -157,7 +164,7 @@ export async function getTimeSeries(f: Filters): Promise<SeriesPoint[]> {
   const unit = granularityFor(f)
   const interval = unit === 'hour' ? '1 hour' : unit === 'day' ? '1 day' : '1 week'
   const pattern = unit === 'hour' ? 'YYYY-MM-DD"T"HH24' : 'YYYY-MM-DD'
-  const tz = SITE_TIMEZONE
+  const tz = f.zone
 
   // `.toISOString()` y no el `Date` pelado: el driver de `postgres-js` instala
   // serializadores transparentes para los tipos de fecha, así que un `Date` suelto en SQL
@@ -308,7 +315,7 @@ export async function getTopLinks(f: Filters, totalVisits: number): Promise<Link
 export type HeatCell = { dow: number; hour: number; visits: number }
 
 export async function getHeatmap(f: Filters): Promise<HeatCell[]> {
-  const local = sql`${visits.createdAt} AT TIME ZONE ${SITE_TIMEZONE}`
+  const local = sql`${visits.createdAt} AT TIME ZONE ${f.zone}`
   const rows = await getDb()
     .select({
       dow: int(sql`extract(isodow from ${local})`),

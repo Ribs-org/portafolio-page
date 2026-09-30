@@ -52,8 +52,13 @@ beforeEach(() => {
   parametros.length = 0
 })
 
+// La zona, a propósito, distinta del default del sitio (`SITE_TIMEZONE` de arriba): los dos
+// `at time zone` de SQL crudo —`getTimeSeries` y `getPostSeries`— tienen que mandar la del
+// dueño, y con las dos cadenas iguales este archivo pasaría verde aunque alguien volviera a
+// leer la constante.
 const FILTROS = {
   ownerId: '11111111-1111-4111-8111-111111111111',
+  zone: 'Europe/Madrid',
   profileId: null,
   from: new Date('2026-08-23T00:00:00Z'),
   to: new Date('2026-09-22T00:00:00Z'),
@@ -71,6 +76,9 @@ describe('ningún Date llega crudo al driver', () => {
     const enviados = todos()
     expect(enviados.length).toBeGreaterThan(0)
     expect(enviados.filter((p) => p instanceof Date)).toEqual([])
+    // Y la zona que viaja es la del dueño, no la del sitio.
+    expect(enviados).toContain('Europe/Madrid')
+    expect(enviados).not.toContain('America/Santiago')
   })
 
   it('posts: getPostSeries manda sus fechas como texto', async () => {
@@ -78,5 +86,7 @@ describe('ningún Date llega crudo al driver', () => {
     const enviados = todos()
     expect(enviados.length).toBeGreaterThan(0)
     expect(enviados.filter((p) => p instanceof Date)).toEqual([])
+    expect(enviados).toContain('Europe/Madrid')
+    expect(enviados).not.toContain('America/Santiago')
   })
 })

@@ -1,7 +1,6 @@
 import Link from 'next/link'
 import { ENLACE_BOTON } from '@/components/boton'
 import { Encabezado } from '@/components/ui'
-import { SITE_TIMEZONE } from '@/lib/analytics'
 import { requireUser } from '@/lib/auth'
 import { avisoDelSiguiente, cortesDeHoy, horaConDia, pieDeAyer, quemados, siguienteCorte } from '@/lib/fuego'
 import { NOMBRE_COCCION, coccionDe } from '@/lib/parrilla'
@@ -31,7 +30,9 @@ export const dynamic = 'force-dynamic'
 const DIAS_ADELANTE = 30
 
 export default async function FuegoPage() {
-  const { id: ownerId } = await requireUser()
+  // «Hoy» y «ayer» son días de calendario: cuáles son depende de la zona del dueño, no de
+  // la del servidor ni de la del sitio.
+  const { id: ownerId, zona } = await requireUser()
   const cuentas = await getCuentas(ownerId)
 
   return (
@@ -39,7 +40,7 @@ export default async function FuegoPage() {
       <header className="mb-6">
         <Encabezado ruta="/admin" />
       </header>
-      {cuentas.some((cuenta) => cuenta.connected) ? <Fuego ownerId={ownerId} /> : <PrimerDia />}
+      {cuentas.some((cuenta) => cuenta.connected) ? <Fuego ownerId={ownerId} zone={zona} /> : <PrimerDia />}
     </>
   )
 }
@@ -63,8 +64,7 @@ function PrimerDia() {
   )
 }
 
-async function Fuego({ ownerId }: { ownerId: string }) {
-  const zone = SITE_TIMEZONE
+async function Fuego({ ownerId, zone }: { ownerId: string; zone: string }) {
   const now = new Date()
   const hoy = dayKey(now, zone)
   const manana = addDays(hoy, 1)

@@ -6,9 +6,8 @@ import { redirect } from 'next/navigation'
 import { cookies } from 'next/headers'
 import { basePublica, existe, guardar, keyDesdeUrl, SIN_ALMACEN } from '@/lib/storage'
 import { and, asc, eq, inArray, max, ne, sql } from 'drizzle-orm'
-import { getDb, links, profiles, socialAccounts, socialPosts, scheduledPosts, scheduledPostTargets, scheduledPostMedia, reglasClave } from '@/db'
+import { getDb, links, profiles, socialAccounts, socialPosts, scheduledPosts, scheduledPostTargets, scheduledPostMedia, reglasClave, users } from '@/db'
 import { LINK_KINDS, type LinkKind } from '@/db/schema'
-import { SITE_TIMEZONE } from '@/lib/analytics'
 import { destroySession, requireAdmin, requireUser } from '@/lib/auth'
 import { normalizeCampaignTag } from '@/lib/social/campaign'
 import { columnasEditablesDeRegla, validarRegla } from '@/lib/social/comentarios/reglas'
@@ -38,7 +37,10 @@ import { validateAtributos, ATRIBUTOS_ERROR, type Atributos } from '@/lib/social
 import { diffMedia, diffTargets } from '@/lib/social/publish/edit'
 import { crearPostProgramado } from '@/lib/social/publish/crear'
 import { CuentaInvalida, verificarCuentas, type CuentaDestino } from '@/lib/social/cuentas'
-import { CUENTA_DE_OTRO, CuentaDeOtro, guardarCuenta, tokensDePaginas } from '@/lib/social/conectar'
+// `guardarCuenta` de `social/conectar` guarda una cuenta *de una red*; la acción de abajo,
+// con el mismo nombre, guarda la cuenta *del usuario*. Se renombra la de la red al
+// importarla porque la acción es la que el formulario nombra desde fuera.
+import { CUENTA_DE_OTRO, CuentaDeOtro, guardarCuenta as guardarCuentaDeRed, tokensDePaginas } from '@/lib/social/conectar'
 import { SIN_TOKEN_DE_PAGINA } from '@/lib/social/facebook'
 import { tiktokConnector } from '@/lib/social/tiktok'
 import { TIKTOK_SIN_CUENTA, consultarCreador, type CreadorTikTok } from '@/lib/social/publish/tiktok-creador'
@@ -48,6 +50,7 @@ import { ARCHIVO_AJENO, ARCHIVO_FALTANTE, CUERPO_ILEGIBLE, parseMediaMovil, type
 import { esReservado } from '@/lib/slugs'
 import { cerrarSesiones, esChoqueDeUnicidad, invitar, pedir, quitar } from '@/lib/usuarios'
 import { fromZonedInput, normalizeUrl, slugify } from '@/lib/utils'
+import { ZONA_INVALIDA, esZonaValida } from '@/lib/zona'
 
 export type FormState = { error?: string; ok?: boolean; aviso?: string }
 
@@ -250,7 +253,8 @@ export async function rotateSlug(profileId: string) {
 
 /* ------------------------------------------------------------------- links -- */
 
-function readLinkForm(formData: FormData) {
+/** `zona` es la del dueño de la sesión: la misma en la que el editor pintó las ventanas. */
+function readLinkForm(formData: FormData, zona: string) {
   const kind = String(formData.get('kind') ?? 'standard')
 
   return {
@@ -263,8 +267,8 @@ function readLinkForm(formData: FormData) {
     isActive: formData.get('isActive') === 'on',
     // Read in the same zone the editor rendered them in, so re-saving a link —
     // which the row toggle does on every click — leaves the window untouched.
-    startsAt: fromZonedInput(String(formData.get('startsAt') ?? ''), SITE_TIMEZONE),
-    endsAt: fromZonedInput(String(formData.get('endsAt') ?? ''), SITE_TIMEZONE),
+    startsAt: fromZonedInput(String(formData.get('startsAt') ?? ''), zona),
+    endsAt: fromZonedInput(String(formData.get('endsAt') ?? ''), zona),
   }
 }
 
@@ -273,8 +277,8 @@ export async function createLink(
   _prev: FormState,
   formData: FormData,
 ): Promise<FormState> {
-  const { id: ownerId } = await requireUser()
-  const values = readLinkForm(formData)
+  const { id: ownerId, zona } = await requireUser()
+  const values = readLinkForm(formData, zona)
 
   if (!values.label) return { error: 'Ponle un nombre al link.' }
   if (!values.url) return { error: 'Falta la URL.' }
@@ -304,8 +308,8 @@ export async function updateLink(
   _prev: FormState,
   formData: FormData,
 ): Promise<FormState> {
-  const { id: ownerId } = await requireUser()
-  const values = readLinkForm(formData)
+  const { id: ownerId, zona } = await requireUser()
+  const values = readLinkForm(formData, zona)
 
   if (!values.label) return { error: 'Ponle un nombre al link.' }
   if (!values.url) return { error: 'Falta la URL.' }
@@ -546,7 +550,7 @@ export async function conectarElegidas(formData: FormData): Promise<void> {
   let fallo: string | null = null
   try {
     for (const cuenta of marcadas) {
-      await guardarCuenta(usuario.id, pendiente.network, {
+      await guardarCuentaDeRed(usuario.id, pendiente.network, {
         externalId: cuenta.externalId,
         handle: cuenta.handle,
         accessToken:
@@ -686,7 +690,7 @@ async function mediaYaSubida(
 }
 
 export async function createScheduledPost(_prev: FormState, formData: FormData): Promise<FormState> {
-  const { id: ownerId } = await requireUser()
+  const { id: ownerId, zona } = await requireUser()
 
   const caption = String(formData.get('caption') ?? '').trim()
 
@@ -713,7 +717,7 @@ export async function createScheduledPost(_prev: FormState, formData: FormData):
   const scheduledAt =
     formData.get('cuandoAhora') === 'on'
       ? new Date(Date.now() + 60_000)
-      : fromZonedInput(String(formData.get('scheduledAt') ?? ''), SITE_TIMEZONE)
+      : fromZonedInput(String(formData.get('scheduledAt') ?? ''), zona)
   const subida = await mediaYaSubida(formData.get('mediaSubida'))
   if ('error' in subida) return { error: subida.error }
   const uploaded = subida.lista
@@ -769,7 +773,7 @@ export async function updateScheduledPost(
   _prev: FormState,
   formData: FormData,
 ): Promise<FormState> {
-  const { id: ownerId } = await requireUser()
+  const { id: ownerId, zona } = await requireUser()
   const db = getDb()
 
   const [post] = await db
@@ -822,7 +826,7 @@ export async function updateScheduledPost(
     .filter((t) => t.status === 'published' && idsElegidosSet.has(t.accountId))
     .map((t) => ({ id: t.accountId, network: t.network, handle: null }))
   const cuentas = [...cuentasPendientes, ...cuentasPublicadasElegidas]
-  const scheduledAt = fromZonedInput(String(formData.get('scheduledAt') ?? ''), SITE_TIMEZONE)
+  const scheduledAt = fromZonedInput(String(formData.get('scheduledAt') ?? ''), zona)
   const keptIds = formData.getAll('keptMedia').map(String)
   const files = formData.getAll('media').filter((f): f is File => f instanceof File && f.size > 0)
   const urls = String(formData.get('mediaUrls') ?? '')
@@ -1093,9 +1097,10 @@ export async function updateScheduledPost(
 }
 
 export async function rescheduleTarget(targetId: string, localDatetime: string): Promise<FormState> {
-  const { id: ownerId } = await requireUser()
+  const { id: ownerId, zona } = await requireUser()
 
-  const scheduledAt = fromZonedInput(localDatetime, SITE_TIMEZONE)
+  // La hora llega del formulario en pantalla, que la escribió en la zona del dueño.
+  const scheduledAt = fromZonedInput(localDatetime, zona)
   if (!scheduledAt || scheduledAt.getTime() <= Date.now()) {
     return { error: 'La hora debe estar en el futuro.' }
   }
@@ -1311,4 +1316,34 @@ export async function cerrarSesionesUsuario(id: string): Promise<{ error?: strin
   await cerrarSesiones(id)
   revalidatePath('/admin/usuarios')
   return {}
+}
+
+/* ------------------------------------------------------------------ cuenta -- */
+
+/**
+ * «Tu Cuenta»: el nombre con que aparece y la zona horaria en que vive.
+ *
+ * Escribe su propia fila de `users`, así que el filtro por dueño acá es `users.id` y no un
+ * `owner_id`: el id sale de la sesión (`requireUser`), nunca del formulario. La zona se
+ * valida contra `Intl` antes de escribir, porque un `<select>` se edita en el navegador.
+ *
+ * `(prev, formData)` es la firma que pide `useActionState`, y por eso la llevan todas las
+ * acciones de formulario del panel: pasada así, directa y sin envolver en una función del
+ * cliente, React puede plantar los campos ocultos que hacen que el formulario siga
+ * guardando sin JavaScript.
+ */
+export async function guardarCuenta(_prev: FormState, formData: FormData): Promise<FormState> {
+  const usuario = await requireUser()
+  const nombre = String(formData.get('nombre') ?? '').trim() || null
+  const zona = String(formData.get('zona') ?? '')
+  if (!esZonaValida(zona)) return { error: ZONA_INVALIDA }
+
+  await getDb().update(users).set({ nombre, zona }).where(eq(users.id, usuario.id))
+
+  // La hora que se ve bajo el selector se calcula en el servidor: sin revalidar esta
+  // pantalla seguiría mostrando la de la zona vieja. `/admin` va también porque la zona es
+  // de todo el panel, no de esta pantalla.
+  revalidatePath('/admin')
+  revalidatePath('/admin/cuenta')
+  return { ok: true }
 }

@@ -4,7 +4,6 @@ import { notFound } from 'next/navigation'
 import { and, eq } from 'drizzle-orm'
 import { ArrowLeft, ExternalLink } from 'lucide-react'
 import { getDb, profiles } from '@/db'
-import { SITE_TIMEZONE } from '@/lib/analytics'
 import { requireUser } from '@/lib/auth'
 import { dominioProducto, esDominioDelProducto } from '@/lib/dominios'
 import { getAllLinks, getAllProfiles } from '@/lib/profiles'
@@ -18,7 +17,9 @@ export const dynamic = 'force-dynamic'
 
 export default async function EditProfilePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
-  const { id: ownerId } = await requireUser()
+  // `zona` dibuja las ventanas de los links en la zona del dueño, que es la misma en la que
+  // `readLinkForm` las vuelve a leer al guardar.
+  const { id: ownerId, zona } = await requireUser()
 
   const [profile] = await getDb()
     .select()
@@ -59,8 +60,8 @@ export default async function EditProfilePage({ params }: { params: Promise<{ id
     icon: link.icon ?? '',
     imageUrl: link.imageUrl,
     isActive: link.isActive,
-    startsAt: toZonedInput(link.startsAt, SITE_TIMEZONE),
-    endsAt: toZonedInput(link.endsAt, SITE_TIMEZONE),
+    startsAt: toZonedInput(link.startsAt, zona),
+    endsAt: toZonedInput(link.endsAt, zona),
   }))
 
   return (

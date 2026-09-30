@@ -29,7 +29,7 @@ const destino = (status: string, lastError: string | null = null): Corte['target
 })
 
 describe('cortesDeHoy', () => {
-  it('es lo programado para el día de hoy en la zona del sitio, en orden de hora, salido o no', () => {
+  it('es lo programado para el día de hoy en la zona que recibe, en orden de hora, salido o no', () => {
     const manana = corte('m', '2026-09-30T12:00:00Z')
     const tarde = corte('t', '2026-09-29T22:00:00Z') // 19:00 en Chile
     const ya = corte('y', '2026-09-29T13:00:00Z') // 10:00 en Chile, ya pasó
@@ -60,7 +60,7 @@ describe('avisoDelSiguiente', () => {
     )
   })
 
-  it('el día es el de la zona del sitio, no el del servidor', () => {
+  it('el día es el de la zona que recibe, no el del servidor', () => {
     // 02:30 UTC del 1 de octubre son las 23:30 del 30 de septiembre en Chile: mañana.
     expect(avisoDelSiguiente(new Date('2026-10-01T02:30:00Z'), AHORA, ZONE)).toBe(
       'El siguiente sale mañana a las 23:30.',

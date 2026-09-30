@@ -9,7 +9,6 @@ import {
   type ScheduledPost,
   type ScheduledPostTarget,
 } from '@/db'
-import { SITE_TIMEZONE } from '@/lib/analytics'
 import { isoInZone } from '@/lib/metrics-api'
 import { requireMobileUser } from '@/lib/mobile-guardia'
 import {
@@ -55,13 +54,17 @@ export type PostMovil = {
  * `id` los distingue — es la clave que el Resumen y el Calendario del teléfono usan
  * para no repetir la de React entre ellos (repaso final de la rama).
  */
-export function agruparPostsMovil(filas: FilaDestinoMovil[], miniaturaPorPost: Map<string, string>): PostMovil[] {
+export function agruparPostsMovil(
+  filas: FilaDestinoMovil[],
+  miniaturaPorPost: Map<string, string>,
+  zone: string,
+): PostMovil[] {
   const mapa = new Map<string, PostMovil>()
   for (const { post, target, handle } of filas) {
     const entrada = mapa.get(post.id) ?? {
       id: post.id,
       texto: post.caption,
-      cuando: isoInZone(post.scheduledAt, SITE_TIMEZONE),
+      cuando: isoInZone(post.scheduledAt, zone),
       portada: post.coverUrl,
       miniatura: miniaturaPorPost.get(post.id) ?? null,
       redes: [],
@@ -111,7 +114,7 @@ export async function GET(request: Request) {
     }
   }
 
-  return NextResponse.json({ posts: agruparPostsMovil(filas, miniaturaPorPost) })
+  return NextResponse.json({ posts: agruparPostsMovil(filas, miniaturaPorPost, usuario.zona) })
 }
 
 /**
@@ -200,7 +203,7 @@ export async function POST(request: Request) {
       cuentas,
       opciones: opcionesCheck.opciones,
     })
-    return NextResponse.json({ id, cuando: isoInZone(scheduledAt!, SITE_TIMEZONE) })
+    return NextResponse.json({ id, cuando: isoInZone(scheduledAt!, usuario.zona) })
   } catch (dbError) {
     console.error('schedule/crear:', String(dbError).slice(0, 300))
     return NextResponse.json({ error: NO_SE_GUARDO }, { status: 500 })

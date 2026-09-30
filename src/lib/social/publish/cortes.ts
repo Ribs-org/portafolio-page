@@ -115,7 +115,7 @@ export function quemadosDe(ownerId: string, opciones: Opciones = {}): Promise<Co
 
 /**
  * El pie de ayer: cuántos destinos salieron y, si el sync ya trajo métricas, cuántas
- * miradas sumaron. «Ayer» se calcula en la zona del sitio con `dayKey`/`addDays`
+ * miradas sumaron. «Ayer» se calcula en la zona que recibe —la del dueño— con `dayKey`/`addDays`
  * (`schedule-week.ts`) y se convierte a instantes reales con `fromZonedInput`
  * (`utils.ts`), la misma pareja que ya usa el compositor para leer/escribir horas locales.
  */

@@ -18,7 +18,7 @@
         "properties": {
           "fecha": {
             "type": "string",
-            "description": "Fecha y hora de publicación, en America/Santiago, formato exacto 'YYYY-MM-DD HH:MM' (también se acepta una 'T' en vez del espacio). No se aceptan segundos, 'Z' ni offsets: un ISO completo con zona se rechaza a propósito, para no reinterpretar un instante UTC como hora de pared. Debe ser futura.",
+            "description": "Fecha y hora de publicación, en la zona horaria del dueño de la llave (la que tiene puesta en Tu Cuenta), formato exacto 'YYYY-MM-DD HH:MM' (también se acepta una 'T' en vez del espacio). No se aceptan segundos, 'Z' ni offsets: un ISO completo con zona se rechaza a propósito, para no reinterpretar un instante UTC como hora de pared. Debe ser futura.",
             "pattern": "^\\d{4}-\\d{2}-\\d{2}[ T]\\d{2}:\\d{2}$"
           },
           "texto": {

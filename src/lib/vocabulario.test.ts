@@ -21,7 +21,7 @@ describe('el vocabulario del panel', () => {
     expect(new Set(nombres).size).toBe(nombres.length)
   })
 
-  it('cinco pestañas, y Ajustes con dos entradas para un usuario y tres para el admin', () => {
+  it('cinco pestañas, y Ajustes con tres entradas para un usuario y cuatro para el admin', () => {
     expect(pestanas(false).map((p) => p.ruta)).toEqual([
       '/admin',
       '/admin/schedule',
@@ -30,8 +30,13 @@ describe('el vocabulario del panel', () => {
       '/admin/analytics',
     ])
     expect(pestanas(true)).toEqual(pestanas(false))
-    expect(ajustes(false).map((p) => p.ruta)).toEqual(['/admin/accounts', '/admin/profiles'])
-    expect(ajustes(true).map((p) => p.ruta)).toEqual(['/admin/accounts', '/admin/profiles', '/admin/usuarios'])
+    expect(ajustes(false).map((p) => p.ruta)).toEqual(['/admin/accounts', '/admin/profiles', '/admin/cuenta'])
+    expect(ajustes(true).map((p) => p.ruta)).toEqual([
+      '/admin/accounts',
+      '/admin/profiles',
+      '/admin/usuarios',
+      '/admin/cuenta',
+    ])
   })
 
   it('pantallaDe resuelve por prefijo, y /admin solo exacto', () => {

@@ -23,7 +23,7 @@ No todas las pantallas tienen gráficos, interruptor o desplegable; en esos caso
 
 ## El panel (`src/app/admin/(dash)/`)
 
-Las nueve comparten `layout.tsx`: fondo `bg-acero-950`, cabecera pegajosa con «Salir» y el
+Las diez comparten `layout.tsx`: fondo `bg-acero-950`, cabecera pegajosa con «Salir» y el
 nombre del panel en `font-titulo uppercase`, y la única reja del panel justo debajo de la
 cabecera. Verifica esa reja una vez por pantalla (punto 3) y confirma que ninguna pantalla
 agrega una segunda.
@@ -108,18 +108,24 @@ sin brasa de adorno en el resto de la tarjeta.
 Título en pantalla: **Los Maestros**. Paneles «Invitar» e «Invitados», con formularios
 (`formularios.tsx`). Revisa el campo de invitar y su botón de submit.
 
+### 10. Tu Cuenta — `/admin/cuenta` — `cuenta/page.tsx`
+
+Título en pantalla: **Tu Cuenta**. Un panel «Tus datos» con el formulario de `formulario.tsx`:
+el nombre, el desplegable de zonas horarias —el único de esta lista con cientos de opciones,
+así que el punto 7 se mira acá con cuidado— y, debajo, la hora en la zona elegida.
+
 ## La puerta (`src/app/ingresar/`)
 
 Pinta su propio fondo (`bg-acero-950`, sin bloque de aurora) y usa `chapa` en la tarjeta.
 Ambas pantallas son pasos de un mismo flujo de entrada por correo.
 
-### 10. Entra con tu correo — `/ingresar` — `page.tsx`
+### 11. Entra con tu correo — `/ingresar` — `page.tsx`
 
 Título en pantalla: **Entra con tu correo**. Formulario de correo (`formularios.tsx`,
 control `CAMPO`). Confirma que el botón de submit ya no lleva el acento violeta del perfil
 (se quitó junto con su `style` inline) y que el primario visible es brasa.
 
-### 11. Tu código — `/ingresar/codigo` — `codigo/page.tsx`
+### 12. Tu código — `/ingresar/codigo` — `codigo/page.tsx`
 
 Título en pantalla: **Tu código**. Se llega acá después de pedir el correo; pide el código
 recibido. Mismo tratamiento de fondo y tarjeta que la anterior — confirma consistencia
@@ -129,12 +135,12 @@ entre ambas.
 
 Comparten `layout.tsx` con fondo propio y sin aurora.
 
-### 12. Privacidad — `/privacidad` — `(legal)/privacidad/page.tsx`
+### 13. Privacidad — `/privacidad` — `(legal)/privacidad/page.tsx`
 
 Título en pantalla: **Privacidad**. Texto largo — el punto 1 (legibilidad sobre la chapa y
 el fondo) es el que más importa acá.
 
-### 13. Términos — `/terminos` — `(legal)/terminos/page.tsx`
+### 14. Términos — `/terminos` — `(legal)/terminos/page.tsx`
 
 Título en pantalla: **Términos**. Mismo chequeo que Privacidad.
 
@@ -143,19 +149,19 @@ Título en pantalla: **Términos**. Mismo chequeo que Privacidad.
 No se navega a ellas directo: hay que forzar un error (por ejemplo, cortando la red antes
 de una carga, o pidiendo un id que no existe) para verlas.
 
-### 14. Error del panel — cualquier ruta bajo `/admin` — `src/app/admin/(dash)/error.tsx`
+### 15. Error del panel — cualquier ruta bajo `/admin` — `src/app/admin/(dash)/error.tsx`
 
 Título en pantalla: **Algo se rompió**. Se dispara ante cualquier error no controlado
 dentro del panel. Confirma fondo propio y tarjeta `chapa`, sin aurora de fondo.
 
-### 15. Error de la puerta — cualquier ruta bajo `/ingresar` — `src/app/ingresar/error.tsx`
+### 16. Error de la puerta — cualquier ruta bajo `/ingresar` — `src/app/ingresar/error.tsx`
 
 Título en pantalla: **Algo se rompió**. Mismo tratamiento que el error del panel; revisa
 que ambos se vean consistentes entre sí.
 
 ## La pantalla fácil de olvidar: elegir cuenta
 
-### 16. ¿Qué cuentas conectar? — `/admin/accounts/elegir` — `accounts/elegir/page.tsx`
+### 17. ¿Qué cuentas conectar? — `/admin/accounts/elegir` — `accounts/elegir/page.tsx`
 
 Título en pantalla: **¿Qué cuentas de [red] conectar?** (el nombre de la red se interpola,
 por ejemplo «¿Qué cuentas de Facebook conectar?»). Solo aparece **a mitad de una conexión

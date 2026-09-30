@@ -21,7 +21,7 @@ import { TIKTOK_SIN_PRIVACIDAD, OPCIONES_ERROR, TRIAL_REEL_MEDIA } from './opcio
 import { TIKTOK_MEDIA } from './validate'
 import { REGLA_PALABRA, REGLA_MENSAJE, REGLA_DOCUMENTO } from '../comentarios/reglas'
 import { verificarCuentas, type CuentaDestino } from '../cuentas'
-import { reglasClave } from '@/db'
+import { reglasClave, scheduledPosts } from '@/db'
 
 // `mediaToBlob` sube con `guardar`; sin precedente en el repo para simularlo, resuelto
 // igual que en `documento.test.ts` — lo que importa es la clave y el content-type con la
@@ -74,7 +74,22 @@ vi.mock('./documento', () => ({
   documentoToBlob: (url: string): Promise<string | null> => documentoToBlobMock(url),
 }))
 
+// Desde que la fecha del lote se lee en la zona del dueño, `batch.ts` importa
+// `@/lib/usuarios`, que trae `server-only` (no resuelve bajo Vitest) y va a la base. Se
+// mockea el módulo entero: acá lo único que se le pide es la zona del dueño del lote.
+//
+// La zona del doble se mueve por test (`zonaDelDueno`) y arranca en una que **no** es el
+// default del sitio: con las dos cadenas iguales, este archivo pasaría verde aunque
+// `scheduleBatch` dejara de preguntar por el dueño y volviera a leer la constante.
+vi.mock('server-only', () => ({}))
+let zonaDelDueno = 'Europe/Madrid'
+vi.mock('@/lib/usuarios', () => ({
+  buscarPorId: async () => ({ id: 'owner-1', zona: zonaDelDueno }),
+}))
+
 const now = new Date('2026-09-02T12:00:00Z')
+/** La zona del dueño del lote: las filas de abajo escriben sus horas en ella. */
+const ZONA = 'Europe/Madrid'
 const base: BatchItem = {
   fecha: '2026-09-03 10:00',
   texto: 'Hola lote',
@@ -114,11 +129,11 @@ describe('destinoPedido', () => {
 describe('validateBatchItem, destinos', () => {
   it('una fila sin cuentas ni redes se rechaza con una frase útil', () => {
     const item = { ...base, redes: [], cuentas: [] }
-    expect(validateBatchItem(item, now)).toMatch(/cuenta/i)
+    expect(validateBatchItem(item, now, ZONA)).toMatch(/cuenta/i)
   })
 
   it('una fila con cuentas y sin redes es válida', () => {
-    expect(validateBatchItem({ ...base, redes: [], cuentas: ['ig-1'] }, now)).toBeNull()
+    expect(validateBatchItem({ ...base, redes: [], cuentas: ['ig-1'] }, now, ZONA)).toBeNull()
   })
 })
 
@@ -181,56 +196,58 @@ describe('opcionesDeFila', () => {
 
 describe('validateBatchItem', () => {
   it('acepta un item de texto puro válido', () => {
-    expect(validateBatchItem(base, now)).toBeNull()
+    expect(validateBatchItem(base, now, ZONA)).toBeNull()
   })
 
   it('rechaza la fecha ilegible con la pista del formato', () => {
-    expect(validateBatchItem({ ...base, fecha: 'mañana a las diez' }, now)).toMatch(/YYYY-MM-DD/)
+    expect(validateBatchItem({ ...base, fecha: 'mañana a las diez' }, now, ZONA)).toMatch(/YYYY-MM-DD/)
   })
 
   it('rechaza redes desconocidas o sin publisher', () => {
-    expect(validateBatchItem({ ...base, redes: ['linkedin'] }, now)).toMatch(/linkedin/)
-    expect(validateBatchItem({ ...base, redes: ['myspace'] }, now)).toMatch(/myspace/)
+    expect(validateBatchItem({ ...base, redes: ['linkedin'] }, now, ZONA)).toMatch(/linkedin/)
+    expect(validateBatchItem({ ...base, redes: ['myspace'] }, now, ZONA)).toMatch(/myspace/)
   })
 
   it('difiere la extensión desconocida: la URL de Drive pasa y el content-type decide', () => {
     const drive = 'https://drive.usercontent.google.com/download?id=abc&export=download'
-    expect(validateBatchItem({ ...base, media: [drive] }, now)).toBeNull()
+    expect(validateBatchItem({ ...base, media: [drive] }, now, ZONA)).toBeNull()
   })
 
   it('la media de tipo diferido igual cuenta como archivo en las reglas por cantidad', () => {
     const url = 'https://ej.com/sin-extension'
-    expect(validateBatchItem({ ...base, redes: ['instagram'], media: [url] }, now)).toBeNull()
-    expect(validateBatchItem({ ...base, redes: ['threads'], media: [url, url] }, now)).toMatch(
+    expect(validateBatchItem({ ...base, redes: ['instagram'], media: [url] }, now, ZONA)).toBeNull()
+    expect(validateBatchItem({ ...base, redes: ['threads'], media: [url, url] }, now, ZONA)).toMatch(
       /un solo archivo/,
     )
-    expect(validateBatchItem({ ...base, redes: ['x'], media: Array(5).fill(url) }, now)).toMatch(
+    expect(validateBatchItem({ ...base, redes: ['x'], media: Array(5).fill(url) }, now, ZONA)).toMatch(
       /cuatro/,
     )
   })
 
   it('delega en las reglas del compositor: límites y formas por red', () => {
-    expect(validateBatchItem({ ...base, texto: 'x'.repeat(281) }, now)).toMatch(/280/)
+    expect(validateBatchItem({ ...base, texto: 'x'.repeat(281) }, now, ZONA)).toMatch(/280/)
     expect(
       validateBatchItem(
         { ...base, redes: ['instagram'], media: [] },
         now,
+        ZONA,
       ),
     ).toMatch(/archivo/)
     expect(
       validateBatchItem(
         { ...base, redes: ['x'], media: ['https://ej.com/v.mp4'] },
         now,
+        ZONA,
       ),
     ).toMatch(/video/)
   })
 
   it('rechaza redes repetidas: el destino es único por post', () => {
-    expect(validateBatchItem({ ...base, redes: ['x', 'x'] }, now)).toMatch(/repetidas/)
+    expect(validateBatchItem({ ...base, redes: ['x', 'x'] }, now, ZONA)).toMatch(/repetidas/)
   })
 
   it('rechaza fechas ISO con zona o segundos: solo YYYY-MM-DD HH:MM', () => {
-    expect(validateBatchItem({ ...base, fecha: '2026-09-03T10:00:00Z' }, now)).toMatch(/YYYY-MM-DD/)
+    expect(validateBatchItem({ ...base, fecha: '2026-09-03T10:00:00Z' }, now, ZONA)).toMatch(/YYYY-MM-DD/)
   })
 })
 
@@ -332,15 +349,15 @@ describe('portada en validateBatchItem', () => {
 
   it('portada con video en media pasa', () => {
     expect(
-      validateBatchItem({ ...conVideo, portada: 'https://ej.com/p.jpg' }, now),
+      validateBatchItem({ ...conVideo, portada: 'https://ej.com/p.jpg' }, now, ZONA),
     ).toBeNull()
   })
 
   it('portada sin ningún video posible es la frase fija', () => {
     expect(
-      validateBatchItem({ ...base, media: ['https://ej.com/a.jpg'], redes: ['facebook'], portada: 'https://ej.com/p.jpg' }, now),
+      validateBatchItem({ ...base, media: ['https://ej.com/a.jpg'], redes: ['facebook'], portada: 'https://ej.com/p.jpg' }, now, ZONA),
     ).toBe(PORTADA_NEEDS_VIDEO)
-    expect(validateBatchItem({ ...base, portada: 'https://ej.com/p.jpg' }, now)).toBe(
+    expect(validateBatchItem({ ...base, portada: 'https://ej.com/p.jpg' }, now, ZONA)).toBe(
       PORTADA_NEEDS_VIDEO,
     )
   })
@@ -348,44 +365,44 @@ describe('portada en validateBatchItem', () => {
   it('media de tipo diferido mantiene viva la portada: el content-type decidirá', () => {
     const drive = 'https://drive.usercontent.google.com/download?id=x&export=download'
     expect(
-      validateBatchItem({ ...base, redes: ['facebook'], media: [drive], portada: 'https://ej.com/p.jpg' }, now),
+      validateBatchItem({ ...base, redes: ['facebook'], media: [drive], portada: 'https://ej.com/p.jpg' }, now, ZONA),
     ).toBeNull()
   })
 
   it('portada con extensión de video es la otra frase fija', () => {
     expect(
-      validateBatchItem({ ...conVideo, portada: 'https://ej.com/p.mp4' }, now),
+      validateBatchItem({ ...conVideo, portada: 'https://ej.com/p.mp4' }, now, ZONA),
     ).toBe(PORTADA_NOT_IMAGE)
   })
 
   it('portada vacía o ausente no exige nada', () => {
-    expect(validateBatchItem({ ...conVideo, portada: '' }, now)).toBeNull()
-    expect(validateBatchItem(conVideo, now)).toBeNull()
+    expect(validateBatchItem({ ...conVideo, portada: '' }, now, ZONA)).toBeNull()
+    expect(validateBatchItem(conVideo, now, ZONA)).toBeNull()
   })
 
   it('portada gif o webp: formato no aceptado por Graph', () => {
-    expect(validateBatchItem({ ...conVideo, portada: 'https://ej.com/p.gif' }, now)).toBe(
+    expect(validateBatchItem({ ...conVideo, portada: 'https://ej.com/p.gif' }, now, ZONA)).toBe(
       PORTADA_FORMAT,
     )
-    expect(validateBatchItem({ ...conVideo, portada: 'https://ej.com/p.webp' }, now)).toBe(
+    expect(validateBatchItem({ ...conVideo, portada: 'https://ej.com/p.webp' }, now, ZONA)).toBe(
       PORTADA_FORMAT,
     )
   })
 
   it('portada png pasa igual que jpg', () => {
-    expect(validateBatchItem({ ...conVideo, portada: 'https://ej.com/p.png' }, now)).toBeNull()
+    expect(validateBatchItem({ ...conVideo, portada: 'https://ej.com/p.png' }, now, ZONA)).toBeNull()
   })
 })
 
 describe('atributos en validateBatchItem', () => {
   it('un objeto plano pasa; uno inválido es la frase fija', () => {
-    expect(validateBatchItem({ ...base, atributos: { hook: 'dato-duro' } }, now)).toBeNull()
-    expect(validateBatchItem({ ...base, atributos: ['hook'] }, now)).toBe(ATRIBUTOS_ERROR)
-    expect(validateBatchItem({ ...base, atributos: { a: { b: 1 } } }, now)).toBe(ATRIBUTOS_ERROR)
+    expect(validateBatchItem({ ...base, atributos: { hook: 'dato-duro' } }, now, ZONA)).toBeNull()
+    expect(validateBatchItem({ ...base, atributos: ['hook'] }, now, ZONA)).toBe(ATRIBUTOS_ERROR)
+    expect(validateBatchItem({ ...base, atributos: { a: { b: 1 } } }, now, ZONA)).toBe(ATRIBUTOS_ERROR)
   })
 
   it('sin atributos no exige nada', () => {
-    expect(validateBatchItem(base, now)).toBeNull()
+    expect(validateBatchItem(base, now, ZONA)).toBeNull()
   })
 })
 
@@ -394,78 +411,78 @@ describe('opciones por red en el lote', () => {
 
   it('tiktok es publicable, pero exige sus opciones', () => {
     const fila: BatchItem = { ...base, redes: ['tiktok'], media: ['https://ej.com/a.mp4'] }
-    expect(validateBatchItem(fila, now)).toBe(TIKTOK_SIN_PRIVACIDAD)
-    expect(validateBatchItem({ ...fila, opciones: { tiktok: directo } }, now)).toBeNull()
-    expect(validateBatchItem({ ...fila, opciones: { tiktok: { modo: 'borrador' } } }, now)).toBeNull()
+    expect(validateBatchItem(fila, now, ZONA)).toBe(TIKTOK_SIN_PRIVACIDAD)
+    expect(validateBatchItem({ ...fila, opciones: { tiktok: directo } }, now, ZONA)).toBeNull()
+    expect(validateBatchItem({ ...fila, opciones: { tiktok: { modo: 'borrador' } } }, now, ZONA)).toBeNull()
   })
 
   it('las opciones malformadas caen con la frase de forma', () => {
     const fila: BatchItem = { ...base, redes: ['tiktok'], media: ['https://ej.com/a.mp4'] }
-    expect(validateBatchItem({ ...fila, opciones: 'directo' }, now)).toBe(OPCIONES_ERROR)
-    expect(validateBatchItem({ ...fila, opciones: { tiktok: { modo: 'ya' } } }, now)).toBe(OPCIONES_ERROR)
+    expect(validateBatchItem({ ...fila, opciones: 'directo' }, now, ZONA)).toBe(OPCIONES_ERROR)
+    expect(validateBatchItem({ ...fila, opciones: { tiktok: { modo: 'ya' } } }, now, ZONA)).toBe(OPCIONES_ERROR)
   })
 
   it('una red que no pide opciones no las acepta', () => {
-    expect(validateBatchItem({ ...base, opciones: { threads: { modo: 'directo' } } }, now)).toBe(OPCIONES_ERROR)
+    expect(validateBatchItem({ ...base, opciones: { threads: { modo: 'directo' } } }, now, ZONA)).toBe(OPCIONES_ERROR)
   })
 
   it('la media de tiktok se valida por extensión antes de descargar', () => {
     const fila: BatchItem = { ...base, redes: ['tiktok'], opciones: { tiktok: directo }, media: [] }
-    expect(validateBatchItem({ ...fila, media: ['https://ej.com/a.png'] }, now)).toBe(TIKTOK_MEDIA)
-    expect(validateBatchItem({ ...fila, media: ['https://ej.com/a.mp4', 'https://ej.com/b.jpg'] }, now)).toBe(
+    expect(validateBatchItem({ ...fila, media: ['https://ej.com/a.png'] }, now, ZONA)).toBe(TIKTOK_MEDIA)
+    expect(validateBatchItem({ ...fila, media: ['https://ej.com/a.mp4', 'https://ej.com/b.jpg'] }, now, ZONA)).toBe(
       TIKTOK_MEDIA,
     )
-    expect(validateBatchItem({ ...fila, media: ['https://drive.google.com/uc?id=x'] }, now)).toBeNull()
+    expect(validateBatchItem({ ...fila, media: ['https://drive.google.com/uc?id=x'] }, now, ZONA)).toBeNull()
   })
 
   it('instagram acepta trialReel con un solo video', () => {
     const fila: BatchItem = { ...base, redes: ['instagram'], media: ['https://ej.com/a.mp4'] }
-    expect(validateBatchItem({ ...fila, opciones: { instagram: { trialReel: true } } }, now)).toBeNull()
-    expect(validateBatchItem({ ...fila, opciones: { instagram: { trialReel: false } } }, now)).toBeNull()
+    expect(validateBatchItem({ ...fila, opciones: { instagram: { trialReel: true } } }, now, ZONA)).toBeNull()
+    expect(validateBatchItem({ ...fila, opciones: { instagram: { trialReel: false } } }, now, ZONA)).toBeNull()
   })
 
   it('un trial reel con fotos, con dos videos o sin video se rechaza por su frase', () => {
     const trial = { ...base, redes: ['instagram'], opciones: { instagram: { trialReel: true } } }
-    expect(validateBatchItem({ ...trial, media: ['https://ej.com/a.jpg'] }, now)).toBe(TRIAL_REEL_MEDIA)
-    expect(validateBatchItem({ ...trial, media: ['https://ej.com/a.mp4', 'https://ej.com/b.jpg'] }, now)).toBe(
+    expect(validateBatchItem({ ...trial, media: ['https://ej.com/a.jpg'] }, now, ZONA)).toBe(TRIAL_REEL_MEDIA)
+    expect(validateBatchItem({ ...trial, media: ['https://ej.com/a.mp4', 'https://ej.com/b.jpg'] }, now, ZONA)).toBe(
       TRIAL_REEL_MEDIA,
     )
-    expect(validateBatchItem({ ...trial, media: ['https://ej.com/a.mp4', 'https://ej.com/b.mp4'] }, now)).toBe(
+    expect(validateBatchItem({ ...trial, media: ['https://ej.com/a.mp4', 'https://ej.com/b.mp4'] }, now, ZONA)).toBe(
       TRIAL_REEL_MEDIA,
     )
-    expect(validateBatchItem({ ...trial, media: [] }, now)).toBe(TRIAL_REEL_MEDIA)
+    expect(validateBatchItem({ ...trial, media: [] }, now, ZONA)).toBe(TRIAL_REEL_MEDIA)
   })
 
   it('un link de Drive puede ser el video del trial reel: no se rechaza antes de descargar', () => {
     const trial = { ...base, redes: ['instagram'], opciones: { instagram: { trialReel: true } } }
-    expect(validateBatchItem({ ...trial, media: ['https://drive.google.com/uc?id=x'] }, now)).toBeNull()
+    expect(validateBatchItem({ ...trial, media: ['https://drive.google.com/uc?id=x'] }, now, ZONA)).toBeNull()
   })
 
   it('la forma de instagram se comprueba igual que la de tiktok', () => {
     const fila: BatchItem = { ...base, redes: ['instagram'], media: ['https://ej.com/a.mp4'] }
-    expect(validateBatchItem({ ...fila, opciones: { instagram: { trialreel: true } } }, now)).toBe(OPCIONES_ERROR)
+    expect(validateBatchItem({ ...fila, opciones: { instagram: { trialreel: true } } }, now, ZONA)).toBe(OPCIONES_ERROR)
   })
 })
 
 describe('regla de palabra clave en el lote', () => {
   it('acepta una regla completa y una fila sin regla', () => {
-    expect(validateBatchItem({ ...base, regla: { palabra: 'GUÍA', mensaje: 'Toma: https://x.cl' } }, now)).toBeNull()
-    expect(validateBatchItem({ ...base, regla: undefined }, now)).toBeNull()
+    expect(validateBatchItem({ ...base, regla: { palabra: 'GUÍA', mensaje: 'Toma: https://x.cl' } }, now, ZONA)).toBeNull()
+    expect(validateBatchItem({ ...base, regla: undefined }, now, ZONA)).toBeNull()
   })
 
   it('rechaza la regla malformada con la frase del campo', () => {
-    expect(validateBatchItem({ ...base, regla: { palabra: 'dos palabras', mensaje: 'm' } }, now)).toBe(REGLA_PALABRA)
-    expect(validateBatchItem({ ...base, regla: { palabra: 'guia' } }, now)).toBe(REGLA_MENSAJE)
-    expect(validateBatchItem({ ...base, regla: 'guia' }, now)).toBe(REGLA_PALABRA)
+    expect(validateBatchItem({ ...base, regla: { palabra: 'dos palabras', mensaje: 'm' } }, now, ZONA)).toBe(REGLA_PALABRA)
+    expect(validateBatchItem({ ...base, regla: { palabra: 'guia' } }, now, ZONA)).toBe(REGLA_MENSAJE)
+    expect(validateBatchItem({ ...base, regla: 'guia' }, now, ZONA)).toBe(REGLA_PALABRA)
   })
 
   it('una regla con documentoUrl que no es URL absoluta rechaza la fila', () => {
     const item = { ...base, regla: { palabra: 'GUIA', mensaje: 'x', documentoUrl: '/g.pdf' } }
-    expect(validateBatchItem(item, now)).toBe(REGLA_DOCUMENTO)
+    expect(validateBatchItem(item, now, ZONA)).toBe(REGLA_DOCUMENTO)
   })
 
   it('una regla sin documentoUrl sigue siendo válida', () => {
-    expect(validateBatchItem({ ...base, regla: { palabra: 'GUIA', mensaje: 'x' } }, now)).toBeNull()
+    expect(validateBatchItem({ ...base, regla: { palabra: 'GUIA', mensaje: 'x' } }, now, ZONA)).toBeNull()
   })
 })
 
@@ -591,5 +608,51 @@ describe('scheduleBatch — trial reel, la comprobación de media antes de subir
     expect(resultados).toEqual([{ index: 0, ok: false, error: TRIAL_REEL_MEDIA }])
     expect(fetchMock).not.toHaveBeenCalled()
     expect(inserts).toEqual([])
+  })
+})
+
+/**
+ * La hora que escribe un lote es hora de pared del dueño, no del servidor ni del sitio.
+ * Es lo único que distingue «19:00» de un instante: el mismo texto guarda dos instantes
+ * distintos según dónde viva quien programó, y `scheduleBatch` lo averigua con
+ * `buscarPorId` una vez por lote.
+ *
+ * La fecha va en 2030 a propósito: `scheduleBatch` calcula `now` con `new Date()` real, y
+ * un octubre cercano dejaría de ser futuro en unos días. Sigue siendo el 5 de octubre, que
+ * es el caso interesante — las dos zonas están en horario de verano y en hemisferios
+ * distintos, así que sus offsets ni siquiera tienen el mismo signo.
+ */
+describe('scheduleBatch — «19:00» son las 19:00 del dueño', () => {
+  const item: BatchItem = {
+    fecha: '2030-10-05 19:00',
+    texto: 'Hola',
+    cuentas: [],
+    redes: ['threads'],
+    media: [],
+  }
+
+  afterEach(() => {
+    inserts.length = 0
+    zonaDelDueno = 'Europe/Madrid'
+  })
+
+  /** El `scheduled_at` que llegó al insert del post. */
+  function instanteGuardado(): Date {
+    const fila = inserts.find((i) => i.tabla === scheduledPosts)
+    return (fila!.valores as { scheduledAt: Date }).scheduledAt
+  }
+
+  it('con el dueño en Madrid, las 19:00 son 17:00Z', async () => {
+    zonaDelDueno = 'Europe/Madrid'
+    const resultados = await scheduleBatch('owner-1', [item])
+    expect(resultados).toEqual([{ index: 0, ok: true, postId: 'post-1' }])
+    expect(instanteGuardado().toISOString()).toBe('2030-10-05T17:00:00.000Z')
+  })
+
+  it('con el dueño en Santiago, el mismo texto son 22:00Z', async () => {
+    zonaDelDueno = 'America/Santiago'
+    const resultados = await scheduleBatch('owner-1', [item])
+    expect(resultados).toEqual([{ index: 0, ok: true, postId: 'post-1' }])
+    expect(instanteGuardado().toISOString()).toBe('2030-10-05T22:00:00.000Z')
   })
 })

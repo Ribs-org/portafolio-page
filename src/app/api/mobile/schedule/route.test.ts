@@ -3,8 +3,9 @@ import type { ScheduledPost, ScheduledPostTarget, Usuario } from '@/db'
 import { CuentaInvalida, type CuentaDestino } from '@/lib/social/cuentas'
 import { OPCIONES_ERROR, TRIAL_REEL_MEDIA } from '@/lib/social/publish/opciones'
 
-// `route.ts` importa `SITE_TIMEZONE` de `@/lib/analytics`, que trae `server-only` (no
-// resuelve bajo Vitest). Mismo motivo y mismo arreglo que `aislamiento.test.ts`.
+// `route.ts` llega a `@/lib/usuarios` por `@/lib/mobile-api` → `publish/batch`, y ese
+// módulo trae `server-only` (no resuelve bajo Vitest). Mismo motivo y mismo arreglo que
+// `aislamiento.test.ts`.
 vi.mock('server-only', () => ({}))
 
 const USUARIO: Usuario = {
@@ -12,6 +13,7 @@ const USUARIO: Usuario = {
   correo: 'dueno@example.com',
   nombre: null,
   rol: 'usuario',
+  zona: 'America/Santiago',
   sesionVersion: 1,
   invitadoEn: new Date('2026-01-01'),
   primerIngresoEn: new Date('2026-01-01'),
@@ -90,7 +92,7 @@ describe('agruparPostsMovil (GET /api/mobile/schedule)', () => {
       { post, target: filaTarget({ id: 'dest-ig-1', accountId: 'ig-1' }), handle: '@vicente' },
       { post, target: filaTarget({ id: 'dest-ig-2', accountId: 'ig-2' }), handle: '@vicenteclips' },
     ]
-    const [agrupado] = agruparPostsMovil(filas, new Map())
+    const [agrupado] = agruparPostsMovil(filas, new Map(), 'America/Santiago')
     expect(agrupado!.redes).toHaveLength(2)
     expect(new Set(agrupado!.redes.map((r) => r.id)).size).toBe(2)
     expect(agrupado!.redes.map((r) => ({ id: r.id, red: r.red, handle: r.handle }))).toEqual([
@@ -105,7 +107,7 @@ describe('agruparPostsMovil (GET /api/mobile/schedule)', () => {
       { post, target: filaTarget({ id: 'dest-1', postId: 'post-2', network: 'instagram' }), handle: '@vicente' },
       { post, target: filaTarget({ id: 'dest-2', postId: 'post-2', network: 'x' }), handle: '@vicente_x' },
     ]
-    const agrupados = agruparPostsMovil(filas, new Map())
+    const agrupados = agruparPostsMovil(filas, new Map(), 'America/Santiago')
     expect(agrupados).toHaveLength(1)
     expect(agrupados[0]!.id).toBe('post-2')
     expect(agrupados[0]!.redes).toHaveLength(2)
