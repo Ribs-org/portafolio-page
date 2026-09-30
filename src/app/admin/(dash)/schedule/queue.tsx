@@ -5,6 +5,7 @@ import { useState, useTransition } from 'react'
 import { deleteScheduledPost, subirAhora } from '@/app/admin/actions'
 import type { ScheduledPost, ScheduledPostTarget } from '@/db/schema'
 import { cn } from '@/lib/utils'
+import { nombreDestino } from './etiqueta'
 import { cortarCola } from './orden'
 import { Redes } from './redes'
 import { Reprogramar } from './reprogramar'
@@ -100,7 +101,7 @@ export function Queue({
               >
                 <Redes targets={[target]} detalle />
                 {target.status === 'failed' && target.lastError && ` — ${target.lastError}`}
-                {target.status === 'failed' && <Reprogramar targetId={target.id} />}
+                {target.status === 'failed' && <Reprogramar targetId={target.id} titulo={nombreDestino(target)} />}
               </span>
             ))}
           </div>
