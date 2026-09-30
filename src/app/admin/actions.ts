@@ -553,6 +553,7 @@ export async function conectarElegidas(formData: FormData): Promise<void> {
           pendiente.network === 'facebook' ? tokens.get(cuenta.externalId)! : pendiente.accessToken,
         refreshToken: pendiente.refreshToken,
         expiresAt: pendiente.expiresAt ? new Date(pendiente.expiresAt) : null,
+        metaUserId: pendiente.metaUserId,
       })
     }
   } catch (error) {

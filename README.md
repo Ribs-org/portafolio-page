@@ -171,6 +171,10 @@ segundo recibe un aviso, no la cuenta de otro. Eso es entre dos usuarios distint
 mismo dueño sí puede conectar varias cuentas suyas de la misma red y elegir a cuáles sale
 cada publicación — ver «Varias cuentas de una misma red», más abajo.
 
+La única tabla sin dueño es `solicitudes_borrado`, donde quedará constancia de cada borrado
+que Meta pida: cuando se escriba una fila, ese dueño ya no tendrá cuentas de Meta y Meta no
+sabe quién es. Hoy la tabla está creada y vacía; todavía no hay quien la escriba.
+
 > El segundo perfil nace con un slug aleatorio (`circulo-a1b2c3d4`) y con `noindex`, para
 > que exista una versión que solo compartes a mano. Cámbialo por lo que quieras.
 
@@ -269,6 +273,11 @@ dueño, no necesitas App Review.
 INSTAGRAM_APP_ID=
 INSTAGRAM_APP_SECRET=
 ```
+
+Al conectar se guarda tu **id de usuario de Meta**, que es lo que Meta manda cuando quitas
+la app desde tu cuenta de Facebook: sin él no hay forma de saber a qué cuentas se refiere.
+Las cuentas conectadas antes del 2026-09-30 lo tienen vacío hasta que vuelvas a conectar
+Instagram y Facebook.
 
 Si administras **más de una cuenta de Instagram**, al conectar el panel te muestra la
 lista y marcas cuáles quieres ver. Cada una queda como una cuenta aparte, con sus

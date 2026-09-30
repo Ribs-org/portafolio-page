@@ -15,6 +15,7 @@ const pendiente = {
     { externalId: '61550000000001', handle: 'Ribs' },
     { externalId: '61550000000002', handle: null },
   ],
+  metaUserId: '10201234567890',
   emitidoEn: Date.now(),
   sub: 'u1',
 }
@@ -37,6 +38,9 @@ describe('serializarPendiente / leerPendiente', () => {
   it('un payload cifrado con otra forma también da null', () => {
     expect(leerPendiente(encryptToken(JSON.stringify({ network: 'x' })))).toBeNull()
     expect(leerPendiente(encryptToken(JSON.stringify({ ...pendiente, candidatas: [{ handle: 'sin id' }] })))).toBeNull()
+    // Una cookie de antes de que existiera el id de usuario de Meta tampoco pasa: son
+    // diez minutos de vida, y el dueño vuelve a conectar.
+    expect(leerPendiente(encryptToken(JSON.stringify({ ...pendiente, metaUserId: undefined })))).toBeNull()
   })
 
   it('una cookie de hace más de diez minutos ya venció', () => {

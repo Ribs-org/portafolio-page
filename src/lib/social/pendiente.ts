@@ -10,6 +10,8 @@ export type ConexionPendiente = {
   refreshToken: string | null
   expiresAt: string | null
   candidatas: Candidata[]
+  /** El id de usuario de la app de Meta, el que llega en los callbacks de baja y borrado. */
+  metaUserId: string | null
   /** Cuándo se emitió, en ms. El maxAge de la cookie lo pone el navegador; esto lo verifica el servidor. */
   emitidoEn: number
   sub: string
@@ -39,6 +41,7 @@ export function leerPendiente(raw: string | undefined): ConexionPendiente | null
     if (p.refreshToken !== null && typeof p.refreshToken !== 'string') return null
     if (p.expiresAt !== null && typeof p.expiresAt !== 'string') return null
     if (!Array.isArray(p.candidatas) || !p.candidatas.every(esCandidata)) return null
+    if (p.metaUserId !== null && typeof p.metaUserId !== 'string') return null
     // El maxAge de la cookie lo hace cumplir el navegador, y un navegador no es de fiar:
     // el reloj del servidor es lo que de verdad vence un login a medias.
     if (typeof p.emitidoEn !== 'number' || !Number.isFinite(p.emitidoEn)) return null
@@ -50,6 +53,7 @@ export function leerPendiente(raw: string | undefined): ConexionPendiente | null
       refreshToken: p.refreshToken,
       expiresAt: p.expiresAt,
       candidatas: p.candidatas,
+      metaUserId: p.metaUserId,
       emitidoEn: p.emitidoEn,
       sub: p.sub,
     }

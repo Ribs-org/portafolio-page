@@ -26,12 +26,14 @@ const GRAPH = 'https://graph.facebook.com/v23.0'
 /** Como la `Candidata` de la cookie, más el token de página que esa nunca lleva. */
 type CandidataConToken = { externalId: string; handle: string | null; accessToken?: string }
 
-type Credential = {
+export type Credential = {
   accessToken: string
   refreshToken: string | null
   expiresAt: Date | null
   /** Lo que el login dejó elegir: una para la mayoría de redes, varias en Meta y Google. */
   candidatas: CandidataConToken[]
+  /** El id de usuario de la app de Meta; solo en `instagram` y `facebook`, y sin valor si /me falló. */
+  metaUserId?: string
 }
 
 /**
@@ -85,6 +87,24 @@ async function exchangeMetaCode(
   return { accessToken: longData.access_token, expiresIn: longData.expires_in }
 }
 
+/**
+ * El id de usuario de esta persona en la app de Meta: ni el de la página ni el de la
+ * cuenta de Instagram, sino el que Meta manda en los callbacks de baja y de borrado, que
+ * es la única forma de saber a quién se refieren. Si la llamada falla la conexión sigue
+ * sin él: la cuenta queda conectada con la columna nula hasta que su dueño reconecte.
+ */
+async function metaUserId(token: string): Promise<string | undefined> {
+  try {
+    const me = await fetch(`${GRAPH}/me?fields=id&access_token=${token}`)
+    if (!me.ok) throw new Error(`${me.status} ${(await me.text()).slice(0, 200)}`)
+    const perfil = (await me.json()) as { id?: string }
+    return perfil.id
+  } catch (error) {
+    console.error('No se pudo leer el id de usuario de Meta:', String(error).slice(0, 300))
+    return undefined
+  }
+}
+
 async function instagramCredential(code: string, redirectUri: string): Promise<Credential> {
   const exchanged = await exchangeMetaCode(code, redirectUri, 'Instagram')
   const token = exchanged.accessToken
@@ -104,6 +124,7 @@ async function instagramCredential(code: string, redirectUri: string): Promise<C
     refreshToken: null,
     expiresAt: instagramTokenExpiry(exchanged.expiresIn),
     candidatas: cuentas.map((c) => ({ externalId: c.id, handle: c.username ? `@${c.username}` : null })),
+    metaUserId: await metaUserId(token),
   }
 }
 
@@ -130,6 +151,7 @@ async function facebookCredential(code: string, redirectUri: string): Promise<Cr
     refreshToken: null,
     expiresAt: null,
     candidatas: paginas.map((p) => ({ externalId: p.id, handle: p.name, accessToken: p.accessToken ?? undefined })),
+    metaUserId: await metaUserId(exchanged.accessToken),
   }
 }
 
@@ -359,7 +381,8 @@ async function tiktokCredential(code: string, redirectUri: string): Promise<Cred
   }
 }
 
-async function fetchCredential(
+/** Exportada para su test: dobla `fetch` y mira el `credential`, sin levantar la ruta. */
+export async function fetchCredential(
   network: string,
   code: string,
   redirectUri: string,
@@ -424,6 +447,7 @@ export async function GET(
         accessToken: unica.accessToken ?? credential.accessToken,
         refreshToken: credential.refreshToken,
         expiresAt: credential.expiresAt,
+        metaUserId: credential.metaUserId,
       })
       // Una conexión que terminó no puede dejar otra a medias detrás: la cookie de una
       // elección anterior abandonada seguiría viva diez minutos y confundiría al panel.
@@ -445,6 +469,7 @@ export async function GET(
         refreshToken: credential.refreshToken,
         expiresAt: credential.expiresAt?.toISOString() ?? null,
         candidatas: credential.candidatas.map(({ externalId, handle }) => ({ externalId, handle })),
+        metaUserId: credential.metaUserId ?? null,
         emitidoEn: Date.now(),
         sub: usuario.id,
       }),
