@@ -6,7 +6,7 @@ import { disconnectAccount, fusionarCuenta, syncSocialNow } from '@/app/admin/ac
 import { NEGATIVE, POSITIVE } from '@/components/charts/theme'
 import { SOCIAL_NETWORKS } from '@/db/schema'
 import type { CuentaRow } from '@/lib/posts-kpis'
-import { networkLabel } from '@/lib/networks'
+import { avisosDe, networkLabel } from '@/lib/networks'
 import { estadoDelFierro, type Fierro } from '@/lib/parrilla'
 import { cn } from '@/lib/utils'
 
@@ -48,7 +48,7 @@ function nombreDe(row: CuentaRow): string {
 }
 
 /** Un bloque por red, una tarjeta por cuenta. Conectar suma; la misma cuenta solo renueva. */
-export function Cuentas({ rows }: { rows: CuentaRow[] }) {
+export function Cuentas({ rows, metaEnRevision }: { rows: CuentaRow[]; metaEnRevision: boolean }) {
   const [pending, startTransition] = useTransition()
   const [aviso, setAviso] = useState<{ texto: string; ok: boolean } | null>(null)
 
@@ -82,6 +82,9 @@ export function Cuentas({ rows }: { rows: CuentaRow[] }) {
                 {cuentas.length === 0 ? 'Conectar →' : 'Agregar cuenta →'}
               </a>
             </div>
+            {avisosDe(network, metaEnRevision).map((aviso) => (
+              <p key={aviso} className="mb-2 text-[0.78rem] text-fg-faint">{aviso}</p>
+            ))}
             {cuentas.length === 0 ? (
               <p className="text-[0.78rem] text-fg-faint">Sin cuentas.</p>
             ) : (

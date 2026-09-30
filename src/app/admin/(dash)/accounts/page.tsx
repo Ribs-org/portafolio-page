@@ -1,5 +1,6 @@
 import { requireUser } from '@/lib/auth'
 import { getCuentas } from '@/lib/posts'
+import { env } from '@/lib/env'
 import { Encabezado } from '@/components/ui'
 import { Cuentas } from './cuentas'
 
@@ -15,6 +16,7 @@ export default async function AccountsPage({
   const mensaje = typeof params.mensaje === 'string' ? params.mensaje.slice(0, 200) : null
   const { id: ownerId } = await requireUser()
   const cuentas = await getCuentas(ownerId)
+  const metaEnRevision = env('META_EN_REVISION') === '1'
   return (
     <>
       <header className="mb-6">
@@ -25,7 +27,7 @@ export default async function AccountsPage({
           {mensaje}
         </p>
       ) : null}
-      <Cuentas rows={cuentas} />
+      <Cuentas rows={cuentas} metaEnRevision={metaEnRevision} />
     </>
   )
 }
