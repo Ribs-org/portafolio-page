@@ -190,8 +190,9 @@ export default function PrivacidadPage() {
           guardados, y las métricas que ya se recogieron se quedan.{' '}
           <span className="text-fg">Pedir el borrado</span> —en esa misma pantalla, entrando a
           «Ver y editar» y usando «Enviar solicitud»— sí borra todo lo que vino de Instagram y
-          Facebook, y Facebook te devuelve un código con una dirección de este sitio que confirma
-          cuándo ocurrió y cuántas cuentas se borraron.
+          Facebook, y con ello cualquier corte programado que se quede sin ningún destino, texto y
+          media incluidos; Facebook te devuelve un código con una dirección de este sitio que
+          confirma cuándo ocurrió y cuántas cuentas se borraron.
         </p>
       </section>
     </article>
