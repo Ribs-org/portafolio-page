@@ -1,10 +1,11 @@
 import 'server-only'
 import { and, desc, eq, gte, inArray, lte, sql, type AnyColumn, type SQL } from 'drizzle-orm'
 import { clicks, getDb, links, profiles, visits } from '@/db'
-import { env } from './env'
 
-/** Dashboard days are bucketed in this zone, not UTC. Override per deployment. */
-export const SITE_TIMEZONE = env('SITE_TIMEZONE') ?? 'America/Santiago'
+// Reexported, not defined here: this file drags in `server-only`, and `lib/zona.ts` (a pure
+// module, covered by its own vitest suite) needs the same derivation without that import.
+import { SITE_TIMEZONE } from './zona'
+export { SITE_TIMEZONE } from './zona'
 
 /**
  * The `YYYY-MM-DD` a moment falls on in SITE_TIMEZONE.

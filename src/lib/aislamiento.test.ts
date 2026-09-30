@@ -132,6 +132,7 @@ const USUARIO = {
   correo: 'dueno@example.com',
   nombre: null,
   rol: 'usuario' as const,
+  zona: 'America/Santiago',
   sesionVersion: 1,
   invitadoEn: new Date('2026-01-01'),
   primerIngresoEn: new Date('2026-01-01'),

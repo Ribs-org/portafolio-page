@@ -50,6 +50,13 @@
       "when": 1790771279157,
       "tag": "0006_meta_user_y_borrados",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1790775486323,
+      "tag": "0007_zona_por_usuario",
+      "breakpoints": true
     }
   ]
 }
