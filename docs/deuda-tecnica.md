@@ -357,3 +357,24 @@ entrega usando `nombreDe` de `src/lib/vocabulario.ts`; estas dos no, porque las 
 tests que comparan el texto letra por letra (el mensaje de error de `deleteProfile` y su
 reflejo en el editor). Cerrarlo cuesta actualizar esos tests junto con la frase — un cambio
 chico, pero deliberadamente fuera de esta entrega, que no tocaba tests de otras.
+
+## `rescheduleTarget` mueve la hora del post aunque el destino ya no case
+
+**Abierto desde 2026-09-29.** La escritura del destino sí está protegida: desde esta entrega
+el `UPDATE` de `scheduled_post_targets` exige `status = 'failed'` en su `where`, así que un
+destino que salió publicado entre la lectura de la acción y su escritura no vuelve a la cola
+—que es lo que lo habría hecho publicar de nuevo, porque el cron levanta todo lo `scheduled`
+y vencido sin mirar el `externalId`—.
+
+Lo que quedó fuera de esa reja es el `UPDATE` de `scheduled_posts`, que corre antes y sin
+condición: en esa carrera la hora del post se mueve igual. No republica ni revive nada, pero
+deja dos restos. La hora del post pasa a decir algo que ningún destino está esperando, y un
+destino hermano que siguiera en `scheduled` se corre a esa hora nueva: se atrasa, no se
+pierde. La acción además devuelve `ok` en ese caso; el `revalidatePath` repinta la verdad en
+el acto, y distinguirlo en la respuesta pedía una frase de error nueva, que esta entrega no
+podía tocar.
+
+Se dejó así porque cerrarlo no es una condición más: hay que reordenar la acción para
+escribir primero el destino, mirar si casó alguna fila, y solo entonces mover la hora del
+post —o envolver las dos escrituras en una transacción—. Es media hora de trabajo con su
+test del orden nuevo, y nada de lo que hoy se ve en pantalla lo pide.
