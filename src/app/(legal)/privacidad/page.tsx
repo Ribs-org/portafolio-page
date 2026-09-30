@@ -8,7 +8,7 @@ export const metadata: Metadata = {
 /** The one value a fork has to change before deploying these pages. */
 const CONTACTO = 'vicente.pareja.jones@gmail.com'
 
-const ACTUALIZADO = '27 de septiembre de 2026'
+const ACTUALIZADO = '30 de septiembre de 2026'
 
 export default function PrivacidadPage() {
   return (
@@ -182,6 +182,17 @@ export default function PrivacidadPage() {
           </a>
           . Ten en cuenta que, por el diseño descrito arriba, lo más probable es que no exista
           forma de vincular ningún registro contigo: no se guardan identificadores estables.
+        </p>
+        <p className="leading-relaxed text-fg-muted">
+          Si conectaste Instagram o Facebook, hay dos caminos desde Facebook, y no son lo mismo.{' '}
+          <span className="text-fg">Quitar esta app</span> —en Configuración → Apps y sitios web—{' '}
+          <span className="text-fg">desconecta</span> esas dos cuentas: se borran los permisos
+          guardados, y las métricas que ya se recogieron se quedan.{' '}
+          <span className="text-fg">Pedir el borrado</span> —en esa misma pantalla, entrando a
+          «Ver y editar» y usando «Enviar solicitud»— sí borra todo lo que vino de Instagram y
+          Facebook, y con ello cualquier corte programado que se quede sin ningún destino, texto y
+          media incluidos; Facebook te devuelve un código con una dirección de este sitio que
+          confirma cuándo ocurrió y cuántas cuentas se borraron.
         </p>
       </section>
     </article>

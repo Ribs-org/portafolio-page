@@ -198,6 +198,10 @@ export const socialAccounts = pgTable(
     network: text('network').notNull(),
     handle: text('handle'),
     externalId: text('external_id'),
+    // El id de usuario de la app de Meta, que no es el de la página ni el de la cuenta de
+    // Instagram: es el que Meta manda en los callbacks de baja y borrado. Nulo en las
+    // cuentas conectadas antes del 2026-09-30, hasta que su dueño reconecte.
+    metaUserId: text('meta_user_id'),
     accessToken: text('access_token'),
     refreshToken: text('refresh_token'),
     expiresAt: timestamp('expires_at', { withTimezone: true }),
@@ -208,6 +212,7 @@ export const socialAccounts = pgTable(
   (t) => [
     unique('social_accounts_network_external_key').on(t.network, t.externalId),
     index('social_accounts_owner_idx').on(t.ownerId),
+    index('social_accounts_meta_user_idx').on(t.metaUserId),
   ],
 ).enableRLS()
 
@@ -571,6 +576,20 @@ export const ajustes = pgTable(
   (t) => [unique('ajustes_owner_clave_key').on(t.ownerId, t.clave), index('ajustes_owner_idx').on(t.ownerId)],
 ).enableRLS()
 
+/**
+ * Cada borrado que Meta nos pidió (data deletion callback): el código que devolvimos y
+ * cuántas cuentas cayeron. Sin dueño a propósito: cuando se inserta, el dueño ya no tiene
+ * cuentas de Meta y Meta no sabe quién es; la página de estado solo muestra fecha y número.
+ */
+export const solicitudesBorrado = pgTable('solicitudes_borrado', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  codigo: text('codigo').notNull().unique(),
+  red: text('red').notNull(),
+  metaUserId: text('meta_user_id').notNull(),
+  cuentas: integer('cuentas').notNull(),
+  creadoEn: timestamp('creado_en', { withTimezone: true }).notNull().defaultNow(),
+}).enableRLS()
+
 export type Profile = typeof profiles.$inferSelect
 export type Link = typeof links.$inferSelect
 export type Visit = typeof visits.$inferSelect
@@ -586,5 +605,6 @@ export type PostComment = typeof postComments.$inferSelect
 export type SourceAuthor = typeof sourceAuthors.$inferSelect
 export type SourcePost = typeof sourcePosts.$inferSelect
 export type Ajuste = typeof ajustes.$inferSelect
+export type SolicitudBorrado = typeof solicitudesBorrado.$inferSelect
 export type Usuario = typeof users.$inferSelect
 export type CodigoIngreso = typeof codigosIngreso.$inferSelect

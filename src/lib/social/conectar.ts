@@ -10,6 +10,8 @@ export type CuentaAConectar = {
   accessToken: string
   refreshToken: string | null
   expiresAt: Date | null
+  /** El id de usuario de la app de Meta; solo lo traen `instagram` y `facebook`. */
+  metaUserId?: string | null
 }
 
 export const CUENTA_DE_OTRO = 'Esa cuenta ya está conectada por otra persona.'
@@ -41,12 +43,19 @@ export async function guardarCuenta(ownerId: string, network: string, cuenta: Cu
     expiresAt: cuenta.expiresAt,
     lastSyncError: null,
   }
+  // El id de usuario de Meta va aparte porque al reconectar solo se escribe cuando lo hay:
+  // así una cuenta de antes de que existiera la columna rellena su nulo, y un `/me` que
+  // falló no borra el id que ya estaba guardado. Las demás redes nunca lo traen.
+  const metaUserId = cuenta.metaUserId ?? null
   await getDb()
     .insert(socialAccounts)
-    .values({ network, externalId: cuenta.externalId, ownerId, ...valores })
+    .values({ network, externalId: cuenta.externalId, ownerId, metaUserId, ...valores })
     // El target sigue siendo (network, external_id) hasta la entrega 3: mientras tanto dos
     // usuarios no pueden conectar la misma cuenta, y es preferible a que uno pise al otro.
-    .onConflictDoUpdate({ target: [socialAccounts.network, socialAccounts.externalId], set: valores })
+    .onConflictDoUpdate({
+      target: [socialAccounts.network, socialAccounts.externalId],
+      set: metaUserId ? { ...valores, metaUserId } : valores,
+    })
 }
 
 const GRAPH = 'https://graph.facebook.com/v23.0'

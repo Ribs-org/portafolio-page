@@ -213,6 +213,25 @@ acciones ni las rutas de API que arman su propio SQL. Cerrarlo de verdad pide de
 cuáles de esas doce se trasladan a `src/lib`, o extender el arnés para que también las
 alcance ahí donde viven.
 
+Y hay una excepción al revés, dentro de `src/lib`: `src/lib/social/meta-bajas.ts`
+(`darDeBaja`, `pasosDeBorrado`, `borrarDatosDe`) busca por `social_accounts.meta_user_id` y
+**no** filtra por dueño, a propósito. Quien pide ahí no es un dueño con sesión sino Meta,
+que no sabe quién es nuestro dueño: el callback de baja o de borrado llega como un `POST`
+público cuya única credencial es el `signed_request` firmado con el app secret. Exigirle un
+`owner_id` a esas consultas sería pedir un dato que la petición no trae. Lo que sostiene el
+aislamiento acá es la firma, no el `WHERE`: por eso nada de ese módulo se llama desde una
+acción con sesión ni desde otra ruta sin haber pasado antes por `leerSignedRequest`
+(`src/lib/social/meta-firma.ts`), y por eso tampoco está en la lista de `aislamiento.test.ts`
+—el arnés lo daría por roto, y no lo está—. Si alguien lo importa desde el panel, el filtro
+por dueño hay que ponerlo en el llamador.
+
+La misma excepción alcanza a la página `/borrado/[codigo]`
+(`src/app/(legal)/borrado/[codigo]/page.tsx`), que lee `solicitudes_borrado` por el código y
+no por dueño: esa tabla no tiene `owner_id` a propósito —cuando la fila se escribe, ese
+dueño ya no tiene cuentas de Meta—, y quien consulta la URL es Meta o quien pidió el
+borrado, ninguno con sesión. Ahí la llave es el código aleatorio de 16 caracteres, y por eso
+la página no muestra nada que necesite más: ni nombre, ni correo, ni handle.
+
 ## Dos caminos que crean publicaciones, sin código compartido
 
 **Abierto desde 2026-09-24.**
@@ -437,3 +456,25 @@ Cerrarlo pide una decisión de producto antes que código: qué significa «ya n
 botón que lo escriba, y la condición correspondiente en `quemadosDe`. Con eso decidido son
 una migración, una acción y un test; sin decidirlo, cualquier límite que se ponga hoy
 —«solo los últimos treinta días»— esconde trabajo pendiente sin avisar.
+
+## Threads se queda fuera de la baja y del borrado de Meta
+
+**Abierto desde 2026-09-30.**
+
+`REDES_META` (`src/lib/social/meta-bajas.ts`) son `instagram` y `facebook`, y `meta_user_id`
+solo lo llenan `instagramCredential` y `facebookCredential`. Threads es una red conectable y
+completa en este código, montada sobre la misma app de Meta pero por otro **caso de uso**,
+el de «API de Threads», que en el App Dashboard tiene su propio par de campos de
+*deauthorize* y *data deletion* y firma sus `signed_request` con `THREADS_APP_SECRET`.
+Ninguno de los dos está implementado: quien quite la app o pida el borrado desde Threads no
+llega a ninguna parte, y sus datos se quedan.
+
+La entrega A acotó su alcance a Instagram y Facebook a propósito, y para el App Review de
+esos permisos alcanza. Lo que no alcanza es el día que Threads entre a revisión.
+
+Cerrarlo son las dos rutas otra vez —`/api/social/meta/threads-baja` y `-borrado`, o un
+segmento por caso de uso— leyendo `THREADS_APP_SECRET`, y una decisión antes: si el id de
+usuario de Threads vive en la misma columna `meta_user_id` (son espacios de ids distintos,
+así que compartir columna pide también mirar la red al filtrar) o en una propia. La página
+de estado y `solicitudes_borrado` sirven igual, que para eso `red` es una columna y no una
+constante.

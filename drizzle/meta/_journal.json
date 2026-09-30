@@ -43,6 +43,13 @@
       "when": 1790734747048,
       "tag": "0005_rls",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1790771279157,
+      "tag": "0006_meta_user_y_borrados",
+      "breakpoints": true
     }
   ]
 }
