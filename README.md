@@ -310,6 +310,12 @@ aparecería en ninguna pantalla y no habría forma de abrirlo ni de borrarlo.
 Si tu cuenta se conectó antes del 2026-09-30 y no la has reconectado, su `meta_user_id`
 está vacío: el callback responde igual, pero con cero cuentas afectadas.
 
+**Estas dos URLs cubren Instagram y Facebook, no Threads.** Threads se conecta por el caso
+de uso «API de Threads» de la misma app, que tiene su propio par de campos —firmados con
+`THREADS_APP_SECRET`, no con el de arriba— y **todavía no está implementado**: quien quite
+la app o pida el borrado desde Threads no llega a ninguna parte. Está anotado en
+`docs/deuda-tecnica.md`.
+
 Si administras **más de una cuenta de Instagram**, al conectar el panel te muestra la
 lista y marcas cuáles quieres ver. Cada una queda como una cuenta aparte, con sus
 posts y sus métricas. Volver a conectar una que ya está solo renueva su acceso.

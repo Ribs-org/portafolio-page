@@ -456,3 +456,25 @@ Cerrarlo pide una decisión de producto antes que código: qué significa «ya n
 botón que lo escriba, y la condición correspondiente en `quemadosDe`. Con eso decidido son
 una migración, una acción y un test; sin decidirlo, cualquier límite que se ponga hoy
 —«solo los últimos treinta días»— esconde trabajo pendiente sin avisar.
+
+## Threads se queda fuera de la baja y del borrado de Meta
+
+**Abierto desde 2026-09-30.**
+
+`REDES_META` (`src/lib/social/meta-bajas.ts`) son `instagram` y `facebook`, y `meta_user_id`
+solo lo llenan `instagramCredential` y `facebookCredential`. Threads es una red conectable y
+completa en este código, montada sobre la misma app de Meta pero por otro **caso de uso**,
+el de «API de Threads», que en el App Dashboard tiene su propio par de campos de
+*deauthorize* y *data deletion* y firma sus `signed_request` con `THREADS_APP_SECRET`.
+Ninguno de los dos está implementado: quien quite la app o pida el borrado desde Threads no
+llega a ninguna parte, y sus datos se quedan.
+
+La entrega A acotó su alcance a Instagram y Facebook a propósito, y para el App Review de
+esos permisos alcanza. Lo que no alcanza es el día que Threads entre a revisión.
+
+Cerrarlo son las dos rutas otra vez —`/api/social/meta/threads-baja` y `-borrado`, o un
+segmento por caso de uso— leyendo `THREADS_APP_SECRET`, y una decisión antes: si el id de
+usuario de Threads vive en la misma columna `meta_user_id` (son espacios de ids distintos,
+así que compartir columna pide también mirar la red al filtrar) o en una propia. La página
+de estado y `solicitudes_borrado` sirven igual, que para eso `red` es una columna y no una
+constante.
