@@ -35,8 +35,9 @@ tiene gráficos: el termómetro de los próximos siete días, las filas de hoy y
 el botón «Poner al fuego» y el pie de ayer en mono. Los puntos 5–7 no aplican. Mira acá que
 las filas se lean a 400 px —la hora, los logos de `Redes` y el texto en una línea caben o
 se envuelven sin cortar— y que el rojo de «Se quemó» y el motivo del fallo se lean sobre la
-chapa. Con una cuenta desconectada en el entorno de prueba se ve la otra cara: la tarjeta
-«Conecta tu primera red», sola.
+chapa. Con **todas** las cuentas desconectadas en el entorno de prueba se ve la otra cara:
+la tarjeta «Conecta tu primera red», sola. Con una desconectada y otra viva sigue saliendo
+El Fuego entero: la tarjeta pide que no quede ninguna con credencial.
 
 ### 2. Los Números — `/admin/analytics` — `analytics/page.tsx`
 
