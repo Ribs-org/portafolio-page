@@ -71,19 +71,26 @@ export function Cuentas({ rows, metaEnRevision }: { rows: CuentaRow[]; metaEnRev
     <section className="space-y-6">
       {SOCIAL_NETWORKS.map((network) => {
         const cuentas = rows.filter((r) => r.network === network)
+        const avisos = avisosDe(network, metaEnRevision)
+        // El enlace describe sus avisos: quien llega tabulando a «Conectar →» los oye antes de
+        // pulsar, aunque en el DOM vayan después.
+        const idsDeAvisos = avisos.map((_, i) => `aviso-${network}-${i}`)
         return (
           <div key={network}>
             <div className="mb-2 flex items-center gap-3">
               <h2 className="font-titulo text-sm font-semibold uppercase tracking-[0.03em]">{networkLabel(network)}</h2>
               <a
                 href={`/api/social/${network}/connect`}
+                aria-describedby={idsDeAvisos.length > 0 ? idsDeAvisos.join(' ') : undefined}
                 className="text-[0.75rem] text-fg-muted transition-colors hover:text-fg"
               >
                 {cuentas.length === 0 ? 'Conectar →' : 'Agregar cuenta →'}
               </a>
             </div>
-            {avisosDe(network, metaEnRevision).map((aviso) => (
-              <p key={aviso} className="mb-2 text-[0.78rem] text-fg-faint">{aviso}</p>
+            {avisos.map((aviso, i) => (
+              <p key={aviso} id={idsDeAvisos[i]} className="mb-2 text-[0.78rem] text-fg-faint">
+                {aviso}
+              </p>
             ))}
             {cuentas.length === 0 ? (
               <p className="text-[0.78rem] text-fg-faint">Sin cuentas.</p>

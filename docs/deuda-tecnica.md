@@ -522,3 +522,20 @@ correcto: «19:00» es 19:00 del dueño en los dos lados), o bien la app solo la
 al selector («se publicará a las 19:00 de Europe/Madrid») y deja que el dueño traduzca. Lo
 segundo es una tarde; lo primero pide aritmética de zonas en el cliente, que es justo lo
 que `fromZonedInput` ya resuelve en el servidor.
+
+## Los Fierros mandan `drizzle-orm` al navegador
+
+**Abierto desde 2026-09-30.**
+
+`src/app/admin/(dash)/accounts/cuentas.tsx` es un componente de cliente y hace
+`import { SOCIAL_NETWORKS } from '@/db/schema'` —un import de valor—. `db/schema` importa
+`drizzle-orm/pg-core` y construye las tablas al cargarse, así que el chunk de cliente de
+`/admin/accounts` (unos 52 KB) lleva el núcleo de `drizzle-orm` dentro. Es el único
+componente de cliente del repositorio que importa el esquema como valor; la revisión de la
+entrega C lo vio en el manifiesto del build. No rompe nada: es peso y una dependencia del
+navegador que no tiene por qué estar ahí.
+
+Cerrarlo: sacar `SOCIAL_NETWORKS` y `SocialNetwork` a un módulo sin drizzle (el candidato
+natural es `src/lib/networks.ts`, que ya es lo que el cliente importa) y que `db/schema`
+los reexporte, para no tocar los demás imports. Una tarde, con un `grep` de los sitios que
+los importan y el build para confirmar que el chunk se achica.

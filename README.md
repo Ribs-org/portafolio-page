@@ -290,8 +290,9 @@ https://TU-DOMINIO/api/social/instagram/callback
 ```
 
 Los permisos que pide la app son `instagram_basic`, `instagram_manage_insights`,
-`pages_show_list`, `pages_read_engagement` e `instagram_content_publish`. El último no se
-usa todavía: se pide ahora porque los permisos se conceden una sola vez, al autorizar.
+`pages_show_list`, `pages_read_engagement` e `instagram_content_publish`. El último es el
+que usa la publicación (reels, fotos, carruseles y trial reels); se pide junto con los demás
+porque los permisos se conceden una sola vez, al autorizar.
 
 Copia el app id y el secret. Mientras la app esté en **modo desarrollo** y tú seas su
 dueño, no necesitas App Review.
