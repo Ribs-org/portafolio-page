@@ -62,11 +62,17 @@ el de Instagram) e `issued_at`. La firma es HMAC-SHA256 del payload con el **app
   de Meta con ese `meta_user_id`, se borra lo que vino de Meta: `post_metrics` de sus
   `social_posts`, `post_comments`, `social_posts`, `account_metrics`,
   `scheduled_post_targets` de esa cuenta, y la fila de `social_accounts`. Los
-  `scheduled_posts` (el texto y la media del dueño) no son datos de Meta y no se tocan;
-  un post que se quede sin destinos sigue en la parrilla como borrador. Después se inserta
+  `scheduled_posts` (el texto y la media del dueño) no son datos de Meta: un corte que
+  conserve destinos en otra red sigue en la parrilla. Pero uno que se quede sin ningún
+  destino se borra con ellos, texto y media incluidos (la media la barre R2), porque la
+  parrilla lee por `innerJoin` con los destinos y un corte sin ninguno desaparece de todas
+  las vistas sin que el dueño pueda ni abrirlo ni borrarlo. Ese séptimo paso solo alcanza
+  a los que **esta** operación dejó huérfanos (`not exists` sobre los destinos que
+  queden), así que un borrador que ya estaba sin destinos no se toca. Después se inserta
   una fila en **`solicitudes_borrado`** y se responde el JSON con la URL de estado.
-- **Firma inválida, sin `signed_request` o algoritmo distinto**: `400` sin cuerpo. Ambas
-  rutas son `POST` públicos, sin sesión.
+- **Firma inválida, sin `signed_request`, algoritmo distinto, o un `issued_at` a más de
+  24 h del reloj**: `400` sin cuerpo. Ambas rutas son `POST` públicos, sin sesión, y la
+  ventana es lo único que impide reenviar un cuerpo capturado y volver a borrar.
 
 ### 2.4 Modelo de datos
 

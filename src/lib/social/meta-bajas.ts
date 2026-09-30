@@ -1,7 +1,7 @@
 import 'server-only'
 import { randomBytes } from 'node:crypto'
 import { and, eq, inArray, sql, type SQL } from 'drizzle-orm'
-import { getDb, socialAccounts, solicitudesBorrado } from '@/db'
+import { getDb, scheduledPostTargets, socialAccounts, solicitudesBorrado } from '@/db'
 
 // Las dos cosas que Meta puede pedirnos por un usuario que quitó la app: la baja
 // (deauthorize) y el borrado (data deletion request).
@@ -43,8 +43,11 @@ export async function darDeBaja(metaUserId: string): Promise<number> {
  * `post_comments` sí tiene cascada, pero se borra explícito para que el orden completo se
  * vea de una lectura.
  *
- * Los `scheduled_posts` no se tocan: el texto y la media son del dueño, no de Meta. Un
- * post que se quede sin destinos sigue en la parrilla como borrador.
+ * Los `scheduled_posts` que conservan algún destino no se tocan: el texto y la media son
+ * del dueño, no de Meta. Los que esta operación deja sin ningún destino se borran con
+ * ellos (`pasoDeHuerfanos`), porque la parrilla lee por `innerJoin` con los destinos y un
+ * post sin ninguno desaparece de todas las vistas sin que el dueño pueda ni abrirlo ni
+ * borrarlo.
  *
  * Devuelve `SQL` y no texto —mismo criterio que `pasosDeFusion`— para que el test pueda
  * renderizarlo con el dialecto y afirmar el orden y los parámetros sin base.
@@ -64,6 +67,31 @@ export function pasosDeBorrado(metaUserId: string): SQL[] {
 }
 
 /**
+ * El séptimo paso: los cortes que se quedaron sin ningún destino, del texto a la media.
+ *
+ * Va aparte de `pasosDeBorrado` porque necesita algo que solo se sabe leyendo antes de
+ * borrar —qué cortes tocaban esas cuentas— y porque los seis primeros comparten dos
+ * invariantes que este no: llevar el `meta_user_id` como parámetro y acotarse a las dos
+ * redes de Meta. Sigue siendo pura, así que su SQL se prueba sin base.
+ *
+ * El `not exists` es la mitad que importa: borra solo lo que **esta** operación dejó
+ * huérfano. Un corte que conserve un destino en otra red sigue en la parrilla, y un
+ * borrador que ya estaba sin destinos —el dueño lo dejó así— no se toca. La media y la
+ * regla cuelgan de `scheduled_posts` en cascada; los archivos los barre R2 al día
+ * siguiente, como con cualquier borrado.
+ *
+ * Sin ids devuelve `null`: nada que borrar, ningún paso que correr.
+ */
+export function pasoDeHuerfanos(postIds: string[]): SQL | null {
+  if (postIds.length === 0) return null
+  const ids = sql.join(
+    postIds.map((id) => sql`${id}`),
+    sql`, `,
+  )
+  return sql`delete from scheduled_posts where id in (${ids}) and not exists (select 1 from scheduled_post_targets t where t.post_id = scheduled_posts.id)`
+}
+
+/**
  * 16 caracteres de base32 en minúscula: legible en una URL y sin ambigüedad 0/O, 1/l.
  *
  * `b % 32` no sesga nada porque 256 es múltiplo de 32: cada letra sale igual de probable.
@@ -77,7 +105,9 @@ export function codigoDeBorrado(): string {
  * Borra lo que vino de Meta para ese usuario y deja constancia; devuelve el código que la
  * respuesta a Meta lleva y que la página de estado sabe leer.
  *
- * Las cuentas se cuentan antes de borrarlas: después ya no existen.
+ * Las cuentas se cuentan antes de borrarlas: después ya no existen. Y los cortes que
+ * tocaban esas cuentas se leen antes también, por la misma razón: el quinto paso borra
+ * sus destinos, que es el único camino que llevaba hasta ellos.
  */
 export async function borrarDatosDe(metaUserId: string): Promise<{ codigo: string; cuentas: number }> {
   const db = getDb()
@@ -87,7 +117,16 @@ export async function borrarDatosDe(metaUserId: string): Promise<{ codigo: strin
       .select({ id: socialAccounts.id })
       .from(socialAccounts)
       .where(and(eq(socialAccounts.metaUserId, metaUserId), inArray(socialAccounts.network, [...REDES_META])))
+    const cuentaIds = afectadas.map((c) => c.id)
+    const cortes = cuentaIds.length
+      ? await tx
+          .selectDistinct({ postId: scheduledPostTargets.postId })
+          .from(scheduledPostTargets)
+          .where(inArray(scheduledPostTargets.accountId, cuentaIds))
+      : []
     for (const paso of pasosDeBorrado(metaUserId)) await tx.execute(paso)
+    const huerfanos = pasoDeHuerfanos(cortes.map((c) => c.postId))
+    if (huerfanos) await tx.execute(huerfanos)
     await tx.insert(solicitudesBorrado).values({ codigo, red: 'meta', metaUserId, cuentas: afectadas.length })
     return { codigo, cuentas: afectadas.length }
   })

@@ -5,7 +5,7 @@ import { describe, expect, it, vi } from 'vitest'
 // módulo bajo prueba lo importa: sin este doble, el import ni siquiera resuelve.
 vi.mock('server-only', () => ({}))
 
-const { BAJA_DESDE_FACEBOOK, codigoDeBorrado, pasosDeBorrado } = await import('./meta-bajas')
+const { BAJA_DESDE_FACEBOOK, codigoDeBorrado, pasoDeHuerfanos, pasosDeBorrado } = await import('./meta-bajas')
 
 const META_USER = 'u1'
 
@@ -50,6 +50,31 @@ describe('pasosDeBorrado', () => {
     for (const p of pasos) {
       expect(p.sql).toMatch(/"?network"?\s+in\s*\(\s*'instagram'\s*,\s*'facebook'\s*\)/i)
     }
+  })
+})
+
+describe('pasoDeHuerfanos', () => {
+  const dialecto = new PgDialect()
+
+  it('sin cortes no hay paso que correr', () => {
+    expect(pasoDeHuerfanos([])).toBeNull()
+  })
+
+  it('borra los cortes por id, con los ids como parámetros', () => {
+    const paso = dialecto.sqlToQuery(pasoDeHuerfanos(['p1', 'p2'])!)
+    expect(paso.sql).toMatch(/delete from scheduled_posts/i)
+    expect(paso.params).toEqual(['p1', 'p2'])
+    expect(paso.sql).not.toContain('p1')
+  })
+
+  it('solo se lleva los que esta operación dejó sin ningún destino', () => {
+    // El `not exists` es la mitad que importa. Sin él, un corte que conserve destinos en
+    // otra red —TikTok, YouTube— se iría con el borrado de Meta, y con él el texto y la
+    // media que el dueño escribió y que no son de Meta.
+    const paso = dialecto.sqlToQuery(pasoDeHuerfanos(['p1'])!)
+    expect(paso.sql).toMatch(
+      /not exists\s*\(\s*select 1 from scheduled_post_targets t where t\.post_id = scheduled_posts\.id\s*\)/i,
+    )
   })
 })
 

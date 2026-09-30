@@ -302,7 +302,10 @@ vino de esas dos redes —posts, comentarios, métricas y los destinos programad
 cuentas— y devuelve a Meta un código y la dirección `https://TU-DOMINIO/borrado/<código>`,
 una página pública donde ese código confirma cuándo fue y cuántas cuentas se borraron. Lo
 que escribiste tú —el texto y la media de una publicación programada— no es de Meta y no
-se toca: un post que se quede sin destinos sigue en la parrilla como borrador.
+se toca mientras el corte conserve algún destino: uno que todavía salga en otra red sigue
+en la parrilla. Un corte que se quede sin ningún destino se borra con ellos, texto y media
+incluidos (la media la barre R2 al día siguiente), porque un corte sin destinos no
+aparecería en ninguna pantalla y no habría forma de abrirlo ni de borrarlo.
 
 Si tu cuenta se conectó antes del 2026-09-30 y no la has reconectado, su `meta_user_id`
 está vacío: el callback responde igual, pero con cero cuentas afectadas.
