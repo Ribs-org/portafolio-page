@@ -86,7 +86,7 @@ export default async function SchedulePage({
               nextHref={scheduleHref(params, { vista: 'calendario', semana: addDays(monday, 7) })}
             />
           ) : (
-            <Queue items={ordenarCola(cortes)} volver={volver} />
+            <Queue items={ordenarCola(cortes)} volver={volver} zone={SITE_TIMEZONE} />
           )}
         </div>
       </div>

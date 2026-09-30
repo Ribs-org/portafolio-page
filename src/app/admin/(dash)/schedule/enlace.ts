@@ -10,8 +10,8 @@ const UN_SOLO_USO = new Set([
 ])
 
 /**
- * Rebuilds the page URL flipping one key, carrying the rest — the content page's
- * `contentHref` mold. One-shot keys (`UN_SOLO_USO`) never carry over.
+ * Rearma la URL de la página cambiando una clave y acarreando el resto — el molde del
+ * `contentHref` de Los Cortes. Las claves de un solo uso (`UN_SOLO_USO`) nunca se acarrean.
  */
 export function scheduleHref(
   params: Record<string, string | string[] | undefined>,

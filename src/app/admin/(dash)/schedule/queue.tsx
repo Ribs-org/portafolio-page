@@ -17,9 +17,11 @@ const VISTA_PREVIA = 20
 export function Queue({
   items,
   volver,
+  zone,
 }: {
   items: Array<{ post: ScheduledPost; targets: Array<ScheduledPostTarget & { handle: string | null }> }>
   volver: string
+  zone: string
 }) {
   const [pending, start] = useTransition()
   const [error, setError] = useState<string | null>(null)
@@ -45,7 +47,15 @@ export function Queue({
             <div className="min-w-0">
               <p className="line-clamp-2 text-sm">{post.caption || '(sin texto)'}</p>
               <p className="mt-1 text-xs text-fg-faint">
-                {post.scheduledAt.toLocaleString('es-CL', { dateStyle: 'medium', timeStyle: 'short' })}
+                {/* La zona llega por prop, como al calendario: `SITE_TIMEZONE` vive en
+                    `analytics.ts`, que trae `server-only` y no cruza a un cliente. Sin
+                    ella, en Vercel (UTC) la cola decía una hora y El Fuego y el calendario
+                    otra para el mismo corte, y ahora las tres listan lo quemado. */}
+                {post.scheduledAt.toLocaleString('es-CL', {
+                  dateStyle: 'medium',
+                  timeStyle: 'short',
+                  timeZone: zone,
+                })}
               </p>
             </div>
             <div className="flex shrink-0 items-center gap-3">
