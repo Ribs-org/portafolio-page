@@ -132,9 +132,16 @@ dígitos que vale diez minutos.
 
 El panel tiene cinco pestañas —El Fuego, La Parrilla (Calendario), Los Cortes
 (Contenido), La Mesa (Comentarios) y Los Números (Analítica)— y el engranaje de Ajustes,
-con Los Fierros (Cuentas), La Vitrina (Perfiles) y Los Maestros (Usuarios, solo el admin).
-Las rutas no cambiaron. Cada pantalla lleva su subtítulo en llano por si el nombre no dice
-nada.
+con Los Fierros (Cuentas), La Vitrina (Perfiles), Los Maestros (Usuarios, solo el admin) y
+Tu Cuenta. Las rutas no cambiaron. Cada pantalla lleva su subtítulo en llano por si el
+nombre no dice nada.
+
+En **Tu Cuenta** (`/admin/cuenta`) cambias dos cosas tuyas: el nombre con el que apareces
+y tu zona horaria. La zona es de cada usuario, no del sitio: naces con la de
+`SITE_TIMEZONE` y la cambias cuando quieras, y debajo del selector se ve qué hora es en la
+tuya ahora mismo, calculada en el servidor. El correo con el que entras no se cambia desde
+ahí. Por ahora la zona solo manda en esa pantalla: las horas del resto del panel siguen
+saliendo de `SITE_TIMEZONE`.
 
 **El Fuego es la entrada**, y muestra solo lo que pide una acción hoy: los próximos siete
 días con su carga, los cortes de hoy —hora, logos de sus redes, el texto en una línea y

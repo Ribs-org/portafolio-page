@@ -207,7 +207,9 @@ const {
   createScheduledPost,
   fusionarCuenta,
   rescheduleTarget,
+  guardarCuenta,
 } = await import('./actions')
+const { ZONA_INVALIDA } = await import('@/lib/zona')
 const { TRIAL_REEL_MEDIA } = await import('@/lib/social/publish/opciones')
 const { FUSION_DISTINTA_RED, FUSION_NO_ES_TUYA, FUSION_FALLO } = await import('@/lib/social/fusion')
 
@@ -642,5 +644,40 @@ describe('rescheduleTarget: la hora nueva solo alcanza a un destino todavía que
 
     expect(await rescheduleTarget('target-ajeno', futuro)).toEqual({ error: 'Ese destino ya no existe.' })
     expect(db.updateCalls).toHaveLength(0)
+  })
+})
+
+describe('guardarCuenta: el nombre y la zona horaria de quien está en la sesión', () => {
+  it('una zona que Intl no conoce no escribe nada y devuelve la frase de siempre', async () => {
+    const formData = new FormData()
+    formData.set('nombre', 'Ana')
+    // Un `<select>` se edita en el navegador: lo que llega no es necesariamente una de las
+    // opciones que se ofrecieron.
+    formData.set('zona', 'Marte/Olympus')
+
+    expect(await guardarCuenta(formData)).toEqual({ ok: false, error: ZONA_INVALIDA })
+    expect(db.updateCalls).toHaveLength(0)
+    expect(revalidados).toEqual([])
+  })
+
+  it('con una zona válida escribe el nombre recortado y la zona, y repinta el panel', async () => {
+    const formData = new FormData()
+    formData.set('nombre', '  Ana Pérez  ')
+    formData.set('zona', 'Europe/Madrid')
+
+    expect(await guardarCuenta(formData)).toEqual({ ok: true })
+    expect(db.updateCalls).toEqual([{ nombre: 'Ana Pérez', zona: 'Europe/Madrid' }])
+    // La hora de abajo se calcula en el servidor: sin este revalidado seguiría siendo la
+    // de la zona vieja.
+    expect(revalidados).toEqual(['/admin', '/admin/cuenta'])
+  })
+
+  it('un nombre en blanco se guarda como nulo, no como cadena vacía', async () => {
+    const formData = new FormData()
+    formData.set('nombre', '   ')
+    formData.set('zona', 'America/Santiago')
+
+    expect(await guardarCuenta(formData)).toEqual({ ok: true })
+    expect(db.updateCalls).toEqual([{ nombre: null, zona: 'America/Santiago' }])
   })
 })

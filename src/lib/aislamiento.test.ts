@@ -117,8 +117,10 @@ const { getCola } = await import('./comentarios-cola')
 const { verificarCuentas, cuentaUnicaPorRed } = await import('./social/cuentas')
 const { todosLosCortes, cortesEntre, quemadosDe, servidosAyer } = await import('./social/publish/cortes')
 const { leerAjuste } = await import('./ajustes')
-const { makeDefault, updateProfile, deleteScheduledPost } = await import('@/app/admin/actions')
-const { guardarCuenta } = await import('./social/conectar')
+const { makeDefault, updateProfile, deleteScheduledPost, guardarCuenta } = await import('@/app/admin/actions')
+// `guardarCuenta` son dos funciones distintas con el mismo nombre: la de `admin/actions`
+// guarda la cuenta *del usuario* y la de `social/conectar`, una cuenta *de una red*.
+const { guardarCuenta: guardarCuentaDeRed } = await import('./social/conectar')
 
 beforeEach(() => {
   capturas.length = 0
@@ -425,6 +427,27 @@ describe('aislamiento por dueño, escrituras (SQL generado, sin base)', () => {
     esperarFiltradoPorDueno(consultas[0]!)
   })
 
+  /**
+   * «Tu Cuenta» es la única escritura del panel cuyo dueño no es un `owner_id`: la fila que
+   * toca **es** la del usuario, así que la reja es `users.id = <el de la sesión>`. Por eso
+   * no usa `esperarFiltradoPorDueno`, que exige la columna `owner_id` literal, y comprueba
+   * lo mismo a mano: el predicado cae en el WHERE y el id viaja como parámetro ligado.
+   */
+  it('admin/actions: guardarCuenta ata su UPDATE a la fila del usuario de la sesión', async () => {
+    const formData = new FormData()
+    formData.set('nombre', 'Ana')
+    formData.set('zona', 'Europe/Madrid')
+    const consultas = await consultasEncadenadas(() => guardarCuenta(formData))
+    expect(consultas).toHaveLength(1)
+
+    const { sql, params } = consultas[0]!
+    expect(sql).toMatch(/update "users"/i)
+    expect(sql.split(/\bwhere\b/i).pop()).toMatch(/"id"\s*=\s*\$/)
+    expect(params).toContain(DUENO)
+    // Y el dueño va como parámetro ligado, nunca escrito en el texto de la consulta.
+    expect(sql).not.toContain(DUENO)
+  })
+
   it('admin/actions: deleteScheduledPost ata su lectura y su DELETE al dueño', async () => {
     // La lectura es una sola (post + estado de cada destino, por leftJoin): con un
     // destino programado sigue al DELETE. Cero filas sería «no existe» y no borraría.
@@ -451,7 +474,7 @@ describe('aislamiento por dueño, escrituras (SQL generado, sin base)', () => {
   it('social/conectar: guardarCuenta escribe con el dueño que recibió', async () => {
     const consultas = await consultasEncadenadas(
       () =>
-        guardarCuenta(DUENO, 'instagram', {
+        guardarCuentaDeRed(DUENO, 'instagram', {
           externalId: '17841400000000000',
           handle: 'cuenta',
           accessToken: 'token',

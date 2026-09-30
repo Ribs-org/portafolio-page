@@ -6,7 +6,7 @@ import { redirect } from 'next/navigation'
 import { cookies } from 'next/headers'
 import { basePublica, existe, guardar, keyDesdeUrl, SIN_ALMACEN } from '@/lib/storage'
 import { and, asc, eq, inArray, max, ne, sql } from 'drizzle-orm'
-import { getDb, links, profiles, socialAccounts, socialPosts, scheduledPosts, scheduledPostTargets, scheduledPostMedia, reglasClave } from '@/db'
+import { getDb, links, profiles, socialAccounts, socialPosts, scheduledPosts, scheduledPostTargets, scheduledPostMedia, reglasClave, users } from '@/db'
 import { LINK_KINDS, type LinkKind } from '@/db/schema'
 import { SITE_TIMEZONE } from '@/lib/analytics'
 import { destroySession, requireAdmin, requireUser } from '@/lib/auth'
@@ -38,7 +38,10 @@ import { validateAtributos, ATRIBUTOS_ERROR, type Atributos } from '@/lib/social
 import { diffMedia, diffTargets } from '@/lib/social/publish/edit'
 import { crearPostProgramado } from '@/lib/social/publish/crear'
 import { CuentaInvalida, verificarCuentas, type CuentaDestino } from '@/lib/social/cuentas'
-import { CUENTA_DE_OTRO, CuentaDeOtro, guardarCuenta, tokensDePaginas } from '@/lib/social/conectar'
+// `guardarCuenta` de `social/conectar` guarda una cuenta *de una red*; la acción de abajo,
+// con el mismo nombre, guarda la cuenta *del usuario*. Se renombra la de la red al
+// importarla porque la acción es la que el formulario nombra desde fuera.
+import { CUENTA_DE_OTRO, CuentaDeOtro, guardarCuenta as guardarCuentaDeRed, tokensDePaginas } from '@/lib/social/conectar'
 import { SIN_TOKEN_DE_PAGINA } from '@/lib/social/facebook'
 import { tiktokConnector } from '@/lib/social/tiktok'
 import { TIKTOK_SIN_CUENTA, consultarCreador, type CreadorTikTok } from '@/lib/social/publish/tiktok-creador'
@@ -48,6 +51,7 @@ import { ARCHIVO_AJENO, ARCHIVO_FALTANTE, CUERPO_ILEGIBLE, parseMediaMovil, type
 import { esReservado } from '@/lib/slugs'
 import { cerrarSesiones, esChoqueDeUnicidad, invitar, pedir, quitar } from '@/lib/usuarios'
 import { fromZonedInput, normalizeUrl, slugify } from '@/lib/utils'
+import { ZONA_INVALIDA, esZonaValida } from '@/lib/zona'
 
 export type FormState = { error?: string; ok?: boolean; aviso?: string }
 
@@ -546,7 +550,7 @@ export async function conectarElegidas(formData: FormData): Promise<void> {
   let fallo: string | null = null
   try {
     for (const cuenta of marcadas) {
-      await guardarCuenta(usuario.id, pendiente.network, {
+      await guardarCuentaDeRed(usuario.id, pendiente.network, {
         externalId: cuenta.externalId,
         handle: cuenta.handle,
         accessToken:
@@ -1311,4 +1315,29 @@ export async function cerrarSesionesUsuario(id: string): Promise<{ error?: strin
   await cerrarSesiones(id)
   revalidatePath('/admin/usuarios')
   return {}
+}
+
+/* ------------------------------------------------------------------ cuenta -- */
+
+/**
+ * «Tu Cuenta»: el nombre con que aparece y la zona horaria en que vive.
+ *
+ * Escribe su propia fila de `users`, así que el filtro por dueño acá es `users.id` y no un
+ * `owner_id`: el id sale de la sesión (`requireUser`), nunca del formulario. La zona se
+ * valida contra `Intl` antes de escribir, porque un `<select>` se edita en el navegador.
+ */
+export async function guardarCuenta(formData: FormData): Promise<{ ok: true } | { ok: false; error: string }> {
+  const usuario = await requireUser()
+  const nombre = String(formData.get('nombre') ?? '').trim() || null
+  const zona = String(formData.get('zona') ?? '')
+  if (!esZonaValida(zona)) return { ok: false, error: ZONA_INVALIDA }
+
+  await getDb().update(users).set({ nombre, zona }).where(eq(users.id, usuario.id))
+
+  // La hora que se ve bajo el selector se calcula en el servidor: sin revalidar esta
+  // pantalla seguiría mostrando la de la zona vieja. `/admin` va también porque la zona es
+  // de todo el panel, no de esta pantalla.
+  revalidatePath('/admin')
+  revalidatePath('/admin/cuenta')
+  return { ok: true }
 }
