@@ -200,6 +200,18 @@ dice que la función no está disponible, escríbenos.» La variable se document
 No hay forma de interceptar ese error: Facebook lo muestra en su propia página y nunca
 vuelve a nuestro callback.
 
+## 4b. Entrega D — lo que los revisores piden para poder entrar y leer
+
+Salió de escribir los guiones (§5): el revisor de Meta tiene que poder entrar al panel y
+no puede leer nuestro correo, y Google lee la portada y la privacidad antes de verificar.
+
+- **Un código fijo de ingreso para un solo correo**, mientras estén puestas
+  `REVISION_CORREO` y `REVISION_CODIGO` (seis dígitos): `pedir()` guarda el hash de ese
+  código y no manda nada; `canjear()` no cambia. Sin variables, nada cambia. Se quitan al
+  pasar la app de Meta a Live. Documentadas en `.env.example` y en el README.
+- **`/privacidad` nombra la Google API Services User Data Policy** y el *Limited Use*, qué
+  se guarda de YouTube y cómo revocar; **la landing nombra a YouTube** entre las redes.
+
 ## 5. Los guiones (después del código)
 
 Tres documentos en `docs/`, en español, con la misma forma que `tiktok-revision-guion.md`:
