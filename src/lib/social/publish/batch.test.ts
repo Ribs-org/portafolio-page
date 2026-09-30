@@ -21,7 +21,7 @@ import { TIKTOK_SIN_PRIVACIDAD, OPCIONES_ERROR, TRIAL_REEL_MEDIA } from './opcio
 import { TIKTOK_MEDIA } from './validate'
 import { REGLA_PALABRA, REGLA_MENSAJE, REGLA_DOCUMENTO } from '../comentarios/reglas'
 import { verificarCuentas, type CuentaDestino } from '../cuentas'
-import { reglasClave } from '@/db'
+import { reglasClave, scheduledPosts } from '@/db'
 
 // `mediaToBlob` sube con `guardar`; sin precedente en el repo para simularlo, resuelto
 // igual que en `documento.test.ts` — lo que importa es la clave y el content-type con la
@@ -77,14 +77,19 @@ vi.mock('./documento', () => ({
 // Desde que la fecha del lote se lee en la zona del dueño, `batch.ts` importa
 // `@/lib/usuarios`, que trae `server-only` (no resuelve bajo Vitest) y va a la base. Se
 // mockea el módulo entero: acá lo único que se le pide es la zona del dueño del lote.
+//
+// La zona del doble se mueve por test (`zonaDelDueno`) y arranca en una que **no** es el
+// default del sitio: con las dos cadenas iguales, este archivo pasaría verde aunque
+// `scheduleBatch` dejara de preguntar por el dueño y volviera a leer la constante.
 vi.mock('server-only', () => ({}))
+let zonaDelDueno = 'Europe/Madrid'
 vi.mock('@/lib/usuarios', () => ({
-  buscarPorId: async () => ({ id: 'owner-1', zona: 'America/Santiago' }),
+  buscarPorId: async () => ({ id: 'owner-1', zona: zonaDelDueno }),
 }))
 
 const now = new Date('2026-09-02T12:00:00Z')
 /** La zona del dueño del lote: las filas de abajo escriben sus horas en ella. */
-const ZONA = 'America/Santiago'
+const ZONA = 'Europe/Madrid'
 const base: BatchItem = {
   fecha: '2026-09-03 10:00',
   texto: 'Hola lote',
@@ -603,5 +608,51 @@ describe('scheduleBatch — trial reel, la comprobación de media antes de subir
     expect(resultados).toEqual([{ index: 0, ok: false, error: TRIAL_REEL_MEDIA }])
     expect(fetchMock).not.toHaveBeenCalled()
     expect(inserts).toEqual([])
+  })
+})
+
+/**
+ * La hora que escribe un lote es hora de pared del dueño, no del servidor ni del sitio.
+ * Es lo único que distingue «19:00» de un instante: el mismo texto guarda dos instantes
+ * distintos según dónde viva quien programó, y `scheduleBatch` lo averigua con
+ * `buscarPorId` una vez por lote.
+ *
+ * La fecha va en 2030 a propósito: `scheduleBatch` calcula `now` con `new Date()` real, y
+ * un octubre cercano dejaría de ser futuro en unos días. Sigue siendo el 5 de octubre, que
+ * es el caso interesante — las dos zonas están en horario de verano y en hemisferios
+ * distintos, así que sus offsets ni siquiera tienen el mismo signo.
+ */
+describe('scheduleBatch — «19:00» son las 19:00 del dueño', () => {
+  const item: BatchItem = {
+    fecha: '2030-10-05 19:00',
+    texto: 'Hola',
+    cuentas: [],
+    redes: ['threads'],
+    media: [],
+  }
+
+  afterEach(() => {
+    inserts.length = 0
+    zonaDelDueno = 'Europe/Madrid'
+  })
+
+  /** El `scheduled_at` que llegó al insert del post. */
+  function instanteGuardado(): Date {
+    const fila = inserts.find((i) => i.tabla === scheduledPosts)
+    return (fila!.valores as { scheduledAt: Date }).scheduledAt
+  }
+
+  it('con el dueño en Madrid, las 19:00 son 17:00Z', async () => {
+    zonaDelDueno = 'Europe/Madrid'
+    const resultados = await scheduleBatch('owner-1', [item])
+    expect(resultados).toEqual([{ index: 0, ok: true, postId: 'post-1' }])
+    expect(instanteGuardado().toISOString()).toBe('2030-10-05T17:00:00.000Z')
+  })
+
+  it('con el dueño en Santiago, el mismo texto son 22:00Z', async () => {
+    zonaDelDueno = 'America/Santiago'
+    const resultados = await scheduleBatch('owner-1', [item])
+    expect(resultados).toEqual([{ index: 0, ok: true, postId: 'post-1' }])
+    expect(instanteGuardado().toISOString()).toBe('2030-10-05T22:00:00.000Z')
   })
 })

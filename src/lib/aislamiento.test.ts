@@ -208,7 +208,7 @@ describe('aislamiento por dueño (SQL generado, sin base)', () => {
     const consultas = await todasLasConsultas(() =>
       getRecentVisits({
         ownerId: DUENO,
-        zone: 'America/Santiago',
+        zone: 'Europe/Madrid', // distinta del default del sitio: el doble no debe coincidir con la constante.
         profileId: null,
         from: new Date('2026-01-01'),
         to: new Date('2026-01-31'),
@@ -390,7 +390,7 @@ describe('aislamiento por dueño (SQL generado, sin base)', () => {
       () =>
         getPostRows({
           ownerId: DUENO,
-          zone: 'America/Santiago',
+          zone: 'Asia/Kolkata', // otra distinta, y de media hora: acá la zona es incidental, pero gratis.
           profileId: null,
           from: new Date('2026-01-01'),
           to: new Date('2026-01-31'),
