@@ -25,7 +25,7 @@ export type Corte = {
   }>
 }
 
-/** Lo programado para hoy en la zona del sitio, salido o no, en orden de hora. */
+/** Lo programado para hoy en la zona que recibe (la del dueño), salido o no, en orden de hora. */
 export function cortesDeHoy<T extends Corte>(cortes: T[], now: Date, zone: string): T[] {
   const hoy = dayKey(now, zone)
   return cortes

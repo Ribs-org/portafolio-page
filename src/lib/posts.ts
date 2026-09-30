@@ -321,7 +321,7 @@ export async function getCuentas(ownerId: string): Promise<CuentaRow[]> {
 }
 
 /**
- * Cuántas publicaciones tiene agendadas cada día, en la zona del sitio.
+ * Cuántas publicaciones tiene agendadas cada día, en la zona que recibe (la del dueño).
  *
  * Alimenta el termómetro de la semana en El Fuego y el aviso de carga del compositor:
  * los dos preguntan lo mismo —¿qué tan llena está la parrilla ese día?— y una sola

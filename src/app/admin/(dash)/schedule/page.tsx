@@ -1,5 +1,4 @@
 import Link from 'next/link'
-import { SITE_TIMEZONE } from '@/lib/analytics'
 import { requireUser } from '@/lib/auth'
 import { getCuentas } from '@/lib/posts'
 import { addDays, contarPorDia, normalizeWeekParam } from '@/lib/schedule-week'
@@ -24,13 +23,15 @@ export default async function SchedulePage({
   const calendarView = params.vista === 'calendario'
   // El compositor nace abierto si lo pidió la URL: así llega «Poner al fuego» de El Fuego.
   const componer = params.componer === '1'
+
+  // La parrilla entera —qué semana es «esta», en qué casilla cae cada corte, qué hora dice
+  // la cola— se dibuja en la zona del dueño.
+  const { id: ownerId, zona } = await requireUser()
   const monday = normalizeWeekParam(
     typeof params.semana === 'string' ? params.semana : undefined,
     new Date(),
-    SITE_TIMEZONE,
+    zona,
   )
-
-  const { id: ownerId } = await requireUser()
   const cuentas = await getCuentas(ownerId)
   // La misma lectura que usa El Fuego (`social/publish/cortes.ts`): posts, destinos con
   // handle y media. Sin ventana: el calendario siempre mostró todo lo del dueño. Vienen
@@ -46,7 +47,7 @@ export default async function SchedulePage({
   const ahora = new Date()
   const carga = contarPorDia(
     cortes.map(({ post }) => post).filter((post) => post.scheduledAt >= ahora),
-    SITE_TIMEZONE,
+    zona,
   )
 
   return (
@@ -80,13 +81,13 @@ export default async function SchedulePage({
             <WeekCalendar
               monday={monday}
               items={cortes}
-              zone={SITE_TIMEZONE}
+              zone={zona}
               volver={volver}
               prevHref={scheduleHref(params, { vista: 'calendario', semana: addDays(monday, -7) })}
               nextHref={scheduleHref(params, { vista: 'calendario', semana: addDays(monday, 7) })}
             />
           ) : (
-            <Queue items={ordenarCola(cortes)} volver={volver} zone={SITE_TIMEZONE} />
+            <Queue items={ordenarCola(cortes)} volver={volver} zone={zona} />
           )}
         </div>
       </div>

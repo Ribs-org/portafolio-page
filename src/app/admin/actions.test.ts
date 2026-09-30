@@ -645,6 +645,27 @@ describe('rescheduleTarget: la hora nueva solo alcanza a un destino todavía que
     expect(await rescheduleTarget('target-ajeno', futuro)).toEqual({ error: 'Ese destino ya no existe.' })
     expect(db.updateCalls).toHaveLength(0)
   })
+
+  it('la hora local se lee en la zona del usuario, no en la del sitio', async () => {
+    leeraQuemado([quemado])
+    const zonaDeAntes = USUARIO.zona
+    USUARIO.zona = 'Europe/Madrid'
+    // El reloj queda fijo antes del instante que se programa: si no, este test caducaría
+    // el día que 2026-10-01 deje de ser futuro y la acción lo rechazaría por pasado.
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-09-30T12:00:00Z'))
+    try {
+      expect(await rescheduleTarget('target-1', '2026-10-01T19:00')).toEqual({ ok: true })
+    } finally {
+      vi.useRealTimers()
+      USUARIO.zona = zonaDeAntes
+    }
+
+    // Las 19:00 de Madrid en octubre (CEST, UTC+2) son las 17:00Z. En Santiago habrían
+    // sido las 22:00Z: es la diferencia que este test sujeta.
+    const values = db.updateCalls[0] as Record<string, unknown>
+    expect(values.scheduledAt).toEqual(new Date('2026-10-01T17:00:00Z'))
+  })
 })
 
 describe('guardarCuenta: el nombre y la zona horaria de quien está en la sesión', () => {

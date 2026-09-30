@@ -47,10 +47,11 @@ export function Queue({
             <div className="min-w-0">
               <p className="line-clamp-2 text-sm">{post.caption || '(sin texto)'}</p>
               <p className="mt-1 text-xs text-fg-faint">
-                {/* La zona llega por prop, como al calendario: `SITE_TIMEZONE` vive en
-                    `analytics.ts`, que trae `server-only` y no cruza a un cliente. Sin
-                    ella, en Vercel (UTC) la cola decía una hora y El Fuego y el calendario
-                    otra para el mismo corte, y ahora las tres listan lo quemado. */}
+                {/* La zona llega por prop, como al calendario: es la del dueño de la
+                    sesión, que la página lee de `requireUser()` — un cliente no tiene
+                    forma de saberla. Sin ella, en Vercel (UTC) la cola decía una hora y El
+                    Fuego y el calendario otra para el mismo corte, y ahora las tres listan
+                    lo quemado. */}
                 {post.scheduledAt.toLocaleString('es-CL', {
                   dateStyle: 'medium',
                   timeStyle: 'short',

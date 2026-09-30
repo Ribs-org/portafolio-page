@@ -8,7 +8,6 @@ import { basePublica, existe, guardar, keyDesdeUrl, SIN_ALMACEN } from '@/lib/st
 import { and, asc, eq, inArray, max, ne, sql } from 'drizzle-orm'
 import { getDb, links, profiles, socialAccounts, socialPosts, scheduledPosts, scheduledPostTargets, scheduledPostMedia, reglasClave, users } from '@/db'
 import { LINK_KINDS, type LinkKind } from '@/db/schema'
-import { SITE_TIMEZONE } from '@/lib/analytics'
 import { destroySession, requireAdmin, requireUser } from '@/lib/auth'
 import { normalizeCampaignTag } from '@/lib/social/campaign'
 import { columnasEditablesDeRegla, validarRegla } from '@/lib/social/comentarios/reglas'
@@ -254,7 +253,8 @@ export async function rotateSlug(profileId: string) {
 
 /* ------------------------------------------------------------------- links -- */
 
-function readLinkForm(formData: FormData) {
+/** `zona` es la del dueño de la sesión: la misma en la que el editor pintó las ventanas. */
+function readLinkForm(formData: FormData, zona: string) {
   const kind = String(formData.get('kind') ?? 'standard')
 
   return {
@@ -267,8 +267,8 @@ function readLinkForm(formData: FormData) {
     isActive: formData.get('isActive') === 'on',
     // Read in the same zone the editor rendered them in, so re-saving a link —
     // which the row toggle does on every click — leaves the window untouched.
-    startsAt: fromZonedInput(String(formData.get('startsAt') ?? ''), SITE_TIMEZONE),
-    endsAt: fromZonedInput(String(formData.get('endsAt') ?? ''), SITE_TIMEZONE),
+    startsAt: fromZonedInput(String(formData.get('startsAt') ?? ''), zona),
+    endsAt: fromZonedInput(String(formData.get('endsAt') ?? ''), zona),
   }
 }
 
@@ -277,8 +277,8 @@ export async function createLink(
   _prev: FormState,
   formData: FormData,
 ): Promise<FormState> {
-  const { id: ownerId } = await requireUser()
-  const values = readLinkForm(formData)
+  const { id: ownerId, zona } = await requireUser()
+  const values = readLinkForm(formData, zona)
 
   if (!values.label) return { error: 'Ponle un nombre al link.' }
   if (!values.url) return { error: 'Falta la URL.' }
@@ -308,8 +308,8 @@ export async function updateLink(
   _prev: FormState,
   formData: FormData,
 ): Promise<FormState> {
-  const { id: ownerId } = await requireUser()
-  const values = readLinkForm(formData)
+  const { id: ownerId, zona } = await requireUser()
+  const values = readLinkForm(formData, zona)
 
   if (!values.label) return { error: 'Ponle un nombre al link.' }
   if (!values.url) return { error: 'Falta la URL.' }
@@ -690,7 +690,7 @@ async function mediaYaSubida(
 }
 
 export async function createScheduledPost(_prev: FormState, formData: FormData): Promise<FormState> {
-  const { id: ownerId } = await requireUser()
+  const { id: ownerId, zona } = await requireUser()
 
   const caption = String(formData.get('caption') ?? '').trim()
 
@@ -717,7 +717,7 @@ export async function createScheduledPost(_prev: FormState, formData: FormData):
   const scheduledAt =
     formData.get('cuandoAhora') === 'on'
       ? new Date(Date.now() + 60_000)
-      : fromZonedInput(String(formData.get('scheduledAt') ?? ''), SITE_TIMEZONE)
+      : fromZonedInput(String(formData.get('scheduledAt') ?? ''), zona)
   const subida = await mediaYaSubida(formData.get('mediaSubida'))
   if ('error' in subida) return { error: subida.error }
   const uploaded = subida.lista
@@ -773,7 +773,7 @@ export async function updateScheduledPost(
   _prev: FormState,
   formData: FormData,
 ): Promise<FormState> {
-  const { id: ownerId } = await requireUser()
+  const { id: ownerId, zona } = await requireUser()
   const db = getDb()
 
   const [post] = await db
@@ -826,7 +826,7 @@ export async function updateScheduledPost(
     .filter((t) => t.status === 'published' && idsElegidosSet.has(t.accountId))
     .map((t) => ({ id: t.accountId, network: t.network, handle: null }))
   const cuentas = [...cuentasPendientes, ...cuentasPublicadasElegidas]
-  const scheduledAt = fromZonedInput(String(formData.get('scheduledAt') ?? ''), SITE_TIMEZONE)
+  const scheduledAt = fromZonedInput(String(formData.get('scheduledAt') ?? ''), zona)
   const keptIds = formData.getAll('keptMedia').map(String)
   const files = formData.getAll('media').filter((f): f is File => f instanceof File && f.size > 0)
   const urls = String(formData.get('mediaUrls') ?? '')
@@ -1097,9 +1097,10 @@ export async function updateScheduledPost(
 }
 
 export async function rescheduleTarget(targetId: string, localDatetime: string): Promise<FormState> {
-  const { id: ownerId } = await requireUser()
+  const { id: ownerId, zona } = await requireUser()
 
-  const scheduledAt = fromZonedInput(localDatetime, SITE_TIMEZONE)
+  // La hora llega del formulario en pantalla, que la escribió en la zona del dueño.
+  const scheduledAt = fromZonedInput(localDatetime, zona)
   if (!scheduledAt || scheduledAt.getTime() <= Date.now()) {
     return { error: 'La hora debe estar en el futuro.' }
   }
