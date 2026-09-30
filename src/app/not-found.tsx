@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import { ENLACE_BOTON } from '@/components/boton'
 
 /**
  * Lo que se ve cuando una dirección no existe.
@@ -22,10 +23,7 @@ export default function NoEncontrado() {
         <p className="mt-2 text-sm leading-relaxed text-fg-muted">
           La dirección no existe, o la página dejó de estar publicada.
         </p>
-        <Link
-          href="/"
-          className="mt-5 inline-flex items-center justify-center rounded-lg bg-brasa px-3.5 py-2 text-sm font-medium text-acero-950 transition-[filter] hover:brightness-110"
-        >
+        <Link href="/" className={`mt-5 ${ENLACE_BOTON}`}>
           Ir al inicio
         </Link>
       </section>

@@ -112,6 +112,7 @@ const { getCuentas, cargaPorDia, getPostRows } = await import('./posts')
 const { getAllProfiles, getProfileBySlug } = await import('./profiles')
 const { getCola } = await import('./comentarios-cola')
 const { verificarCuentas, cuentaUnicaPorRed } = await import('./social/cuentas')
+const { todosLosCortes, cortesEntre, quemadosDe, servidosAyer } = await import('./social/publish/cortes')
 const { leerAjuste } = await import('./ajustes')
 const { makeDefault, updateProfile, deleteScheduledPost } = await import('@/app/admin/actions')
 
@@ -284,6 +285,58 @@ describe('aislamiento por dueño (SQL generado, sin base)', () => {
     const consultas = await todasLasConsultas(() => cuentaUnicaPorRed(DUENO, ['instagram']))
     expect(consultas).toHaveLength(1)
     esperarFiltradoPorDueno(consultas[0]!)
+  })
+
+  /**
+   * Las tres lecturas de cortes comparten un cargador: posts + destinos + handle en una
+   * consulta, y la media en otra por los ids que esa ya filtró (mismo criterio que
+   * `post_metrics` en `getPostRows`). Sin filas, la de media no se construye: por eso
+   * cada caso ve una sola consulta, y `quemadosDe` lleva su subconsulta de fallos
+   * *antes* del dueño en el `where` — el arnés mira lo que queda tras el último «where».
+   */
+  it('social/publish/cortes: todosLosCortes ata su consulta al dueño', async () => {
+    const consultas = await todasLasConsultas(() => todosLosCortes(DUENO))
+    expect(consultas).toHaveLength(1)
+    for (const c of consultas) esperarFiltradoPorDueno(c)
+  })
+
+  it('social/publish/cortes: cortesEntre ata su consulta al dueño', async () => {
+    const consultas = await todasLasConsultas(() =>
+      cortesEntre(DUENO, new Date('2026-01-01'), new Date('2026-01-31')),
+    )
+    expect(consultas).toHaveLength(1)
+    for (const c of consultas) esperarFiltradoPorDueno(c)
+  })
+
+  it('social/publish/cortes: quemadosDe ata su consulta al dueño, con la subconsulta de fallos dentro', async () => {
+    const consultas = await todasLasConsultas(() => quemadosDe(DUENO))
+    expect(consultas).toHaveLength(1)
+    for (const c of consultas) esperarFiltradoPorDueno(c)
+    expect(consultas[0]!.params).toContain('failed')
+  })
+
+  /**
+   * `servidosAyer` encadena tres consultas: los destinos publicados ayer (atada al
+   * dueño), los `social_posts` que cruzan por `external_id` (atada al dueño) y las
+   * métricas de esos posts (`post_metrics` no tiene columna de dueño, así que va por
+   * los ids que la consulta anterior ya filtró — mismo criterio que `getPostRows` más
+   * arriba). Con un destino publicado y un post que cruza, la tercera consulta se
+   * queda sin respuesta y revienta ahí, que es lo único que hace falta para verla.
+   */
+  it('social/publish/cortes: servidosAyer ata sus tres consultas al dueño, directo o por el id que ya filtró la anterior', async () => {
+    // Cada fila es un arreglo de valores en el orden del `select`, no un objeto: la
+    // primera consulta selecciona `postId, network, externalId` y la segunda
+    // `id, network, externalId` — mismo formato que `filaPost` más abajo. La red tiene
+    // que coincidir, o el cruce `red:externalId` descarta el post y no hay tercera.
+    const consultas = await consultasEncadenadas(
+      () => servidosAyer(DUENO, new Date('2026-01-02T12:00:00Z'), 'America/Santiago'),
+      [[['post-1', 'instagram', 'ext-1']], [['social-post-1', 'instagram', 'ext-1']]],
+    )
+    expect(consultas).toHaveLength(3)
+    const [destinos, posts, metricas] = consultas as [Captura, Captura, Captura]
+    esperarFiltradoPorDueno(destinos)
+    esperarFiltradoPorDueno(posts)
+    expect(metricas.params).toContain('social-post-1') // post_metrics: por el id que ya filtró `posts`.
   })
 
   it('ajustes: leerAjuste filtra por dueño', async () => {

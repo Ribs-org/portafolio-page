@@ -1,40 +1,19 @@
 import Link from 'next/link'
-import { asc, eq, inArray } from 'drizzle-orm'
-import { getDb, scheduledPosts, scheduledPostTargets, scheduledPostMedia, socialAccounts } from '@/db'
 import { SITE_TIMEZONE } from '@/lib/analytics'
 import { requireUser } from '@/lib/auth'
 import { getCuentas } from '@/lib/posts'
 import { addDays, contarPorDia, normalizeWeekParam } from '@/lib/schedule-week'
+import { todosLosCortes } from '@/lib/social/publish/cortes'
 import { cn } from '@/lib/utils'
 import { Encabezado } from '@/components/ui'
 import { Composer } from './composer'
 import { BatchUpload } from './batch-upload'
+import { scheduleHref } from './enlace'
 import { ordenarCola } from './orden'
 import { Queue } from './queue'
 import { WeekCalendar } from './calendar'
 
 export const dynamic = 'force-dynamic'
-
-/**
- * Rebuilds the page URL flipping one key, carrying the rest — the content page's
- * `contentHref` mold. `mensaje` never carries over (one-shot OAuth outcome).
- */
-function scheduleHref(
-  params: Record<string, string | string[] | undefined>,
-  changes: Record<string, string | null>,
-): string {
-  const next = new URLSearchParams()
-  for (const [key, value] of Object.entries(params)) {
-    if (key in changes || key === 'mensaje') continue
-    if (typeof value === 'string') next.set(key, value)
-    else if (Array.isArray(value)) for (const v of value) next.append(key, v)
-  }
-  for (const [key, value] of Object.entries(changes)) {
-    if (value !== null) next.set(key, value)
-  }
-  const query = next.toString()
-  return query ? `/admin/schedule?${query}` : '/admin/schedule'
-}
 
 export default async function SchedulePage({
   searchParams,
@@ -43,6 +22,8 @@ export default async function SchedulePage({
 }) {
   const params = await searchParams
   const calendarView = params.vista === 'calendario'
+  // El compositor nace abierto si lo pidió la URL: así llega «Poner al fuego» de El Fuego.
+  const componer = params.componer === '1'
   const monday = normalizeWeekParam(
     typeof params.semana === 'string' ? params.semana : undefined,
     new Date(),
@@ -51,48 +32,11 @@ export default async function SchedulePage({
 
   const { id: ownerId } = await requireUser()
   const cuentas = await getCuentas(ownerId)
-  const db = getDb()
-  // `leftJoin` y no `innerJoin` con `socialAccounts`: un destino cuya cuenta ya no
-  // exista no debe desaparecer del calendario, debe mostrarse por su red (ver
-  // `nombreDestino` en `./etiqueta`). El `on` de este join es solo la relación
-  // destino↔cuenta; el filtro por dueño se queda en el `where` de abajo.
-  const rows = await db
-    .select({ post: scheduledPosts, target: scheduledPostTargets, handle: socialAccounts.handle })
-    .from(scheduledPosts)
-    .innerJoin(scheduledPostTargets, eq(scheduledPostTargets.postId, scheduledPosts.id))
-    .leftJoin(socialAccounts, eq(socialAccounts.id, scheduledPostTargets.accountId))
-    .where(eq(scheduledPosts.ownerId, ownerId))
-    .orderBy(asc(scheduledPosts.scheduledAt))
+  // La misma lectura que usa El Fuego (`social/publish/cortes.ts`): posts, destinos con
+  // handle y media. Sin ventana: el calendario siempre mostró todo lo del dueño. Vienen
+  // por hora ascendente, como el calendario los necesita; la lista los reordena aparte.
+  const cortes = await todosLosCortes(ownerId)
 
-  const posts = new Map<
-    string,
-    {
-      post: (typeof rows)[number]['post']
-      targets: Array<(typeof rows)[number]['target'] & { handle: string | null }>
-      media: Array<typeof scheduledPostMedia.$inferSelect>
-    }
-  >()
-  for (const row of rows) {
-    const entry = posts.get(row.post.id) ?? { post: row.post, targets: [], media: [] }
-    entry.targets.push({ ...row.target, handle: row.handle })
-    posts.set(row.post.id, entry)
-  }
-
-  // Media in its own query: joining it above would multiply post×target×media rows
-  // for nothing, and the calendar only needs the first thumbnail anyway.
-  const ids = [...posts.keys()]
-  if (ids.length > 0) {
-    const media = await db
-      .select()
-      .from(scheduledPostMedia)
-      .where(inArray(scheduledPostMedia.postId, ids))
-      .orderBy(asc(scheduledPostMedia.position))
-    for (const m of media) posts.get(m.postId)?.media.push(m)
-  }
-
-  // Ordenados por fecha ascendente, que es lo que el calendario necesita dentro de
-  // cada día. La lista los reordena aparte: ahí lo próximo va arriba.
-  const items = [...posts.values()]
   // `volver` carries the exact view to return to after editing — list or a given week.
   const volver = scheduleHref(params, {})
 
@@ -101,7 +45,7 @@ export default async function SchedulePage({
   // contradicen. Solo lo que viene: no se puede programar en el pasado.
   const ahora = new Date()
   const carga = contarPorDia(
-    items.map(({ post }) => post).filter((post) => post.scheduledAt >= ahora),
+    cortes.map(({ post }) => post).filter((post) => post.scheduledAt >= ahora),
     SITE_TIMEZONE,
   )
 
@@ -112,7 +56,7 @@ export default async function SchedulePage({
       </header>
 
       <div className="space-y-6">
-        <Composer carga={carga} cuentas={cuentas} />
+        <Composer carga={carga} cuentas={cuentas} abierto={componer} />
         <BatchUpload />
         <div>
           <div className="mb-3 flex items-center gap-1.5">
@@ -135,14 +79,14 @@ export default async function SchedulePage({
           {calendarView ? (
             <WeekCalendar
               monday={monday}
-              items={items}
+              items={cortes}
               zone={SITE_TIMEZONE}
               volver={volver}
               prevHref={scheduleHref(params, { vista: 'calendario', semana: addDays(monday, -7) })}
               nextHref={scheduleHref(params, { vista: 'calendario', semana: addDays(monday, 7) })}
             />
           ) : (
-            <Queue items={ordenarCola(items)} volver={volver} />
+            <Queue items={ordenarCola(cortes)} volver={volver} zone={SITE_TIMEZONE} />
           )}
         </div>
       </div>

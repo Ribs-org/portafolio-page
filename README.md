@@ -10,7 +10,7 @@ quede con tus números.
 | --- | --- |
 | `/` | La página principal del dueño del dominio. Cada usuario tiene una principal, pero solo la del admin se sirve en la raíz |
 | `/<slug>` | La página de un usuario. Cada dominio sirve solo las de su dueño; el del producto las sirve todas |
-| `/admin` | Tu panel: resumen, analítica y editor |
+| `/admin` | Tu panel: El Fuego, lo que pide una acción hoy; adentro, la parrilla, los números y el editor |
 
 Corre en planes gratis: Next.js 16 en Vercel, Postgres en Supabase y la media en Cloudflare R2
 (10 GB gratis, egress $0).
@@ -123,11 +123,22 @@ Abre el sitio: ahora se ve un perfil de ejemplo.
 Entra en `/ingresar` con tu correo (el de `ADMIN_EMAIL`): te llega un código de seis
 dígitos que vale diez minutos.
 
-El panel tiene cinco pestañas —Resumen (los números de un vistazo, hasta que lo
-reemplace El Fuego), La Parrilla (Calendario), Los Cortes (Contenido), La Mesa
-(Comentarios) y Los Números (Analítica)— y el engranaje de Ajustes, con Los Fierros
-(Cuentas), La Vitrina (Perfiles) y Los Maestros (Usuarios, solo el admin). Las rutas no
-cambiaron. Cada pantalla lleva su subtítulo en llano por si el nombre no dice nada.
+El panel tiene cinco pestañas —El Fuego, La Parrilla (Calendario), Los Cortes
+(Contenido), La Mesa (Comentarios) y Los Números (Analítica)— y el engranaje de Ajustes,
+con Los Fierros (Cuentas), La Vitrina (Perfiles) y Los Maestros (Usuarios, solo el admin).
+Las rutas no cambiaron. Cada pantalla lleva su subtítulo en llano por si el nombre no dice
+nada.
+
+**El Fuego es la entrada**, y muestra solo lo que pide una acción hoy: los próximos siete
+días con su carga, los cortes de hoy —hora, logos de sus redes, el texto en una línea y
+cómo van—, lo que se quemó con el motivo y el botón para darle hora nueva, el botón de
+poner algo al fuego, y al pie cuántos cortes salieron ayer. Lo que no pide una acción hoy
+está un clic más adentro y no se perdió: el tráfico, los links, el embudo y qué contenido
+te trae gente viven en **Los Números**, y tus páginas públicas en **La Vitrina**. Las
+miradas de ayer solo aparecen si la sincronización ya trajo las métricas de esos cortes;
+un cero inventado diría «nadie miró» cuando lo cierto es «todavía no se sabe». Y sin
+ninguna red conectada El Fuego no dibuja nada de eso: una sola tarjeta que te manda a Los
+Fierros, porque hasta ahí no hay nada que poner al fuego.
 
 Solo entran los correos invitados; desde **Los Maestros** (Usuarios, dentro de Ajustes),
 visible para el admin, invitas a más gente. Ya adentro cambias foto, bio, colores, links y
@@ -301,11 +312,12 @@ texto aparte; en el teléfono, sin poder tocarse y con «reconéctala» al lado 
 donde antes se leía solo la red —el calendario, la cola, el editor, y en el teléfono el
 Calendario y el Resumen— ahora se leen la red **y** el handle: `Instagram · @vicenteclips`.
 Las dos cosas, porque casi ninguna de esas pantallas dibuja un icono de la red —el
-calendario y la cola del panel son la excepción: el calendario con un logo por destino bajo
-la hora del corte, la cola con ese mismo logo junto al handle y el estado, y en las dos el
-handle en el `title` o al lado del icono—, así que en el resto (el editor, y en el teléfono
-el Calendario y el Resumen) el handle sigue siendo lo que distingue cada destino, y la red
-sola no distingue dos cuentas de la misma red en el mismo corte.
+calendario, la cola y El Fuego son la excepción: el calendario con un logo por destino bajo
+la hora del corte, la cola con ese mismo logo junto al handle y el estado, El Fuego con él
+en cada fila de hoy y de lo quemado, y en las tres el handle en el `title` o al lado del
+icono—, así que en el resto (el editor, y en el teléfono el Calendario y el Resumen) el
+handle sigue siendo lo que distingue cada destino, y la red sola no distingue dos cuentas
+de la misma red en el mismo corte.
 
 TikTok pide sus propias opciones por destino —privacidad, comentarios, dúo, comercial—, así
 que con dos cuentas de TikTok marcadas verás dos bloques, uno por cuenta. No se comparten a

@@ -2,6 +2,7 @@
 
 import { useId } from 'react'
 import { useFormStatus } from 'react-dom'
+import { BOTON_FORMA } from '@/components/boton'
 import { pantallaDe } from '@/lib/vocabulario'
 import { cn } from '@/lib/utils'
 
@@ -84,7 +85,8 @@ export function Button({
     <button
       {...props}
       className={cn(
-        'inline-flex items-center justify-center gap-1.5 rounded-lg px-3.5 py-2 text-sm font-medium transition-colors disabled:opacity-50',
+        BOTON_FORMA,
+        'transition-colors disabled:opacity-50',
         variant === 'primary' && 'bg-brasa text-acero-950 hover:brightness-110',
         variant === 'ghost' && 'border border-acero-700 text-fg-muted hover:bg-acero-800 hover:text-fg',
         variant === 'danger' && 'border border-negative/40 text-negative hover:bg-negative/10',

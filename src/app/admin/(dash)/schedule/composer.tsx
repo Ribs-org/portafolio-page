@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { useActionState, useId, useState } from 'react'
+import { useActionState, useEffect, useId, useState } from 'react'
 import { createScheduledPost, type FormState } from '@/app/admin/actions'
 import { Button, Field, GroupLabel, Input, Submit, Textarea } from '@/components/ui'
 import type { CuentaRow } from '@/lib/posts-kpis'
@@ -79,8 +79,28 @@ const CLASE_CALOR: Record<Calor, string> = {
   llena: 'grilla-llena',
 }
 
-export function Composer({ carga, cuentas }: { carga: Record<string, number>; cuentas: CuentaRow[] }) {
+export function Composer({
+  carga,
+  cuentas,
+  abierto,
+}: {
+  carga: Record<string, number>
+  cuentas: CuentaRow[]
+  // Nace desplegado cuando la URL lo pidió (`?componer=1`), que es como llega el que
+  // viene de «Poner al fuego». Después el `<details>` se abre y se cierra solo.
+  abierto?: boolean
+}) {
   const captionId = useId()
+
+  /**
+   * El que llega con `?componer=1` viene a escribir, y el `<details>` que nace abierto por
+   * atributo no dispara ningún `toggle`: el foco de `onToggle`, más abajo, no le llega. Sin
+   * esto aterriza desde «Poner al fuego» con el foco en el `body` y un clic de más que dar.
+   * Abrirlo a mano sigue pasando por `onToggle`, que es donde ese caso ya funciona.
+   */
+  useEffect(() => {
+    if (abierto) document.getElementById(captionId)?.focus()
+  }, [abierto, captionId])
   // Cuentas cuya red todavía publica desde aquí. Una cuenta de una red que no está en
   // `ENABLED` no se ofrece, esté o no conectada.
   const publicables = cuentas.filter((c) => ENABLED.has(c.network))
@@ -140,6 +160,7 @@ export function Composer({ carga, cuentas }: { carga: Record<string, number>; cu
 
   return (
     <details
+      open={abierto}
       className="rounded-xl bg-white/[0.03] p-4"
       onToggle={(event) => {
         // `Textarea` solo acepta las props del `<textarea>`, así que no hay `ref` que

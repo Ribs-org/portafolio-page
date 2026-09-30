@@ -188,19 +188,30 @@ La lección operativa, para la próxima vez que haya que reconocer un error de P
 
 `aislamiento.test.ts` importa funciones de `src/lib` y comprueba que cada una ate su
 consulta al dueño. Eso deja sin protección cualquier consulta escrita **fuera de
-`src/lib`**: `schedule/page.tsx` arma su propio `leftJoin` inline, no una función de
-`src/lib`, así que el arnés no la alcanza. Esta rama sumó tres más con el mismo patrón,
-las tres en rutas de API: `api/schedule/posts/route.ts`, `api/mobile/schedule/route.ts` y
-`api/mobile/overview/route.ts` (esta última con dos, una por cada ventana que arma —
-«hoy» y «próximos»). Las cuatro son correctas hoy —el filtro del dueño sigue en el
-`WHERE` de cada una, verificado a mano— pero nada impide que mañana alguien mueva uno al
-`ON` del join sin que ninguna prueba chille.
+`src/lib`**. La del calendario (`schedule/page.tsx`) lo estuvo hasta el 2026-09-29, cuando
+El Fuego necesitó la misma lectura y se movió a `src/lib/social/publish/cortes.ts`, donde
+el arnés sí la ve. Eso achicó la superficie en una, no la cerró: `grep -rln "getDb()"
+src/app` (sin contar el test) da hoy doce archivos que arman su propio SQL, en tres clases:
 
-Extraer solo una de esas consultas para cubrirla arreglaría un caso de varios sin
-criterio: el patrón real del repositorio es que el arnés llega a `src/lib` y no a las
-páginas ni a las rutas de API que arman su propio SQL. Cerrarlo de verdad pide decidir
-qué páginas y rutas arman SQL inline y trasladar esas consultas a `src/lib`, o extender
-el arnés para que también las alcance ahí donde viven.
+- **Cuatro páginas del panel**: `schedule/[id]/page.tsx`, `profiles/[id]/page.tsx`,
+  `analytics/page.tsx` y `accounts/elegir/page.tsx`.
+- **Las acciones de servidor**, `admin/actions.ts`, con decenas de consultas (la guardia de
+  `rescheduleTarget` que se añadió el 2026-09-29 es una de ellas).
+- **Siete rutas de API**: `api/schedule/posts`, `api/mobile/schedule`, `api/mobile/overview`
+  (esta con dos consultas, una por ventana), `api/mobile/accounts`,
+  `api/mobile/schedule/accounts`, `api/track/visit` y `api/track/click`.
+
+De todas ellas, solo las tres primeras rutas se leyeron a mano el 2026-09-24 y tenían el
+dueño en el `WHERE`; del resto esta entrada no afirma nada, y las dos de `api/track/*`
+escriben colgando de un perfil, que es otra forma de acotar. Lo que sí vale para todas:
+nada impide que mañana alguien mueva un filtro al `ON` de un join sin que ninguna prueba
+chille.
+
+El calendario no se extrajo por criterio sino porque otra pantalla la pedía; el patrón
+real del repositorio sigue siendo que el arnés llega a `src/lib` y no a las páginas, las
+acciones ni las rutas de API que arman su propio SQL. Cerrarlo de verdad pide decidir
+cuáles de esas doce se trasladan a `src/lib`, o extender el arnés para que también las
+alcance ahí donde viven.
 
 ## Dos caminos que crean publicaciones, sin código compartido
 
@@ -357,3 +368,72 @@ entrega usando `nombreDe` de `src/lib/vocabulario.ts`; estas dos no, porque las 
 tests que comparan el texto letra por letra (el mensaje de error de `deleteProfile` y su
 reflejo en el editor). Cerrarlo cuesta actualizar esos tests junto con la frase — un cambio
 chico, pero deliberadamente fuera de esta entrega, que no tocaba tests de otras.
+
+## `rescheduleTarget` mueve la hora del post aunque el destino ya no case
+
+**Abierto desde 2026-09-29.** La escritura del destino sí está protegida: desde esta entrega
+el `UPDATE` de `scheduled_post_targets` exige `status = 'failed'` en su `where`, así que un
+destino que salió publicado entre la lectura de la acción y su escritura no vuelve a la cola
+—que es lo que lo habría hecho publicar de nuevo, porque el cron levanta todo lo `scheduled`
+y vencido sin mirar el `externalId`—.
+
+Lo que quedó fuera de esa reja es el `UPDATE` de `scheduled_posts`, que corre antes y sin
+condición: en esa carrera la hora del post se mueve igual. No republica ni revive nada, pero
+deja dos restos. La hora del post pasa a decir algo que ningún destino está esperando, y un
+destino hermano que siguiera en `scheduled` se corre a esa hora nueva: se atrasa, no se
+pierde. La acción además devuelve `ok` en ese caso; el `revalidatePath` repinta la verdad en
+el acto, y distinguirlo en la respuesta pedía una frase de error nueva, que esta entrega no
+podía tocar.
+
+Se dejó así porque cerrarlo no es una condición más: hay que reordenar la acción para
+escribir primero el destino, mirar si casó alguna fila, y solo entonces mover la hora del
+post —o envolver las dos escrituras en una transacción—. Es media hora de trabajo con su
+test del orden nuevo, y nada de lo que hoy se ve en pantalla lo pide.
+
+## El Fuego mira treinta días para nombrar el siguiente corte
+
+**Abierto desde 2026-09-29.**
+
+Cuando hoy no hay nada puesto, El Fuego dice «La parrilla está fría hoy.» y nombra el
+siguiente corte. Ese siguiente sale de una segunda lectura acotada a **treinta días**
+(`DIAS_ADELANTE` en `src/app/admin/(dash)/page.tsx`), no de toda la agenda. Con algo
+programado al día treinta y uno, la pantalla dice que la parrilla está fría y **no dice
+nada más**, que es indistinguible de no tener nada agendado nunca.
+
+La ventana existe porque la alternativa era leer la agenda entera del dueño para pintar una
+frase: `cortesEntre` trae posts y destinos, y sin tope eso crece con cada publicación
+programada de la historia. Treinta días cubre el caso real —un hueco de una semana o dos— a
+cambio de un borde que casi nadie toca.
+
+Cerrarlo pide una consulta distinta a la que hay: en vez de una ventana, el **primer** corte
+después de mañana ordenado por hora y con `limit 1`, que no depende de ningún tope. Es una
+función nueva en `src/lib/social/publish/cortes.ts` con su entrada en el arnés de
+aislamiento; media hora. Lo que no conviene es agrandar el número y seguir con una ventana:
+mueve el borde, no lo quita.
+
+## «Se quemó» no tiene ventana de fecha ni forma de podarse
+
+**Abierto desde 2026-09-29.**
+
+`quemadosDe` (`src/lib/social/publish/cortes.ts`) trae **todo** destino en `failed` del
+dueño, sin mirar la fecha, y El Fuego los lista enteros. Es a propósito: un fallo viejo
+sigue pidiendo la acción hasta que alguien lo reprograma, y esconderlo a los siete días
+sería perderlo en silencio. Desde esta entrega la lista va del más reciente al más viejo y
+cada fila que no es de hoy lleva su día y su mes delante, así que al menos se sabe qué es
+qué — que es lo mínimo en una lista sin ventana, donde un fallo puede ser de agosto.
+
+Lo que no tiene es salida propia. Un destino quemado sale de la lista cuando algo lo
+devuelve a la cola —reprogramarlo, «Subir ahora» (`subirAhora`, que rearma todo destino
+`failed` del corte), guardar el corte en su editor (los `rearmIds` de `diffTargets`, que
+rearman cualquier destino `failed` que siga elegido)— o cuando se borra el corte entero
+(`borrarPostProgramado`, que lo permite mientras ningún destino haya alcanzado a
+publicarse). Las cuatro son efectos de otra cosa: no hay «descartar», ni caducidad, ni
+poda. Un dueño que acumule cuarenta fallos de hace meses —una cuenta que se desconectó y
+nadie reconectó— abre la pantalla de entrada y ve cuarenta filas, que es exactamente lo
+contrario de «solo lo que pide una acción hoy».
+
+Cerrarlo pide una decisión de producto antes que código: qué significa «ya no me importa»
+—una columna `descartado_en` en `scheduled_post_targets`, o un estado nuevo en el enum—, un
+botón que lo escriba, y la condición correspondiente en `quemadosDe`. Con eso decidido son
+una migración, una acción y un test; sin decidirlo, cualquier límite que se ponga hoy
+—«solo los últimos treinta días»— esconde trabajo pendiente sin avisar.

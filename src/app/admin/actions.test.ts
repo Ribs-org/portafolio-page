@@ -8,7 +8,13 @@ import { getTableName } from 'drizzle-orm'
 // importar el módulo real bajo Vitest (mismo motivo que en `usuarios.test.ts`).
 vi.mock('server-only', () => ({}))
 
-vi.mock('next/cache', () => ({ revalidatePath: () => {} }))
+/** Las rutas que cada acción mandó a repintar, en orden: lo único que delata un revalidado. */
+const revalidados = vi.hoisted(() => [] as string[])
+vi.mock('next/cache', () => ({
+  revalidatePath: (ruta: string) => {
+    revalidados.push(ruta)
+  },
+}))
 
 /** Marca distinguible de un `redirect()` real, para comprobar que ocurrió sin simular a Next. */
 class RedirectSignal extends Error {
@@ -51,6 +57,9 @@ vi.mock('@/lib/auth', () => ({
  */
 const db = vi.hoisted(() => ({
   updateCalls: [] as unknown[],
+  // El `where` de cada UPDATE, en el mismo orden que `updateCalls`: es donde vive la reja
+  // de estado de `rescheduleTarget`, que el `set` no delata.
+  updateWheres: [] as unknown[],
   deleteCalls: [] as unknown[],
   perfilesDelDueno: [
     { id: 'profile-1', isDefault: false },
@@ -138,8 +147,9 @@ vi.mock('@/db', async (importOriginal) => {
     getDb: () => ({
       update: () => ({
         set: (values: unknown) => ({
-          where: async () => {
+          where: async (condicion: unknown) => {
             db.updateCalls.push(values)
+            db.updateWheres.push(condicion)
             if (db.updateError) throw db.updateError
           },
         }),
@@ -188,14 +198,21 @@ vi.mock('@/db', async (importOriginal) => {
 // Import estático, después de los `vi.mock` (Vitest los sube igual al principio del
 // archivo): un import dinámico dentro de cada `it` pagaría de nuevo la transformación de
 // todo lo que `actions.ts` arrastra.
-const { updateProfile, deleteProfile, makeDefault, updateScheduledPost, createScheduledPost, fusionarCuenta } = await import(
-  './actions'
-)
+const {
+  updateProfile,
+  deleteProfile,
+  makeDefault,
+  updateScheduledPost,
+  createScheduledPost,
+  fusionarCuenta,
+  rescheduleTarget,
+} = await import('./actions')
 const { TRIAL_REEL_MEDIA } = await import('@/lib/social/publish/opciones')
 const { FUSION_DISTINTA_RED, FUSION_NO_ES_TUYA, FUSION_FALLO } = await import('@/lib/social/fusion')
 
 beforeEach(() => {
   db.updateCalls.length = 0
+  db.updateWheres.length = 0
   db.deleteCalls.length = 0
   db.perfilesDelDueno = [
     { id: 'profile-1', isDefault: false },
@@ -210,6 +227,7 @@ beforeEach(() => {
   crear.crearPostProgramadoCalls.length = 0
   db.executeCalls.length = 0
   db.executeError = null
+  revalidados.length = 0
 })
 
 /**
@@ -572,5 +590,56 @@ describe('fusionarCuenta: una tarjeta muerta se absorbe en la viva de su red', (
     db.scheduledSelectQueue.push([muerta, viva])
     db.executeError = new Error('la base no responde')
     expect(await fusionarCuenta('muerta', 'viva')).toEqual({ error: FUSION_FALLO })
+  })
+})
+
+describe('rescheduleTarget: la hora nueva solo alcanza a un destino todavía quemado', () => {
+  const quemado = { id: 'target-1', postId: 'post-1', status: 'failed' }
+  /** Una hora futura cualquiera, que es lo único que la acción exige del campo. */
+  const futuro = '2030-01-01T10:00'
+  /**
+   * Dos entradas por lectura, no una: el `where` de la consulta lleva dentro la subconsulta
+   * de posts del dueño, que para el doble es otro `select().from().where()` y se come el
+   * primer turno de la cola. La segunda entrada es la que la acción de verdad lee.
+   */
+  function leeraQuemado(filas: unknown[]) {
+    db.scheduledSelectQueue.push([], filas)
+  }
+
+  it('el UPDATE del destino pide status = failed, como el rearm del editor', async () => {
+    leeraQuemado([quemado])
+
+    expect(await rescheduleTarget('target-1', futuro)).toEqual({ ok: true })
+
+    // Dos escrituras: la hora del post y el destino de vuelta a la cola.
+    expect(db.updateCalls).toHaveLength(2)
+    const where = new PgDialect().sqlToQuery(db.updateWheres[1] as SQL)
+    expect(where.params).toEqual(['target-1', 'failed'])
+  })
+
+  it('repinta las dos pantallas que muestran lo quemado, no solo la parrilla', async () => {
+    leeraQuemado([quemado])
+
+    await rescheduleTarget('target-1', futuro)
+
+    // El Fuego («Se quemó») vive en `/admin` y su botón de reprogramar es el mismo que el
+    // de la cola: sin este revalidado, la fila que se acaba de arreglar sigue ahí.
+    expect(revalidados).toEqual(['/admin/schedule', '/admin'])
+  })
+
+  it('una hora pasada no escribe nada y devuelve la frase de siempre', async () => {
+    leeraQuemado([quemado])
+
+    expect(await rescheduleTarget('target-1', '2020-01-02T03:04')).toEqual({
+      error: 'La hora debe estar en el futuro.',
+    })
+    expect(db.updateCalls).toHaveLength(0)
+  })
+
+  it('un destino que la consulta atada al dueño no trae no se toca', async () => {
+    leeraQuemado([])
+
+    expect(await rescheduleTarget('target-ajeno', futuro)).toEqual({ error: 'Ese destino ya no existe.' })
+    expect(db.updateCalls).toHaveLength(0)
   })
 })

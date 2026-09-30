@@ -4,6 +4,7 @@ import { useEffect } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { Button } from '@/components/ui'
+import { nombreDe } from '@/lib/vocabulario'
 
 /**
  * La red del panel entero: cualquier excepción de una página de `(dash)` cae acá en vez
@@ -20,7 +21,7 @@ export default function PanelError({
   retry: () => void
 }) {
   // La salida de emergencia no sirve cuando la que se rompió es la pantalla de llegada.
-  const enElResumen = usePathname() === '/admin'
+  const enElFuego = usePathname() === '/admin'
 
   // El mensaje puede venir de una fila de la base o de la respuesta de una red: a la
   // consola, donde lo lee quien depura, y nunca a la pantalla.
@@ -39,9 +40,9 @@ export default function PanelError({
         <Button type="button" variant="primary" onClick={() => retry()}>
           Reintentar
         </Button>
-        {enElResumen ? null : (
+        {enElFuego ? null : (
           <Link href="/admin" className="text-sm text-fg-muted transition-colors hover:text-fg">
-            Ir al Resumen
+            Ir a {nombreDe('/admin')}
           </Link>
         )}
       </div>
