@@ -190,17 +190,28 @@ La lección operativa, para la próxima vez que haya que reconocer un error de P
 consulta al dueño. Eso deja sin protección cualquier consulta escrita **fuera de
 `src/lib`**. La del calendario (`schedule/page.tsx`) lo estuvo hasta el 2026-09-29, cuando
 El Fuego necesitó la misma lectura y se movió a `src/lib/social/publish/cortes.ts`, donde
-el arnés sí la ve. Quedan tres con el mismo patrón, las tres en rutas de API:
-`api/schedule/posts/route.ts`, `api/mobile/schedule/route.ts` y
-`api/mobile/overview/route.ts` (esta última con dos, una por cada ventana que arma —
-«hoy» y «próximos»). Son correctas hoy —el filtro del dueño sigue en el `WHERE` de cada
-una, verificado a mano— pero nada impide que mañana alguien mueva uno al `ON` del join sin
-que ninguna prueba chille.
+el arnés sí la ve. Eso achicó la superficie en una, no la cerró: `grep -rln "getDb()"
+src/app` (sin contar el test) da hoy doce archivos que arman su propio SQL, en tres clases:
+
+- **Cuatro páginas del panel**: `schedule/[id]/page.tsx`, `profiles/[id]/page.tsx`,
+  `analytics/page.tsx` y `accounts/elegir/page.tsx`.
+- **Las acciones de servidor**, `admin/actions.ts`, con decenas de consultas (la guardia de
+  `rescheduleTarget` que se añadió el 2026-09-29 es una de ellas).
+- **Siete rutas de API**: `api/schedule/posts`, `api/mobile/schedule`, `api/mobile/overview`
+  (esta con dos consultas, una por ventana), `api/mobile/accounts`,
+  `api/mobile/schedule/accounts`, `api/track/visit` y `api/track/click`.
+
+De todas ellas, solo las tres primeras rutas se leyeron a mano el 2026-09-24 y tenían el
+dueño en el `WHERE`; del resto esta entrada no afirma nada, y las dos de `api/track/*`
+escriben colgando de un perfil, que es otra forma de acotar. Lo que sí vale para todas:
+nada impide que mañana alguien mueva un filtro al `ON` de un join sin que ninguna prueba
+chille.
 
 El calendario no se extrajo por criterio sino porque otra pantalla la pedía; el patrón
-real del repositorio sigue siendo que el arnés llega a `src/lib` y no a las rutas de API
-que arman su propio SQL. Cerrarlo de verdad pide trasladar esas tres consultas a
-`src/lib`, o extender el arnés para que también las alcance ahí donde viven.
+real del repositorio sigue siendo que el arnés llega a `src/lib` y no a las páginas, las
+acciones ni las rutas de API que arman su propio SQL. Cerrarlo de verdad pide decidir
+cuáles de esas doce se trasladan a `src/lib`, o extender el arnés para que también las
+alcance ahí donde viven.
 
 ## Dos caminos que crean publicaciones, sin código compartido
 

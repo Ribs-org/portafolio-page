@@ -57,12 +57,12 @@ Reemplaza al Resumen como `/admin`. De arriba abajo, y nada más que esto:
 2. **Ahora en la parrilla.** Los cortes de hoy, en orden de hora: la hora, la fila de logos de
    sus destinos, el texto en una línea, el estado en palabras. Sin miniatura. Si no hay nada
    hoy: «La parrilla está fría hoy» y el siguiente corte con su día.
-3. **Se quemó.** Solo si algún destino está en `failed`, **sin ventana de fecha**: un
-   fallo viejo sigue pidiendo la acción hasta que algo lo devuelva a la cola, y uno de un
-   corte programado para la semana que viene que falló en un «Subir ahora» la pide igual.
-   Por eso cada fila que no es de hoy lleva su día y su mes delante. Cada fila: la hora, el logo del destino que falló, el texto en una línea, el
-   motivo en llano, y el botón de reprogramar que ya tiene la cola. Si no hay nada, la sección
-   no existe.
+3. **Se quemó.** Solo si algún destino está en `failed`, **sin ventana de fecha**: un fallo
+   viejo sigue pidiendo la acción hasta que algo lo devuelva a la cola, y uno de un corte
+   programado para la semana que viene que falló en un «Subir ahora» la pide igual. Por eso
+   cada fila que no es de hoy lleva su día y su mes delante. Cada fila: la hora, el logo del
+   destino que falló, el texto en una línea, el motivo en llano, y el botón de reprogramar que
+   ya tiene la cola. Si no hay nada, la sección no existe.
 4. **Poner al fuego**, el botón primario, que lleva al compositor de La Parrilla abierto.
 5. **Al pie, en mono:** ayer. «6 cortes servidos» siempre; «· 1.2k miradas» solo si el sync ya
    trajo las métricas de esos cortes —si no, se omite, no se inventa un cero—.
