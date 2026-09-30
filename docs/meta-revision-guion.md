@@ -52,9 +52,9 @@ encendido por variables de entorno mientras dure la revisión:
   página de Facebook, y con dos o tres publicaciones y comentarios).
 - Se quita la variable el día que la app pasa a Live.
 
-**Esto es código que hoy no existe** (dos variables, una rama en `src/lib/ingreso.ts` y
-su test). Pedirlo antes de mandar el review: sin él, Meta rechaza por «no pudimos
-acceder a la app».
+Está hecho (entrega D, `codigoDeRevision` en `src/lib/ingreso.ts`; las variables se
+documentan en `.env.example` y en la sección de Meta del README). Sin esa puerta, Meta
+rechaza por «no pudimos acceder a la app».
 
 ### La cuenta de prueba y su contenido
 
