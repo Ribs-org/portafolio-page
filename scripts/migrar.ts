@@ -9,6 +9,7 @@ import { env } from '../src/lib/env'
 import { normalizarCorreo } from '../src/lib/ingreso'
 import { decidirMigracion } from '../src/lib/migraciones'
 import { direccionBase, primeraDireccionLibre } from '../src/lib/slugs'
+import { ZONA_POR_DEFECTO } from '../src/lib/zona'
 
 async function main() {
   const decision = decidirMigracion({
@@ -68,8 +69,11 @@ export async function adoptarHuerfanas(sql: postgres.Sql): Promise<void> {
   if (!correo) {
     throw new Error('ADMIN_EMAIL no está configurada o no es un correo válido: no se pueden adoptar las filas sin dueño')
   }
+  // `zona` explícita y no el default de la columna: en una base nueva esta es la fila que
+  // crea al admin, y `SITE_TIMEZONE` existe acá (este script corre en el build de Vercel).
+  // El `do update` no la toca: quien ya eligió la suya en Tu Cuenta se la queda.
   const filas = await sql`
-    insert into users (correo, rol) values (${correo}, 'admin')
+    insert into users (correo, rol, zona) values (${correo}, 'admin', ${ZONA_POR_DEFECTO})
     on conflict (correo) do update set rol = 'admin'
     returning id, nombre`
   const admin = filas[0] as { id: string; nombre: string | null }

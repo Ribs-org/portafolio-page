@@ -21,6 +21,7 @@ import {
   puedePedir,
   vigente,
 } from './ingreso'
+import { ZONA_POR_DEFECTO } from './zona'
 
 /** La clave con la que se hashean los códigos: derivada, para no reutilizar AUTH_SECRET. */
 export function claveCodigos(): string {
@@ -98,7 +99,7 @@ export async function asegurarAdmin(): Promise<Usuario> {
   const db = getDb()
   const [fila] = await db
     .insert(users)
-    .values({ correo, rol: 'admin' })
+    .values({ correo, rol: 'admin', zona: ZONA_POR_DEFECTO })
     .onConflictDoUpdate({ target: users.correo, set: { rol: 'admin', updatedAt: new Date() } })
     .returning()
 
@@ -141,7 +142,10 @@ export async function invitar(correoBruto: string, nombre: string | null): Promi
   const correo = normalizarCorreo(correoBruto)
   if (!correo) return { error: CORREO_INVALIDO }
   if (await buscarPorCorreo(correo)) return { error: USUARIO_YA_INVITADO }
-  const [usuario] = await getDb().insert(users).values({ correo, nombre: nombre?.trim() || null }).returning()
+  const [usuario] = await getDb()
+    .insert(users)
+    .values({ correo, nombre: nombre?.trim() || null, zona: ZONA_POR_DEFECTO })
+    .returning()
   try {
     await crearPaginaDe(usuario!)
   } catch (error) {
