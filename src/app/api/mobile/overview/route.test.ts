@@ -1,9 +1,9 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { ScheduledPost, ScheduledPostTarget } from '@/db'
 
-// `route.ts` importa `SITE_TIMEZONE`/`getKpis` de `@/lib/analytics`, que trae
-// `server-only` (no resuelve bajo Vitest). Mismo motivo y mismo arreglo que
-// `schedule/route.test.ts` y `aislamiento.test.ts`.
+// `route.ts` importa `getKpis`/`localDay` de `@/lib/analytics`, que trae `server-only`
+// (no resuelve bajo Vitest). Mismo motivo y mismo arreglo que `schedule/route.test.ts`
+// y `aislamiento.test.ts`.
 vi.mock('server-only', () => ({}))
 
 const { agruparPostsMovil } = await import('./route')
@@ -55,7 +55,7 @@ describe('agruparPostsMovil (GET /api/mobile/overview)', () => {
       { post, target: filaTarget({ id: 'dest-ig-1', accountId: 'ig-1' }), handle: '@vicente' },
       { post, target: filaTarget({ id: 'dest-ig-2', accountId: 'ig-2' }), handle: '@vicenteclips' },
     ]
-    const [agrupado] = agruparPostsMovil(filas)
+    const [agrupado] = agruparPostsMovil(filas, 'America/Santiago')
     expect(agrupado!.redes).toHaveLength(2)
     expect(new Set(agrupado!.redes.map((r) => r.id)).size).toBe(2)
     expect(agrupado!.redes.map((r) => ({ id: r.id, red: r.red, handle: r.handle }))).toEqual([
@@ -70,7 +70,7 @@ describe('agruparPostsMovil (GET /api/mobile/overview)', () => {
       { post, target: filaTarget({ id: 'dest-1', postId: 'post-2', network: 'instagram' }), handle: '@vicente' },
       { post, target: filaTarget({ id: 'dest-2', postId: 'post-2', network: 'x' }), handle: '@vicente_x' },
     ]
-    const agrupados = agruparPostsMovil(filas)
+    const agrupados = agruparPostsMovil(filas, 'America/Santiago')
     expect(agrupados).toHaveLength(1)
     expect(agrupados[0]!.id).toBe('post-2')
     expect(agrupados[0]!.redes).toHaveLength(2)

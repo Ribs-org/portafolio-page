@@ -6,8 +6,7 @@ import { env } from '@/lib/env'
 // La derivación vive acá y no en `lib/analytics.ts` (que la reexporta con el mismo nombre)
 // porque ese archivo importa `server-only`: cargarlo desde este módulo puro rompería
 // `zona.test.ts`, que no corre en el runtime del servidor. Mismo criterio que
-// `schedule-week.ts` y `social/publish/batch.ts`, que evitan el mismo import por el mismo
-// motivo.
+// `schedule-week.ts`, que evita el mismo import por el mismo motivo.
 
 export const SITE_TIMEZONE = env('SITE_TIMEZONE') ?? 'America/Santiago'
 export const ZONA_POR_DEFECTO = SITE_TIMEZONE

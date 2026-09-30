@@ -14,7 +14,8 @@ programar.
 
 **Redes que publican hoy:** `instagram`, `facebook`, `youtube`, `threads`, `x`, `tiktok`.
 
-**Zona horaria:** todo lo que escribes y lees en horas está en `America/Santiago`.
+**Zona horaria:** todo lo que escribes y lees en horas está en la zona horaria del
+dueño de la llave — la que tiene puesta en Tu Cuenta (`/admin/cuenta`).
 
 ## Autenticación
 
@@ -66,7 +67,7 @@ Cuerpo que no sea `{ posts: [...] }`: `400` con
 ### `fecha` (obligatorio)
 
 Exactamente `YYYY-MM-DD HH:MM` (también se acepta una `T` en vez del espacio). Hora
-de Chile, futura, precisión de minutos.
+de la zona del dueño, futura, precisión de minutos.
 
 No se aceptan segundos, ni `Z`, ni offsets: un ISO completo se **rechaza** a
 propósito, para que nunca se reinterprete tu instante UTC como hora de pared.
@@ -357,7 +358,7 @@ Authorization: Bearer <SCHEDULE_API_KEY>
 ```
 
 Parámetros, todos opcionales:
-- `desde`, `hasta`: `YYYY-MM-DD` en hora de Chile, **ambos inclusive**. Por defecto,
+- `desde`, `hasta`: `YYYY-MM-DD` en la zona del dueño, **ambos inclusive**. Por defecto,
   los últimos 30 días. Formato inválido o rango invertido: `400` con
   `El rango de fechas no se entendió (usa YYYY-MM-DD).`
 - `red`: una de las conocidas. Otra cosa: `400` con `Red desconocida: <valor>.`
@@ -442,7 +443,7 @@ Lo que hay en el calendario entre dos días, **por fecha de salida** y sin impor
 ya salió: programado, publicando, publicado o fallido. Úsalo antes de armar una tanda,
 para no pisar horas ni repetir temas, y después, para saber qué salió y qué falló.
 
-Parámetros, ambos opcionales, `YYYY-MM-DD` en hora de Chile, **ambos inclusive**:
+Parámetros, ambos opcionales, `YYYY-MM-DD` en la zona del dueño, **ambos inclusive**:
 - `desde`: por defecto hoy.
 - `hasta`: por defecto 30 días después de `desde`.
 
@@ -474,7 +475,7 @@ Un rango pasado vale (lista lo ya publicado). Formato inválido o rango invertid
 ```
 
 - **`id`** es el `postId` que devolvió el lote al programar.
-- **`fecha`** es la hora de salida, ISO con el offset de Chile. Los posts vienen
+- **`fecha`** es la hora de salida, ISO con el offset de la zona del dueño. Los posts vienen
   ordenados por ella.
 - **`media`** viene en el orden del carrusel, ya en el almacén propio (la URL de
   origen que mandaste no se conserva).

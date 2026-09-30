@@ -9,7 +9,7 @@ import {
   type ScheduledPost,
   type ScheduledPostTarget,
 } from '@/db'
-import { SITE_TIMEZONE, getKpis, localDay } from '@/lib/analytics'
+import { getKpis, localDay } from '@/lib/analytics'
 import { isoInZone } from '@/lib/metrics-api'
 import { requireMobileUser } from '@/lib/mobile-guardia'
 import { MAX_POSTS, parseRango } from '@/lib/mobile-api'
@@ -37,13 +37,13 @@ export type PostResumenMovil = {
  * `id` los distingue — es la clave que el Resumen del teléfono usa para no repetir la
  * de React entre ellos (repaso final de la rama).
  */
-export function agruparPostsMovil(filas: FilaDestinoMovil[]): PostResumenMovil[] {
+export function agruparPostsMovil(filas: FilaDestinoMovil[], zone: string): PostResumenMovil[] {
   const mapa = new Map<string, PostResumenMovil>()
   for (const { post, target, handle } of filas) {
     const entrada = mapa.get(post.id) ?? {
       id: post.id,
       texto: post.caption,
-      cuando: isoInZone(post.scheduledAt, SITE_TIMEZONE),
+      cuando: isoInZone(post.scheduledAt, zone),
       redes: [],
     }
     entrada.redes.push({ id: target.id, red: target.network, handle, estado: target.status })
@@ -58,10 +58,11 @@ export async function GET(request: Request) {
     return new NextResponse('No autorizado', { status: 401 })
   }
   const ownerId = usuario.id
+  const zone = usuario.zona
 
   const now = new Date()
   const { from, to } = parseRango(new URL(request.url).searchParams.get('rango'), now)
-  const filters = { ownerId, from, to, profileId: null, includeBots: false }
+  const filters = { ownerId, zone, from, to, profileId: null, includeBots: false }
   const db = getDb()
 
   // Las mismas funciones del panel: nada se recalcula acá.
@@ -119,8 +120,8 @@ export async function GET(request: Request) {
   )
 
   return NextResponse.json({
-    desde: localDay(from),
-    hasta: localDay(to),
+    desde: localDay(from, zone),
+    hasta: localDay(to, zone),
     // Igual que la API del editor: si el tope mordió, la app lo sabe en vez de
     // subestimar en silencio las views ganadas de la ventana.
     truncado: rows.length >= MAX_POSTS,
@@ -130,7 +131,7 @@ export async function GET(request: Request) {
       arrastre: contenido.pull,
       seguidores: seguidoresTotal,
     },
-    hoy: agruparPostsMovil(hoy),
-    proximos: agruparPostsMovil(proximos).slice(0, 5),
+    hoy: agruparPostsMovil(hoy, zone),
+    proximos: agruparPostsMovil(proximos, zone).slice(0, 5),
   })
 }

@@ -17,7 +17,6 @@ import { Encabezado } from '@/components/ui'
 import { buildAccountCards, buildAccountSeries } from '@/lib/account-stats'
 import { requireUser } from '@/lib/auth'
 import {
-  SITE_TIMEZONE,
   type Filters,
   type Kpis,
   getBrowsers,
@@ -71,8 +70,8 @@ export default async function AnalyticsPage({
   searchParams: Promise<Record<string, string | string[] | undefined>>
 }) {
   const params = await searchParams
-  const { id: ownerId } = await requireUser()
-  const filters = parseFilters(params, ownerId)
+  const { id: ownerId, zona } = await requireUser()
+  const filters = parseFilters(params, ownerId, zona)
 
   // Solo lo que hace falta para pintar algo: la barra de filtros, las cuatro cifras y el
   // gráfico de tráfico. Los otros once paneles esperan abajo, cada grupo en su propio
@@ -182,8 +181,8 @@ async function PanelesDeOrigen({ filters, visits }: { filters: Filters; visits: 
   // Este sí depende del anterior: los posts se piden por las campañas que volvieron.
   const campaignPosts = await getCampaignPosts(filters.ownerId, campaigns.map((c) => c.campaign))
 
-  const accountFrom = localDay(filters.from)
-  const accountTo = localDay(filters.to)
+  const accountFrom = localDay(filters.from, filters.zone)
+  const accountTo = localDay(filters.to, filters.zone)
   const cards = buildAccountCards(accountRows, accountFrom, accountTo)
   const accountSeries = buildAccountSeries(accountRows, accountFrom, accountTo)
 
@@ -294,7 +293,7 @@ async function PanelesDeAudiencia({ filters, kpis }: { filters: Filters; kpis: K
         </Panel>
       </div>
 
-      <Panel title="Cuándo te visitan" hint={`Hora local de ${SITE_TIMEZONE}`}>
+      <Panel title="Cuándo te visitan" hint={`Hora local de ${filters.zone}`}>
         <Heatmap cells={heatmap} />
       </Panel>
 

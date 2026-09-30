@@ -1,11 +1,11 @@
 import { NextResponse } from 'next/server'
 import { SOCIAL_NETWORKS } from '@/db/schema'
-import { SITE_TIMEZONE } from '@/lib/analytics'
 import { env } from '@/lib/env'
 import { buildMetricPost, parseRango } from '@/lib/metrics-api'
 import { attributesFor } from '@/lib/post-attributes'
 import { getPostRows } from '@/lib/posts'
-import { adminId } from '@/lib/usuarios'
+import { adminId, buscarPorId } from '@/lib/usuarios'
+import { ZONA_POR_DEFECTO } from '@/lib/zona'
 
 export const dynamic = 'force-dynamic'
 
@@ -20,12 +20,18 @@ export async function GET(request: Request) {
     return new NextResponse('No autorizado', { status: 401 })
   }
 
+  // El dueño antes que el rango: `desde`/`hasta` son días, y un día solo existe en una
+  // zona. La llave de API es del despliegue, no de una persona, así que el dueño es el
+  // admin y la zona, la suya (la de Tu Cuenta).
+  const ownerId = await adminId()
+  const zone = (await buscarPorId(ownerId))?.zona ?? ZONA_POR_DEFECTO
+
   const url = new URL(request.url)
   const rango = parseRango(
     url.searchParams.get('desde'),
     url.searchParams.get('hasta'),
     new Date(),
-    SITE_TIMEZONE,
+    zone,
   )
   if ('error' in rango) return NextResponse.json({ error: rango.error }, { status: 400 })
 
@@ -34,13 +40,11 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: `Red desconocida: ${red}.` }, { status: 400 })
   }
 
-  const ownerId = await adminId()
-
   // Mismo motor que el panel: acumulado + ganado en la ventana, visitas por ?s=. La
   // ventana viaja además como filtro de publicación, para que el tope acote lo pedido
   // y no las 200 filas más nuevas del catálogo entero.
   const all = await getPostRows(
-    { ownerId, from: rango.from, to: rango.to, profileId: null, includeBots: false },
+    { ownerId, zone, from: rango.from, to: rango.to, profileId: null, includeBots: false },
     false,
     { publishedFrom: rango.from, publishedTo: rango.to, limit: MAX_POSTS },
   )
@@ -53,7 +57,7 @@ export async function GET(request: Request) {
   return NextResponse.json({
     truncado: all.length >= MAX_POSTS,
     posts: rows.map((row) =>
-      buildMetricPost(row, atributosByKey.get(`${row.network}:${row.externalId}`) ?? null, SITE_TIMEZONE),
+      buildMetricPost(row, atributosByKey.get(`${row.network}:${row.externalId}`) ?? null, zone),
     ),
   })
 }

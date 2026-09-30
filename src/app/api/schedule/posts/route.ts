@@ -1,10 +1,10 @@
 import { NextResponse } from 'next/server'
 import { and, asc, eq, gte, inArray, lt } from 'drizzle-orm'
 import { getDb, scheduledPosts, scheduledPostMedia, scheduledPostTargets, socialAccounts } from '@/db'
-import { SITE_TIMEZONE } from '@/lib/analytics'
 import { env } from '@/lib/env'
 import { armarProgramados, parseVentana } from '@/lib/schedule-api'
-import { adminId } from '@/lib/usuarios'
+import { adminId, buscarPorId } from '@/lib/usuarios'
+import { ZONA_POR_DEFECTO } from '@/lib/zona'
 
 export const dynamic = 'force-dynamic'
 
@@ -21,17 +21,20 @@ export async function GET(request: Request) {
     return new NextResponse('No autorizado', { status: 401 })
   }
 
+  // La llave de API es del despliegue, no de una persona: lo que entra por ahí es del
+  // admin, y las horas que salen van en la zona suya (la de Tu Cuenta). Se resuelve antes
+  // de la ventana porque `desde`/`hasta` son días, y un día solo existe en una zona.
+  const ownerId = await adminId()
+  const zone = (await buscarPorId(ownerId))?.zona ?? ZONA_POR_DEFECTO
+
   const url = new URL(request.url)
   const ventana = parseVentana(
     url.searchParams.get('desde'),
     url.searchParams.get('hasta'),
     new Date(),
-    SITE_TIMEZONE,
+    zone,
   )
   if ('error' in ventana) return NextResponse.json({ error: ventana.error }, { status: 400 })
-
-  // La llave de API es del despliegue, no de una persona: lo que entra por ahí es del admin.
-  const ownerId = await adminId()
 
   const db = getDb()
   // `leftJoin` y no `innerJoin` con `socialAccounts`: un destino cuya cuenta ya no
@@ -60,6 +63,6 @@ export async function GET(request: Request) {
   return NextResponse.json({
     desde: ventana.desde,
     hasta: ventana.hasta,
-    posts: armarProgramados(filas, medias, SITE_TIMEZONE),
+    posts: armarProgramados(filas, medias, zone),
   })
 }

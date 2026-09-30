@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { SOCIAL_NETWORKS } from '@/db/schema'
-import { SITE_TIMEZONE, localDay } from '@/lib/analytics'
+import { localDay } from '@/lib/analytics'
 import { buildMetricPost } from '@/lib/metrics-api'
 import { requireMobileUser } from '@/lib/mobile-guardia'
 import { MAX_POSTS, parseRango } from '@/lib/mobile-api'
@@ -15,6 +15,7 @@ export async function GET(request: Request) {
     return new NextResponse('No autorizado', { status: 401 })
   }
   const ownerId = usuario.id
+  const zone = usuario.zona
 
   const url = new URL(request.url)
   const now = new Date()
@@ -27,7 +28,7 @@ export async function GET(request: Request) {
     .filter((red) => (SOCIAL_NETWORKS as readonly string[]).includes(red))
 
   const todas = await getPostRows(
-    { ownerId, from, to, profileId: null, includeBots: false },
+    { ownerId, zone, from, to, profileId: null, includeBots: false },
     false,
     { publishedFrom: from, publishedTo: to, limit: MAX_POSTS },
   )
@@ -35,13 +36,13 @@ export async function GET(request: Request) {
   const atributos = await attributesFor(ownerId, rows)
 
   return NextResponse.json({
-    desde: localDay(from),
-    hasta: localDay(to),
+    desde: localDay(from, zone),
+    hasta: localDay(to, zone),
     // Sobre lo traído antes del filtro por red, igual que `all` en la API del editor:
     // el tope acota el catálogo completo, no lo que quedó tras filtrar.
     truncado: todas.length >= MAX_POSTS,
     posts: rows.map((row) => ({
-      ...buildMetricPost(row, atributos.get(`${row.network}:${row.externalId}`) ?? null, SITE_TIMEZONE),
+      ...buildMetricPost(row, atributos.get(`${row.network}:${row.externalId}`) ?? null, zone),
       // Lo único que la app necesita y el shape del editor-LLM no lleva.
       miniatura: row.thumbnailUrl,
     })),

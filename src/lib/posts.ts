@@ -11,7 +11,7 @@ import {
   visits,
 } from '@/db'
 import type { Filters, Granularity } from './analytics'
-import { SITE_TIMEZONE, describe, granularityFor, localDay } from './analytics'
+import { describe, granularityFor, localDay } from './analytics'
 import {
   postKpisFrom,
   type CuentaRow,
@@ -42,13 +42,21 @@ const int = (fragment: SQL) => sql<number>`${fragment}`.mapWith(Number)
  * component: that component renders on the server first (in the runtime's zone, UTC on
  * Vercel) and then in the browser (in the viewer's), so a post published at 02:00 UTC
  * read "25 ago" on one side and "24 ago" on the other — a hydration mismatch, and a day
- * boundary drawn outside SITE_TIMEZONE either way.
+ * boundary drawn outside the owner's zone either way.
+ *
+ * Un formateador por zona, memorizado: construir un `Intl.DateTimeFormat` por fila son
+ * doscientos por página, y la zona cambia como mucho una vez por petición.
  */
-const PUBLISHED = new Intl.DateTimeFormat('es', {
-  day: 'numeric',
-  month: 'short',
-  timeZone: SITE_TIMEZONE,
-})
+const PUBLISHED = new Map<string, Intl.DateTimeFormat>()
+
+function publishedLabel(date: Date, zone: string): string {
+  let formatter = PUBLISHED.get(zone)
+  if (!formatter) {
+    formatter = new Intl.DateTimeFormat('es', { day: 'numeric', month: 'short', timeZone: zone })
+    PUBLISHED.set(zone, formatter)
+  }
+  return formatter.format(date)
+}
 
 /**
  * `opts` exists for the metrics API: the panel wants the latest 200 posts whatever
@@ -62,8 +70,8 @@ export async function getPostRows(
   opts: { publishedFrom?: Date; publishedTo?: Date; limit?: number } = {},
 ): Promise<PostRow[]> {
   const db = getDb()
-  const from = localDay(f.from)
-  const to = localDay(f.to)
+  const from = localDay(f.from, f.zone)
+  const to = localDay(f.to, f.zone)
 
   const postConds: SQL[] = [eq(socialPosts.ownerId, f.ownerId)]
   if (!includeArchived) postConds.push(isNull(socialPosts.archivedAt))
@@ -154,7 +162,7 @@ export async function getPostRows(
 
     // Sin esto, la primera sincronización de un catálogo viejo cargaría toda su
     // historia como crecimiento de la ventana que la contiene.
-    const publishedDay = localDay(post.publishedAt)
+    const publishedDay = localDay(post.publishedAt, f.zone)
 
     const views = periodChange(snapshotsOf('views'), from, to, publishedDay)
     const likes = periodChange(snapshotsOf('likes'), from, to, publishedDay)
@@ -173,7 +181,7 @@ export async function getPostRows(
       caption: post.caption,
       thumbnailUrl: post.thumbnailUrl,
       mediaType: post.mediaType,
-      publishedLabel: PUBLISHED.format(post.publishedAt),
+      publishedLabel: publishedLabel(post.publishedAt, f.zone),
       publishedAt: post.publishedAt,
       campaign: post.campaign,
       archived: post.archivedAt !== null,
@@ -237,11 +245,11 @@ function seriesGranularity(f: Filters): Granularity {
  * or negative, because the `greatest(0, …)` would never see the individual days.
  */
 export async function getPostSeries(f: Filters): Promise<PostSeriesPoint[]> {
-  const tz = SITE_TIMEZONE
+  const tz = f.zone
   const unit = seriesGranularity(f)
   const interval = unit === 'day' ? '1 day' : '1 week'
-  const from = localDay(f.from)
-  const to = localDay(f.to)
+  const from = localDay(f.from, f.zone)
+  const to = localDay(f.to, f.zone)
 
   // Toda fecha va con `.toISOString()`: el driver de `postgres-js` instala serializadores
   // transparentes para los tipos de fecha, o sea que NO convierte, y un `Date` interpolado

@@ -72,8 +72,8 @@ export default async function ContentPage({
   searchParams: Promise<Record<string, string | string[] | undefined>>
 }) {
   const params = await searchParams
-  const { id: ownerId } = await requireUser()
-  const filters = parseFilters(params, ownerId)
+  const { id: ownerId, zona } = await requireUser()
+  const filters = parseFilters(params, ownerId, zona)
   const includeArchived = params.archivados === '1'
   const onlyWithMetrics = params.metricas === '1'
   const redes = listParam(params.red)

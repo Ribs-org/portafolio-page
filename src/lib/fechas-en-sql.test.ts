@@ -54,6 +54,7 @@ beforeEach(() => {
 
 const FILTROS = {
   ownerId: '11111111-1111-4111-8111-111111111111',
+  zone: 'America/Santiago',
   profileId: null,
   from: new Date('2026-08-23T00:00:00Z'),
   to: new Date('2026-09-22T00:00:00Z'),

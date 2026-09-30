@@ -190,14 +190,14 @@ Ordenado por lo que bloquea un trámite primero.
    página `/borrado/<código>` que diga en qué estado quedó. Y el **deauthorize callback**,
    que es la misma verificación con otra acción (marcar sin credencial). Alcance: una ruta,
    una página, tests de la firma y del aislamiento por dueño; un día.
-2. **Zona horaria por usuario.** Ya existe el campo `users.zona`, el selector en Tu Cuenta
-   (`/admin/cuenta`) y la zona pasa por el panel entero (El Fuego, el calendario, la cola,
-   el editor de un corte, las ventanas de los links) y por las acciones que guardan horas:
-   quien está en Madrid escribe «19:00» y salen las 19:00 de Madrid. Falta la otra mitad:
-   la API (`/api/schedule/posts`, `api/mobile/*`), el lote de publicación y Los Números,
-   que todavía agrupan con `SITE_TIMEZONE`. La constante se queda como la zona con la que
-   nace un usuario y la del sitio público. No bloquea ningún trámite, pero sí una beta con
-   gente fuera de Chile.
+2. **Zona horaria por usuario.** Hecho. Existe el campo `users.zona`, el selector en Tu
+   Cuenta (`/admin/cuenta`), y la zona pasa por el panel entero (El Fuego, el calendario,
+   la cola, el editor de un corte, las ventanas de los links), por las acciones que
+   guardan horas —quien está en Madrid escribe «19:00» y salen las 19:00 de Madrid— y por
+   dentro: Los Números y Los Cortes agrupan en ella, y la API (`/api/schedule/posts`,
+   `/api/metrics/posts`, `api/mobile/*`) y el lote de publicación leen y devuelven sus
+   horas en la del dueño. `SITE_TIMEZONE` se queda como la zona con la que nace un usuario
+   y la del sitio público.
 3. **Avisos honestos antes de conectar.** En Los Fierros, junto a cada botón: Instagram
    pide cuenta Business/Creator con página de Facebook; TikTok publica en privado hasta la
    auditoría (ya está); YouTube publica en privado hasta la auditoría de cuota. Y en el

@@ -1,4 +1,3 @@
-import { env } from '@/lib/env'
 import { fromZonedInput } from '@/lib/utils'
 import { extensionDe, validateScheduleDraft } from './validate'
 import { validateAtributos } from './atributos'
@@ -10,21 +9,19 @@ import { CuentaInvalida, cuentaUnicaPorRed, verificarCuentas, type CuentaDestino
 import { validarRegla, REGLA_DOCUMENTO } from '../comentarios/reglas'
 import { descargarSeguro } from './descarga-segura'
 import { documentoToBlob } from './documento'
-
-// Same derivation as SITE_TIMEZONE in lib/analytics — duplicated here because that
-// module is server-only and this one must stay importable by vitest.
-const ZONE = env('SITE_TIMEZONE') ?? 'America/Santiago'
+import { buscarPorId } from '@/lib/usuarios'
+import { ZONA_POR_DEFECTO } from '@/lib/zona'
 
 /**
- * Parse a fecha string (YYYY-MM-DD HH:MM format) to a Date in the site timezone.
+ * Parse a fecha string (YYYY-MM-DD HH:MM format) to a Date in the owner's timezone.
  * Returns null if the date cannot be parsed.
  */
-function parseFecha(fecha: string): Date | null {
+function parseFecha(fecha: string, zone: string): Date | null {
   // fromZonedInput slices to 16 chars, which would silently discard a Z or seconds
-  // an API caller sent — reinterpreting their UTC instant as site wall-clock time.
+  // an API caller sent — reinterpreting their UTC instant as the owner's wall-clock time.
   if (!/^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}$/.test(fecha.trim())) return null
   const isoDateTime = fecha.replace(' ', 'T')
-  return fromZonedInput(isoDateTime, ZONE)
+  return fromZonedInput(isoDateTime, zone)
 }
 
 export type BatchItem = {
@@ -263,9 +260,12 @@ export function opcionesDeFila(
 /**
  * The batch item's whole rulebook: its own shape first, then the composer's exact
  * rules via validateScheduleDraft — one source of truth for limits and media shapes.
+ *
+ * `zone` es la del dueño del lote: «2026-10-01 19:00» son las siete de su tarde, no las
+ * de un sitio.
  */
-export function validateBatchItem(item: BatchItem, now: Date): string | null {
-  const scheduledAt = parseFecha(item.fecha)
+export function validateBatchItem(item: BatchItem, now: Date, zone: string): string | null {
+  const scheduledAt = parseFecha(item.fecha, zone)
   if (!scheduledAt) return 'La fecha no se entendió (usa YYYY-MM-DD HH:MM).'
 
   const pedido = destinoPedido(item)
@@ -382,8 +382,13 @@ export async function scheduleBatch(ownerId: string, items: BatchItem[]): Promis
   const now = new Date()
   const results: BatchResult[] = []
 
+  // Una sola vez por lote: las cincuenta filas son del mismo dueño y sus horas se leen
+  // en la misma zona. Un dueño que ya no existe no debería llegar acá (la llave o la
+  // sesión ya lo resolvieron), pero si llega, el default del sitio es mejor que reventar.
+  const zone = (await buscarPorId(ownerId))?.zona ?? ZONA_POR_DEFECTO
+
   for (const [index, item] of items.entries()) {
-    const invalid = validateBatchItem(item, now)
+    const invalid = validateBatchItem(item, now, zone)
     if (invalid) {
       results.push({ index, ok: false, error: invalid })
       continue
@@ -429,7 +434,7 @@ export async function scheduleBatch(ownerId: string, items: BatchItem[]): Promis
       // de cada destino solo se sabe acá. `validateScheduleDraft` se vuelve a correr
       // más abajo, siempre con las redes de `destinos`.
       const networks = [...new Set(destinos.map((d) => d.network))]
-      const scheduledAt = parseFecha(item.fecha)!
+      const scheduledAt = parseFecha(item.fecha, zone)!
 
       // Todavía antes de subir nada: con redes nombradas, `validateBatchItem` ya corrió
       // estas mismas reglas de forma (TikTok exige video, X hasta 4 fotos, Threads un

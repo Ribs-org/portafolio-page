@@ -208,6 +208,7 @@ describe('aislamiento por dueño (SQL generado, sin base)', () => {
     const consultas = await todasLasConsultas(() =>
       getRecentVisits({
         ownerId: DUENO,
+        zone: 'America/Santiago',
         profileId: null,
         from: new Date('2026-01-01'),
         to: new Date('2026-01-31'),
@@ -389,6 +390,7 @@ describe('aislamiento por dueño (SQL generado, sin base)', () => {
       () =>
         getPostRows({
           ownerId: DUENO,
+          zone: 'America/Santiago',
           profileId: null,
           from: new Date('2026-01-01'),
           to: new Date('2026-01-31'),

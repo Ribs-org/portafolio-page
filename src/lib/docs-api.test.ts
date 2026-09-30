@@ -1,5 +1,5 @@
 import { readFileSync } from 'node:fs'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import {
   MAX_DOCUMENTO_BYTES,
   MAX_MENSAJE,
@@ -14,6 +14,10 @@ import { MAX_BATCH_ITEMS } from './social/publish/batch'
 import { TRIAL_REEL_NO_DISPONIBLE } from './social/publish/publisher'
 import { BORRADO_YA_PUBLICADO } from './schedule-api'
 import { TRIAL_REEL_MEDIA } from './social/publish/opciones'
+
+// `batch.ts` importa `@/lib/usuarios` (la zona del dueño del lote), que trae
+// `server-only` y no resuelve bajo Vitest. Mismo arreglo que en `aislamiento.test.ts`.
+vi.mock('server-only', () => ({}))
 
 // Estas tres pruebas son la reja que impide que `public/docs/api.json` y
 // `public/docs/api-llm.md` —la documentación para un LLM que llama a la API a ciegas—

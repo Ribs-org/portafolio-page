@@ -30,7 +30,7 @@ export type PostRow = {
   thumbnailUrl: string | null
   mediaType: string | null
   /**
-   * Already formatted, in SITE_TIMEZONE. A raw timestamp would be formatted twice by
+   * Already formatted, in the owner's zone. A raw timestamp would be formatted twice by
    * the client component that renders it — once on the server, once in the browser —
    * in two different zones, and the day boundary belongs to neither of them.
    */

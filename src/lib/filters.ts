@@ -20,9 +20,15 @@ const DAYS: Record<RangeKey, number | null> = {
 
 export type ParsedFilters = Filters & { range: RangeKey }
 
+/**
+ * `zone` no sale de la URL: es la del dueño, y quien llama ya la tiene (la sesión en el
+ * panel, `buscarPorId` en la API). Exigirla acá es lo que impide que una pantalla nueva
+ * arme `Filters` y agrupe los días en la zona del servidor sin que nadie lo note.
+ */
 export function parseFilters(
   searchParams: Record<string, string | string[] | undefined>,
   ownerId: string,
+  zone: string,
 ): ParsedFilters {
   const raw = typeof searchParams.range === 'string' ? searchParams.range : '30d'
   const range = (RANGES.find((r) => r.key === raw)?.key ?? '30d') as RangeKey
@@ -40,6 +46,7 @@ export function parseFilters(
   return {
     range,
     ownerId,
+    zone,
     from,
     to,
     profileId: profileParam && profileParam !== 'all' ? profileParam : null,

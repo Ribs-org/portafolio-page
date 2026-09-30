@@ -35,8 +35,8 @@ export async function GET(request: Request) {
     )
     .orderBy(asc(accountMetrics.day), asc(accountMetrics.network))
 
-  const desde = localDay(from)
-  const hasta = localDay(to)
+  const desde = localDay(from, usuario.zona)
+  const hasta = localDay(to, usuario.zona)
 
   // Mismos datos que account-stats.ts arma para el panel, traducidos al español que
   // habla el resto de la API móvil (account-stats.ts sigue sirviendo al panel web).

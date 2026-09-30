@@ -25,6 +25,10 @@ const SIN_CODIGO = 'No conocemos ese código de borrado.'
  *
  * Un código desconocido responde `200` con la frase, no `404`: Meta consulta esta URL y un
  * 404 se lee como «no borraron nada».
+ *
+ * Por eso mismo la fecha sale en `SITE_TIMEZONE` y no en la zona de nadie: sin `owner_id`
+ * no hay dueño a quien preguntarle la suya, y quien abre la página tampoco trae sesión.
+ * Es uno de los pocos sitios públicos donde la constante sigue siendo la respuesta.
  */
 export default async function BorradoPage({ params }: { params: Promise<{ codigo: string }> }) {
   const { codigo } = await params
