@@ -50,6 +50,10 @@ el de Instagram) e `issued_at`. La firma es HMAC-SHA256 del payload con el **app
   su dueño reconecte. Si Meta manda un callback por uno de esos usuarios, la ruta responde
   igual (Meta lo exige) con cero cuentas afectadas. El README lo dice: «reconecta Instagram
   y Facebook para quedar cubierto».
+- Una cookie pendiente escrita **antes** del cambio no trae el campo, y se acepta con
+  `metaUserId` en `null` en vez de tomarse por sesión vencida: quien está eligiendo su
+  cuenta en ese momento no tiene por qué empezar de nuevo, y esa fila rellena su nulo al
+  reconectar como cualquier otra.
 
 ### 2.3 Qué hace cada callback
 
@@ -91,19 +95,30 @@ nada más: ni nombre ni correo de nadie.
 
 ### 2.6 Módulos
 
-- `src/lib/social/meta-firma.ts`: `leerSignedRequest(raw, secret): { userId, issuedAt } | null`,
-  pura; base64url, HMAC-SHA256, comparación en tiempo constante (`timingSafeEqual`),
-  rechaza cualquier `algorithm` que no sea `HMAC-SHA256`. Tests con firmas construidas en
-  el propio test y con las mutaciones obvias (firma cambiada, payload cambiado, algoritmo
-  distinto, sin punto).
+- `src/lib/social/meta-firma.ts`:
+  `leerSignedRequest(raw, secret, now = Date.now()): { userId, issuedAt } | null`, pura;
+  base64url, HMAC-SHA256, comparación en tiempo constante (`timingSafeEqual`), rechaza
+  cualquier `algorithm` que no sea `HMAC-SHA256`, y rechaza un `issued_at` a más de 24 h
+  del reloj en cualquier sentido —Meta no manda nonce, así que sin esa ventana el mismo
+  cuerpo capturado vuelve a borrar para siempre—. `now` entra por parámetro para que el
+  test no dependa del reloj. Tests con firmas construidas en el propio test y con las
+  mutaciones obvias (firma cambiada, payload cambiado, algoritmo distinto, sin punto,
+  fecha vieja, fecha en el futuro).
 - `src/lib/social/meta-bajas.ts`: `darDeBaja(metaUserId): Promise<number>` y
   `borrarDatosDe(metaUserId): Promise<{ codigo: string; cuentas: number }>`. Los pasos
   de SQL salen a `pasosDeBorrado(metaUserId): SQL[]` como en `fusion.ts`, para poder
-  probar el SQL con `PgDialect().sqlToQuery()` sin base.
+  probar el SQL con `PgDialect().sqlToQuery()` sin base. El séptimo paso, el de los cortes
+  que quedaron sin ningún destino, va en `pasoDeHuerfanos(postIds): SQL | null`: necesita
+  ids que solo se saben leyendo antes de borrar los destinos, y no comparte las dos
+  invariantes de los otros seis.
 - Las dos rutas y la página. El README, sección de Meta: las dos URLs a configurar y la
-  nota de reconectar. La página de privacidad, donde dice «escribe a …»: además, que quitar
-  la app desde Facebook borra lo que vino de Meta. `docs/deuda-tecnica.md`, entrada del
-  arnés: las dos rutas buscan por `meta_user_id` a propósito.
+  nota de reconectar. La página de privacidad, donde dice «escribe a …»: las dos acciones
+  de Facebook, que no son la misma —quitar la app **desconecta** Instagram y Facebook (se
+  van las credenciales, el historial se queda), y **pedir el borrado** desde esa misma
+  pantalla borra lo que vino de esas dos redes y devuelve un código con su página de
+  estado—. Decirlo al revés es prometer en la página legal más de lo que el código hace.
+  `docs/deuda-tecnica.md`, entrada del arnés: las dos rutas buscan por `meta_user_id` a
+  propósito.
 
 ## 3. Entrega B — La zona horaria de cada usuario
 

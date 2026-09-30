@@ -184,12 +184,14 @@ export default function PrivacidadPage() {
           forma de vincular ningún registro contigo: no se guardan identificadores estables.
         </p>
         <p className="leading-relaxed text-fg-muted">
-          Si conectaste Instagram o Facebook, hay un camino más corto y no hace falta escribir:{' '}
-          <span className="text-fg">quitar esta app desde tu cuenta de Facebook</span> —en
-          Configuración → Apps y sitios web— borra lo que vino de esas dos redes. Facebook te
-          entrega entonces una dirección de este sitio, de la forma{' '}
-          <code className="font-mono text-[0.85em] text-fg-muted">/borrado/&lt;código&gt;</code>, que
-          confirma cuándo ocurrió y cuántas cuentas se borraron.
+          Si conectaste Instagram o Facebook, hay dos caminos desde Facebook, y no son lo mismo.{' '}
+          <span className="text-fg">Quitar esta app</span> —en Configuración → Apps y sitios web—{' '}
+          <span className="text-fg">desconecta</span> esas dos cuentas: se borran los permisos
+          guardados, y las métricas que ya se recogieron se quedan.{' '}
+          <span className="text-fg">Pedir el borrado</span> —en esa misma pantalla, entrando a
+          «Ver y editar» y usando «Enviar solicitud»— sí borra todo lo que vino de Instagram y
+          Facebook, y Facebook te devuelve un código con una dirección de este sitio que confirma
+          cuándo ocurrió y cuántas cuentas se borraron.
         </p>
       </section>
     </article>
