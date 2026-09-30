@@ -157,7 +157,7 @@ En Los Fierros, bajo el título de cada red, una línea en `text-fg-faint`, siem
 | Instagram | «Cuenta Business o Creator, enlazada a una página de Facebook. Una cuenta personal no puede conectar.» |
 | Facebook | «Una página, no un perfil personal.» |
 | YouTube | «Hasta que Google apruebe la cuota de la app, lo que publiques sale privado.» |
-| TikTok | La que ya existe sobre «Solo yo» hasta la auditoría. |
+| TikTok | «Hasta que TikTok apruebe la publicación directa, lo que publiques sale como “Solo yo”.» (Los Fierros no lo decía; solo el compositor.) |
 
 Y, solo mientras la app de Meta siga en modo desarrollo, una segunda línea en los bloques
 de Instagram y Facebook, encendida por la variable **`META_EN_REVISION=1`**: «Mientras Meta
