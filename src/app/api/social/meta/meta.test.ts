@@ -102,3 +102,19 @@ describe('POST /api/social/meta/borrado', () => {
     vi.restoreAllMocks()
   })
 })
+
+describe('un cuerpo que no es formulario', () => {
+  // Meta manda formulario; cualquier otra cosa es basura o un sondeo, y no merece un 500.
+  const json = (ruta: string) =>
+    new Request(`https://ejemplo.cl/api/social/meta/${ruta}`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ signed_request: FIRMADO }),
+    })
+  it('es 400 en las dos rutas, y no toca nada', async () => {
+    expect((await POST_baja(json('baja'))).status).toBe(400)
+    expect((await POST_borrado(json('borrado'))).status).toBe(400)
+    expect(baja).not.toHaveBeenCalled()
+    expect(borrado).not.toHaveBeenCalled()
+  })
+})
