@@ -79,7 +79,11 @@ En tu proyecto de Vercel, pestaña **Storage**:
 
 - **Create Database → Supabase** — inyecta `DATABASE_URL` sola. Obligatoria. Usa el
   *pooler* (`aws-0-<región>.pooler.supabase.com`), no la conexión directa: esa es solo IPv6
-  y las funciones de Vercel no la alcanzan.
+  y las funciones de Vercel no la alcanzan. La app entra como `postgres` y solo por esa
+  conexión: la **Data API** de Supabase (la que usa la llave `anon`) no se usa nunca, y las
+  migraciones la dejan a ciegas —RLS activo en todas las tablas, sin políticas, y sin
+  permisos para `anon` ni `authenticated`—. Si un día hiciera falta, es escribir políticas,
+  no apagar RLS.
 - **Almacenamiento de media** — no es de Vercel: un bucket de Cloudflare R2, porque
   su plan gratis son 10 GB con egress $0 y los videos programados no caben en menos.
   En dash.cloudflare.com → R2: crea el bucket, cuélgale un subdominio propio y emite
