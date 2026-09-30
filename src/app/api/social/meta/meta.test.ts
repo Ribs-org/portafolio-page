@@ -24,7 +24,10 @@ function firmar(payload: object, secreto = SECRETO): string {
   const firma = createHmac('sha256', secreto).update(cuerpo).digest('base64url')
   return `${firma}.${cuerpo}`
 }
-const FIRMADO = firmar({ algorithm: 'HMAC-SHA256', user_id: USUARIO, issued_at: 1790000000 })
+// Recién emitido: las rutas llaman a `leerSignedRequest` con el reloj de verdad, y un
+// `issued_at` fijo quedaría fuera de la ventana de 24 h al día siguiente de escribir esto.
+const emitidoAhora = () => Math.floor(Date.now() / 1000)
+const FIRMADO = firmar({ algorithm: 'HMAC-SHA256', user_id: USUARIO, issued_at: emitidoAhora() })
 
 function peticion(ruta: string, signedRequest: string | null): Request {
   return new Request(`https://ejemplo.cl/api/social/meta/${ruta}`, {
@@ -80,6 +83,15 @@ describe('POST /api/social/meta/borrado', () => {
   it('sin el secreto configurado la ruta queda cerrada, aunque la firma venga bien', async () => {
     vi.stubEnv('INSTAGRAM_APP_SECRET', '')
     expect((await POST_borrado(peticion('borrado', FIRMADO))).status).toBe(400)
+    expect(borrado).not.toHaveBeenCalled()
+  })
+
+  it('un cuerpo viejo, aunque bien firmado, es 400 y no borra nada', async () => {
+    // El camino destructivo es el que hace falta cerrar: reenviar el mismo cuerpo
+    // capturado volvería a borrar, y eso no se deshace. La ventana la impone
+    // `leerSignedRequest`; acá se comprueba que la ruta la respeta con el reloj de verdad.
+    const viejo = firmar({ algorithm: 'HMAC-SHA256', user_id: USUARIO, issued_at: emitidoAhora() - 48 * 3600 })
+    expect((await POST_borrado(peticion('borrado', viejo))).status).toBe(400)
     expect(borrado).not.toHaveBeenCalled()
   })
 
