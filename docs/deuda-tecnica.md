@@ -478,3 +478,23 @@ usuario de Threads vive en la misma columna `meta_user_id` (son espacios de ids 
 así que compartir columna pide también mirar la red al filtrar) o en una propia. La página
 de estado y `solicitudes_borrado` sirven igual, que para eso `red` es una columna y no una
 constante.
+
+## Cambiar de zona horaria deja el historial de métricas en la zona vieja
+
+**Abierto desde 2026-09-30.**
+
+Cada snapshot de `post_metrics` y `account_metrics` lleva un `day`, y desde la entrega B
+del panel para terceros `sync.ts` lo escribe en la zona del dueño de la cuenta (con
+`ZONA_POR_DEFECTO` si la cuenta no tiene dueño), que es la misma zona con la que
+`getPostRows` y las series de Los Números lo leen. Mientras el dueño no cambie su zona,
+todo cuadra.
+
+Si la cambia en Tu Cuenta, los `day` ya escritos se quedan en la zona vieja y los nuevos
+salen en la nueva: cerca de la fecha del cambio una fila puede correrse un día en la
+serie —ni pérdida ni duplicación, un artefacto de un día, una sola vez—. No se avisa en
+Tu Cuenta a propósito: alarmaría por algo que casi nadie va a notar.
+
+Cerrarlo cuesta una de dos: reescribir los `day` del dueño al cambiar de zona (una
+migración de datos por usuario, dentro de `guardarCuenta`), o guardar el instante del
+snapshot y calcular el día al leer, que es un cambio de esquema y de todas las lecturas.
+

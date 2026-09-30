@@ -817,13 +817,13 @@ coincide con ninguno se acepta como nombre de red — resuelta solo si la fila t
 ### Métricas por API
 
 `GET /api/metrics/posts` con el mismo `Authorization: Bearer <SCHEDULE_API_KEY>`.
-Parámetros opcionales: `desde` y `hasta` (`YYYY-MM-DD` en la zona del sitio, ambos
+Parámetros opcionales: `desde` y `hasta` (`YYYY-MM-DD` en la zona horaria del dueño, la de Tu Cuenta; ambos
 inclusive; por defecto los últimos 30 días) y `red` (una de las conocidas).
 
 Devuelve `{ truncado, posts: [...] }` con una fila por publicación **publicada dentro
 del rango** — no por métrica movida en él: un video de agosto que crece en septiembre
 aparece en una consulta de agosto, no de septiembre. Cada fila trae red, `externalId`,
-permalink, texto, `publicadoEl` (ISO con offset del sitio), la etiqueta `?s=`, sus
+permalink, texto, `publicadoEl` (ISO con el offset de la zona del dueño), la etiqueta `?s=`, sus
 `atributos` (o `null` si el post no salió del calendario) y `metricas`: `views`
 (acumulado), `viewsGanadas` (dentro del rango), `likes`, `comentarios`, `compartidos`,
 `alcance`, `visitasAlSitio`, `clicks`, `ctr` y `arrastre`. Un `null` significa que la
@@ -836,7 +836,7 @@ números recién al día siguiente.
 ### Calendario por API
 
 `GET /api/schedule/posts` con el mismo `Authorization`. Parámetros opcionales `desde`
-y `hasta` (`YYYY-MM-DD` en la zona del sitio, ambos inclusive; por defecto de hoy a 30
+y `hasta` (`YYYY-MM-DD` en la zona horaria del dueño, la de Tu Cuenta; ambos inclusive; por defecto de hoy a 30
 días). Devuelve `{ desde, hasta, posts }` con lo programado cuya **hora de salida** cae
 en la ventana, salido o no: texto, `fecha` (ISO con offset), portada, media en orden,
 `atributos`, y por cada destino su estado (`scheduled`, `publishing`, `published`,
